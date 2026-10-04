@@ -2,7 +2,7 @@ const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
 let reasons = [];
-let isAdmin = false; // обновява се от wireAdminToggle() по-долу
+let isAdmin = false;
 
 function defaultReasons(){
   return [
@@ -35,7 +35,6 @@ const historyMonthInput = document.getElementById('historyMonth');
 historyMonthInput.value = currentMonthPrefix();
 historyMonthInput.addEventListener('change', renderHistory);
 
-/* ---------- дата и нощна смяна (същата логика като production-log) ---------- */
 
 function localDateStr(d){
   const y = d.getFullYear();
@@ -51,6 +50,7 @@ const yesterdayObj = new Date(now);
 yesterdayObj.setDate(yesterdayObj.getDate()-1);
 const yesterdayStr = localDateStr(yesterdayObj);
 
+// Match the production log's delayed night-shift reporting date.
 const effectiveHour = debugHour !== null ? parseInt(debugHour,10) : now.getHours();
 const isLikelyNightReport = effectiveHour < 10;
 dateInput.value = isLikelyNightReport ? yesterdayStr : todayStr;
@@ -70,20 +70,19 @@ dateInput.addEventListener('change', ()=>{
   renderDayTotal();
 });
 
-/* ---------- продължителност (начало/край, с преминаване през полунощ) ---------- */
 
 function timeToMin(t){
   const [h,m] = t.split(':').map(Number);
   return h*60+m;
 }
 
-// връща минути, или null ако часовете са невалидни/еднакви
+// Missing or equal times leave the duration unspecified; earlier end times wrap past midnight.
 function computeDuration(start, end){
   if(!start || !end) return null;
   const s = timeToMin(start), e = timeToMin(end);
   if(s === e) return null;
   let diff = e - s;
-  if(diff < 0) diff += 24*60; // преминава през полунощ
+  if(diff < 0) diff += 24*60;
   return diff;
 }
 
@@ -112,7 +111,6 @@ function updateDurationReadout(){
 startInput.addEventListener('input', updateDurationReadout);
 endInput.addEventListener('input', updateDurationReadout);
 
-/* ---------- избор на смяна ---------- */
 
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
   const btn = e.target.closest('.shift-btn');
@@ -132,7 +130,6 @@ function updateSaveEnabled(){
   saveBtn.textContent = ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
 }
 
-/* ---------- причини ---------- */
 
 reasonSelect.addEventListener('change', ()=>{
   otherReasonRow.style.display = (reasonSelect.value === 'Друго') ? 'flex' : 'none';
@@ -167,7 +164,7 @@ addReasonBtn.addEventListener('click', async ()=>{
     return;
   }
   if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  reasons.splice(reasons.length-1, 0, val); // преди "Друго"
+  reasons.splice(reasons.length-1, 0, val); // Keep the free-text reason as the final option.
   await sync.commitData();
   newReasonInput.value = '';
   render();
@@ -182,7 +179,6 @@ async function removeReason(r){
   render();
 }
 
-/* ---------- file sync (споделен модул, виж js/file-sync.js) ---------- */
 
 const sync = createFileSync({
   dbName: 'portfolio-downtime-fs-db',
@@ -221,7 +217,6 @@ wireAdminToggle(document.getElementById('adminToggleBtn'), (admin)=>{
   render();
 });
 
-/* ---------- запис ---------- */
 
 saveBtn.addEventListener('click', async ()=>{
   const dur = computeDuration(startInput.value, endInput.value);
@@ -276,7 +271,6 @@ async function deleteEntry(id){
   render();
 }
 
-/* ---------- рендериране ---------- */
 
 function fmtDate(d){
   const [y,m,day] = d.split('-');

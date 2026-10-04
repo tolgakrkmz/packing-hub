@@ -189,9 +189,7 @@ function clamp(v, min, max) {
   );
 }
 
-/* ================================================================
-   FILE SYNC
-================================================================ */
+/* File connections */
 
 const sync = createFileSync({
   dbName: 'portfolio-tonnage-fs-db',
@@ -401,9 +399,7 @@ el.lockedAdminBtn.addEventListener(
       .click()
 );
 
-/* ================================================================
-   CONTROLS
-================================================================ */
+/* Dashboard controls */
 
 document
   .querySelectorAll(
@@ -471,9 +467,7 @@ el.lineShiftMonthSelect.addEventListener(
 
 
 
-/* ================================================================
-   BASIC AGGREGATION
-================================================================ */
+/* Production aggregation */
 
 function getAvailableYears() {
   return Array.from(
@@ -681,9 +675,7 @@ function aggregateByYear() {
     });
 }
 
-/* ================================================================
-   MONTH SELECTORS
-================================================================ */
+/* Month selection */
 
 function populateMonthSelectors() {
   if (!selectedYear) {
@@ -806,9 +798,7 @@ function populateMonthSelectors() {
   }
 }
 
-/* ================================================================
-   MONTHLY ADMIN DASHBOARD
-================================================================ */
+/* Monthly production result */
 
 function getMonthlyDashboardData() {
   if (
@@ -2102,9 +2092,7 @@ function renderMonthlyTrendChart(
   );
 }
 
-/* ================================================================
-   AVARII
-================================================================ */
+/* Downtime aggregation */
 
 function aggregateAvByMonth(
   year
@@ -2465,9 +2453,7 @@ function renderAvTable(
     html;
 }
 
-/* ================================================================
-   EXISTING STACKED CHART
-================================================================ */
+/* Production charts and tables */
 
 function renderStackedBarChart(
   container,
@@ -2943,14 +2929,9 @@ function renderKpis(
 }
 
 
-/* ================================================================
-   WORKFORCE CAPACITY
-   - Production headcount = active Automatic + Manual.
-   - Stickers are supporting headcount and are not included in t/person-shift.
-   - Capacity model assumes 3 operating shifts/day in the 4-team rotation.
-   - Historical months use today's active roster because roster snapshots
-     by date are not stored yet.
-================================================================ */
+/* Workforce capacity assumes three operating shifts per day. Stickers are
+ * excluded from production headcount. Historical periods use the current roster
+ * because dated roster snapshots are not available. */
 
 const WF_TEAMS = ['А','Б','В','Г'];
 const WF_ROT_PATTERN = [3,3,3,3,'Н',2,2,2,2,'Н',1,1,1,1,'Н','Н'];
@@ -3117,10 +3098,8 @@ function aggregateWorkforceMonth(counts) {
 function workforceScenario(monthData, counts) {
   if (!monthData || !counts || !counts.productionTotal) return null;
 
-  // Всички входни стойности са автоматични:
-  // - целта идва от production-log.json (същата „Месечна цел“ от Тонаж и брак);
-  // - резервът е броят хора в „Допълнителни“ от Personnel / Shift;
-  // - производителността се изчислява от реалния тонаж за периода / активен производствен щат / календарни дни.
+  // Use the production goal and reserve headcount from their source files.
+  // Productivity is output divided by active production headcount and calendar days.
   const target = Math.max(0, Number(goalTons) || 0);
   const reservePeople = Math.max(0, Number(counts.additional) || 0);
   const reservePct = counts.productionTotal > 0
@@ -3343,9 +3322,7 @@ function renderWorkforceDashboard() {
   renderWorkforceCapacityChart(monthData, counts, scenario);
 }
 
-/* ================================================================
-   LINE / SHIFT
-================================================================ */
+/* Line and shift breakdown */
 
 function aggregateLineByShift(
   scopeEntries
@@ -3619,9 +3596,7 @@ function renderLineShiftTable(
     html;
 }
 
-/* ================================================================
-   MAIN RENDER
-================================================================ */
+/* Dashboard rendering */
 
 function renderAll() {
   if (

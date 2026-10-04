@@ -1,14 +1,8 @@
-/* ============================================================
-   line-downtime.css — стилове само за line-downtime.html
-   (общите неща — цветове, .panel, .conn-*, header — са в theme.css)
-   ============================================================ */
-
 body{ padding:24px 16px 60px; }
 .wrap{max-width:760px;margin:0 auto;}
 header h1{letter-spacing:.2px;}
 .head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
 
-/* shift selector — идентично на production-log */
 .shift-grid{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -74,7 +68,6 @@ header h1{letter-spacing:.2px;}
 .save-btn:disabled{background:var(--border);color:var(--text-muted);cursor:not-allowed;}
 .msg{font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px;min-height:16px;}
 
-/* daily total */
 .day-card{
   display:flex;justify-content:space-between;align-items:center;
   background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
@@ -84,7 +77,6 @@ header h1{letter-spacing:.2px;}
 .day-card .lab b{color:var(--text);font-weight:700;}
 .day-card .val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:22px;font-weight:700;}
 
-/* summary по смени */
 .summary-grid{
   display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
 }
@@ -100,7 +92,6 @@ header h1{letter-spacing:.2px;}
 .sum-В .lab{color:var(--teal);} .sum-Г .lab{color:var(--coral);}
 .sum-СТИКЕРИ .lab{color:var(--purple);font-size:9px;}
 
-/* причини — хоризонтални барове */
 .reason-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;}
 .reason-row:last-child{margin-bottom:0;}
 .reason-row .lab{flex:0 0 170px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -108,7 +99,6 @@ header h1{letter-spacing:.2px;}
 .reason-row .bar-fill{height:100%;background:var(--pink);border-radius:5px;}
 .reason-row .val{flex:0 0 64px;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
 
-/* admin: списък с причини */
 .reason-chip{
   display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);
   border:1px solid var(--border);border-radius:999px;padding:5px 6px 5px 12px;
@@ -120,7 +110,6 @@ header h1{letter-spacing:.2px;}
 }
 .reason-chip button:hover{color:var(--red);}
 
-/* история */
 .history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
 .history-head h2{margin:0;}
 .history-filter{display:flex;align-items:center;gap:8px;}

@@ -2,7 +2,7 @@ const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
 let goalTons = 3000;
-let isAdmin = false; // обновява се от wireAdminToggle() по-долу
+let isAdmin = false;
 
 const dateInput = document.getElementById('dateInput');
 const tonInput = document.getElementById('tonInput');
@@ -42,15 +42,15 @@ function localDateStr(d){
 }
 
 const now = new Date();
-// ВРЕМЕННО ЗА ТЕСТ — маха се след проверка
+// Allow an hour override to verify reporting-date boundaries.
 const debugHour = new URLSearchParams(location.search).get('testHour');
 const todayStr = localDateStr(now);
 const yesterdayObj = new Date(now);
 yesterdayObj.setDate(yesterdayObj.getDate()-1);
 const yesterdayStr = localDateStr(yesterdayObj);
 
-// Между полунощ и 10ч сутринта приемаме, че е закъснял отчет
-// от НОЩНАТА смяна (22:00–06:00) — тя принадлежи на вчерашния ден.
+/* Default reports entered before 10:00 to the previous production day
+ * to allow delayed night-shift reporting. */
 const effectiveHour = debugHour !== null ? parseInt(debugHour,10) : now.getHours();
 const isLikelyNightReport = effectiveHour < 10;
 dateInput.value = isLikelyNightReport ? yesterdayStr : todayStr;
@@ -113,7 +113,6 @@ function fmt(n){
   return Math.round(n).toLocaleString('bg-BG');
 }
 
-/* ---------- file sync (shared module, see js/file-sync.js) ---------- */
 const sync = createFileSync({
   dbName: 'portfolio-tonnage-fs-db',
   suggestedFileName: 'production-log.json',
@@ -144,8 +143,6 @@ const sync = createFileSync({
   }
 });
 
-// Admin режим — споделен с останалите инструменти в хъба (виж js/file-sync.js).
-// Не-admin потребители могат да записват смени, но не виждат бутона за изтриване.
 wireAdminToggle(document.getElementById('adminToggleBtn'), (admin) => {
   isAdmin = admin;
   render();
@@ -264,7 +261,7 @@ saveBtn.addEventListener('click', async ()=>{
 });
 
 async function deleteEntry(id){
-  if(!isAdmin) return; // допълнителна преграда — не само UI скриване
+  if(!isAdmin) return;
   if(sync.fileHandle){ await sync.refreshFromDisk(); }
   entries = entries.filter(e=>e.id !== id);
   await sync.commitData();
@@ -288,7 +285,7 @@ grid.innerHTML = SHIFTS.map(s=>{
     + '</div>';
 }).join('');
 
-  // История по месеци, най-новите първо. Запазваме разгънатите секции при опресняване.
+  // Preserve expanded history groups during automatic refreshes.
   const wrap = document.getElementById('historyWrap');
   const monthOpenStates = new Map(Array.from(wrap.querySelectorAll('.history-month'), section=>[
     section.dataset.month, section.open
@@ -330,7 +327,6 @@ grid.innerHTML = SHIFTS.map(s=>{
           + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
           + '</td></tr>';
       }
-      // Бутонът за изтриване се показва само в admin режим
       const delCell = isAdmin
         ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
         : '<td></td>';

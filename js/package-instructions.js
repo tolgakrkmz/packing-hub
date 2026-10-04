@@ -67,8 +67,7 @@ function categoryBadgeHtml(category) {
   return '<span class="cat-badge cat-none">Некатегоризиран</span>';
 }
 
-// Използва се при bulk импорт И при първоначално разпознаване на папките —
-// генерира уникален вътрешен идентификатор, когато няма (или не е разпознат) номер.
+// Generate an internal identifier when a profile number is unavailable.
 function generateUniqueFallbackNumber() {
   let candidate;
   do {
@@ -102,10 +101,6 @@ const sync = createDirectorySync({
 
 sync.init();
 
-// Безопасен запис: винаги чете НАЙ-АКТУАЛНОТО от диска непосредствено преди запис,
-// прилага промяната върху него (не върху евентуално остарялото копие в паметта),
-// и чак тогава записва. Това силно смалява прозореца, в който двама души,
-// работещи едновременно от различни компютри, биха презаписали промените си взаимно.
 async function readIndexFromDisk() {
   try {
     const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
@@ -119,6 +114,8 @@ async function readIndexFromDisk() {
   }
 }
 
+// Reload the index before applying an edit to reduce stale overwrites.
+// This read/modify/write sequence is not atomic across multiple writers.
 async function updateIndexOnDisk(mutatorFn) {
   if (!rootDirHandle) return;
   const latest = await readIndexFromDisk();
@@ -135,19 +132,17 @@ async function updateIndexOnDisk(mutatorFn) {
     throw err;
   }
 
-  dbIndex = latest; // локалната памет вече е синхронизирана с реално записаното
+  dbIndex = latest;
 }
 
-// Запазена за съвместимост там, където просто искаме да запишем текущия dbIndex както е.
-// НЕ Я използвай за единични промени — предпочитай updateIndexOnDisk(), за да избегнеш
-// презаписване на промени от друг компютър.
+/* Merge the full in-memory index into the latest disk data. Stale local
+ * records can still overwrite concurrent edits; scoped mutations are preferable. */
 async function saveIndexDatabase() {
   await updateIndexOnDisk((latest) => {
     Object.assign(latest, dbIndex);
   });
 }
 
-// Навигира до подпапка по релативен път, който може да съдържа '/'
 async function resolveNestedDirHandle(baseHandle, relativePath, create) {
   const parts = String(relativePath).split('/').filter(Boolean);
   let handle = baseHandle;
@@ -163,11 +158,7 @@ async function getProfileFolderHandle(folderName) {
   return resolveNestedDirHandle(profilesDir, folderName, false);
 }
 
-// ------------------------------------------------------------------
-// АВТОМАТИЧНО РАЗПОЗНАВАНЕ ПРИ ПЪРВО СВЪРЗВАНЕ (ако няма index файл)
-// ------------------------------------------------------------------
-// Прескача през data/profiles по същата двустепенна логика като bulk импорта
-// и построява целия dbIndex от нулата — без да изисква номер за никой профил.
+// Rebuild the index from existing profile folders when no index is available.
 async function rebuildIndexFromFolders() {
   const freshIndex = {};
   if (!rootDirHandle) return freshIndex;
@@ -259,8 +250,7 @@ function renderThumbs() {
   });
 }
 
-// Save profile to folder — единично добавяне: номерът тук ОСТАВА като идентификатор,
-// но ако е празен, ще му се генерира автоматичен (вместо да блокираме записа).
+// Retain supplied profile numbers; generate an identifier when none is supplied.
 el.saveBtn.addEventListener('click', async () => {
   let number = el.numberInput.value.trim();
   const name = el.nameInput.value.trim();
@@ -336,9 +326,6 @@ el.saveBtn.addEventListener('click', async () => {
   }
 });
 
-// ------------------------------------------------------------------
-// Търсене и показване на резултати (основно по ИМЕ/КЛИЕНТ, номерът е вторичен)
-// ------------------------------------------------------------------
 
 el.searchInput.addEventListener('input', () => {
   renderSearch();
@@ -377,7 +364,7 @@ function getFilteredProfiles() {
     const name = String(profile.name || '').toLowerCase();
     const client = String(profile.client || '').toLowerCase();
     const number = String(profile.number || '').toLowerCase();
-    // Претегляме по име/клиент — номерът остава само допълнително съвпадение
+    // Rank name and customer matches above profile-number matches.
     return name.includes(query) || client.includes(query) || number.includes(query);
   });
 }
@@ -575,9 +562,6 @@ el.lightbox.addEventListener('click', (e) => {
   if (e.target === el.lightbox) el.lightbox.classList.remove('open');
 });
 
-// ------------------------------------------------------------------
-// BULK ИМПОРТ — разпознаване на съществуващи папки и масово добавяне
-// ------------------------------------------------------------------
 
 const bulkEl = {
   bulkBtn: document.getElementById('bulkBtn'),
@@ -591,8 +575,7 @@ const bulkEl = {
   bulkSelectAll: document.getElementById('bulkSelectAll')
 };
 
-// Сега 'el' и 'bulkEl' вече съществуват — безопасно е да закачим admin режима.
-// isAdminMode() / wireAdminToggle() идват от js/file-sync.js (споделени).
+// Initialize the admin UI after both control groups exist.
 wireAdminToggle(document.getElementById('adminToggleBtn'), applyPackageInstructionsAdminUI);
 
 let bulkCandidates = [];
@@ -619,7 +602,7 @@ async function inspectFolderDirect(handle) {
     const txtHandle = await handle.getFileHandle('instruction.txt');
     const file = await txtHandle.getFile();
     instructionText = await file.text();
-  } catch (e) { /* няма instruction.txt — ОК */ }
+  } catch (e) { /* An instruction file is optional when inspecting an existing profile folder. */ }
 
   const files = [];
   for await (const [fname, fhandle] of handle.entries()) {
@@ -815,8 +798,6 @@ bulkEl.bulkSelectAll.addEventListener('change', (e) => {
   bulkEl.bulkResults.querySelectorAll('.bulk-check').forEach(cb => { cb.checked = e.target.checked; });
 });
 
-// Импортиране — номерът вече НЕ Е задължителен. Ако е празен, всеки избран
-// кандидат получава автоматично генериран уникален идентификатор.
 bulkEl.bulkImportBtn.addEventListener('click', async () => {
   const checkedIdxs = Array.from(bulkEl.bulkResults.querySelectorAll('.bulk-check:checked'))
     .map(cb => parseInt(cb.dataset.idx, 10));

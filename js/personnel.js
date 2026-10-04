@@ -1,9 +1,5 @@
-/* ============================================================
-   Personnel / Shift Dashboard — schema v3
-   Един човек = един запис. Броят по участък/екип се изчислява
-   само от active:true. Стикери са една смяна.
-   Ролите са фиксирани по участък и се избират от списък.
-   ============================================================ */
+/* Personnel schema v3: one record per person, active-only headcounts,
+ * a single stickers shift, and category-specific role options. */
 
 const SCHEMA_VERSION = 3;
 const CATS = [
@@ -64,8 +60,7 @@ function normalizeRole(category, role, name=''){
   if(exact) return exact;
 
   if(category==='stickers'){
-    // Legacy data used role "стикери" for everyone. Initial assignment:
-    // Demo migration defaults to the packing operator role.
+    // Normalize legacy stickers roles to the supported role options.
     return 'Опаковчик';
   }
   if(category==='manual'){
@@ -113,8 +108,7 @@ function loadIncomingData(data, allowMigration){
   const src=data && typeof data==='object' ? data : {};
   const version=Number(src.schemaVersion||1);
 
-  // v1 е старият roster отпреди Personnel dashboard. Както при v2,
-  // използваме одобрения seed и пазим историята.
+  // Replace pre-dashboard rosters with the initial roster while retaining history.
   if(version < 2 && allowMigration){
     employees=deepClone(DEFAULT_EMPLOYEES);
     settings=deepClone(DEFAULT_PERSONNEL_SETTINGS);
@@ -130,8 +124,7 @@ function loadIncomingData(data, allowMigration){
     return true;
   }
 
-  // v2 -> v3 запазва текущите хора и промени, но нормализира:
-  // Стикери = 1 смяна и ролите = фиксираните стойности.
+  // Preserve existing records while normalizing teams and category-specific roles.
   employees=src.employees.map(normalizeEmployee).filter(p=>p.id && p.name);
   settings=normalizeSettings(src.settings);
   moveLog=Array.isArray(src.moveLog) ? src.moveLog : [];
@@ -142,7 +135,6 @@ function loadIncomingData(data, allowMigration){
   return version !== SCHEMA_VERSION;
 }
 
-/* ---------- rotation formula (unchanged) ---------- */
 const SHIFT_LABELS = ShiftSchedule.LABELS;
 const WEEKDAYS_SHORT = ['пн','вт','ср','чт','пт','сб','нд'];
 function shiftCodeFor(team,dateObj){
@@ -153,7 +145,6 @@ function parseLocalDate(str){
   return new Date(y,m-1,d);
 }
 
-/* ---------- file sync ---------- */
 const sync = createFileSync({
   dbName:'portfolio-personnel-fs-db',
   suggestedFileName:'personnel.json',
@@ -179,7 +170,6 @@ const sync = createFileSync({
   }
 });
 
-/* ---------- admin gate ---------- */
 function applyAdminGate(admin){
   document.getElementById('lockedBox').style.display=admin?'none':'block';
   document.getElementById('hubContent').style.display=admin?'block':'none';
@@ -190,7 +180,6 @@ wireAdminToggle(document.getElementById('adminToggleBtn'),applyAdminGate);
 const lockedAdminBtn=document.getElementById('lockedAdminBtn');
 if(lockedAdminBtn){ lockedAdminBtn.addEventListener('click',()=>document.getElementById('adminToggleBtn').click()); }
 
-/* ---------- counts ---------- */
 function activePeople(category=null,team=null){
   return employees.filter(p=>p.active && (!category || p.category===category) && (!team || p.team===team));
 }
@@ -243,7 +232,6 @@ function renderSummary(){
   document.getElementById('summaryGrid').innerHTML=html;
 }
 
-/* ---------- today ---------- */
 const todayDateInput=document.getElementById('todayDate');
 todayDateInput.value=localISODate();
 todayDateInput.addEventListener('change',renderToday);
@@ -278,7 +266,6 @@ function renderToday(){
     <span class="badge team-1_смяна">1 смяна — ${stickers} души</span>`;
 }
 
-/* ---------- monthly rotation (div grid, no table) ---------- */
 const monthNames=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
 const schedMonth=document.getElementById('schedMonth');
 const schedYear=document.getElementById('schedYear');
@@ -312,7 +299,6 @@ function renderSchedule(){
   document.getElementById('schedWrap').innerHTML=`<div class="schedule-shell">${head}${rows}</div>`;
 }
 
-/* ---------- people dashboard ---------- */
 function roleRank(p){
   const list=ROLE_OPTIONS[p.category] || ROLE_OPTIONS.auto;
   const idx=list.indexOf(p.role);
@@ -381,7 +367,6 @@ function renderPeople(){
   document.querySelectorAll('[data-edit-person]').forEach(btn=>btn.addEventListener('click',()=>openPersonModal(btn.dataset.editPerson)));
 }
 
-/* ---------- person modal ---------- */
 const personModal=document.getElementById('personModal');
 const personForm=document.getElementById('personForm');
 const personCategory=document.getElementById('personCategory');
@@ -468,7 +453,6 @@ personForm.addEventListener('submit',async e=>{
   showToast(id?'Промяната е записана.':'Човекът е добавен.');
 });
 
-/* ---------- settings modal ---------- */
 const settingsModal=document.getElementById('settingsModal');
 document.getElementById('settingsBtn').addEventListener('click',()=>{
   document.getElementById('stickersStage1').value=settings.stickersStage1;
@@ -487,7 +471,6 @@ document.getElementById('settingsForm').addEventListener('submit',async e=>{
   showToast('Настройките са записани.');
 });
 
-/* ---------- history ---------- */
 function renderLog(){
   const el=document.getElementById('logList');
   if(!moveLog.length){ el.innerHTML='<div class="empty">Все още няма промени.</div>'; return; }
@@ -496,7 +479,7 @@ function renderLog(){
     if(m.type==='settings') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>Настройки:</b> ${escapeHTML(m.detail||'')}</span></div>`;
     if(m.type==='create') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name)}</b> — добавен → ${escapeHTML(m.to||'')}</span></div>`;
     if(m.type==='update') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name)}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}${m.detail?' · '+escapeHTML(m.detail):''}</span></div>`;
-    // Backward compatibility with v1 logs: {date,name,from,to}
+    // Accept the legacy history shape: {date, name, from, to}.
     return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name||'')}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}</span></div>`;
   }).join('');
 }

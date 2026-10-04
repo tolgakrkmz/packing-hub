@@ -1,13 +1,9 @@
-/* ============================================================
-   file-sync.js — Shared logic for File System Access API
-   Contains both single-file sync and directory sync logic.
-   Existing IndexedDB names and localStorage keys are stable identifiers;
-   keep them when renaming module files so saved connections remain available.
-   ============================================================ */
+/* Shared file and directory access. Keep browser storage identifiers stable
+ * when renaming modules so existing file connections remain available. */
 
 const connectionPanels = new WeakMap();
 
-// Един панел може да съдържа няколко независими файла (например в статистиките).
+// Collapse a shared connection panel only when all of its files are connected.
 function registerConnectionPanel(connDot){
   const panel = connDot.closest('#connPanel');
   if(!panel) return ()=>{};
@@ -40,7 +36,7 @@ function registerConnectionPanel(connDot){
     label.appendChild(toggle);
     head.appendChild(label);
 
-    // Входът и изходът остават достъпни и при свит панел.
+    // Keep login controls accessible when the connection panel is collapsed.
     const actions = document.createElement('div');
     actions.className = 'conn-panel-actions';
     body.querySelectorAll('#adminToggleBtn, #roleToggleBtn').forEach(button=>{
@@ -228,10 +224,6 @@ function createFileSync(cfg){
     });
   }
 
-  // ПОПРАВЕНО: преди това ползваше несъществуваща променлива 'saved' и никога
-  // не стигаше до реалния reconnect опит — при всяко изтекло разрешение падаше
-  // директно в catch и връщаше целия "Отвори файл" диалог отначало.
-  // fileHandle вече е наличен тук (init() го подготвя, преди да покаже бутона).
   el.reconnectBtn.addEventListener('click', async ()=>{
     try{
       const perm = await fileHandle.requestPermission({ mode: accessMode });
@@ -329,10 +321,7 @@ function createFileSync(cfg){
   };
 }
 
-/* ============================================================
-   Directory Sync — New logic for Package Instructions
-   Requests permission for a full directory instead of a file.
-   ============================================================ */
+/* Directory access for packing instructions and their local assets. */
 
 function createDirectorySync(cfg){
   const {
@@ -399,7 +388,6 @@ function createDirectorySync(cfg){
     await idbSet('mainDir', handle);
     const data = await readIndexData();
 
-    // Pass both the loaded JSON data and the root folder handle to the module
     await onConnect(data, handle);
     render();
 
@@ -420,7 +408,6 @@ function createDirectorySync(cfg){
     }
   });
 
-  // Not needed for directory structure
   if(el.createFileBtn) el.createFileBtn.style.display = 'none';
 
   el.reconnectBtn.addEventListener('click', async ()=>{
@@ -459,7 +446,6 @@ function createDirectorySync(cfg){
       }catch(e){}
     }
     setConn('off', 'Все още не сте свързани с основната мрежова папка.');
-    // Keep button label accurate
     el.openFileBtn.textContent = "Избери основна папка";
     render();
   }
@@ -471,17 +457,8 @@ function createDirectorySync(cfg){
   };
 }
 
-/* ============================================================
-   Admin Mode — споделена UI бариера за ВСИЧКИ инструменти в хъба.
-   НЕ Е истинска защита (само клиентска страна, без сървър) — просто
-   пази от случайно/непреднамерено добавяне, bulk импорт или триене
-   от хора, които не би трябвало да пипат тези операции.
-   Входът важи, докато е отворен браузърът (sessionStorage) —
-   при затваряне на браузъра (всички прозорци) admin режимът
-   автоматично излиза, за да не остане включен на чужд компютър.
-   Затваряне само на таба и връщане към него в СЪЩИЯ отворен
-   браузър обичайно пази сесията; пълно затваряне на браузъра — не.
-   ============================================================ */
+/* Admin mode is a browser UI gate, not an authorization boundary.
+ * Its session is stored in sessionStorage. */
 
 const ADMIN_STORAGE_KEY = 'portfolioHubAdminMode';
 const ADMIN_PASSWORD = 'demo-admin';
@@ -490,9 +467,7 @@ function isAdminMode(){
   return sessionStorage.getItem(ADMIN_STORAGE_KEY) === 'true';
 }
 
-// buttonEl: бутонът "🔒 Admin" на съответната страница.
-// onChange(isAdmin): извиква се веднага при wire-ване и при всяка промяна,
-// за да могат страниците да показват/скриват каквото им трябва.
+// Notify the caller during initialization and whenever admin mode changes.
 function wireAdminToggle(buttonEl, onChange){
   if(!buttonEl) return;
 
@@ -509,7 +484,7 @@ function wireAdminToggle(buttonEl, onChange){
       return;
     }
     const pass = prompt('Admin парола:');
-    if(pass === null) return; // отказал е диалога
+    if(pass === null) return;
     if(pass === ADMIN_PASSWORD){
       sessionStorage.setItem(ADMIN_STORAGE_KEY, 'true');
       refresh();
@@ -521,18 +496,8 @@ function wireAdminToggle(buttonEl, onChange){
   refresh();
 }
 
-/* ============================================================
-   Legacy Role Login — запазени помощни функции за вход по роля.
-   Разширява admin бариерата с по-фина роля: началник на смяна.
-   Един и същ вход (парола) разпознава дали е Admin (мениджър —
-   вижда и сверява всички смени) или началник на конкретна смяна
-   (вижда и въвежда само за своя екип). Паролите са отделни за
-   всяка смяна, за да не могат смените да влизат в чужди данни.
-   Входът е в sessionStorage — излиза автоматично при затваряне
-   на браузъра, за да не остане включен на чужд компютър.
-
-   ВАЖНО: смени паролите тук преди реално ползване във фабриката.
-   ============================================================ */
+/* Legacy role helpers retained for compatibility. Browser role state
+ * controls the interface; file permissions are enforced by the browser and OS. */
 
 const SHIFT_TEAMS = ['А', 'Б', 'В', 'Г', 'СТИКЕРИ'];
 
@@ -540,7 +505,6 @@ const SHIFT_PASSWORDS = {}; // Role login is unused in this demo.
 
 const ROLE_STORAGE_KEY = 'portfolioHubRole';
 
-// Връща null (не е влязъл) или { type: 'admin' } или { type: 'shift', team: 'А' }
 function getCurrentRole(){
   try{
     const raw = sessionStorage.getItem(ROLE_STORAGE_KEY);
@@ -556,9 +520,7 @@ function clearCurrentRole(){
   sessionStorage.removeItem(ROLE_STORAGE_KEY);
 }
 
-// buttonEl: бутонът за вход/изход.
-// onChange(role): извиква се веднага при wire-ване и при всяка промяна на ролята.
-// role е null, {type:'admin'} или {type:'shift', team:'...'}
+// Notify the caller during initialization and whenever the role changes.
 function wireRoleLogin(buttonEl, onChange){
   if(!buttonEl) return;
 

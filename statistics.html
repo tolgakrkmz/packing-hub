@@ -7,8 +7,7 @@
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/pair-targets-statistics.css">
 <link rel="stylesheet" href="css/statistics-navigation.css">
-<style>
-body{padding:24px 16px 60px;}
+<style>body{padding:24px 16px 60px;}
 .wrap{max-width:1100px;margin:0 auto;}
 
 .locked-box{text-align:center;padding:60px 20px;color:var(--text-muted);}
@@ -26,7 +25,6 @@ body{padding:24px 16px 60px;}
 .year-select-row select,.dashboard-select{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;}
 .year-select-row select:focus,.dashboard-select:focus{border-color:var(--purple);}
 
-/* ===================== MONTHLY HERO ===================== */
 .month-dashboard{position:relative;overflow:hidden;border:1px solid #343945;border-radius:16px;margin-bottom:20px;background:
   radial-gradient(circle at 12% 0%,rgba(155,123,209,.18),transparent 34%),
   radial-gradient(circle at 92% 16%,rgba(63,191,160,.10),transparent 30%),
@@ -93,7 +91,6 @@ body{padding:24px 16px 60px;}
 @keyframes drawLine{to{stroke-dashoffset:0;}}
 @keyframes fadeArea{to{opacity:1;}}
 
-/* ===================== EXISTING STATS ===================== */
 .chart-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px;overflow-x:auto;}
 .chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-muted);}
 .chart-legend span{display:inline-flex;align-items:center;gap:5px;}
@@ -106,7 +103,6 @@ body{padding:24px 16px 60px;}
 .stats-table tr:last-child td{border-bottom:none;}
 .stats-table tr.total-row td{font-weight:700;color:var(--text);border-top:2px solid var(--border);}
 
-/* Причините остават свити; записите се отварят само при нужда. */
 .stats-table .av-reasons-row td{padding:0 10px 9px;}
 .av-reasons{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);}
 .av-reasons summary,.av-reason-group summary{display:flex;align-items:baseline;gap:8px;cursor:pointer;list-style:none;padding:8px 10px;}
@@ -166,7 +162,6 @@ body{padding:24px 16px 60px;}
 }
 
 
-/* ===================== WORKFORCE CAPACITY ===================== */
 .workforce-dashboard{position:relative;overflow:hidden;margin:0 0 20px;border:1px solid #343945;border-radius:16px;background:
   radial-gradient(circle at 8% 0%,rgba(63,191,160,.13),transparent 30%),
   radial-gradient(circle at 96% 6%,rgba(155,123,209,.14),transparent 32%),
@@ -298,7 +293,6 @@ body{padding:24px 16px 60px;}
 
   <div id="statsContent" style="display:none;">
 
-    <!-- МЕСЕЧЕН ADMIN DASHBOARD -->
     <section class="month-dashboard" id="monthDashboard">
       <div class="dashboard-top">
         <div>
@@ -412,7 +406,6 @@ body{padding:24px 16px 60px;}
     </div>
 
     <div class="stats-section" id="statsWorkforce" data-stats-panel="workforce" role="tabpanel" aria-labelledby="statsTabWorkforce" hidden>
-    <!-- WORKFORCE CAPACITY -->
     <section class="workforce-dashboard" id="workforceDashboard">
       <div class="wf-head">
         <div>

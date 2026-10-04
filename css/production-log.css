@@ -1,13 +1,7 @@
-/* ============================================================
-   production-log.css — стилове само за production-log.html
-   (общите неща — цветове, .panel, .conn-*, header — са в theme.css)
-   ============================================================ */
-
 body{ padding:24px 16px 60px; }
 .wrap{max-width:760px;margin:0 auto;}
 header h1{letter-spacing:.2px;}
 
-/* shift selector */
 .shift-grid{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -77,7 +71,6 @@ header h1{letter-spacing:.2px;}
 .save-btn:disabled{background:var(--border);color:var(--text-muted);cursor:not-allowed;}
 .msg{font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px;min-height:16px;}
 
-/* summary */
 .summary-grid{
   display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
 }
@@ -93,7 +86,6 @@ header h1{letter-spacing:.2px;}
 .sum-В .lab{color:var(--teal);} .sum-Г .lab{color:var(--coral);}
 .sum-СТИКЕРИ .lab{color:var(--purple);font-size:9px;}
 
-/* history */
 .history-hint{font-size:12px;color:var(--text-muted);margin:0 0 12px;}
 .history-month{
   border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px;
@@ -137,7 +129,6 @@ tbody tr:last-child td{border-bottom:none;}
 .del-btn:hover{color:var(--red);}
 .note{font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5;}
 
-/* daily total */
 .day-card{
   display:flex;justify-content:space-between;align-items:center;
   background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
@@ -147,7 +138,6 @@ tbody tr:last-child td{border-bottom:none;}
 .day-card .lab b{color:var(--text);font-weight:700;}
 .day-card .val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:22px;font-weight:700;}
 
-/* monthly goal */
 .goal-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
 .goal-edit{display:flex;align-items:center;gap:6px;}
 .goal-edit label{font-size:12px;color:var(--text-muted);}
@@ -172,7 +162,6 @@ tbody tr:last-child td{border-bottom:none;}
 .status-bad{background:#331414;border-color:var(--red);color:var(--text);}
 .status-done{background:var(--teal-dark);border-color:var(--teal);color:var(--text);}
 
-/* breakdown */
 .toggle-row{
   display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--text);
   margin-bottom:14px;
