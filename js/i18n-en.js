@@ -793,5 +793,7 @@ const HUB_EN_MESSAGES = {
   "Първо свържете валиден файл. Записът не е направен.": "Connect a valid file first. Nothing was saved.",
   "Файлът вече съдържа данни. Използвайте „Отвори файл“.": "This file already contains data. Use “Open file”.",
   "Създай нов индекс": "Create new index",
+  "Заредете състава от файл": "Load personnel from a file",
+  "Изберете файла с хората или създайте нов празен файл. Съставът се пази само в избрания файл.": "Select your personnel file or create a new empty file. The roster is stored only in the selected file.",
   "Инструкции за опаковка": "Packing instructions"
 };

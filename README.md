@@ -52,6 +52,11 @@ module; supported older personnel formats retain their existing records. Opening
 a personnel file or packing index does not rewrite it. New files and indexes
 require an explicit create action, which refuses to replace existing content.
 
+Personnel starts without a roster and asks you to select a file. Only people from
+that file appear; creating a new file starts with an empty roster. Adding people
+and changing settings requires a valid connection. The bundled fictional roster
+is available by opening `data/personnel.json`.
+
 ## Technical choices
 
 - Plain scripts support opening the project through `file://` without module CORS issues.

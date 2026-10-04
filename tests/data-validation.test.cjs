@@ -45,8 +45,10 @@ test('parsing errors contain fixed messages without any file content',()=>{
 });
 test('personnel migration retains historical people and intentionally empty rosters',()=>{
   const source=fs.readFileSync(path.join(root,'js/personnel.js'),'utf8').split('const sync = createFileSync')[0];
-  vm.runInContext('const DEFAULT_EMPLOYEES = [{id:"demo-seed",name:"Demo Seed"}]; const DEFAULT_PERSONNEL_SETTINGS = {stickersStage1:1,stickersStage2:1};',sandbox);
+  vm.runInContext('const DEFAULT_EMPLOYEES = [{id:"demo-seed",name:"Demo Seed"}];',sandbox);
   vm.runInContext(source,sandbox);
+  assert.equal(vm.runInContext('employees.length',sandbox),0);
+  assert.equal(vm.runInContext('createDefaultData().employees.length',sandbox),0);
   sandbox.legacy={schemaVersion:1,employees:[person],moveLog:[{type:'update',detail:'Demo history'}]};
   vm.runInContext('loadIncomingData(legacy,true)',sandbox);
   assert.equal(vm.runInContext('employees[0].id',sandbox),'demo-person');

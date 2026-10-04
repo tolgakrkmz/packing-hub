@@ -16,7 +16,9 @@ const ROLE_OPTIONS = {
   stickers:['Началник смяна','Опаковчик']
 };
 
-let employees = deepClone(DEFAULT_EMPLOYEES);
+const DEFAULT_PERSONNEL_SETTINGS = {stickersStage1:4,stickersStage2:6};
+let employees = [];
+let personnelLoaded = false;
 let settings = Object.assign({}, DEFAULT_PERSONNEL_SETTINGS);
 let moveLog = [];
 let activeFilter = 'all';
@@ -95,7 +97,7 @@ function normalizeEmployee(p){
 function createDefaultData(){
   return {
     schemaVersion:SCHEMA_VERSION,
-    employees:deepClone(DEFAULT_EMPLOYEES),
+    employees:[],
     settings:deepClone(DEFAULT_PERSONNEL_SETTINGS),
     moveLog:[]
   };
@@ -106,6 +108,7 @@ function addLog(entry){
 }
 function loadIncomingData(data, allowMigration){
   const src=HubDataValidation.validate('personnel',data);
+  personnelLoaded = true;
   const version=Number(src.schemaVersion||1);
 
   // Preserve existing records while normalizing teams and category-specific roles.
@@ -398,10 +401,12 @@ function locationText(p){
   return `${catLabel(p.category)} / ${p.team} / ${p.active?'активен':'извън състава'}`;
 }
 async function saveWithFreshData(mutator){
+  if(!sync.isReady){ showToast('Първо свържете валиден файл. Записът не е направен.'); return false; }
   if(sync.fileHandle) await sync.refreshFromDisk();
   await mutator();
   await sync.commitData();
   renderAll();
+  return true;
 }
 personForm.addEventListener('submit',async e=>{
   e.preventDefault();
@@ -418,7 +423,7 @@ personForm.addEventListener('submit',async e=>{
   const duplicate=employees.find(p=>p.id!==id && p.name.localeCompare(draft.name,'bg',{sensitivity:'base'})===0);
   if(duplicate){ alert('Вече има човек с това име. Редактирай съществуващия запис.'); return; }
 
-  await saveWithFreshData(async()=>{
+  if(!await saveWithFreshData(async()=>{
     if(id){
       const p=employees.find(x=>x.id===id);
       if(!p) return;
@@ -430,7 +435,7 @@ personForm.addEventListener('submit',async e=>{
       employees.push(p);
       addLog({type:'create',name:p.name,to:locationText(p),detail:p.note||''});
     }
-  });
+  })) return;
   closeModal(personModal);
   showToast(id?'Промяната е записана.':'Човекът е добавен.');
 });
@@ -445,10 +450,10 @@ document.getElementById('settingsForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const stage1=Math.max(0,parseInt(document.getElementById('stickersStage1').value,10)||0);
   const stage2=Math.max(0,parseInt(document.getElementById('stickersStage2').value,10)||0);
-  await saveWithFreshData(async()=>{
+  if(!await saveWithFreshData(async()=>{
     settings={stickersStage1:stage1,stickersStage2:stage2};
     addLog({type:'settings',name:'Стикери',detail:`Етап 1: ${stage1} души · Етап 2: ${stage2} души`});
-  });
+  })) return;
   closeModal(settingsModal);
   showToast('Настройките са записани.');
 });
@@ -473,6 +478,9 @@ function showToast(message){
 }
 
 function renderAll(){
+  document.getElementById('rosterEmptyState').hidden=personnelLoaded;
+  document.getElementById('rosterDashboard').hidden=!personnelLoaded;
+  if(!personnelLoaded) return;
   renderSummary();
   renderToday();
   renderCatFilters();
