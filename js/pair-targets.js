@@ -40,6 +40,8 @@
     if(!context) return;
     $('contextDate').value = context.date;
     $('contextShift').value = String(context.shiftCode);
+    const scheduledTeam = ShiftSchedule.teamFor(ShiftSchedule.parseDate(context.date),context.shiftCode);
+    $('contextTeam').innerHTML = `<option value="${escape(scheduledTeam)}">Екип ${escape(scheduledTeam)}</option><option value="СТИКЕРИ">Стикери · 1-ва смяна</option>`;
     $('contextTeam').value = context.team;
   }
   function validScope() {
@@ -62,9 +64,9 @@
   function render() {
     if(!context) return;
     const live = ShiftSchedule.current();
-    $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}`;
+    $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}${live.shiftCode === 1 ? ' · Стикери' : ''}`;
     $('liveDate').textContent = `${fmtDate(live.date)} · ${ShiftSchedule.HOURS[live.shiftCode]}${new Date().getHours() < 6 ? ' · започнала вчера' : ''}`;
-    const isCurrent = PairTargets.inScope(context,live);
+    const isCurrent = PairTargets.inScope(context,live) || context.team === 'СТИКЕРИ' && context.date === live.date && context.shiftCode === live.shiftCode;
     $('contextBadge').textContent = isCurrent ? 'Текуща смяна' : 'Друга работна смяна';
     $('contextBadge').className = 'badge '+(isCurrent ? 'achieved' : 'pending');
     $('contextNote').classList.toggle('historical',!isCurrent);
@@ -79,7 +81,7 @@
     const actualKg = entries.reduce((sum,entry) => sum+(entry.result?.kg || 0),0);
     const totalCrates = entries.reduce((sum,entry) => sum+entry.targetCrates,0);
     const actualCrates = entries.reduce((sum,entry) => sum+(entry.result?.crates || 0),0);
-    $('contextNote').textContent = !pairsLoaded || !rosterLoaded ? 'Свържете файла за двойките и файла за състава, за да започнете.' : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.HOURS[context.shiftCode]}. Таргетът е постигнат при изпълнение и на двете цели.`;
+    $('contextNote').textContent = !pairsLoaded || !rosterLoaded ? 'Свържете файла за двойките и файла за състава, за да започнете.' : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.HOURS[context.shiftCode]}. Таргетът е постигнат при изпълнение и на двете цели.${context.team === 'СТИКЕРИ' ? ' 1 смяна, фиксиран състав, без автоматична ротация.' : ''}`;
     $('shiftTotals').innerHTML = [
       [rosterLoaded ? people.length : '—','Хора в състава'],[rosterLoaded ? available.length : '—','Неразпределени'],
       [entries.length,`Двойки · ${done} отчетени · ${hit} постигнати`],[`${fmt(actualKg)} / ${fmt(totalKg)}`,`кг · ${fmt(actualCrates)} / ${fmt(totalCrates)} каси`]
@@ -237,11 +239,18 @@
       const date = $('contextDate').value;
       ShiftSchedule.parseDate(date);
       const shiftCode = Number($('contextShift').value);
-      const team = ShiftSchedule.teamFor(ShiftSchedule.parseDate(date),shiftCode);
+      const team = context.team === 'СТИКЕРИ' && shiftCode === 1 ? 'СТИКЕРИ' : ShiftSchedule.teamFor(ShiftSchedule.parseDate(date),shiftCode);
       context = {date,shiftCode,team}; followLive = false;
       $('pageError').textContent = ''; updateControls(); render();
     } catch(error) { updateControls(); $('pageError').textContent = error.message; }
   }));
+  $('contextTeam').addEventListener('change',() => {
+    const stickers = $('contextTeam').value === 'СТИКЕРИ';
+    const shiftCode = stickers ? 1 : context.shiftCode;
+    context = {date:context.date,shiftCode,team:stickers ? 'СТИКЕРИ' : ShiftSchedule.teamFor(ShiftSchedule.parseDate(context.date),shiftCode)};
+    followLive = false;
+    $('pageError').textContent = ''; updateControls(); render();
+  });
   $('currentShiftBtn').addEventListener('click',() => { selectLive(); render(); });
   $('addPairBtn').addEventListener('click',() => {
     if(followLive) { selectLive(); render(); }
