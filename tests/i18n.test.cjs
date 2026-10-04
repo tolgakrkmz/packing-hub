@@ -45,6 +45,14 @@ test('exact translation preserves custom values and avoids inherited object keys
   assert.equal(i18n.t('constructor',true),'constructor');
   assert.equal(i18n.t('Механична повреда',true),'Mechanical fault');
 });
+test('file validation errors translate for every supported module',()=>{
+  const {i18n}=environment('en');
+  for(const label of ['Тонаж и брак','Престои','Смени и хора','Двойки и таргети','Инструкции за опаковка']) {
+    const translated=i18n.t('Файлът не е валиден за „'+label+'“. Данните не са променени.');
+    assert.match(translated,/The file is not valid/);
+    assert.doesNotMatch(translated,/[А-Яа-я]/);
+  }
+});
 test('every page loads the translator with a demo-specific preference key', () => {
   const root = path.resolve(__dirname,'..');
   for (const file of fs.readdirSync(root).filter(name => name.endsWith('.html'))) {

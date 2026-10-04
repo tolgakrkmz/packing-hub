@@ -105,24 +105,8 @@ function addLog(entry){
   moveLog=moveLog.slice(0,300);
 }
 function loadIncomingData(data, allowMigration){
-  const src=data && typeof data==='object' ? data : {};
+  const src=HubDataValidation.validate('personnel',data);
   const version=Number(src.schemaVersion||1);
-
-  // Replace pre-dashboard rosters with the initial roster while retaining history.
-  if(version < 2 && allowMigration){
-    employees=deepClone(DEFAULT_EMPLOYEES);
-    settings=deepClone(DEFAULT_PERSONNEL_SETTINGS);
-    moveLog=Array.isArray(src.moveLog) ? src.moveLog.slice(0,299) : [];
-    addLog({type:'migration',name:'Система',detail:'Миграция към Personnel / Shift dashboard (schema v3)'});
-    return true;
-  }
-
-  if(!Array.isArray(src.employees) || !src.employees.length){
-    employees=deepClone(DEFAULT_EMPLOYEES);
-    settings=deepClone(DEFAULT_PERSONNEL_SETTINGS);
-    moveLog=Array.isArray(src.moveLog) ? src.moveLog : [];
-    return true;
-  }
 
   // Preserve existing records while normalizing teams and category-specific roles.
   employees=src.employees.map(normalizeEmployee).filter(p=>p.id && p.name);
@@ -152,10 +136,7 @@ const sync = createFileSync({
   defaultData:createDefaultData,
   getData:()=>({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog}),
   render:renderAll,
-  onConnect:async(data)=>{
-    const shouldPersist=loadIncomingData(data,true);
-    if(shouldPersist) await sync.commitData();
-  },
+  onConnect:(data)=>{ loadIncomingData(data,true); },
   onRefresh:(data)=>{ loadIncomingData(data,false); },
   elements:{
     connDot:document.getElementById('connDot'),

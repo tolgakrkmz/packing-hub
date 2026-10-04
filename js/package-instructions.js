@@ -82,12 +82,7 @@ const sync = createDirectorySync({
   onConnect: async (data, handle) => {
     rootDirHandle = handle;
 
-    if (data && Object.keys(data).length) {
-      dbIndex = data;
-    } else {
-      dbIndex = await rebuildIndexFromFolders();
-      await saveIndexDatabase();
-    }
+    dbIndex = data;
   },
   onRefresh: (data) => {
     dbIndex = data || {};
@@ -102,16 +97,10 @@ const sync = createDirectorySync({
 sync.init();
 
 async function readIndexFromDisk() {
-  try {
-    const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
-    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: true });
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    return text.trim() ? JSON.parse(text) : {};
-  } catch (err) {
-    console.error('Грешка при четене на индекса от диска:', err);
-    return {};
-  }
+  const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: false });
+  const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
+  const file = await fileHandle.getFile();
+  return HubDataValidation.parse('package-instructions',await file.text());
 }
 
 // Reload the index before applying an edit to reduce stale overwrites.
@@ -120,10 +109,11 @@ async function updateIndexOnDisk(mutatorFn) {
   if (!rootDirHandle) return;
   const latest = await readIndexFromDisk();
   mutatorFn(latest);
+  HubDataValidation.validate('package-instructions',latest);
 
   try {
-    const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
-    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: true });
+    const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: false });
+    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
     const writable = await fileHandle.createWritable();
     await writable.write(JSON.stringify(latest, null, 2));
     await writable.close();

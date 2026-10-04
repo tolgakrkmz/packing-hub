@@ -85,6 +85,9 @@ function createFileSync(cfg){
     defaultData, onConnect, onRefresh, getData, render, elements: el
   } = cfg;
 
+  const dataKind = HubDataValidation.kindFor(suggestedFileName);
+  const validate = value => cfg.validate ? cfg.validate(value) : dataKind ? HubDataValidation.validate(dataKind,value) : value;
+  let readyForWrites = false;
   let fileHandle = null;
   let pollTimer = null;
   let readRevision = 0;
@@ -100,7 +103,8 @@ function createFileSync(cfg){
   }
 
   function connectionLost(error){
-    setConn('off', cfg.strictJson && error ? error.message : 'Връзката с файла е прекъсната — свържете отново или отворете файла.');
+    readyForWrites = false;
+    setConn('off', error && error.code === 'HUB_DATA' ? error.message : 'Връзката с файла е прекъсната — свържете отново или отворете файла.');
     el.openFileBtn.style.display = 'inline-block';
     el.reconnectBtn.style.display = fileHandle ? 'inline-block' : 'none';
   }
@@ -120,23 +124,21 @@ function createFileSync(cfg){
   const idbGet = (key)=> idbOp('readonly', (s,res,rej)=>{ const r=s.get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
   const idbSet = (key,val)=> idbOp('readwrite', (s,res)=>{ s.put(val,key); res(); });
 
-  async function readFileData(){
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    if(!text.trim()) {
-      if(cfg.strictJson) throw new Error('Файлът е празен. Изберете валиден JSON файл.');
-      return defaultData();
-    }
-    try{ return JSON.parse(text); }catch(e){
-      if(cfg.strictJson) throw new Error('Файлът не съдържа валиден JSON.');
-      return defaultData();
-    }
+  async function readFileData(handle = fileHandle){
+    const file = await handle.getFile();
+    return validate(HubDataValidation.parse('',await file.text()));
   }
 
-  async function writeFileData(){
-    const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(getData(), null, 2));
-    await writable.close();
+  async function writeFileData(handle = fileHandle, data = getData()){
+    validate(data);
+    const writable = await handle.createWritable();
+    try {
+      await writable.write(JSON.stringify(data, null, 2));
+      await writable.close();
+    } catch(error) {
+      if(writable.abort) await writable.abort().catch(()=>{});
+      throw error;
+    }
   }
 
   async function refreshFromDisk(){
@@ -146,6 +148,7 @@ function createFileSync(cfg){
       const data = await readFileData();
       if(revision !== readRevision) return;
       await onRefresh(data);
+      readyForWrites = true;
       setConn('on', 'Свързан с: ' + (fileHandle.name || 'мрежов файл'));
       el.openFileBtn.style.display = 'none';
       if(el.createFileBtn) el.createFileBtn.style.display = 'none';
@@ -159,11 +162,12 @@ function createFileSync(cfg){
 
   async function connectAndLoad(handle){
     ++readRevision;
-    fileHandle = handle;
     setConn('off', 'Свързване с файла…');
-    await idbSet('mainFile', handle);
-    const data = await readFileData();
+    const data = await readFileData(handle);
     await onConnect(data);
+    fileHandle = handle;
+    readyForWrites = true;
+    await idbSet('mainFile', handle);
     render();
     setConn('on', 'Свързан с: ' + (handle.name || 'мрежов файл'));
     el.openFileBtn.style.display = 'none';
@@ -187,11 +191,17 @@ function createFileSync(cfg){
   async function commitData(){
     if(cfg.readOnly) throw new Error('Файлът се използва само за четене.');
     ++readRevision;
+    if(!readyForWrites) throw HubDataValidation.error('Първо свържете валиден файл. Записът не е направен.');
     if(fileHandle){
-      try{ await writeFileData(); }
-      catch(e){ connectionLost(e); throw e; }
+      try{
+        await readFileData();
+        await writeFileData();
+      } catch(e){ connectionLost(e); throw e; }
     } else if(!supportsFS){
+      validate(getData());
       saveLocalFallback();
+    } else {
+      throw HubDataValidation.error('Първо свържете валиден файл. Записът не е направен.');
     }
   }
 
@@ -214,9 +224,10 @@ function createFileSync(cfg){
           suggestedName: suggestedFileName,
           types: [{ description: 'JSON File', accept: { 'application/json': ['.json'] } }]
         });
-        fileHandle = handle;
-        await onConnect(defaultData());
-        await writeFileData();
+        const existing = await handle.getFile();
+        if((await existing.text()).trim()) throw HubDataValidation.error('Файлът вече съдържа данни. Използвайте „Отвори файл“.');
+        const initial = validate(defaultData());
+        await writeFileData(handle,initial);
         await connectAndLoad(handle);
       }catch(e){
         if(e.name !== 'AbortError') connectionLost(e);
@@ -269,12 +280,13 @@ function createFileSync(cfg){
       const f = el.importFallback.files[0];
       if(!f) return;
       try{
-        const data = JSON.parse(await f.text());
+        const data = validate(HubDataValidation.parse('',await f.text()));
         await onConnect(data);
+        readyForWrites = true;
         render();
         setConn('on', 'Импортирани данни от файл (запазете отново след нови записи).');
       }catch(e){
-        setConn('off', 'Невалиден файл.');
+        connectionLost(e);
       }
     });
 
@@ -284,13 +296,13 @@ function createFileSync(cfg){
   async function loadLocalFallback(){
     try{
       const raw = localStorage.getItem(localStorageKey);
-      if(raw){ await onConnect(JSON.parse(raw)); }
-    }catch(e){}
+      if(raw){ await onConnect(validate(HubDataValidation.parse('',raw))); readyForWrites = true; }
+    }catch(e){ connectionLost(e); }
     render();
   }
 
   function saveLocalFallback(){
-    try{ localStorage.setItem(localStorageKey, JSON.stringify(getData())); }catch(e){ if(cfg.strictJson) throw e; }
+    localStorage.setItem(localStorageKey, JSON.stringify(getData()));
   }
 
   async function init(){
@@ -307,7 +319,7 @@ function createFileSync(cfg){
         el.reconnectBtn.style.display = 'inline-block';
         render();
         return;
-      }catch(e){}
+      }catch(e){ connectionLost(e); render(); return; }
     }
     setConn('off', 'Все още не сте свързани с общия файл.');
     render();
@@ -317,7 +329,8 @@ function createFileSync(cfg){
     init,
     commitData,
     refreshFromDisk,
-    get fileHandle(){ return fileHandle; }
+    get fileHandle(){ return fileHandle; },
+    get isReady(){ return readyForWrites; }
   };
 }
 
@@ -338,8 +351,8 @@ function createDirectorySync(cfg){
     updatePanel(state === 'on' && supportsFS && !!dirHandle);
   }
 
-  function connectionLost(){
-    setConn('off', 'Връзката с папката е прекъсната — свържете отново или изберете папката.');
+  function connectionLost(error){
+    setConn('off', error && error.code === 'HUB_DATA' ? error.message : 'Връзката с папката е прекъсната — свържете отново или изберете папката.');
     el.openFileBtn.style.display = 'inline-block';
     el.reconnectBtn.style.display = dirHandle ? 'inline-block' : 'none';
   }
@@ -359,13 +372,11 @@ function createDirectorySync(cfg){
   const idbGet = (key)=> idbOp('readonly', (s,res,rej)=>{ const r=s.get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
   const idbSet = (key,val)=> idbOp('readwrite', (s,res)=>{ s.put(val,key); res(); });
 
-  async function readIndexData(){
-    const dataDir = await dirHandle.getDirectoryHandle('data', { create: true });
-    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: true });
+  async function readIndexData(handle = dirHandle){
+    const dataDir = await handle.getDirectoryHandle('data', { create: false });
+    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
     const file = await fileHandle.getFile();
-    const text = await file.text();
-    if(!text.trim()) return defaultData();
-    return JSON.parse(text);
+    return HubDataValidation.parse('package-instructions',await file.text());
   }
 
   async function refreshFromDisk(){
@@ -377,18 +388,17 @@ function createDirectorySync(cfg){
       el.openFileBtn.style.display = 'none';
       el.reconnectBtn.style.display = 'none';
     }catch(e){
-      connectionLost();
+      connectionLost(e);
       throw e;
     }
   }
 
   async function connectAndLoad(handle){
-    dirHandle = handle;
     setConn('off', 'Свързване с папката…');
-    await idbSet('mainDir', handle);
-    const data = await readIndexData();
-
+    const data = await readIndexData(handle);
     await onConnect(data, handle);
+    dirHandle = handle;
+    await idbSet('mainDir', handle);
     render();
 
     setConn('on', 'Свързан с папка: ' + handle.name);
@@ -404,11 +414,30 @@ function createDirectorySync(cfg){
       const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
       await connectAndLoad(handle);
     }catch(e){
-      if(e.name !== 'AbortError') connectionLost();
+      if(e.name !== 'AbortError') connectionLost(e);
     }
   });
 
-  if(el.createFileBtn) el.createFileBtn.style.display = 'none';
+  if(el.createFileBtn){
+    el.createFileBtn.style.display = 'inline-block';
+    el.createFileBtn.textContent = 'Създай нов индекс';
+    el.createFileBtn.addEventListener('click',async()=>{
+      try {
+        const handle = await window.showDirectoryPicker({mode:'readwrite'});
+        const dataDir = await handle.getDirectoryHandle('data',{create:true});
+        let exists = false;
+        try { await dataDir.getFileHandle('package-instructions.json',{create:false}); exists = true; }
+        catch(error) { if(error.name !== 'NotFoundError') throw error; }
+        if(exists) throw HubDataValidation.error('Файлът вече съдържа данни. Използвайте „Отвори файл“.');
+        const initial = HubDataValidation.validate('package-instructions',defaultData());
+        const file = await dataDir.getFileHandle('package-instructions.json',{create:true});
+        const writable = await file.createWritable();
+        try { await writable.write(JSON.stringify(initial,null,2)); await writable.close(); }
+        catch(error) { if(writable.abort) await writable.abort().catch(()=>{}); throw error; }
+        await connectAndLoad(handle);
+      } catch(error) { if(error.name !== 'AbortError') connectionLost(error); }
+    });
+  }
 
   el.reconnectBtn.addEventListener('click', async ()=>{
     try{
@@ -443,7 +472,7 @@ function createDirectorySync(cfg){
         el.reconnectBtn.style.display = 'inline-block';
         render();
         return;
-      }catch(e){}
+      }catch(e){ connectionLost(e); render(); return; }
     }
     setConn('off', 'Все още не сте свързани с основната мрежова папка.');
     el.openFileBtn.textContent = "Избери основна папка";

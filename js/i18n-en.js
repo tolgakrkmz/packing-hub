@@ -784,5 +784,14 @@ const HUB_EN_MESSAGES = {
   "септември": "September",
   "октомври": "October",
   "ноември": "November",
-  "декември": "December"
+  "декември": "December",
+  "Файлът не е валиден за „Тонаж и брак“. Данните не са променени.": "The file is not valid for “Production & Scrap”. The data has not changed.",
+  "Файлът не е валиден за „Престои“. Данните не са променени.": "The file is not valid for “Downtime”. The data has not changed.",
+  "Файлът не е валиден за „Смени и хора“. Данните не са променени.": "The file is not valid for “Personnel & Shifts”. The data has not changed.",
+  "Файлът не е валиден за „Двойки и таргети“. Данните не са променени.": "The file is not valid for “Pair Targets”. The data has not changed.",
+  "Файлът не е валиден за „Инструкции за опаковка“. Данните не са променени.": "The file is not valid for “Packing instructions”. The data has not changed.",
+  "Първо свържете валиден файл. Записът не е направен.": "Connect a valid file first. Nothing was saved.",
+  "Файлът вече съдържа данни. Използвайте „Отвори файл“.": "This file already contains data. Use “Open file”.",
+  "Създай нов индекс": "Create new index",
+  "Инструкции за опаковка": "Packing instructions"
 };

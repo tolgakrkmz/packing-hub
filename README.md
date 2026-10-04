@@ -45,6 +45,13 @@ and refresh every 20 seconds. Saving changes modifies the selected local files.
 The demo uses separate browser storage names to avoid loading existing production
 connections. Browsers without direct file access use manual import/export.
 
+Files are validated for the selected module before loading, refreshing or saving.
+Empty, malformed and incompatible JSON leaves the last accepted data intact and
+blocks writes until a valid file is connected. Filenames do not identify the
+module; supported older personnel formats retain their existing records. Opening
+a personnel file or packing index does not rewrite it. New files and indexes
+require an explicit create action, which refuses to replace existing content.
+
 ## Technical choices
 
 - Plain scripts support opening the project through `file://` without module CORS issues.
