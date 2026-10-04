@@ -40,8 +40,6 @@
     if(!context) return;
     $('contextDate').value = context.date;
     $('contextShift').value = String(context.shiftCode);
-    const scheduledTeam = ShiftSchedule.teamFor(ShiftSchedule.parseDate(context.date),context.shiftCode);
-    $('contextTeam').innerHTML = `<option value="${escape(scheduledTeam)}">Екип ${escape(scheduledTeam)}</option><option value="СТИКЕРИ">Стикери · 1-ва смяна</option>`;
     $('contextTeam').value = context.team;
   }
   function validScope() {
@@ -64,7 +62,9 @@
   function render() {
     if(!context) return;
     const live = ShiftSchedule.current();
-    $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}${live.shiftCode === 1 ? ' · Стикери' : ''}`;
+    $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}`;
+    $('stickersShiftBtn').setAttribute('aria-pressed',String(context.team === 'СТИКЕРИ'));
+    $('stickersShiftBtn').disabled = busy;
     $('liveDate').textContent = `${fmtDate(live.date)} · ${ShiftSchedule.HOURS[live.shiftCode]}${new Date().getHours() < 6 ? ' · започнала вчера' : ''}`;
     const isCurrent = PairTargets.inScope(context,live) || context.team === 'СТИКЕРИ' && context.date === live.date && context.shiftCode === live.shiftCode;
     $('contextBadge').textContent = isCurrent ? 'Текуща смяна' : 'Друга работна смяна';
@@ -170,7 +170,7 @@
     if(busy) return false;
     busy = true;
     $('savePairBtn').disabled = true;
-    const lockedControls = Array.from(document.querySelectorAll('#connPanel button, #pairDialog button[type="button"], #contextDate, #contextShift, #contextTeam, #currentShiftBtn')).map(element => [element,element.disabled]);
+    const lockedControls = Array.from(document.querySelectorAll('#connPanel button, #pairDialog button[type="button"], #contextDate, #contextShift, #contextTeam, #currentShiftBtn, #stickersShiftBtn')).map(element => [element,element.disabled]);
     lockedControls.forEach(([element]) => { element.disabled = true; });
     errorElement.textContent = '';
     let previous = null;
@@ -244,10 +244,9 @@
       $('pageError').textContent = ''; updateControls(); render();
     } catch(error) { updateControls(); $('pageError').textContent = error.message; }
   }));
-  $('contextTeam').addEventListener('change',() => {
-    const stickers = $('contextTeam').value === 'СТИКЕРИ';
-    const shiftCode = stickers ? 1 : context.shiftCode;
-    context = {date:context.date,shiftCode,team:stickers ? 'СТИКЕРИ' : ShiftSchedule.teamFor(ShiftSchedule.parseDate(context.date),shiftCode)};
+  $('stickersShiftBtn').addEventListener('click',() => {
+    if(busy) return;
+    context = {date:ShiftSchedule.localDate(),shiftCode:1,team:'СТИКЕРИ'};
     followLive = false;
     $('pageError').textContent = ''; updateControls(); render();
   });

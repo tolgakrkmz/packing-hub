@@ -43,13 +43,14 @@
 <main id="hubContent">
   <section class="panel live-panel">
     <div><span class="eyebrow">В момента на смяна</span><h2 id="liveShift"></h2><p class="muted" id="liveDate"></p></div>
+    <button id="stickersShiftBtn" class="stickers-button" type="button" aria-pressed="false">Стикери</button>
   </section>
   <section class="panel">
     <div class="section-head"><h2>Работна смяна</h2><span class="badge" id="contextBadge"></span><button id="currentShiftBtn" type="button">Текуща смяна</button></div>
     <div class="context-fields">
       <label>Дата на започване<input id="contextDate" type="date" required></label>
       <label>Работни часове<select id="contextShift"><option value="1">1-ва · 06:00–14:00</option><option value="2">2-ра · 14:00–22:00</option><option value="3">Нощна · 22:00–06:00</option></select></label>
-      <label>Екип<select id="contextTeam"></select></label>
+      <label>Екип по график<input id="contextTeam" type="text" readonly></label>
     </div>
     <p id="contextNote" class="muted"></p>
     <div id="shiftTotals" class="totals"></div>
