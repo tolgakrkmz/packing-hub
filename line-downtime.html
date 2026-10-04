@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>Аварии на автоматична линия — Package Hub</title>
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/line-downtime.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+<a href="index.html">← Назад към Package Hub</a>
+<div class="head-row">
+<div>
+<h1>Аварии на автоматична линия</h1>
+<p>Отчитане на престой по часове, смяна и причина.</p>
+</div>
+<button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+</div>
+</header>
+
+<!-- връзка с мрежовия файл -->
+<div class="panel" id="connPanel">
+<h2>Връзка с мрежовия файл</h2>
+<div class="conn-row">
+<span class="conn-dot" id="connDot"></span>
+<span class="conn-text" id="connText">Проверка...</span>
+<button class="conn-btn primary" id="openFileBtn">Отвори файл</button>
+<button class="conn-btn primary" id="createFileBtn">Създай нов файл</button>
+<button class="conn-btn" id="reconnectBtn" style="display:none;">Възстанови връзка</button>
+<button class="conn-btn" id="refreshBtn" style="display:none;">↻ Опресни</button>
+<input type="file" id="importFallback" accept=".json">
+</div>
+<div class="conn-note" id="connNote"></div>
+</div>
+
+<!-- престой за деня -->
+<div class="day-card">
+<div class="lab">Престой <b id="dayLabel">днес</b></div>
+<div class="val" id="dayVal">0 мин</div>
+</div>
+
+<!-- нова авария -->
+<div class="panel">
+<h2>Нова авария</h2>
+
+<div class="shift-grid" id="shiftGrid">
+<div class="shift-btn" data-shift="А">А</div>
+<div class="shift-btn" data-shift="Б">Б</div>
+<div class="shift-btn" data-shift="В">В</div>
+<div class="shift-btn" data-shift="Г">Г</div>
+<div class="shift-btn" data-shift="СТИКЕРИ">СТИКЕРИ</div>
+</div>
+
+<div class="row">
+<div class="field">
+<label>Дата</label>
+<input type="date" id="dateInput">
+<div class="date-hint" id="dateHint"></div>
+</div>
+<div class="field field-btn">
+<label>&nbsp;</label>
+<button type="button" class="quick-yesterday" id="yesterdayBtn">Вчера</button>
+</div>
+</div>
+
+<div class="row">
+<div class="field">
+<label>Начало</label>
+<input type="time" id="startInput">
+</div>
+<div class="field">
+<label>Край</label>
+<input type="time" id="endInput">
+</div>
+<div class="field">
+<label>Продължителност</label>
+<div class="duration-readout" id="durationReadout">—</div>
+</div>
+</div>
+
+<div class="row">
+<div class="field" style="flex:2;min-width:220px;">
+<label>Причина</label>
+<select id="reasonSelect"></select>
+</div>
+</div>
+
+<div class="row" id="otherReasonRow" style="display:none;">
+<div class="field">
+<label>Опиши причината</label>
+<input type="text" id="otherReasonInput" placeholder="Кратко описание...">
+</div>
+</div>
+
+<div class="row">
+<div class="field">
+<label>Бележка (незадължително)</label>
+<input type="text" id="noteInput" placeholder="Допълнителни детайли...">
+</div>
+</div>
+
+<button class="save-btn" id="saveBtn" disabled>Изберете смяна за запис</button>
+<div class="msg" id="msg"></div>
+</div>
+
+<!-- admin: управление на причините -->
+<div class="panel" id="reasonsAdminPanel" style="display:none;">
+<h2>Списък с причини</h2>
+<div id="reasonsList"></div>
+<div class="row" style="margin-top:10px;">
+<div class="field">
+<input type="text" id="newReasonInput" placeholder="Нова причина...">
+</div>
+<button class="conn-btn primary" id="addReasonBtn">Добави</button>
+</div>
+</div>
+
+<!-- месечно обобщение по смени -->
+<div class="panel">
+<h2>Този месец по смени</h2>
+<div class="summary-grid" id="summaryGrid"></div>
+</div>
+
+<!-- причини този месец -->
+<div class="panel">
+<h2>Причини този месец</h2>
+<div id="reasonBars"></div>
+</div>
+
+<!-- история -->
+<div class="panel">
+<div class="history-head">
+  <h2>История за месеца</h2>
+  <div class="history-filter">
+    <label for="historyMonth">Месец</label>
+    <input type="month" id="historyMonth">
+  </div>
+</div>
+<div id="historyWrap"></div>
+<div class="history-note">Обобщенията за всички периоди са в <a href="statistics.html">Статистики</a>.</div>
+</div>
+
+</div>
+<script src="js/file-sync.js"></script>
+<script src="js/line-downtime.js"></script>
+</body>
+</html>

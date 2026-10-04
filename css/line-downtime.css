@@ -1,0 +1,156 @@
+/* ============================================================
+   line-downtime.css — стилове само за line-downtime.html
+   (общите неща — цветове, .panel, .conn-*, header — са в theme.css)
+   ============================================================ */
+
+body{ padding:24px 16px 60px; }
+.wrap{max-width:760px;margin:0 auto;}
+header h1{letter-spacing:.2px;}
+.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+
+/* shift selector — идентично на production-log */
+.shift-grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  margin-bottom:16px;
+}
+@media (max-width:520px){
+  .shift-grid{grid-template-columns:repeat(3,1fr);}
+}
+.shift-btn{
+  border:1.5px solid var(--border);
+  background:var(--panel-2);
+  color:var(--text);
+  border-radius:8px;
+  padding:14px 4px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  text-align:center;
+  transition:transform .08s ease;
+}
+.shift-btn:active{transform:scale(.96);}
+.shift-btn.sel-А{background:var(--amber-dark);border-color:var(--amber);color:var(--amber);}
+.shift-btn.sel-Б{background:var(--blue-dark);border-color:var(--blue);color:var(--blue);}
+.shift-btn.sel-В{background:var(--teal-dark);border-color:var(--teal);color:var(--teal);}
+.shift-btn.sel-Г{background:var(--coral-dark);border-color:var(--coral);color:var(--coral);}
+.shift-btn.sel-СТИКЕРИ{background:var(--purple-dark);border-color:var(--purple);color:var(--purple);font-size:12px;}
+
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.field{flex:1;min-width:140px;}
+.field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px;}
+.field-btn{flex:0 0 auto;min-width:0;}
+.field input[type=date],
+.field input[type=time],
+.field input[type=text],
+.field select{
+  width:100%;background:var(--panel-2);border:1px solid var(--border);
+  color:var(--text);border-radius:8px;padding:10px;font-size:14px;
+  font-family:inherit;
+}
+.field select{cursor:pointer;}
+
+.date-hint{font-size:11px;color:var(--amber);margin-top:6px;line-height:1.4;}
+.quick-yesterday{
+  background:var(--panel-2);border:1px solid var(--border);color:var(--text-muted);
+  border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;white-space:nowrap;
+}
+.quick-yesterday:active{background:var(--border);color:var(--text);}
+
+.duration-readout{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+  padding:10px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:16px;font-weight:700;
+}
+.duration-readout.warn{border-color:var(--red);color:var(--red);}
+
+.save-btn{
+  width:100%;background:var(--amber);color:#241a05;border:none;
+  border-radius:8px;padding:14px;font-size:15px;font-weight:700;
+  cursor:pointer;margin-top:4px;
+}
+.save-btn:active{opacity:.85;}
+.save-btn:disabled{background:var(--border);color:var(--text-muted);cursor:not-allowed;}
+.msg{font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px;min-height:16px;}
+
+/* daily total */
+.day-card{
+  display:flex;justify-content:space-between;align-items:center;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;margin-bottom:18px;
+}
+.day-card .lab{font-size:12px;color:var(--text-muted);}
+.day-card .lab b{color:var(--text);font-weight:700;}
+.day-card .val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:22px;font-weight:700;}
+
+/* summary по смени */
+.summary-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:8px;
+}
+@media (max-width:520px){.summary-grid{grid-template-columns:repeat(3,1fr);}}
+.sum-card{
+  background:var(--panel-2);border-radius:8px;padding:10px 8px;text-align:center;
+  border:1px solid var(--border);
+}
+.sum-card .lab{font-size:11px;font-weight:700;margin-bottom:4px;}
+.sum-card .val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;font-weight:700;}
+.sum-card .sub{font-size:10px;color:var(--text-muted);margin-top:2px;}
+.sum-А .lab{color:var(--amber);} .sum-Б .lab{color:var(--blue);}
+.sum-В .lab{color:var(--teal);} .sum-Г .lab{color:var(--coral);}
+.sum-СТИКЕРИ .lab{color:var(--purple);font-size:9px;}
+
+/* причини — хоризонтални барове */
+.reason-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;}
+.reason-row:last-child{margin-bottom:0;}
+.reason-row .lab{flex:0 0 170px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.reason-row .bar-track{flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
+.reason-row .bar-fill{height:100%;background:var(--pink);border-radius:5px;}
+.reason-row .val{flex:0 0 64px;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+
+/* admin: списък с причини */
+.reason-chip{
+  display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);
+  border:1px solid var(--border);border-radius:999px;padding:5px 6px 5px 12px;
+  font-size:12px;margin:0 6px 6px 0;
+}
+.reason-chip button{
+  background:none;border:none;color:var(--text-muted);cursor:pointer;
+  font-size:14px;line-height:1;padding:2px 6px;
+}
+.reason-chip button:hover{color:var(--red);}
+
+/* история */
+.history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.history-head h2{margin:0;}
+.history-filter{display:flex;align-items:center;gap:8px;}
+.history-filter label{font-size:11px;color:var(--text-muted);font-weight:700;}
+.history-filter input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit;}
+.history-filter input:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+#historyWrap{overflow-x:auto;}
+#historyWrap table{min-width:520px;}
+.history-note{font-size:11px;color:var(--text-muted);margin-top:12px;line-height:1.5;}
+.history-note a{color:var(--amber);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  text-align:left;color:var(--text-muted);font-weight:700;
+  font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  padding:6px 8px;border-bottom:1px solid var(--border);
+}
+tbody td{padding:9px 8px;border-bottom:1px solid var(--border);}
+tbody tr:last-child td{border-bottom:none;}
+.tag{
+  display:inline-block;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;
+}
+.tag-А{background:var(--amber-dark);color:var(--amber);}
+.tag-Б{background:var(--blue-dark);color:var(--blue);}
+.tag-В{background:var(--teal-dark);color:var(--teal);}
+.tag-Г{background:var(--coral-dark);color:var(--coral);}
+.tag-СТИКЕРИ{background:var(--purple-dark);color:var(--purple);}
+.num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:right;}
+.dur{color:var(--pink);}
+.del-btn{
+  background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px;padding:2px 6px;
+}
+.del-btn:hover{color:var(--red);}
+.note-inline{font-size:11px;color:var(--text-muted);}

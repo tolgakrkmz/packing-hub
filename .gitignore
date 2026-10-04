@@ -1,0 +1,33 @@
+# Local state, credentials and generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+node_modules/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+*.zip
+*.bak
+backup/
+backups/
+private/
+local-data/
+# Only reviewed demo fixtures belong in this repository.
+data/*
+!data/personnel.json
+!data/production-log.json
+!data/line-downtime.json
+!data/pair-targets.json
+!data/package-instructions.json
+!data/archive/
+data/archive/*
+!data/archive/leave-management.json
+!data/profiles/
+data/profiles/*
+!data/profiles/demo-profile-001/
+data/profiles/demo-profile-001/*
+!data/profiles/demo-profile-001/instruction.txt

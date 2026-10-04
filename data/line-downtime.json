@@ -1,0 +1,134 @@
+{
+  "entries": [
+    {
+      "id": "demo-downtime-60",
+      "date": "2026-08-05",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-54",
+      "date": "2026-08-11",
+      "shift": "В",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-48",
+      "date": "2026-08-17",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-42",
+      "date": "2026-08-23",
+      "shift": "В",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-36",
+      "date": "2026-08-29",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-30",
+      "date": "2026-09-04",
+      "shift": "В",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-24",
+      "date": "2026-09-10",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-18",
+      "date": "2026-09-16",
+      "shift": "В",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-12",
+      "date": "2026-09-22",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-6",
+      "date": "2026-09-28",
+      "shift": "В",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    },
+    {
+      "id": "demo-downtime-0",
+      "date": "2026-10-04",
+      "shift": "А",
+      "start": "10:00",
+      "end": "10:25",
+      "durationMin": 25,
+      "reason": "Липса на материал",
+      "reasonNote": "",
+      "note": "Fictional example: replenishment delay."
+    }
+  ],
+  "reasons": [
+    "Механична повреда",
+    "Електрическа повреда",
+    "Смяна на артикул / пренастройка",
+    "Липса на материал",
+    "Качествен проблем / настройка",
+    "Спиране на тока",
+    "Друго"
+  ]
+}

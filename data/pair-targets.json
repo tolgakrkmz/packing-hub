@@ -1,0 +1,606 @@
+{
+  "module": "pair-targets",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "demo-pair-20-1",
+      "date": "2026-09-14",
+      "shiftCode": 1,
+      "team": "Г",
+      "members": [
+        {
+          "id": "demo-4-auto-1",
+          "name": "Demo Operator 4-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-4-auto-2",
+          "name": "Demo Operator 4-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-14T19:00:00Z"
+      },
+      "createdAt": "2026-09-14T05:00:00Z",
+      "updatedAt": "2026-09-14T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-20-2",
+      "date": "2026-09-14",
+      "shiftCode": 2,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-14T19:00:00Z"
+      },
+      "createdAt": "2026-09-14T05:00:00Z",
+      "updatedAt": "2026-09-14T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-20-3",
+      "date": "2026-09-14",
+      "shiftCode": 3,
+      "team": "Б",
+      "members": [
+        {
+          "id": "demo-2-auto-1",
+          "name": "Demo Operator 2-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-2-auto-2",
+          "name": "Demo Operator 2-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-14T19:00:00Z"
+      },
+      "createdAt": "2026-09-14T05:00:00Z",
+      "updatedAt": "2026-09-14T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-10-1",
+      "date": "2026-09-24",
+      "shiftCode": 1,
+      "team": "Б",
+      "members": [
+        {
+          "id": "demo-2-auto-1",
+          "name": "Demo Operator 2-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-2-auto-2",
+          "name": "Demo Operator 2-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-24T19:00:00Z"
+      },
+      "createdAt": "2026-09-24T05:00:00Z",
+      "updatedAt": "2026-09-24T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-10-2",
+      "date": "2026-09-24",
+      "shiftCode": 2,
+      "team": "Г",
+      "members": [
+        {
+          "id": "demo-4-auto-1",
+          "name": "Demo Operator 4-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-4-auto-2",
+          "name": "Demo Operator 4-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-24T19:00:00Z"
+      },
+      "createdAt": "2026-09-24T05:00:00Z",
+      "updatedAt": "2026-09-24T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-10-3",
+      "date": "2026-09-24",
+      "shiftCode": 3,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-09-24T19:00:00Z"
+      },
+      "createdAt": "2026-09-24T05:00:00Z",
+      "updatedAt": "2026-09-24T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-5-1",
+      "date": "2026-09-29",
+      "shiftCode": 1,
+      "team": "Г",
+      "members": [
+        {
+          "id": "demo-4-auto-1",
+          "name": "Demo Operator 4-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-4-auto-2",
+          "name": "Demo Operator 4-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-09-29T19:00:00Z"
+      },
+      "createdAt": "2026-09-29T05:00:00Z",
+      "updatedAt": "2026-09-29T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-5-2",
+      "date": "2026-09-29",
+      "shiftCode": 2,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-09-29T19:00:00Z"
+      },
+      "createdAt": "2026-09-29T05:00:00Z",
+      "updatedAt": "2026-09-29T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-5-3",
+      "date": "2026-09-29",
+      "shiftCode": 3,
+      "team": "А",
+      "members": [
+        {
+          "id": "demo-1-auto-1",
+          "name": "Demo Operator 1-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-1-auto-2",
+          "name": "Demo Operator 1-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-09-29T19:00:00Z"
+      },
+      "createdAt": "2026-09-29T05:00:00Z",
+      "updatedAt": "2026-09-29T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-2-1",
+      "date": "2026-10-02",
+      "shiftCode": 1,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-10-02T19:00:00Z"
+      },
+      "createdAt": "2026-10-02T05:00:00Z",
+      "updatedAt": "2026-10-02T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-2-2",
+      "date": "2026-10-02",
+      "shiftCode": 2,
+      "team": "А",
+      "members": [
+        {
+          "id": "demo-1-auto-1",
+          "name": "Demo Operator 1-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-1-auto-2",
+          "name": "Demo Operator 1-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-10-02T19:00:00Z"
+      },
+      "createdAt": "2026-10-02T05:00:00Z",
+      "updatedAt": "2026-10-02T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-2-3",
+      "date": "2026-10-02",
+      "shiftCode": 3,
+      "team": "Б",
+      "members": [
+        {
+          "id": "demo-2-auto-1",
+          "name": "Demo Operator 2-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-2-auto-2",
+          "name": "Demo Operator 2-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 1100,
+        "crates": 44,
+        "reasonKey": "",
+        "reasonText": "",
+        "reportedAt": "2026-10-02T19:00:00Z"
+      },
+      "createdAt": "2026-10-02T05:00:00Z",
+      "updatedAt": "2026-10-02T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-1-1",
+      "date": "2026-10-03",
+      "shiftCode": 1,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-10-03T19:00:00Z"
+      },
+      "createdAt": "2026-10-03T05:00:00Z",
+      "updatedAt": "2026-10-03T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-1-2",
+      "date": "2026-10-03",
+      "shiftCode": 2,
+      "team": "А",
+      "members": [
+        {
+          "id": "demo-1-auto-1",
+          "name": "Demo Operator 1-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-1-auto-2",
+          "name": "Demo Operator 1-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-10-03T19:00:00Z"
+      },
+      "createdAt": "2026-10-03T05:00:00Z",
+      "updatedAt": "2026-10-03T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-1-3",
+      "date": "2026-10-03",
+      "shiftCode": 3,
+      "team": "Б",
+      "members": [
+        {
+          "id": "demo-2-auto-1",
+          "name": "Demo Operator 2-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-2-auto-2",
+          "name": "Demo Operator 2-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": {
+        "kg": 850,
+        "crates": 38,
+        "reasonKey": "materials",
+        "reasonText": "Fictional example: material arrived late.",
+        "reportedAt": "2026-10-03T19:00:00Z"
+      },
+      "createdAt": "2026-10-03T05:00:00Z",
+      "updatedAt": "2026-10-03T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-0-1",
+      "date": "2026-10-04",
+      "shiftCode": 1,
+      "team": "В",
+      "members": [
+        {
+          "id": "demo-3-auto-1",
+          "name": "Demo Operator 3-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-3-auto-2",
+          "name": "Demo Operator 3-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": null,
+      "createdAt": "2026-10-04T05:00:00Z",
+      "updatedAt": "2026-10-04T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-0-2",
+      "date": "2026-10-04",
+      "shiftCode": 2,
+      "team": "А",
+      "members": [
+        {
+          "id": "demo-1-auto-1",
+          "name": "Demo Operator 1-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-1-auto-2",
+          "name": "Demo Operator 1-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto",
+        "manual"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": null,
+      "createdAt": "2026-10-04T05:00:00Z",
+      "updatedAt": "2026-10-04T19:00:00Z"
+    },
+    {
+      "id": "demo-pair-0-3",
+      "date": "2026-10-04",
+      "shiftCode": 3,
+      "team": "Г",
+      "members": [
+        {
+          "id": "demo-4-auto-1",
+          "name": "Demo Operator 4-auto-01",
+          "category": "auto",
+          "role": "Началник смяна"
+        },
+        {
+          "id": "demo-4-auto-2",
+          "name": "Demo Operator 4-auto-02",
+          "category": "auto",
+          "role": "Опаковчик"
+        }
+      ],
+      "areas": [
+        "auto"
+      ],
+      "targetKg": 1000,
+      "targetCrates": 40,
+      "result": null,
+      "createdAt": "2026-10-04T05:00:00Z",
+      "updatedAt": "2026-10-04T19:00:00Z"
+    }
+  ]
+}

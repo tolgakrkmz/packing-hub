@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personnel / Shift Dashboard</title>
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/personnel.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+<a href="index.html">← Package Hub</a>
+<h1>Personnel / Shift Dashboard</h1>
+<p>Активен състав, екипи, роли, ротация и промени — на едно място.</p>
+</header>
+
+<div class="locked-box" id="lockedBox">
+  <div class="icon">🔒</div>
+  <h2>Тази страница е само за администратори</h2>
+  <p>Влез в admin режим, за да видиш и редактираш персонала.</p>
+  <button id="lockedAdminBtn">Admin вход</button>
+</div>
+
+<div class="panel connection-panel" id="connPanel" style="display:none;">
+<h2>Споделен файл</h2>
+<div class="conn-row">
+<div class="conn-dot" id="connDot"></div>
+<div class="conn-text" id="connText">Проверява се връзка…</div>
+<button class="conn-btn" id="openFileBtn">Отвори файл от мрежата</button>
+<button class="conn-btn" id="createFileBtn">Създай нов файл</button>
+<button class="conn-btn primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
+<button class="conn-btn" id="refreshBtn" style="display:none;">Опресни</button>
+<button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+</div>
+<input type="file" id="importFallback" accept="application/json">
+<div class="conn-note" id="connNote">Избери общия <b>personnel.json</b> в мрежовата папка. След първото свързване промените се записват директно в него.</div>
+</div>
+
+<div id="hubContent" style="display:none;">
+
+<section class="dashboard-hero">
+  <div class="hero-copy">
+    <div class="eyebrow">LIVE PERSONNEL</div>
+    <h2>Състав на производството</h2>
+    <p id="heroSub">Обобщението се изчислява автоматично от активните хора.</p>
+  </div>
+  <div class="hero-actions">
+    <button class="action-btn secondary" id="settingsBtn">Настройки</button>
+    <button class="action-btn" id="addPersonBtn">+ Добави човек</button>
+  </div>
+</section>
+
+<div class="summary-grid" id="summaryGrid"></div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Кой е на смяна</h2>
+      <div class="panel-sub">Общият брой за всеки екип включва активните хора от автоматична и ръчна опаковка.</div>
+    </div>
+    <div class="today-row">
+      <label for="todayDate">Дата</label>
+      <input type="date" id="todayDate">
+    </div>
+  </div>
+  <div class="today-grid" id="todayGrid"></div>
+  <div class="stickers-note" id="stickersNote"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Месечна ротация</h2>
+      <div class="panel-sub">Автоматичен график по екипи. Съставът се управлява отделно от ротацията.</div>
+    </div>
+    <div class="sched-controls">
+      <select id="schedMonth" aria-label="Месец"></select>
+      <select id="schedYear" aria-label="Година"></select>
+    </div>
+  </div>
+  <div class="sched-scroll"><div id="schedWrap"></div></div>
+</div>
+
+<div class="panel personnel-panel">
+  <div class="panel-head personnel-head">
+    <div>
+      <h2>Персонал</h2>
+      <div class="panel-sub">Редакцията на човек променя веднага обобщението и състава на екипите.</div>
+    </div>
+    <div class="search-wrap">
+      <input type="search" id="searchInput" placeholder="Търси по име, роля или бележка…" autocomplete="off">
+    </div>
+  </div>
+  <div class="segment-tabs" id="catFilters"></div>
+  <div id="peopleWrap"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Последни промени</h2>
+      <div class="panel-sub">Пазят се последните промени по състав, екип и настройки.</div>
+    </div>
+  </div>
+  <div class="log-list" id="logList"></div>
+</div>
+
+</div>
+</div>
+
+<div class="modal-backdrop" id="personModal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">PERSONNEL</div>
+        <h3 id="personModalTitle">Редакция на човек</h3>
+      </div>
+      <button class="icon-btn" data-close-modal="personModal" aria-label="Затвори">×</button>
+    </div>
+    <form id="personForm">
+      <input type="hidden" id="personId">
+      <div class="form-grid">
+        <label class="field field-wide">Име
+          <input id="personName" type="text" required autocomplete="off">
+        </label>
+        <label class="field">Участък
+          <select id="personCategory" required></select>
+        </label>
+        <label class="field">Екип
+          <select id="personTeam" required></select>
+        </label>
+        <label class="field field-wide">Роля / позиция
+          <select id="personRole" required></select>
+        </label>
+        <label class="field field-wide">Бележка
+          <input id="personNote" type="text" placeholder="напр. ТР, преси, предизвестие…" autocomplete="off">
+        </label>
+      </div>
+      <label class="status-switch">
+        <input id="personActive" type="checkbox" checked>
+        <span class="switch-ui"></span>
+        <span><b>Активен състав</b><small>Ако е изключено, човекът остава в системата, но не влиза в броя на екипа.</small></span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="action-btn ghost" data-close-modal="personModal">Отказ</button>
+        <button type="submit" class="action-btn">Запази</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal" aria-hidden="true">
+  <div class="modal-card small" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow">SETTINGS</div>
+        <h3 id="settingsModalTitle">Оперативни настройки</h3>
+      </div>
+      <button class="icon-btn" data-close-modal="settingsModal" aria-label="Затвори">×</button>
+    </div>
+    <form id="settingsForm">
+      <div class="form-grid">
+        <label class="field">Стикери — 1-ви етап
+          <input id="stickersStage1" type="number" min="0" step="1" required>
+        </label>
+        <label class="field">Стикери — 2-ри етап
+    ßœ      <input id="stickersStage2" type="number" min="0" step="1" required>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="action-btn ghost" data-close-modal="settingsModal">Отказ</button>
+        <button type="submit" class="action-btn">Запази</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/file-sync.js"></script>
+<script src="js/employees-seed.js"></script>
+<script src="js/shift-schedule.js"></script>
+<script src="js/personnel.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "DEMO-001": {
+    "number": "DEMO-001",
+    "name": "Fictional packing profile",
+    "client": "Demo Customer",
+    "category": "standard",
+    "folderName": "demo-profile-001",
+    "images": [],
+    "timestamp": 0
+  }
+}

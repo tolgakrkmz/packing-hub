@@ -1,0 +1,65 @@
+:root{
+  --bg:#15171b;
+  --panel:#1d2025;
+  --panel-2:#22262c;
+  --border:#2c3039;
+  --text:#edebe3;
+  --text-muted:#8a8d93;
+
+  --amber:#f5a623;      --amber-dark:#3a2c10;
+  --blue:#4a90c4;        --blue-dark:#122733;
+  --teal:#3fbfa0;        --teal-dark:#0f2c26;
+  --coral:#e0765a;       --coral-dark:#331a11;
+  --purple:#9b7bd1;      --purple-dark:#251c38;
+  --pink:#c26b9e;        --pink-dark:#2c1826;
+  --red:#e2544a;
+}
+
+/* базов ресет, общ за всички страници */
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+
+/* панел с общи стилове (заглавие, форми) — използва се във всеки модул */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px;}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:0 0 14px;font-weight:700;}
+
+/* лента за връзка с мрежовия файл — идентична във всички модули */
+.conn-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.conn-dot{width:9px;height:9px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
+.conn-dot.on{background:var(--teal);}
+.conn-dot.off{background:var(--red);}
+.conn-text{font-size:13px;flex:1;min-width:160px;}
+.conn-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+.conn-btn.primary{background:var(--amber);color:#241a05;border-color:var(--amber);}
+.conn-btn:active{opacity:.85;}
+.conn-note{font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5;}
+input[type=file]{display:none;}
+
+/* Компактна лента при свързани всички файлове на модула. */
+.conn-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.panel .conn-panel-head h2{margin:0;flex:1;min-width:0;}
+.conn-panel-toggle{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;padding:0;border:0;background:none;color:var(--text-muted);font:inherit;text-align:left;cursor:pointer;}
+.conn-panel-toggle::before{content:'\25B8';color:var(--amber);}
+.conn-panel-toggle[aria-expanded=true]::before{content:'\25BE';}
+.conn-panel-toggle:disabled{cursor:default;opacity:1;}
+.conn-panel-toggle:focus-visible{outline:2px solid var(--amber);outline-offset:5px;border-radius:3px;}
+.conn-panel-status{font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--amber);}
+.conn-panel-status.ready{color:var(--teal);}
+.conn-panel-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.conn-panel-actions .conn-btn{padding:6px 10px;font-size:11px;}
+.conn-panel-body{margin-top:14px;}
+.conn-panel-body[hidden]{display:none;}
+.conn-panel-body .conn-subhead:first-child{margin-top:0;}
+
+/* общ хедър за под-страниците (със стрелка "назад") */
+header{margin-bottom:20px;}
+header a{color:var(--text-muted);font-size:11px;text-decoration:none;display:inline-block;margin-bottom:8px;}
+header h1{font-size:20px;font-weight:700;margin:0 0 4px;}
+header p{margin:0;color:var(--text-muted);font-size:13px;}
+
+.empty{color:var(--text-muted);font-size:13px;text-align:center;padding:20px 0;}

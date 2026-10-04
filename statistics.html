@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>Статистики — Package Hub</title>
+<link rel="stylesheet" href="css/theme.css">
+<style>
+body{padding:24px 16px 60px;}
+.wrap{max-width:1100px;margin:0 auto;}
+
+.locked-box{text-align:center;padding:60px 20px;color:var(--text-muted);}
+.locked-box .icon{font-size:40px;margin-bottom:14px;}
+.locked-box h2{color:var(--text);font-size:16px;margin:0 0 8px;}
+.locked-box button{margin-top:16px;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;}
+
+.view-toggle{display:flex;gap:8px;margin-bottom:18px;}
+.view-toggle button{background:var(--panel-2);border:1px solid var(--border);color:var(--text-muted);border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.18s ease;}
+.view-toggle button:hover{border-color:#464b57;color:var(--text);}
+.view-toggle button.active{background:var(--purple);border-color:var(--purple);color:#fff;}
+
+.year-select-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+.year-select-row label{font-size:12px;color:var(--text-muted);font-weight:700;}
+.year-select-row select,.dashboard-select{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;}
+.year-select-row select:focus,.dashboard-select:focus{border-color:var(--purple);}
+
+/* ===================== MONTHLY HERO ===================== */
+.month-dashboard{position:relative;overflow:hidden;border:1px solid #343945;border-radius:16px;margin-bottom:20px;background:
+  radial-gradient(circle at 12% 0%,rgba(155,123,209,.18),transparent 34%),
+  radial-gradient(circle at 92% 16%,rgba(63,191,160,.10),transparent 30%),
+  linear-gradient(145deg,#20242b 0%,#1a1d22 74%);box-shadow:0 16px 50px rgba(0,0,0,.16);}
+.month-dashboard::after{content:"";position:absolute;width:260px;height:260px;border:1px solid rgba(255,255,255,.035);border-radius:50%;right:-105px;top:-135px;pointer-events:none;}
+.dashboard-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 22px 0;position:relative;z-index:1;}
+.dashboard-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-muted);font-weight:800;margin-bottom:7px;}
+.dashboard-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.dashboard-title{font-size:22px;line-height:1.15;font-weight:850;letter-spacing:-.02em;}
+.status-chip{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;border:1px solid var(--border);white-space:nowrap;}
+.status-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px rgba(255,255,255,.035);}
+.status-chip.good,.status-chip.done{color:var(--teal);background:rgba(63,191,160,.08);border-color:rgba(63,191,160,.22);}
+.status-chip.warn{color:var(--amber);background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.22);}
+.status-chip.bad{color:#ef746c;background:rgba(226,84,74,.08);border-color:rgba(226,84,74,.22);}
+.status-chip.neutral{color:var(--text-muted);}
+.dashboard-filter{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.dashboard-filter label{font-size:11px;color:var(--text-muted);font-weight:700;}
+
+.dashboard-main{display:grid;grid-template-columns:minmax(250px,.78fr) minmax(0,1.6fr);gap:22px;padding:20px 22px 22px;position:relative;z-index:1;}
+.goal-side{display:flex;align-items:center;gap:20px;min-width:0;}
+.goal-ring{--progress:0deg;--ring-color:var(--purple);width:148px;height:148px;border-radius:50%;flex:0 0 148px;display:grid;place-items:center;background:conic-gradient(var(--ring-color) var(--progress),#2b3038 0);position:relative;transition:background .3s ease;}
+.goal-ring::before{content:"";position:absolute;inset:11px;background:#1d2025;border:1px solid rgba(255,255,255,.035);border-radius:50%;}
+.goal-ring-inner{position:relative;z-index:1;text-align:center;}
+.goal-ring-pct{font-size:28px;font-weight:900;letter-spacing:-.04em;line-height:1;}
+.goal-ring-sub{font-size:10px;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:.08em;}
+.goal-copy{min-width:0;}
+.goal-label{font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:6px;}
+.goal-value{font-size:30px;font-weight:900;letter-spacing:-.035em;line-height:1.05;white-space:nowrap;}
+.goal-target{font-size:13px;color:var(--text-muted);margin-top:5px;}
+.goal-remaining{margin-top:14px;font-size:12px;color:var(--text-muted);line-height:1.45;}
+.goal-remaining strong{color:var(--text);font-weight:800;}
+
+.dashboard-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:center;}
+.dashboard-kpi{background:rgba(17,19,23,.34);border:1px solid rgba(255,255,255,.055);border-radius:11px;padding:13px 14px;min-height:78px;}
+.dashboard-kpi .lab{font-size:10px;text-transform:uppercase;letter-spacing:.055em;color:var(--text-muted);font-weight:750;margin-bottom:7px;}
+.dashboard-kpi .val{font-size:20px;font-weight:850;letter-spacing:-.02em;}
+.dashboard-kpi .sub{font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.35;}
+
+.pace-strip{margin:0 22px 18px;border:1px solid rgba(255,255,255,.055);border-radius:10px;padding:10px 12px;background:rgba(17,19,23,.28);position:relative;z-index:1;}
+.pace-line{height:7px;background:#2a2f37;border-radius:99px;overflow:hidden;position:relative;}
+.pace-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--purple),var(--teal));transition:width .65s cubic-bezier(.2,.8,.2,1);}
+.pace-meta{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:10px;color:var(--text-muted);}
+.pace-meta strong{color:var(--text);font-weight:800;}
+
+.trend-card{margin:0 22px 22px;border:1px solid rgba(255,255,255,.055);background:rgba(17,19,23,.28);border-radius:12px;padding:14px 14px 9px;position:relative;z-index:1;}
+.trend-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px;}
+.trend-title{font-size:12px;font-weight:800;}
+.trend-subtitle{font-size:10px;color:var(--text-muted);margin-top:3px;}
+.trend-legend{display:flex;gap:12px;align-items:center;font-size:10px;color:var(--text-muted);white-space:nowrap;}
+.trend-key{display:inline-flex;align-items:center;gap:5px;}
+.trend-key i{display:inline-block;width:15px;height:2px;border-radius:99px;background:var(--teal);}
+.trend-key.plan i{background:var(--purple);opacity:.8;}
+.monthly-chart{height:252px;position:relative;overflow:hidden;}
+.monthly-chart svg{width:100%;height:100%;display:block;overflow:visible;}
+.monthly-chart .actual-line{filter:drop-shadow(0 3px 5px rgba(63,191,160,.12));stroke-dasharray:1800;stroke-dashoffset:1800;animation:drawLine .85s ease forwards;}
+.monthly-chart .actual-area{opacity:0;animation:fadeArea .6s .25s ease forwards;}
+.monthly-chart .plan-line{stroke-dasharray:5 5;}
+.monthly-chart .chart-guide{opacity:0;pointer-events:none;}
+.monthly-chart:hover .chart-guide.active{opacity:1;}
+.chart-tooltip{position:absolute;z-index:5;display:none;pointer-events:none;min-width:148px;background:#121419;border:1px solid #393e48;border-radius:9px;padding:9px 10px;box-shadow:0 12px 30px rgba(0,0,0,.28);font-size:10px;color:var(--text-muted);transform:translate(-50%,-112%);}
+.chart-tooltip strong{display:block;color:var(--text);font-size:11px;margin-bottom:5px;}
+.chart-tooltip .tt-row{display:flex;justify-content:space-between;gap:14px;line-height:1.7;}
+.chart-tooltip .tt-row b{font-weight:800;color:var(--text);}
+@keyframes drawLine{to{stroke-dashoffset:0;}}
+@keyframes fadeArea{to{opacity:1;}}
+
+/* ===================== EXISTING STATS ===================== */
+.chart-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px;overflow-x:auto;}
+.chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-muted);}
+.chart-legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+.stats-table{width:100%;border-collapse:collapse;font-size:13px;}
+.stats-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);padding:8px 10px;border-bottom:1px solid var(--border);}
+.stats-table td{padding:9px 10px;border-bottom:1px solid var(--border);}
+.stats-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.stats-table tr:last-child td{border-bottom:none;}
+.stats-table tr.total-row td{font-weight:700;color:var(--text);border-top:2px solid var(--border);}
+
+/* Причините остават свити; записите се отварят само при нужда. */
+.stats-table .av-reasons-row td{padding:0 10px 9px;}
+.av-reasons{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);}
+.av-reasons summary,.av-reason-group summary{display:flex;align-items:baseline;gap:8px;cursor:pointer;list-style:none;padding:8px 10px;}
+.av-reasons summary::-webkit-details-marker,.av-reason-group summary::-webkit-details-marker{display:none;}
+.av-reasons summary::before,.av-reason-group summary::before{content:'\25B8';color:var(--amber);flex-shrink:0;}
+.av-reasons[open]>summary::before,.av-reason-group[open]>summary::before{content:'\25BE';}
+.av-reasons summary:focus-visible,.av-reason-group summary:focus-visible{outline:2px solid var(--purple);outline-offset:-2px;border-radius:6px;}
+.av-reasons-preview{flex:1;min-width:0;font-size:11px;line-height:1.5;color:var(--text-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.av-reasons-preview strong{color:var(--text);font-weight:650;}
+.av-reasons-action{font-size:10px;color:var(--purple);white-space:nowrap;}
+.av-reasons[open]>.av-reasons-list{border-top:1px solid var(--border);}
+.av-reasons-list{max-height:320px;overflow-y:auto;overscroll-behavior:contain;padding:4px;}
+.av-reason-group+.av-reason-group{border-top:1px solid var(--border);}
+.av-reason-label{flex:1;min-width:0;font-size:12px;overflow-wrap:anywhere;}
+.av-reason-metrics{font-size:11px;color:var(--text-muted);white-space:nowrap;}
+.av-reason-metrics b{color:var(--amber);font-weight:700;}
+.av-reason-records{list-style:none;padding:0 10px 8px 26px;margin:0;}
+.av-reason-records li{padding:7px 0;border-top:1px solid var(--border);}
+.av-record-meta{font-size:10px;color:var(--text-muted);line-height:1.5;}
+.av-record-note{font-size:12px;line-height:1.5;margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere;}
+@media(max-width:520px){
+  .av-reasons summary,.av-reason-group summary{flex-wrap:wrap;}
+  .av-reasons-action,.av-reason-metrics{margin-left:18px;}
+  .av-reason-label{flex-basis:calc(100% - 26px);}
+}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+.kpi-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.kpi-card .lab{font-size:11px;color:var(--text-muted);margin-bottom:6px;}
+.kpi-card .val{font-size:19px;font-weight:800;}
+
+.conn-subhead{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;}
+.conn-subhead:first-of-type{margin-top:0;}
+
+.line-shift-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px;}
+.line-shift-head h2{margin-bottom:0;}
+.line-month-filter{display:flex;align-items:center;gap:8px;}
+.line-month-filter label{font-size:10px;color:var(--text-muted);font-weight:700;}
+.line-month-filter select{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px;}
+
+@media(max-width:760px){
+  .dashboard-top{flex-direction:column;}
+  .dashboard-filter{width:100%;justify-content:space-between;}
+  .dashboard-main{grid-template-columns:1fr;}
+  .goal-side{justify-content:flex-start;}
+  .dashboard-kpis{grid-template-columns:repeat(2,1fr);}
+  .trend-head{flex-direction:column;}
+  .trend-legend{white-space:normal;}
+}
+@media(max-width:480px){
+  .goal-side{align-items:flex-start;}
+  .goal-ring{width:120px;height:120px;flex-basis:120px;}
+  .goal-ring-pct{font-size:23px;}
+  .goal-value{font-size:25px;}
+  .dashboard-kpis{grid-template-columns:1fr 1fr;}
+  .monthly-chart{height:220px;}
+}
+
+
+/* ===================== WORKFORCE CAPACITY ===================== */
+.workforce-dashboard{position:relative;overflow:hidden;margin:0 0 20px;border:1px solid #343945;border-radius:16px;background:
+  radial-gradient(circle at 8% 0%,rgba(63,191,160,.13),transparent 30%),
+  radial-gradient(circle at 96% 6%,rgba(155,123,209,.14),transparent 32%),
+  linear-gradient(145deg,#20242b 0%,#1a1d22 78%);box-shadow:0 16px 50px rgba(0,0,0,.13);}
+.workforce-dashboard::after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.03);border-radius:50%;left:-165px;bottom:-210px;pointer-events:none;}
+.wf-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:22px 22px 0;position:relative;z-index:1;}
+.wf-title{font-size:20px;font-weight:850;letter-spacing:-.02em;}
+.wf-subtitle{font-size:11px;color:var(--text-muted);line-height:1.5;margin-top:5px;max-width:680px;}
+.wf-head-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.wf-source-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid rgba(255,255,255,.07);border-radius:999px;background:rgba(17,19,23,.28);font-size:10px;color:var(--text-muted);}
+.wf-source-pill b{color:var(--text);font-weight:800;}
+.wf-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;padding:18px 22px 0;position:relative;z-index:1;}
+.wf-kpi{min-height:86px;padding:12px 12px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(17,19,23,.34);}
+.wf-kpi .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.055em;color:var(--text-muted);font-weight:760;margin-bottom:7px;line-height:1.3;}
+.wf-kpi .val{font-size:20px;font-weight:880;letter-spacing:-.025em;white-space:nowrap;}
+.wf-kpi .sub{font-size:9.5px;color:var(--text-muted);margin-top:5px;line-height:1.35;}
+.wf-kpi.emphasis{border-color:rgba(155,123,209,.22);background:rgba(155,123,209,.055);}
+.wf-kpi.good .val{color:var(--teal);}.wf-kpi.warn .val{color:var(--amber);}.wf-kpi.bad .val{color:var(--red);}
+.wf-main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.72fr);gap:12px;padding:12px 22px 22px;position:relative;z-index:1;}
+.wf-card{border:1px solid rgba(255,255,255,.055);border-radius:12px;background:rgba(17,19,23,.28);padding:14px;min-width:0;}
+.wf-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px;}
+.wf-card-title{font-size:12px;font-weight:800;}.wf-card-sub{font-size:10px;color:var(--text-muted);margin-top:3px;line-height:1.45;}
+.wf-chart{height:300px;position:relative;overflow:hidden;}
+.wf-chart svg{width:100%;height:100%;display:block;}
+.wf-chart-empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.5;padding:20px;}
+.wf-line-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px;}
+.wf-line-metric{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);}
+.wf-line-metric .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;}.wf-line-metric .v{font-size:14px;font-weight:850;margin-top:4px;}
+.wf-calc{display:flex;flex-direction:column;gap:11px;}
+.wf-auto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.wf-auto-source{padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);min-width:0;}
+.wf-auto-source .l{font-size:9px;color:var(--text-muted);font-weight:760;text-transform:uppercase;letter-spacing:.045em;line-height:1.3;}
+.wf-auto-source .v{font-size:17px;font-weight:880;color:var(--text);margin-top:5px;white-space:nowrap;}
+.wf-auto-source .s{font-size:9px;color:var(--text-muted);margin-top:4px;line-height:1.35;}
+.wf-auto-source.target .v{color:var(--amber);}
+.wf-auto-source.reserve .v{color:#c3a8ee;}
+.wf-auto-source.productivity .v{color:var(--teal);}
+.wf-field label{display:block;font-size:9.5px;color:var(--text-muted);font-weight:750;margin:0 0 5px;line-height:1.25;}
+.wf-field input{width:100%;box-sizing:border-box;background:#171a1f;border:1px solid #353b45;color:var(--text);border-radius:8px;padding:9px 10px;font:700 13px inherit;outline:none;}
+.wf-field input:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(155,123,209,.08);}
+.wf-productivity-row{display:flex;gap:7px;align-items:flex-end;}.wf-productivity-row .wf-field{flex:1;}.wf-mini-btn{border:1px solid var(--border);background:var(--panel-2);color:var(--text-muted);border-radius:8px;padding:9px 10px;font-size:10px;font-weight:750;cursor:pointer;white-space:nowrap;}.wf-mini-btn:hover{color:var(--text);border-color:#4a505c;}
+.wf-results{display:grid;gap:7px;margin-top:2px;}
+.wf-result{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);font-size:10.5px;color:var(--text-muted);}
+.wf-result b{font-size:15px;color:var(--text);font-weight:880;white-space:nowrap;}.wf-result.strong{border-color:rgba(155,123,209,.2);background:rgba(155,123,209,.055);}.wf-result.strong b{color:#c3a8ee;}
+.wf-result.good b{color:var(--teal);}.wf-result.bad b{color:var(--red);}.wf-result.warn b{color:var(--amber);}
+.wf-calc-note{font-size:9.5px;color:var(--text-muted);line-height:1.5;padding-top:2px;}
+.wf-calc-note strong{color:var(--text);font-weight:800;}
+.wf-no-data{margin:18px 22px 22px;padding:14px 16px;border:1px dashed #3a404a;border-radius:10px;color:var(--text-muted);font-size:11px;line-height:1.6;position:relative;z-index:1;}
+@media (max-width:980px){.wf-kpis{grid-template-columns:repeat(3,1fr)}.wf-main{grid-template-columns:1fr}.wf-chart{height:280px;}}
+@media (max-width:640px){.wf-head{flex-direction:column}.wf-head-right{justify-content:flex-start}.wf-kpis{grid-template-columns:1fr 1fr;padding-left:14px;padding-right:14px}.wf-main{padding-left:14px;padding-right:14px}.wf-line-metrics{grid-template-columns:1fr}.wf-auto-grid{grid-template-columns:1fr}.wf-chart{height:250px}}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <a href="index.html">← Package Hub</a>
+    <h1>Статистики — Package Hub</h1>
+    <p>Само за администратори</p>
+  </header>
+
+  <div class="panel" id="connPanel" style="display:none;">
+    <h2>Споделени файлове (мрежова папка)</h2>
+
+    <div class="conn-subhead">Тонажен дневник</div>
+    <div class="conn-row">
+      <div class="conn-dot" id="connDot"></div>
+      <div class="conn-text" id="connText">Проверява се връзка…</div>
+      <button class="conn-btn" id="openFileBtn">Отвори файл от мрежата</button>
+      <button class="conn-btn" id="createFileBtn">Създай нов файл</button>
+      <button class="conn-btn primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn" id="refreshBtn" style="display:none;">Опресни</button>
+    </div>
+    <input type="file" id="importFallback" accept="application/json">
+    <div class="conn-note" id="connNote">Свържи се със същия production-log.json файл, който ползва тонажният дневник.</div>
+
+    <div class="conn-subhead">Аварии на автоматична линия</div>
+    <div class="conn-row" id="avConnRow">
+      <div class="conn-dot" id="avConnDot"></div>
+      <div class="conn-text" id="avConnText">Проверява се връзка…</div>
+      <button class="conn-btn" id="avOpenFileBtn">Отвори файл от мрежата</button>
+      <button class="conn-btn" id="avCreateFileBtn">Създай нов файл</button>
+      <button class="conn-btn primary" id="avReconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn" id="avRefreshBtn" style="display:none;">Опресни</button>
+    </div>
+    <input type="file" id="avImportFallback" accept="application/json">
+    <div class="conn-note" id="avConnNote">Свържи се със същия line-downtime.json файл, който ползва модулът за аварии. Само за четене — статистиката не пипа този файл.</div>
+
+
+
+    <div class="conn-subhead">Personnel / Shift</div>
+    <div class="conn-row" id="personnelConnRow">
+      <div class="conn-dot" id="personnelConnDot"></div>
+      <div class="conn-text" id="personnelConnText">Проверява се връзка…</div>
+      <button class="conn-btn" id="personnelOpenFileBtn">Отвори файл от мрежата</button>
+      <button class="conn-btn" id="personnelCreateFileBtn" style="display:none;">Създай нов файл</button>
+      <button class="conn-btn primary" id="personnelReconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn" id="personnelRefreshBtn" style="display:none;">Опресни</button>
+    </div>
+    <input type="file" id="personnelImportFallback" accept="application/json">
+    <div class="conn-note" id="personnelConnNote">Използва същия personnel.json като Personnel / Shift. Статистиката само чете състава.</div>
+
+    <div style="margin-top:16px;">
+      <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+    </div>
+  </div>
+
+  <div class="locked-box" id="lockedBox">
+    <div class="icon">🔒</div>
+    <h2>Тази страница е само за администратори</h2>
+    <p>Влез в admin режим, за да видиш статистиките.</p>
+    <button id="lockedAdminBtn">Admin вход</button>
+  </div>
+
+  <div id="statsContent" style="display:none;">
+
+    <!-- МЕСЕЧЕН ADMIN DASHBOARD -->
+    <section class="month-dashboard" id="monthDashboard">
+      <div class="dashboard-top">
+        <div>
+          <div class="dashboard-eyebrow">Месечен резултат</div>
+          <div class="dashboard-title-row">
+            <div class="dashboard-title" id="dashboardTitle">—</div>
+            <div class="status-chip neutral" id="dashboardStatus">Няма данни</div>
+          </div>
+        </div>
+        <div class="dashboard-filter">
+          <label for="dashboardMonthSelect">Месец</label>
+          <select class="dashboard-select" id="dashboardMonthSelect"></select>
+        </div>
+      </div>
+
+      <div class="dashboard-main">
+        <div class="goal-side">
+          <div class="goal-ring" id="goalRing">
+            <div class="goal-ring-inner">
+              <div class="goal-ring-pct" id="goalRingPct">0%</div>
+              <div class="goal-ring-sub">от целта</div>
+            </div>
+          </div>
+          <div class="goal-copy">
+            <div class="goal-label">Произведено</div>
+            <div class="goal-value" id="dashboardActual">0.0 т</div>
+            <div class="goal-target" id="dashboardGoal">от 0.0 т цел</div>
+            <div class="goal-remaining" id="dashboardRemaining">—</div>
+          </div>
+        </div>
+
+        <div class="dashboard-kpis">
+          <div class="dashboard-kpi">
+            <div class="lab">Средно / ден</div>
+            <div class="val" id="dashboardAvg">—</div>
+            <div class="sub" id="dashboardAvgSub">календарен темп</div>
+          </div>
+          <div class="dashboard-kpi">
+            <div class="lab">Нужно / ден</div>
+            <div class="val" id="dashboardRequired">—</div>
+            <div class="sub" id="dashboardRequiredSub">за достигане на целта</div>
+          </div>
+          <div class="dashboard-kpi">
+            <div class="lab">Прогноза</div>
+            <div class="val" id="dashboardForecast">—</div>
+            <div class="sub" id="dashboardForecastSub">при текущото темпо</div>
+          </div>
+          <div class="dashboard-kpi">
+            <div class="lab">Спрямо плана</div>
+            <div class="val" id="dashboardDelta">—</div>
+            <div class="sub" id="dashboardDeltaSub">към отчетния ден</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pace-strip">
+        <div class="pace-line"><div class="pace-fill" id="paceFill"></div></div>
+        <div class="pace-meta">
+          <span id="paceLeft">0.0 т произведени</span>
+          <span id="paceRight">Цел: 0.0 т</span>
+        </div>
+      </div>
+
+      <div class="trend-card">
+        <div class="trend-head">
+          <div>
+            <div class="trend-title">Натрупан тонаж спрямо плана</div>
+            <div class="trend-subtitle" id="trendSubtitle">Реално изпълнение по дни</div>
+          </div>
+          <div class="trend-legend">
+            <span class="trend-key"><i></i> Реално</span>
+            <span class="trend-key plan"><i></i> План</span>
+          </div>
+        </div>
+        <div class="monthly-chart" id="monthlyTrendChart">
+          <div class="chart-tooltip" id="monthlyChartTooltip"></div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <!-- WORKFORCE CAPACITY -->
+    <section class="workforce-dashboard" id="workforceDashboard">
+      <div class="wf-head">
+        <div>
+          <div class="dashboard-eyebrow">Workforce capacity</div>
+          <div class="wf-title">Персонал спрямо производствената цел</div>
+          <div class="wf-subtitle" id="wfSubtitle">Измерена производителност от избрания месец × текущ активен производствен състав.</div>
+        </div>
+        <div class="wf-head-right">
+          <span class="wf-source-pill">Щат: <b id="wfStaffSource">—</b></span>
+          <span class="status-chip neutral" id="wfStatus">Няма данни</span>
+        </div>
+      </div>
+
+      <div id="wfNoData" class="wf-no-data" style="display:none;"></div>
+
+      <div id="wfBody">
+        <div class="wf-kpis">
+          <div class="wf-kpi">
+            <div class="lab">Производствен щат</div>
+            <div class="val" id="wfCurrentStaff">—</div>
+            <div class="sub" id="wfCurrentStaffSub">Автоматична + Ръчна</div>
+          </div>
+          <div class="wf-kpi emphasis">
+            <div class="lab">Реално т / човек / ден</div>
+            <div class="val" id="wfMeasuredProductivity">—</div>
+            <div class="sub" id="wfMeasuredProductivitySub">по текущия щат и избрания месец</div>
+          </div>
+          <div class="wf-kpi">
+            <div class="lab">Нужно т / човек / ден</div>
+            <div class="val" id="wfRequiredProductivity">—</div>
+            <div class="sub">за зададената цел при текущия щат</div>
+          </div>
+          <div class="wf-kpi">
+            <div class="lab">Нужно т / смяна</div>
+            <div class="val" id="wfTargetPerShift">—</div>
+            <div class="sub">3 работни смени на ден</div>
+          </div>
+          <div class="wf-kpi" id="wfCapacityKpi">
+            <div class="lab">Капацитет с текущия щат</div>
+            <div class="val" id="wfCurrentCapacity">—</div>
+            <div class="sub" id="wfCurrentCapacitySub">при измерената производителност</div>
+          </div>
+          <div class="wf-kpi" id="wfGapKpi">
+            <div class="lab">Staffing gap</div>
+            <div class="val" id="wfGap">—</div>
+            <div class="sub" id="wfGapSub">спрямо щата с резерв</div>
+          </div>
+        </div>
+
+        <div class="wf-main">
+          <div class="wf-card">
+            <div class="wf-card-head">
+              <div>
+                <div class="wf-card-title">Капацитет спрямо активния щат</div>
+                <div class="wf-card-sub">Колко месечен тонаж поддържа различен размер щат при измерената производителност на щатен човек / ден.</div>
+              </div>
+              <div class="wf-source-pill">Модел: <b>3 смени / ден</b></div>
+            </div>
+            <div class="wf-chart" id="wfCapacityChart"></div>
+            <div class="wf-line-metrics">
+              <div class="wf-line-metric"><div class="l">Автоматична</div><div class="v" id="wfAutoProd">—</div></div>
+              <div class="wf-line-metric"><div class="l">Ръчна</div><div class="v" id="wfManualProd">—</div></div>
+              <div class="wf-line-metric"><div class="l">Supporting — Стикери</div><div class="v" id="wfStickersCount">—</div></div>
+            </div>
+          </div>
+
+          <div class="wf-card wf-calc">
+            <div>
+              <div class="wf-card-title">Автоматичен калкулатор за необходим щат</div>
+              <div class="wf-card-sub">Всички входни стойности идват автоматично от „Тонаж и брак“ и Personnel / Shift.</div>
+            </div>
+
+            <div class="wf-auto-grid">
+              <div class="wf-auto-source target">
+                <div class="l">Месечна цел</div>
+                <div class="v" id="wfCalcTarget">—</div>
+                <div class="s">от „Тонаж и брак“</div>
+              </div>
+              <div class="wf-auto-source reserve">
+                <div class="l">Резерв / отсъствия</div>
+                <div class="v" id="wfCalcReserve">—</div>
+                <div class="s" id="wfCalcReserveSub">от „Допълнителни“</div>
+              </div>
+              <div class="wf-auto-source productivity">
+                <div class="l">Производителност</div>
+                <div class="v" id="wfCalcProductivity">—</div>
+                <div class="s">т / щатен човек / ден · изчислено</div>
+              </div>
+            </div>
+
+            <div class="wf-results">
+              <div class="wf-result"><span>Базов необходим щат</span><b id="wfRequiredBase">—</b></div>
+              <div class="wf-result strong"><span>Щат с резерв</span><b id="wfRequiredReserve">—</b></div>
+              <div class="wf-result" id="wfResultGapRow"><span>Спрямо текущия щат</span><b id="wfResultGap">—</b></div>
+              <div class="wf-result"><span>Средно нужни хора / работна смяна</span><b id="wfRequiredPerShift">—</b></div>
+            </div>
+
+            <div class="wf-calc-note" id="wfCalcNote">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="view-toggle">
+      <button class="active" data-view="month">По месеци</button>
+      <button data-view="year">По години</button>
+    </div>
+
+    <div class="year-select-row" id="yearSelectRow">
+      <label for="yearSelect">Година</label>
+      <select id="yearSelect"></select>
+    </div>
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div class="chart-wrap">
+      <div id="chartContainer"></div>
+      <div class="chart-legend" id="chartLegend"></div>
+    </div>
+
+    <div class="panel">
+      <h2 id="tableTitle">Разбивка</h2>
+      <div id="tableContainer"></div>
+    </div>
+
+    <div class="panel">
+      <div class="line-shift-head">
+        <h2 id="lineShiftTitle">Ръчна / автоматична линия по смяна</h2>
+        <div class="line-month-filter">
+          <label for="lineShiftMonthSelect">Месец</label>
+          <select id="lineShiftMonthSelect"></select>
+        </div>
+      </div>
+      <div class="conn-note" id="lineShiftHint" style="margin:0 0 14px;"></div>
+      <div id="lineShiftContainer" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Престой на автоматична линия</h2>
+      <div class="kpi-row" id="avKpiRow"></div>
+      <div class="conn-note" id="avHint" style="margin-bottom:14px;"></div>
+      <h2 id="avTableTitle">Разбивка</h2>
+      <p class="conn-note" style="margin:0 0 10px;">Разгънете „Причини“ под периода, после изберете причина за конкретните записи и бележки. Водещата причина е тази с най-много минути престой.</p>
+      <div id="avTableContainer" style="overflow-x:auto;"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/file-sync.js"></script>
+<script src="js/statistics.js"></script>
+</body>
+</html>

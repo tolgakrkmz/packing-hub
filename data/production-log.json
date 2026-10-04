@@ -1,0 +1,2384 @@
+{
+  "entries": [
+    {
+      "id": "demo-production-60-1",
+      "date": "2026-08-05",
+      "shift": "А",
+      "tonnage": 2294,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1821,
+        "autoCrates": 73,
+        "manKg": 473,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-60-2",
+      "date": "2026-08-05",
+      "shift": "Б",
+      "tonnage": 2438,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 1922,
+        "autoCrates": 77,
+        "manKg": 516,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-60-3",
+      "date": "2026-08-05",
+      "shift": "В",
+      "tonnage": 2582,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 2023,
+        "autoCrates": 81,
+        "manKg": 559,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-59-1",
+      "date": "2026-08-06",
+      "shift": "А",
+      "tonnage": 2234,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1784,
+        "autoCrates": 71,
+        "manKg": 450,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-59-2",
+      "date": "2026-08-06",
+      "shift": "Г",
+      "tonnage": 2378,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 1885,
+        "autoCrates": 75,
+        "manKg": 493,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-59-3",
+      "date": "2026-08-06",
+      "shift": "В",
+      "tonnage": 2522,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 1986,
+        "autoCrates": 79,
+        "manKg": 536,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-58-1",
+      "date": "2026-08-07",
+      "shift": "Б",
+      "tonnage": 2174,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 1747,
+        "autoCrates": 70,
+        "manKg": 427,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-58-2",
+      "date": "2026-08-07",
+      "shift": "Г",
+      "tonnage": 2318,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 1848,
+        "autoCrates": 74,
+        "manKg": 470,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-58-3",
+      "date": "2026-08-07",
+      "shift": "В",
+      "tonnage": 2462,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 1949,
+        "autoCrates": 78,
+        "manKg": 513,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-57-1",
+      "date": "2026-08-08",
+      "shift": "Б",
+      "tonnage": 2114,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 1710,
+        "autoCrates": 68,
+        "manKg": 404,
+        "manCrates": 20
+      }
+    },
+    {
+      "id": "demo-production-57-2",
+      "date": "2026-08-08",
+      "shift": "Г",
+      "tonnage": 2258,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 1811,
+        "autoCrates": 72,
+        "manKg": 447,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-57-3",
+      "date": "2026-08-08",
+      "shift": "В",
+      "tonnage": 2402,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 1912,
+        "autoCrates": 76,
+        "manKg": 490,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-56-1",
+      "date": "2026-08-09",
+      "shift": "Б",
+      "tonnage": 2504,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 1673,
+        "autoCrates": 67,
+        "manKg": 831,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-56-2",
+      "date": "2026-08-09",
+      "shift": "Г",
+      "tonnage": 2198,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 1774,
+        "autoCrates": 71,
+        "manKg": 424,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-56-3",
+      "date": "2026-08-09",
+      "shift": "А",
+      "tonnage": 2342,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 1875,
+        "autoCrates": 75,
+        "manKg": 467,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-55-1",
+      "date": "2026-08-10",
+      "shift": "Б",
+      "tonnage": 2444,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 1636,
+        "autoCrates": 65,
+        "manKg": 808,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-55-2",
+      "date": "2026-08-10",
+      "shift": "В",
+      "tonnage": 2138,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 1737,
+        "autoCrates": 69,
+        "manKg": 401,
+        "manCrates": 20
+      }
+    },
+    {
+      "id": "demo-production-55-3",
+      "date": "2026-08-10",
+      "shift": "А",
+      "tonnage": 2282,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 1838,
+        "autoCrates": 74,
+        "manKg": 444,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-54-1",
+      "date": "2026-08-11",
+      "shift": "Г",
+      "tonnage": 2384,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 1599,
+        "autoCrates": 64,
+        "manKg": 785,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-54-2",
+      "date": "2026-08-11",
+      "shift": "В",
+      "tonnage": 2528,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 1700,
+        "autoCrates": 68,
+        "manKg": 828,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-54-3",
+      "date": "2026-08-11",
+      "shift": "А",
+      "tonnage": 2222,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 1801,
+        "autoCrates": 72,
+        "manKg": 421,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-53-1",
+      "date": "2026-08-12",
+      "shift": "Г",
+      "tonnage": 2324,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 1562,
+        "autoCrates": 62,
+        "manKg": 762,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-53-2",
+      "date": "2026-08-12",
+      "shift": "В",
+      "tonnage": 2468,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 1663,
+        "autoCrates": 67,
+        "manKg": 805,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-53-3",
+      "date": "2026-08-12",
+      "shift": "А",
+      "tonnage": 2612,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 1764,
+        "autoCrates": 71,
+        "manKg": 848,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-52-1",
+      "date": "2026-08-13",
+      "shift": "Г",
+      "tonnage": 2264,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 1525,
+        "autoCrates": 61,
+        "manKg": 739,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-52-2",
+      "date": "2026-08-13",
+      "shift": "В",
+      "tonnage": 2408,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 1626,
+        "autoCrates": 65,
+        "manKg": 782,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-52-3",
+      "date": "2026-08-13",
+      "shift": "Б",
+      "tonnage": 2552,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 1727,
+        "autoCrates": 69,
+        "manKg": 825,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-51-1",
+      "date": "2026-08-14",
+      "shift": "Г",
+      "tonnage": 3204,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 2488,
+        "autoCrates": 100,
+        "manKg": 716,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-51-2",
+      "date": "2026-08-14",
+      "shift": "А",
+      "tonnage": 2348,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 1589,
+        "autoCrates": 64,
+        "manKg": 759,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-51-3",
+      "date": "2026-08-14",
+      "shift": "Б",
+      "tonnage": 2492,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1690,
+        "autoCrates": 68,
+        "manKg": 802,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-50-1",
+      "date": "2026-08-15",
+      "shift": "В",
+      "tonnage": 3144,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 2451,
+        "autoCrates": 98,
+        "manKg": 693,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-50-2",
+      "date": "2026-08-15",
+      "shift": "А",
+      "tonnage": 2288,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 1552,
+        "autoCrates": 62,
+        "manKg": 736,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-50-3",
+      "date": "2026-08-15",
+      "shift": "Б",
+      "tonnage": 2432,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1653,
+        "autoCrates": 66,
+        "manKg": 779,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-49-1",
+      "date": "2026-08-16",
+      "shift": "В",
+      "tonnage": 3084,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 2414,
+        "autoCrates": 97,
+        "manKg": 670,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-49-2",
+      "date": "2026-08-16",
+      "shift": "А",
+      "tonnage": 2228,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 1515,
+        "autoCrates": 61,
+        "manKg": 713,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-49-3",
+      "date": "2026-08-16",
+      "shift": "Б",
+      "tonnage": 2372,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 1616,
+        "autoCrates": 65,
+        "manKg": 756,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-48-1",
+      "date": "2026-08-17",
+      "shift": "В",
+      "tonnage": 3024,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 2377,
+        "autoCrates": 95,
+        "manKg": 647,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-48-2",
+      "date": "2026-08-17",
+      "shift": "А",
+      "tonnage": 3168,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 2478,
+        "autoCrates": 99,
+        "manKg": 690,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-48-3",
+      "date": "2026-08-17",
+      "shift": "Г",
+      "tonnage": 2312,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 1579,
+        "autoCrates": 63,
+        "manKg": 733,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-47-1",
+      "date": "2026-08-18",
+      "shift": "В",
+      "tonnage": 2964,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 2340,
+        "autoCrates": 94,
+        "manKg": 624,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-47-2",
+      "date": "2026-08-18",
+      "shift": "Б",
+      "tonnage": 3108,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 2441,
+        "autoCrates": 98,
+        "manKg": 667,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-47-3",
+      "date": "2026-08-18",
+      "shift": "Г",
+      "tonnage": 2252,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 1542,
+        "autoCrates": 62,
+        "manKg": 710,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-46-1",
+      "date": "2026-08-19",
+      "shift": "А",
+      "tonnage": 2904,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 2303,
+        "autoCrates": 92,
+        "manKg": 601,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-46-2",
+      "date": "2026-08-19",
+      "shift": "Б",
+      "tonnage": 3048,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 2404,
+        "autoCrates": 96,
+        "manKg": 644,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-46-3",
+      "date": "2026-08-19",
+      "shift": "Г",
+      "tonnage": 2192,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 1505,
+        "autoCrates": 60,
+        "manKg": 687,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-45-1",
+      "date": "2026-08-20",
+      "shift": "А",
+      "tonnage": 2844,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 2266,
+        "autoCrates": 91,
+        "manKg": 578,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-45-2",
+      "date": "2026-08-20",
+      "shift": "Б",
+      "tonnage": 2988,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 2367,
+        "autoCrates": 95,
+        "manKg": 621,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-45-3",
+      "date": "2026-08-20",
+      "shift": "Г",
+      "tonnage": 3132,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 2468,
+        "autoCrates": 99,
+        "manKg": 664,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-44-1",
+      "date": "2026-08-21",
+      "shift": "А",
+      "tonnage": 2784,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 2229,
+        "autoCrates": 89,
+        "manKg": 555,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-44-2",
+      "date": "2026-08-21",
+      "shift": "Б",
+      "tonnage": 2928,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 2330,
+        "autoCrates": 93,
+        "manKg": 598,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-44-3",
+      "date": "2026-08-21",
+      "shift": "В",
+      "tonnage": 3072,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 2431,
+        "autoCrates": 97,
+        "manKg": 641,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-43-1",
+      "date": "2026-08-22",
+      "shift": "А",
+      "tonnage": 2724,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 2192,
+        "autoCrates": 88,
+        "manKg": 532,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-43-2",
+      "date": "2026-08-22",
+      "shift": "Г",
+      "tonnage": 2868,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 2293,
+        "autoCrates": 92,
+        "manKg": 575,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-43-3",
+      "date": "2026-08-22",
+      "shift": "В",
+      "tonnage": 3012,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 2394,
+        "autoCrates": 96,
+        "manKg": 618,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-42-1",
+      "date": "2026-08-23",
+      "shift": "Б",
+      "tonnage": 2664,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 2155,
+        "autoCrates": 86,
+        "manKg": 509,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-42-2",
+      "date": "2026-08-23",
+      "shift": "Г",
+      "tonnage": 2808,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 2256,
+        "autoCrates": 90,
+        "manKg": 552,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-42-3",
+      "date": "2026-08-23",
+      "shift": "В",
+      "tonnage": 2952,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 2357,
+        "autoCrates": 94,
+        "manKg": 595,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-41-1",
+      "date": "2026-08-24",
+      "shift": "Б",
+      "tonnage": 2604,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 2118,
+        "autoCrates": 85,
+        "manKg": 486,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-41-2",
+      "date": "2026-08-24",
+      "shift": "Г",
+      "tonnage": 2748,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 2219,
+        "autoCrates": 89,
+        "manKg": 529,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-41-3",
+      "date": "2026-08-24",
+      "shift": "В",
+      "tonnage": 2892,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 2320,
+        "autoCrates": 93,
+        "manKg": 572,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-40-1",
+      "date": "2026-08-25",
+      "shift": "Б",
+      "tonnage": 2544,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 2081,
+        "autoCrates": 83,
+        "manKg": 463,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-40-2",
+      "date": "2026-08-25",
+      "shift": "Г",
+      "tonnage": 2688,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 2182,
+        "autoCrates": 87,
+        "manKg": 506,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-40-3",
+      "date": "2026-08-25",
+      "shift": "А",
+      "tonnage": 2832,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 2283,
+        "autoCrates": 91,
+        "manKg": 549,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-39-1",
+      "date": "2026-08-26",
+      "shift": "Б",
+      "tonnage": 2484,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 2044,
+        "autoCrates": 82,
+        "manKg": 440,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-39-2",
+      "date": "2026-08-26",
+      "shift": "В",
+      "tonnage": 2628,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 2145,
+        "autoCrates": 86,
+        "manKg": 483,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-39-3",
+      "date": "2026-08-26",
+      "shift": "А",
+      "tonnage": 2772,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 2246,
+        "autoCrates": 90,
+        "manKg": 526,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-38-1",
+      "date": "2026-08-27",
+      "shift": "Г",
+      "tonnage": 2424,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 2007,
+        "autoCrates": 80,
+        "manKg": 417,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-38-2",
+      "date": "2026-08-27",
+      "shift": "В",
+      "tonnage": 2568,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 2108,
+        "autoCrates": 84,
+        "manKg": 460,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-38-3",
+      "date": "2026-08-27",
+      "shift": "А",
+      "tonnage": 2712,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 2209,
+        "autoCrates": 88,
+        "manKg": 503,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-37-1",
+      "date": "2026-08-28",
+      "shift": "Г",
+      "tonnage": 2814,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 1970,
+        "autoCrates": 79,
+        "manKg": 844,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-37-2",
+      "date": "2026-08-28",
+      "shift": "В",
+      "tonnage": 2508,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 2071,
+        "autoCrates": 83,
+        "manKg": 437,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-37-3",
+      "date": "2026-08-28",
+      "shift": "А",
+      "tonnage": 2652,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 2172,
+        "autoCrates": 87,
+        "manKg": 480,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-36-1",
+      "date": "2026-08-29",
+      "shift": "Г",
+      "tonnage": 2754,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 1933,
+        "autoCrates": 77,
+        "manKg": 821,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-36-2",
+      "date": "2026-08-29",
+      "shift": "В",
+      "tonnage": 2448,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 2034,
+        "autoCrates": 81,
+        "manKg": 414,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-36-3",
+      "date": "2026-08-29",
+      "shift": "Б",
+      "tonnage": 2592,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 2135,
+        "autoCrates": 85,
+        "manKg": 457,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-35-1",
+      "date": "2026-08-30",
+      "shift": "Г",
+      "tonnage": 2694,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1896,
+        "autoCrates": 76,
+        "manKg": 798,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-35-2",
+      "date": "2026-08-30",
+      "shift": "А",
+      "tonnage": 2838,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 1997,
+        "autoCrates": 80,
+        "manKg": 841,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-35-3",
+      "date": "2026-08-30",
+      "shift": "Б",
+      "tonnage": 2532,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 2098,
+        "autoCrates": 84,
+        "manKg": 434,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-34-1",
+      "date": "2026-08-31",
+      "shift": "В",
+      "tonnage": 2634,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1859,
+        "autoCrates": 74,
+        "manKg": 775,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-34-2",
+      "date": "2026-08-31",
+      "shift": "А",
+      "tonnage": 2778,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 1960,
+        "autoCrates": 78,
+        "manKg": 818,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-34-3",
+      "date": "2026-08-31",
+      "shift": "Б",
+      "tonnage": 2472,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 2061,
+        "autoCrates": 82,
+        "manKg": 411,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-33-1",
+      "date": "2026-09-01",
+      "shift": "В",
+      "tonnage": 2574,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 1822,
+        "autoCrates": 73,
+        "manKg": 752,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-33-2",
+      "date": "2026-09-01",
+      "shift": "А",
+      "tonnage": 2718,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 1923,
+        "autoCrates": 77,
+        "manKg": 795,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-33-3",
+      "date": "2026-09-01",
+      "shift": "Б",
+      "tonnage": 2862,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 2024,
+        "autoCrates": 81,
+        "manKg": 838,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-32-1",
+      "date": "2026-09-02",
+      "shift": "В",
+      "tonnage": 2514,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 1785,
+        "autoCrates": 71,
+        "manKg": 729,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-32-2",
+      "date": "2026-09-02",
+      "shift": "А",
+      "tonnage": 2658,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 1886,
+        "autoCrates": 75,
+        "manKg": 772,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-32-3",
+      "date": "2026-09-02",
+      "shift": "Г",
+      "tonnage": 2802,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 1987,
+        "autoCrates": 79,
+        "manKg": 815,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-31-1",
+      "date": "2026-09-03",
+      "shift": "В",
+      "tonnage": 2454,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 1748,
+        "autoCrates": 70,
+        "manKg": 706,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-31-2",
+      "date": "2026-09-03",
+      "shift": "Б",
+      "tonnage": 2598,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 1849,
+        "autoCrates": 74,
+        "manKg": 749,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-31-3",
+      "date": "2026-09-03",
+      "shift": "Г",
+      "tonnage": 2742,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 1950,
+        "autoCrates": 78,
+        "manKg": 792,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-30-1",
+      "date": "2026-09-04",
+      "shift": "А",
+      "tonnage": 2394,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 1711,
+        "autoCrates": 68,
+        "manKg": 683,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-30-2",
+      "date": "2026-09-04",
+      "shift": "Б",
+      "tonnage": 2538,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 1812,
+        "autoCrates": 72,
+        "manKg": 726,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-30-3",
+      "date": "2026-09-04",
+      "shift": "Г",
+      "tonnage": 2682,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 1913,
+        "autoCrates": 77,
+        "manKg": 769,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-29-1",
+      "date": "2026-09-05",
+      "shift": "А",
+      "tonnage": 2334,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 1674,
+        "autoCrates": 67,
+        "manKg": 660,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-29-2",
+      "date": "2026-09-05",
+      "shift": "Б",
+      "tonnage": 2478,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 1775,
+        "autoCrates": 71,
+        "manKg": 703,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-29-3",
+      "date": "2026-09-05",
+      "shift": "Г",
+      "tonnage": 2622,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 1876,
+        "autoCrates": 75,
+        "manKg": 746,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-28-1",
+      "date": "2026-09-06",
+      "shift": "А",
+      "tonnage": 2274,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 1637,
+        "autoCrates": 65,
+        "manKg": 637,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-28-2",
+      "date": "2026-09-06",
+      "shift": "Б",
+      "tonnage": 2418,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 1738,
+        "autoCrates": 70,
+        "manKg": 680,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-28-3",
+      "date": "2026-09-06",
+      "shift": "В",
+      "tonnage": 2562,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 1839,
+        "autoCrates": 74,
+        "manKg": 723,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-27-1",
+      "date": "2026-09-07",
+      "shift": "А",
+      "tonnage": 2214,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 1600,
+        "autoCrates": 64,
+        "manKg": 614,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-27-2",
+      "date": "2026-09-07",
+      "shift": "Г",
+      "tonnage": 2358,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 1701,
+        "autoCrates": 68,
+        "manKg": 657,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-27-3",
+      "date": "2026-09-07",
+      "shift": "В",
+      "tonnage": 2502,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 1802,
+        "autoCrates": 72,
+        "manKg": 700,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-26-1",
+      "date": "2026-09-08",
+      "shift": "Б",
+      "tonnage": 2154,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 1563,
+        "autoCrates": 63,
+        "manKg": 591,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-26-2",
+      "date": "2026-09-08",
+      "shift": "Г",
+      "tonnage": 2298,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 1664,
+        "autoCrates": 67,
+        "manKg": 634,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-26-3",
+      "date": "2026-09-08",
+      "shift": "В",
+      "tonnage": 2442,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1765,
+        "autoCrates": 71,
+        "manKg": 677,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-25-1",
+      "date": "2026-09-09",
+      "shift": "Б",
+      "tonnage": 2094,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 1526,
+        "autoCrates": 61,
+        "manKg": 568,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-25-2",
+      "date": "2026-09-09",
+      "shift": "Г",
+      "tonnage": 2238,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 1627,
+        "autoCrates": 65,
+        "manKg": 611,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-25-3",
+      "date": "2026-09-09",
+      "shift": "В",
+      "tonnage": 2382,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1728,
+        "autoCrates": 69,
+        "manKg": 654,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-24-1",
+      "date": "2026-09-10",
+      "shift": "Б",
+      "tonnage": 3034,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 2489,
+        "autoCrates": 100,
+        "manKg": 545,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-24-2",
+      "date": "2026-09-10",
+      "shift": "Г",
+      "tonnage": 2178,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 1590,
+        "autoCrates": 64,
+        "manKg": 588,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-24-3",
+      "date": "2026-09-10",
+      "shift": "А",
+      "tonnage": 2322,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 1691,
+        "autoCrates": 68,
+        "manKg": 631,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-23-1",
+      "date": "2026-09-11",
+      "shift": "Б",
+      "tonnage": 2974,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 2452,
+        "autoCrates": 98,
+        "manKg": 522,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-23-2",
+      "date": "2026-09-11",
+      "shift": "В",
+      "tonnage": 2118,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 1553,
+        "autoCrates": 62,
+        "manKg": 565,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-23-3",
+      "date": "2026-09-11",
+      "shift": "А",
+      "tonnage": 2262,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 1654,
+        "autoCrates": 66,
+        "manKg": 608,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-22-1",
+      "date": "2026-09-12",
+      "shift": "Г",
+      "tonnage": 2914,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 2415,
+        "autoCrates": 97,
+        "manKg": 499,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-22-2",
+      "date": "2026-09-12",
+      "shift": "В",
+      "tonnage": 2058,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 1516,
+        "autoCrates": 61,
+        "manKg": 542,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-22-3",
+      "date": "2026-09-12",
+      "shift": "А",
+      "tonnage": 2202,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 1617,
+        "autoCrates": 65,
+        "manKg": 585,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-21-1",
+      "date": "2026-09-13",
+      "shift": "Г",
+      "tonnage": 2854,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 2378,
+        "autoCrates": 95,
+        "manKg": 476,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-21-2",
+      "date": "2026-09-13",
+      "shift": "В",
+      "tonnage": 2998,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 2479,
+        "autoCrates": 99,
+        "manKg": 519,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-21-3",
+      "date": "2026-09-13",
+      "shift": "А",
+      "tonnage": 2142,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 1580,
+        "autoCrates": 63,
+        "manKg": 562,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-20-1",
+      "date": "2026-09-14",
+      "shift": "Г",
+      "tonnage": 2794,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 2341,
+        "autoCrates": 94,
+        "manKg": 453,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-20-2",
+      "date": "2026-09-14",
+      "shift": "В",
+      "tonnage": 2938,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 2442,
+        "autoCrates": 98,
+        "manKg": 496,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-20-3",
+      "date": "2026-09-14",
+      "shift": "Б",
+      "tonnage": 2082,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 1543,
+        "autoCrates": 62,
+        "manKg": 539,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-19-1",
+      "date": "2026-09-15",
+      "shift": "Г",
+      "tonnage": 2734,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 2304,
+        "autoCrates": 92,
+        "manKg": 430,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-19-2",
+      "date": "2026-09-15",
+      "shift": "А",
+      "tonnage": 2878,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 2405,
+        "autoCrates": 96,
+        "manKg": 473,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-19-3",
+      "date": "2026-09-15",
+      "shift": "Б",
+      "tonnage": 2022,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 1506,
+        "autoCrates": 60,
+        "manKg": 516,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-18-1",
+      "date": "2026-09-16",
+      "shift": "В",
+      "tonnage": 2674,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 2267,
+        "autoCrates": 91,
+        "manKg": 407,
+        "manCrates": 20
+      }
+    },
+    {
+      "id": "demo-production-18-2",
+      "date": "2026-09-16",
+      "shift": "А",
+      "tonnage": 2818,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 2368,
+        "autoCrates": 95,
+        "manKg": 450,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-18-3",
+      "date": "2026-09-16",
+      "shift": "Б",
+      "tonnage": 2962,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 2469,
+        "autoCrates": 99,
+        "manKg": 493,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-17-1",
+      "date": "2026-09-17",
+      "shift": "В",
+      "tonnage": 3064,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 2230,
+        "autoCrates": 89,
+        "manKg": 834,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-17-2",
+      "date": "2026-09-17",
+      "shift": "А",
+      "tonnage": 2758,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 2331,
+        "autoCrates": 93,
+        "manKg": 427,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-17-3",
+      "date": "2026-09-17",
+      "shift": "Б",
+      "tonnage": 2902,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 2432,
+        "autoCrates": 97,
+        "manKg": 470,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-16-1",
+      "date": "2026-09-18",
+      "shift": "В",
+      "tonnage": 3004,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 2193,
+        "autoCrates": 88,
+        "manKg": 811,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-16-2",
+      "date": "2026-09-18",
+      "shift": "А",
+      "tonnage": 2698,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 2294,
+        "autoCrates": 92,
+        "manKg": 404,
+        "manCrates": 20
+      }
+    },
+    {
+      "id": "demo-production-16-3",
+      "date": "2026-09-18",
+      "shift": "Г",
+      "tonnage": 2842,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 2395,
+        "autoCrates": 96,
+        "manKg": 447,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-15-1",
+      "date": "2026-09-19",
+      "shift": "В",
+      "tonnage": 2944,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 2156,
+        "autoCrates": 86,
+        "manKg": 788,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-15-2",
+      "date": "2026-09-19",
+      "shift": "Б",
+      "tonnage": 3088,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 2257,
+        "autoCrates": 90,
+        "manKg": 831,
+        "manCrates": 42
+      }
+    },
+    {
+      "id": "demo-production-15-3",
+      "date": "2026-09-19",
+      "shift": "Г",
+      "tonnage": 2782,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 2358,
+        "autoCrates": 94,
+        "manKg": 424,
+        "manCrates": 21
+      }
+    },
+    {
+      "id": "demo-production-14-1",
+      "date": "2026-09-20",
+      "shift": "А",
+      "tonnage": 2884,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 2119,
+        "autoCrates": 85,
+        "manKg": 765,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-14-2",
+      "date": "2026-09-20",
+      "shift": "Б",
+      "tonnage": 3028,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 2220,
+        "autoCrates": 89,
+        "manKg": 808,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-14-3",
+      "date": "2026-09-20",
+      "shift": "Г",
+      "tonnage": 2722,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 2321,
+        "autoCrates": 93,
+        "manKg": 401,
+        "manCrates": 20
+      }
+    },
+    {
+      "id": "demo-production-13-1",
+      "date": "2026-09-21",
+      "shift": "А",
+      "tonnage": 2824,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 2082,
+        "autoCrates": 83,
+        "manKg": 742,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-13-2",
+      "date": "2026-09-21",
+      "shift": "Б",
+      "tonnage": 2968,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 2183,
+        "autoCrates": 87,
+        "manKg": 785,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-13-3",
+      "date": "2026-09-21",
+      "shift": "Г",
+      "tonnage": 3112,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 2284,
+        "autoCrates": 91,
+        "manKg": 828,
+        "manCrates": 41
+      }
+    },
+    {
+      "id": "demo-production-12-1",
+      "date": "2026-09-22",
+      "shift": "А",
+      "tonnage": 2764,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 2045,
+        "autoCrates": 82,
+        "manKg": 719,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-12-2",
+      "date": "2026-09-22",
+      "shift": "Б",
+      "tonnage": 2908,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 2146,
+        "autoCrates": 86,
+        "manKg": 762,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-12-3",
+      "date": "2026-09-22",
+      "shift": "В",
+      "tonnage": 3052,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 2247,
+        "autoCrates": 90,
+        "manKg": 805,
+        "manCrates": 40
+      }
+    },
+    {
+      "id": "demo-production-11-1",
+      "date": "2026-09-23",
+      "shift": "А",
+      "tonnage": 2704,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 2008,
+        "autoCrates": 80,
+        "manKg": 696,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-11-2",
+      "date": "2026-09-23",
+      "shift": "Г",
+      "tonnage": 2848,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 2109,
+        "autoCrates": 84,
+        "manKg": 739,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-11-3",
+      "date": "2026-09-23",
+      "shift": "В",
+      "tonnage": 2992,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 2210,
+        "autoCrates": 88,
+        "manKg": 782,
+        "manCrates": 39
+      }
+    },
+    {
+      "id": "demo-production-10-1",
+      "date": "2026-09-24",
+      "shift": "Б",
+      "tonnage": 2644,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1971,
+        "autoCrates": 79,
+        "manKg": 673,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-10-2",
+      "date": "2026-09-24",
+      "shift": "Г",
+      "tonnage": 2788,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 2072,
+        "autoCrates": 83,
+        "manKg": 716,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-10-3",
+      "date": "2026-09-24",
+      "shift": "В",
+      "tonnage": 2932,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 2173,
+        "autoCrates": 87,
+        "manKg": 759,
+        "manCrates": 38
+      }
+    },
+    {
+      "id": "demo-production-9-1",
+      "date": "2026-09-25",
+      "shift": "Б",
+      "tonnage": 2584,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1934,
+        "autoCrates": 77,
+        "manKg": 650,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-9-2",
+      "date": "2026-09-25",
+      "shift": "Г",
+      "tonnage": 2728,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 2035,
+        "autoCrates": 81,
+        "manKg": 693,
+        "manCrates": 35
+      }
+    },
+    {
+      "id": "demo-production-9-3",
+      "date": "2026-09-25",
+      "shift": "В",
+      "tonnage": 2872,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 2136,
+        "autoCrates": 85,
+        "manKg": 736,
+        "manCrates": 37
+      }
+    },
+    {
+      "id": "demo-production-8-1",
+      "date": "2026-09-26",
+      "shift": "Б",
+      "tonnage": 2524,
+      "brak": 0,
+      "breakdown": {
+        "autoKg": 1897,
+        "autoCrates": 76,
+        "manKg": 627,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-8-2",
+      "date": "2026-09-26",
+      "shift": "Г",
+      "tonnage": 2668,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 1998,
+        "autoCrates": 80,
+        "manKg": 670,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-8-3",
+      "date": "2026-09-26",
+      "shift": "А",
+      "tonnage": 2812,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 2099,
+        "autoCrates": 84,
+        "manKg": 713,
+        "manCrates": 36
+      }
+    },
+    {
+      "id": "demo-production-7-1",
+      "date": "2026-09-27",
+      "shift": "Б",
+      "tonnage": 2464,
+      "brak": 22,
+      "breakdown": {
+        "autoKg": 1860,
+        "autoCrates": 74,
+        "manKg": 604,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-7-2",
+      "date": "2026-09-27",
+      "shift": "В",
+      "tonnage": 2608,
+      "brak": 23,
+      "breakdown": {
+        "autoKg": 1961,
+        "autoCrates": 78,
+        "manKg": 647,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-7-3",
+      "date": "2026-09-27",
+      "shift": "А",
+      "tonnage": 2752,
+      "brak": 24,
+      "breakdown": {
+        "autoKg": 2062,
+        "autoCrates": 82,
+        "manKg": 690,
+        "manCrates": 34
+      }
+    },
+    {
+      "id": "demo-production-6-1",
+      "date": "2026-09-28",
+      "shift": "Г",
+      "tonnage": 2404,
+      "brak": 19,
+      "breakdown": {
+        "autoKg": 1823,
+        "autoCrates": 73,
+        "manKg": 581,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-6-2",
+      "date": "2026-09-28",
+      "shift": "В",
+      "tonnage": 2548,
+      "brak": 20,
+      "breakdown": {
+        "autoKg": 1924,
+        "autoCrates": 77,
+        "manKg": 624,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-6-3",
+      "date": "2026-09-28",
+      "shift": "А",
+      "tonnage": 2692,
+      "brak": 21,
+      "breakdown": {
+        "autoKg": 2025,
+        "autoCrates": 81,
+        "manKg": 667,
+        "manCrates": 33
+      }
+    },
+    {
+      "id": "demo-production-5-1",
+      "date": "2026-09-29",
+      "shift": "Г",
+      "tonnage": 2344,
+      "brak": 16,
+      "breakdown": {
+        "autoKg": 1786,
+        "autoCrates": 71,
+        "manKg": 558,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-5-2",
+      "date": "2026-09-29",
+      "shift": "В",
+      "tonnage": 2488,
+      "brak": 17,
+      "breakdown": {
+        "autoKg": 1887,
+        "autoCrates": 75,
+        "manKg": 601,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-5-3",
+      "date": "2026-09-29",
+      "shift": "А",
+      "tonnage": 2632,
+      "brak": 18,
+      "breakdown": {
+        "autoKg": 1988,
+        "autoCrates": 80,
+        "manKg": 644,
+        "manCrates": 32
+      }
+    },
+    {
+      "id": "demo-production-4-1",
+      "date": "2026-09-30",
+      "shift": "Г",
+      "tonnage": 2284,
+      "brak": 13,
+      "breakdown": {
+        "autoKg": 1749,
+        "autoCrates": 70,
+        "manKg": 535,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-4-2",
+      "date": "2026-09-30",
+      "shift": "В",
+      "tonnage": 2428,
+      "brak": 14,
+      "breakdown": {
+        "autoKg": 1850,
+        "autoCrates": 74,
+        "manKg": 578,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-4-3",
+      "date": "2026-09-30",
+      "shift": "Б",
+      "tonnage": 2572,
+      "brak": 15,
+      "breakdown": {
+        "autoKg": 1951,
+        "autoCrates": 78,
+        "manKg": 621,
+        "manCrates": 31
+      }
+    },
+    {
+      "id": "demo-production-3-1",
+      "date": "2026-10-01",
+      "shift": "Г",
+      "tonnage": 2224,
+      "brak": 10,
+      "breakdown": {
+        "autoKg": 1712,
+        "autoCrates": 68,
+        "manKg": 512,
+        "manCrates": 26
+      }
+    },
+    {
+      "id": "demo-production-3-2",
+      "date": "2026-10-01",
+      "shift": "А",
+      "tonnage": 2368,
+      "brak": 11,
+      "breakdown": {
+        "autoKg": 1813,
+        "autoCrates": 73,
+        "manKg": 555,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-3-3",
+      "date": "2026-10-01",
+      "shift": "Б",
+      "tonnage": 2512,
+      "brak": 12,
+      "breakdown": {
+        "autoKg": 1914,
+        "autoCrates": 77,
+        "manKg": 598,
+        "manCrates": 30
+      }
+    },
+    {
+      "id": "demo-production-2-1",
+      "date": "2026-10-02",
+      "shift": "В",
+      "tonnage": 2164,
+      "brak": 7,
+      "breakdown": {
+        "autoKg": 1675,
+        "autoCrates": 67,
+        "manKg": 489,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-2-2",
+      "date": "2026-10-02",
+      "shift": "А",
+      "tonnage": 2308,
+      "brak": 8,
+      "breakdown": {
+        "autoKg": 1776,
+        "autoCrates": 71,
+        "manKg": 532,
+        "manCrates": 27
+      }
+    },
+    {
+      "id": "demo-production-2-3",
+      "date": "2026-10-02",
+      "shift": "Б",
+      "tonnage": 2452,
+      "brak": 9,
+      "breakdown": {
+        "autoKg": 1877,
+        "autoCrates": 75,
+        "manKg": 575,
+        "manCrates": 29
+      }
+    },
+    {
+      "id": "demo-production-1-1",
+      "date": "2026-10-03",
+      "shift": "В",
+      "tonnage": 2104,
+      "brak": 4,
+      "breakdown": {
+        "autoKg": 1638,
+        "autoCrates": 66,
+        "manKg": 466,
+        "manCrates": 23
+      }
+    },
+    {
+      "id": "demo-production-1-2",
+      "date": "2026-10-03",
+      "shift": "А",
+      "tonnage": 2248,
+      "brak": 5,
+      "breakdown": {
+        "autoKg": 1739,
+        "autoCrates": 70,
+        "manKg": 509,
+        "manCrates": 25
+      }
+    },
+    {
+      "id": "demo-production-1-3",
+      "date": "2026-10-03",
+      "shift": "Б",
+      "tonnage": 2392,
+      "brak": 6,
+      "breakdown": {
+        "autoKg": 1840,
+        "autoCrates": 74,
+        "manKg": 552,
+        "manCrates": 28
+      }
+    },
+    {
+      "id": "demo-production-0-1",
+      "date": "2026-10-04",
+      "shift": "В",
+      "tonnage": 2044,
+      "brak": 1,
+      "breakdown": {
+        "autoKg": 1601,
+        "autoCrates": 64,
+        "manKg": 443,
+        "manCrates": 22
+      }
+    },
+    {
+      "id": "demo-production-0-2",
+      "date": "2026-10-04",
+      "shift": "А",
+      "tonnage": 2188,
+      "brak": 2,
+      "breakdown": {
+        "autoKg": 1702,
+        "autoCrates": 68,
+        "manKg": 486,
+        "manCrates": 24
+      }
+    },
+    {
+      "id": "demo-production-0-3",
+      "date": "2026-10-04",
+      "shift": "Г",
+      "tonnage": 2332,
+      "brak": 3,
+      "breakdown": {
+        "autoKg": 1803,
+        "autoCrates": 72,
+        "manKg": 529,
+        "manCrates": 26
+      }
+    }
+  ],
+  "goalTons": 240
+}

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>Тонажен дневник</title>
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/production-log.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <a href="index.html">← Package Hub</a>
+    <h1>Тонажен дневник на смените</h1>
+    <p>Смените си отчитат тонаж и брак в края на смяната</p>
+  </header>
+
+  <div class="panel" id="connPanel">
+    <h2>Споделен файл (мрежова папка)</h2>
+    <div class="conn-row">
+      <div class="conn-dot" id="connDot"></div>
+      <div class="conn-text" id="connText">Проверява се връзка…</div>
+      <button class="conn-btn" id="openFileBtn">Отвори файл от мрежата</button>
+      <button class="conn-btn" id="createFileBtn">Създай нов файл</button>
+      <button class="conn-btn primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn" id="refreshBtn" style="display:none;">Опресни</button>
+      <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+    </div>
+    <input type="file" id="importFallback" accept="application/json">
+    <div class="conn-note" id="connNote">
+      Първия път изберете или създайте един .json файл в споделената мрежова папка — всички компютри трябва да сочат към същия файл. Работи в Chrome и Edge. Изисква се веднъж на браузър (не изисква интернет).
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Нов запис</h2>
+
+    <div class="row">
+      <div class="field">
+        <label for="dateInput">Дата</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="field">
+      <label for="dateInput">Дата</label>
+      <input type="date" id="dateInput">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+    <button type="button" id="yesterdayBtn" class="conn-btn" style="padding:6px 10px;font-size:11px;">← Вчера (нощна смяна)</button>
+    <span id="dateHint" style="font-size:11px;color:var(--amber);"></span>
+    </div>
+  </div>
+    </div>
+
+    <div class="shift-grid" id="shiftGrid">
+      <button class="shift-btn" data-shift="А">А</button>
+      <button class="shift-btn" data-shift="Б">Б</button>
+      <button class="shift-btn" data-shift="В">В</button>
+      <button class="shift-btn" data-shift="Г">Г</button>
+      <button class="shift-btn" data-shift="СТИКЕРИ">СТИКЕРИ</button>
+    </div>
+
+    <label class="toggle-row">
+      <input type="checkbox" id="breakdownToggle">
+      Разбивка по вид опаковане (автоматична машина / ръчна опаковка)
+    </label>
+
+    <div id="simpleTonRow" class="row">
+      <div class="field">
+        <label>Тонаж (кг)</label>
+        <div class="stepper">
+          <button type="button" data-target="tonInput" data-step="-50">−</button>
+          <input type="number" id="tonInput" value="0" min="0">
+          <button type="button" data-target="tonInput" data-step="50">+</button>
+        </div>
+        <div class="quick">
+          <button type="button" data-target="tonInput" data-step="500">+500</button>
+          <button type="button" data-target="tonInput" data-step="1000">+1000</button>
+          <button type="button" data-target="tonInput" data-set="0">Нулирай</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="breakdownRows" style="display:none;">
+      <div class="breakdown-grid">
+        <div class="bd-card">
+          <div class="bd-title">Автоматична машина</div>
+          <label class="mini-label">Кг</label>
+          <div class="stepper">
+            <button type="button" data-target="autoKgInput" data-step="-50">−</button>
+            <input type="number" id="autoKgInput" value="0" min="0">
+            <button type="button" data-target="autoKgInput" data-step="50">+</button>
+          </div>
+          <div class="quick">
+            <button type="button" data-target="autoKgInput" data-step="500">+500</button>
+            <button type="button" data-target="autoKgInput" data-set="0">0</button>
+          </div>
+          <label class="mini-label">Брой каси</label>
+          <div class="stepper">
+            <button type="button" data-target="autoCrateInput" data-step="-1">−</button>
+            <input type="number" id="autoCrateInput" value="0" min="0">
+            <button type="button" data-target="autoCrateInput" data-step="1">+</button>
+          </div>
+          <div class="quick">
+            <button type="button" data-target="autoCrateInput" data-step="10">+10</button>
+            <button type="button" data-target="autoCrateInput" data-set="0">0</button>
+          </div>
+        </div>
+        <div class="bd-card manual">
+          <div class="bd-title">Ръчна опаковка</div>
+          <label class="mini-label">Кг</label>
+          <div class="stepper">
+            <button type="button" data-target="manKgInput" data-step="-50">−</button>
+            <input type="number" id="manKgInput" value="0" min="0">
+            <button type="button" data-target="manKgInput" data-step="50">+</button>
+          </div>
+          <div class="quick">
+            <button type="button" data-target="manKgInput" data-step="500">+500</button>
+            <button type="button" data-target="manKgInput" data-set="0">0</button>
+          </div>
+          <label class="mini-label">Брой каси</label>
+          <div class="stepper">
+            <button type="button" data-target="manCrateInput" data-step="-1">−</button>
+            <input type="number" id="manCrateInput" value="0" min="0">
+            <button type="button" data-target="manCrateInput" data-step="1">+</button>
+          </div>
+          <div class="quick">
+            <button type="button" data-target="manCrateInput" data-step="10">+10</button>
+            <button type="button" data-target="manCrateInput" data-set="0">0</button>
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Общо тонаж (изчислено автоматично)</label>
+        <div class="total-readout" id="totalReadout">0 кг</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Брак (кг)</label>
+        <div class="stepper">
+          <button type="button" data-target="brakInput" data-step="-5">−</button>
+          <input type="number" id="brakInput" value="0" min="0">
+          <button type="button" data-target="brakInput" data-step="5">+</button>
+        </div>
+        <div class="quick">
+          <button type="button" data-target="brakInput" data-step="20">+20</button>
+          <button type="button" data-target="brakInput" data-step="50">+50</button>
+          <button type="button" data-target="brakInput" data-set="0">Нулирай</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" id="saveBtn" disabled>Изберете смяна за запис</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Тонаж за денонощието</h2>
+    <div class="day-card">
+      <div class="lab">Общо за <b id="dayLabel">днес</b> (всички смени)</div>
+      <div class="val" id="dayVal">0 кг</div>
+    </div>
+
+    <h2>Месечна цел</h2>
+    <div class="goal-head">
+      <div class="goal-edit">
+        <label for="goalInput">Цел за месеца (тонове)</label>
+        <input type="number" id="goalInput" min="0" step="10">
+      </div>
+    </div>
+    <div class="goal-nums">
+      <span class="cur" id="goalCur">0 т</span>
+      <span class="tgt" id="goalTgt">от 3000 т</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="status" id="goalStatus"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Общо по смени (всички записи)</h2>
+    <div class="summary-grid" id="summaryGrid"></div>
+  </div>
+
+  <div class="panel">
+    <h2>История на записите по месеци</h2>
+    <p class="history-hint">Изберете месец, за да разгънете или свиете записите.</p>
+    <div id="historyWrap"></div>
+    <div class="note">Данните се пазят в общия .json файл в мрежовата папка — всички свързани компютри виждат едни и същи записи.</div>
+  </div>
+
+</div>
+
+<script src="js/file-sync.js"></script>
+<script src="js/production-log.js"></script>
+</body>
+</html>

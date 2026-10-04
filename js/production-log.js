@@ -1,0 +1,358 @@
+const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
+let selectedShift = null;
+let entries = [];
+let goalTons = 3000;
+let isAdmin = false; // обновява се от wireAdminToggle() по-долу
+
+const dateInput = document.getElementById('dateInput');
+const tonInput = document.getElementById('tonInput');
+const brakInput = document.getElementById('brakInput');
+const saveBtn = document.getElementById('saveBtn');
+const msg = document.getElementById('msg');
+const goalInput = document.getElementById('goalInput');
+const breakdownToggle = document.getElementById('breakdownToggle');
+const simpleTonRow = document.getElementById('simpleTonRow');
+const breakdownRows = document.getElementById('breakdownRows');
+const autoKgInput = document.getElementById('autoKgInput');
+const autoCrateInput = document.getElementById('autoCrateInput');
+const manKgInput = document.getElementById('manKgInput');
+const manCrateInput = document.getElementById('manCrateInput');
+const totalReadout = document.getElementById('totalReadout');
+
+breakdownToggle.addEventListener('change', ()=>{
+  const on = breakdownToggle.checked;
+  simpleTonRow.style.display = on ? 'none' : 'flex';
+  breakdownRows.style.display = on ? 'block' : 'none';
+  updateTotalReadout();
+});
+
+function updateTotalReadout(){
+  const total = (parseInt(autoKgInput.value||'0',10)) + (parseInt(manKgInput.value||'0',10));
+  totalReadout.textContent = fmt(total)+' кг';
+}
+[autoKgInput, manKgInput].forEach(inp=>{
+  inp.addEventListener('input', updateTotalReadout);
+});
+
+function localDateStr(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
+
+const now = new Date();
+// ВРЕМЕННО ЗА ТЕСТ — маха се след проверка
+const debugHour = new URLSearchParams(location.search).get('testHour');
+const todayStr = localDateStr(now);
+const yesterdayObj = new Date(now);
+yesterdayObj.setDate(yesterdayObj.getDate()-1);
+const yesterdayStr = localDateStr(yesterdayObj);
+
+// Между полунощ и 10ч сутринта приемаме, че е закъснял отчет
+// от НОЩНАТА смяна (22:00–06:00) — тя принадлежи на вчерашния ден.
+const effectiveHour = debugHour !== null ? parseInt(debugHour,10) : now.getHours();
+const isLikelyNightReport = effectiveHour < 10;
+dateInput.value = isLikelyNightReport ? yesterdayStr : todayStr;
+
+const dateHint = document.getElementById('dateHint');
+if(isLikelyNightReport){
+  dateHint.textContent = '🌙 Избрана е вчерашна дата (нощна смяна) — провери дали е вярно.';
+}
+
+document.getElementById('yesterdayBtn').addEventListener('click', ()=>{
+  dateInput.value = yesterdayStr;
+  dateHint.textContent = '';
+  renderDayTotal();
+});
+
+dateInput.addEventListener('change', ()=>{
+  dateHint.textContent = '';
+  renderDayTotal();
+});
+
+goalInput.addEventListener('change', async ()=>{
+  let v = parseInt(goalInput.value || '0', 10);
+  if(v < 0) v = 0;
+  if(sync.fileHandle){ await sync.refreshFromDisk(); }
+  goalTons = v;
+  goalInput.value = v;
+  await sync.commitData();
+  renderGoal();
+});
+
+document.getElementById('shiftGrid').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.shift-btn');
+  if(!btn) return;
+  selectedShift = btn.dataset.shift;
+  document.querySelectorAll('.shift-btn').forEach(b=>{
+    b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
+  });
+  btn.classList.add('sel-'+selectedShift);
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Запиши смяна ' + selectedShift;
+});
+
+document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const target = document.getElementById(btn.dataset.target);
+    if(btn.dataset.set !== undefined){
+      target.value = btn.dataset.set;
+      updateTotalReadout();
+      return;
+    }
+    const step = parseInt(btn.dataset.step,10);
+    let v = parseInt(target.value || '0', 10) + step;
+    if(v < 0) v = 0;
+    target.value = v;
+    updateTotalReadout();
+  });
+});
+
+function fmt(n){
+  return Math.round(n).toLocaleString('bg-BG');
+}
+
+/* ---------- file sync (shared module, see js/file-sync.js) ---------- */
+const sync = createFileSync({
+  dbName: 'portfolio-tonnage-fs-db',
+  suggestedFileName: 'production-log.json',
+  localStorageKey: 'portfolio-tonnage-fallback',
+  defaultData: () => ({ entries: [], goalTons: 3000 }),
+  getData: () => ({ entries, goalTons }),
+  render: render,
+  onConnect: (data)=>{
+    entries = data.entries || [];
+    goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
+    goalInput.value = goalTons;
+  },
+  onRefresh: (data)=>{
+    entries = data.entries || [];
+    goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
+    goalInput.value = goalTons;
+  },
+  elements: {
+    connDot: document.getElementById('connDot'),
+    connText: document.getElementById('connText'),
+    openFileBtn: document.getElementById('openFileBtn'),
+    createFileBtn: document.getElementById('createFileBtn'),
+    reconnectBtn: document.getElementById('reconnectBtn'),
+    refreshBtn: document.getElementById('refreshBtn'),
+    importFallback: document.getElementById('importFallback'),
+    connNote: document.getElementById('connNote'),
+    connRow: document.querySelector('#connPanel .conn-row')
+  }
+});
+
+// Admin режим — споделен с останалите инструменти в хъба (виж js/file-sync.js).
+// Не-admin потребители могат да записват смени, но не виждат бутона за изтриване.
+wireAdminToggle(document.getElementById('adminToggleBtn'), (admin) => {
+  isAdmin = admin;
+  render();
+});
+
+function fmtTons(kg){
+  return (kg/1000).toLocaleString('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
+}
+
+function fmtDate(d){
+  const [y,m,day] = d.split('-');
+  return day+'.'+m+'.'+y;
+}
+
+function renderDayTotal(){
+  const d = dateInput.value;
+  const total = entries.filter(e=>e.date===d).reduce((a,e)=>a+e.tonnage,0);
+  document.getElementById('dayLabel').textContent = (d===todayStr) ? 'днес' : fmtDate(d);
+  document.getElementById('dayVal').textContent = fmt(total)+' кг';
+}
+
+function renderGoal(){
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysTotal = new Date(year, month+1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const daysRemaining = Math.max(daysTotal - dayOfMonth + 1, 0);
+  const monthPrefix = year + '-' + String(month+1).padStart(2,'0');
+
+  const monthKg = entries.filter(e=>e.date && e.date.startsWith(monthPrefix))
+    .reduce((a,e)=>a+e.tonnage,0);
+  const goalKg = goalTons * 1000;
+
+  document.getElementById('goalCur').textContent = fmtTons(monthKg)+' т';
+  document.getElementById('goalTgt').textContent = 'от '+fmtTons(goalKg)+' т';
+
+  const pct = goalKg > 0 ? (monthKg/goalKg*100) : 0;
+  const fill = document.getElementById('progressFill');
+  fill.style.width = Math.min(pct,100)+'%';
+
+  const statusEl = document.getElementById('goalStatus');
+  const currentDailyAvg = monthKg / dayOfMonth;
+  const remainingKg = Math.max(goalKg - monthKg, 0);
+  const requiredDailyAvg = daysRemaining > 0 ? remainingKg / daysRemaining : 0;
+  const projectedKg = currentDailyAvg * daysTotal;
+
+  let cls, text;
+  if(monthKg >= goalKg){
+    cls = 'status-done';
+    text = '<b>Целта е постигната.</b> Изработени '+fmtTons(monthKg)+' т при цел '+fmtTons(goalKg)+' т за месеца.';
+    fill.style.background = 'var(--teal)';
+  } else if(daysRemaining <= 0){
+    cls = 'status-bad';
+    text = '<b>Месецът приключи</b> без постигане на целта — '+fmtTons(monthKg)+' от '+fmtTons(goalKg)+' т.';
+    fill.style.background = 'var(--red)';
+  } else if(projectedKg >= goalKg * 0.98){
+    cls = 'status-ok';
+    text = '<b>По план сте.</b> Остават '+daysRemaining+' дни. При сегашния темп (~'+fmtTons(currentDailyAvg)+' т/ден) прогнозата е '+fmtTons(projectedKg)+' т до края на месеца.';
+    fill.style.background = 'var(--teal)';
+  } else if(projectedKg >= goalKg * 0.85){
+    cls = 'status-warn';
+    text = '<b>Леко изоставане.</b> Остават '+daysRemaining+' дни. Нужен среден темп ~'+fmtTons(requiredDailyAvg)+' т/ден, за да стигнете целта (сегашен темп: ~'+fmtTons(currentDailyAvg)+' т/ден).';
+    fill.style.background = 'var(--amber)';
+  } else {
+    cls = 'status-bad';
+    text = '<b>Изоставане от плана.</b> Остават '+daysRemaining+' дни, а трябва средно ~'+fmtTons(requiredDailyAvg)+' т/ден — доста над сегашния темп от ~'+fmtTons(currentDailyAvg)+' т/ден.';
+    fill.style.background = 'var(--red)';
+  }
+  statusEl.className = 'status '+cls;
+  statusEl.innerHTML = text;
+}
+
+saveBtn.addEventListener('click', async ()=>{
+  if(!selectedShift) return;
+  const useBreakdown = breakdownToggle.checked;
+  let tonnage, breakdown = null;
+  if(useBreakdown){
+    const autoKg = parseInt(autoKgInput.value||'0',10);
+    const autoCrates = parseInt(autoCrateInput.value||'0',10);
+    const manKg = parseInt(manKgInput.value||'0',10);
+    const manCrates = parseInt(manCrateInput.value||'0',10);
+    tonnage = autoKg + manKg;
+    breakdown = { autoKg, autoCrates, manKg, manCrates };
+  } else {
+    tonnage = parseInt(tonInput.value||'0',10);
+  }
+  const entry = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    date: dateInput.value,
+    shift: selectedShift,
+    tonnage: tonnage,
+    brak: parseInt(brakInput.value||'0',10),
+    breakdown: breakdown
+  };
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Записва се...';
+  if(sync.fileHandle){ await sync.refreshFromDisk(); }
+  entries.push(entry);
+  await sync.commitData();
+  render();
+  msg.textContent = 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.';
+  tonInput.value = 0;
+  brakInput.value = 0;
+  autoKgInput.value = 0;
+  autoCrateInput.value = 0;
+  manKgInput.value = 0;
+  manCrateInput.value = 0;
+  updateTotalReadout();
+  selectedShift = null;
+  document.querySelectorAll('.shift-btn').forEach(b=>{
+    b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
+  });
+  saveBtn.textContent = 'Изберете смяна за запис';
+  setTimeout(()=>{ saveBtn.disabled = true; }, 10);
+});
+
+async function deleteEntry(id){
+  if(!isAdmin) return; // допълнителна преграда — не само UI скриване
+  if(sync.fileHandle){ await sync.refreshFromDisk(); }
+  entries = entries.filter(e=>e.id !== id);
+  await sync.commitData();
+  render();
+}
+
+function render(){
+  renderDayTotal();
+  renderGoal();
+
+const grid = document.getElementById('summaryGrid');
+const nowMonthPrefix = new Date().getFullYear() + '-' + String(new Date().getMonth()+1).padStart(2,'0');
+grid.innerHTML = SHIFTS.map(s=>{
+  const rows = entries.filter(e=>e.shift===s && e.date && e.date.startsWith(nowMonthPrefix));
+  const ton = rows.reduce((a,e)=>a+e.tonnage,0);
+  const brak = rows.reduce((a,e)=>a+e.brak,0);
+  return '<div class="sum-card sum-'+s+'">'
+    + '<div class="lab">'+s+'</div>'
+    + '<div class="val">'+fmt(ton)+' кг</div>'
+    + '<div class="sub">брак: '+fmt(brak)+' кг</div>'
+    + '</div>';
+}).join('');
+
+  // История по месеци, най-новите първо. Запазваме разгънатите секции при опресняване.
+  const wrap = document.getElementById('historyWrap');
+  const monthOpenStates = new Map(Array.from(wrap.querySelectorAll('.history-month'), section=>[
+    section.dataset.month, section.open
+  ]));
+  if(entries.length === 0){
+    wrap.innerHTML = '<div class="empty">Все още няма записи.</div>';
+    return;
+  }
+  const sorted = [...entries].sort((a,b)=>{
+    if(a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return b.id.localeCompare(a.id);
+  });
+  const months = new Map();
+  sorted.forEach(entry=>{
+    const monthKey = entry.date ? entry.date.slice(0,7) : '';
+    if(!months.has(monthKey)) months.set(monthKey, []);
+    months.get(monthKey).push(entry);
+  });
+  const monthNames = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
+  const latestMonth = months.keys().next().value;
+  let html = '';
+  months.forEach((rows, monthKey)=>{
+    const [year, month] = monthKey.split('-');
+    const label = monthKey ? monthNames[Number(month)-1]+' '+year : 'Без дата';
+    const tonnage = rows.reduce((total, entry)=>total+entry.tonnage, 0);
+    const isOpen = monthOpenStates.has(monthKey) ? monthOpenStates.get(monthKey) : monthKey === latestMonth;
+    html += '<details class="history-month" data-month="'+monthKey+'"'+(isOpen ? ' open' : '')+'>'
+      + '<summary><span class="history-month-title">'+label+'</span>'
+      + '<span class="history-month-stats"><b>'+fmt(tonnage)+' кг</b> · '+rows.length+' '+(rows.length===1 ? 'запис' : 'записа')+'</span></summary>'
+      + '<div class="history-month-table"><table><thead><tr>'
+      + '<th>Дата</th><th>Смяна</th><th style="text-align:right">Тонаж</th><th style="text-align:right">Каси</th><th style="text-align:right">Брак</th><th></th>'
+      + '</tr></thead><tbody>';
+    rows.forEach(e=>{
+      const bd = e.breakdown;
+      const crates = bd ? (bd.autoCrates + bd.manCrates) : null;
+      let detailRow = '';
+      if(bd){
+        detailRow = '<tr class="bd-detail"><td></td><td colspan="5" style="padding:0 8px 9px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">'
+          + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
+          + '</td></tr>';
+      }
+      // Бутонът за изтриване се показва само в admin режим
+      const delCell = isAdmin
+        ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
+        : '<td></td>';
+      html += '<tr>'
+        + '<td>'+e.date+'</td>'
+        + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
+        + '<td class="num">'+fmt(e.tonnage)+' кг</td>'
+        + '<td class="num">'+(crates!==null ? fmt(crates) : '—')+'</td>'
+        + '<td class="num brak">'+fmt(e.brak)+' кг</td>'
+        + delCell
+        + '</tr>'
+        + detailRow;
+    });
+    html += '</tbody></table></div></details>';
+  });
+  wrap.innerHTML = html;
+
+  if(isAdmin){
+    wrap.querySelectorAll('.del-btn').forEach(b=>{
+      b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
+    });
+  }
+}
+
+sync.init();

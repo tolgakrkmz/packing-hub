@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Двойки и таргети · Package Hub</title>
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/pair-targets.css">
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a href="index.html">← Package Hub</a>
+  <h1>Двойки и таргети</h1>
+  <p>Разпределение на хората и отчет на всяка двойка по смяна.</p>
+</header>
+<div class="panel" id="connPanel">
+  <h2>Споделени файлове</h2>
+  <h3 class="conn-subhead">Двойки и таргети</h3>
+  <div class="conn-row" id="pairsConnRow">
+    <span class="conn-dot" id="pairsConnDot"></span><span class="conn-text" id="pairsConnText">Изберете файл.</span>
+    <button class="conn-btn" id="pairsOpenFileBtn" type="button">Отвори файл</button>
+    <button class="conn-btn primary" id="pairsCreateFileBtn" type="button">Създай нов файл</button>
+    <button class="conn-btn" id="pairsReconnectBtn" type="button" style="display:none">Свържи отново</button>
+    <button class="conn-btn" id="pairsRefreshBtn" type="button" style="display:none">Опресни</button>
+  </div>
+  <input type="file" id="pairsImportFallback" accept="application/json">
+  <p class="conn-note" id="pairsConnNote">Изберете data/pair-targets.json или създайте нов файл в локалната папка за данни.</p>
+  <h3 class="conn-subhead">Състав от Personnel</h3>
+  <div class="conn-row" id="rosterConnRow">
+    <span class="conn-dot" id="rosterConnDot"></span><span class="conn-text" id="rosterConnText">Изберете файла за състава.</span>
+    <button class="conn-btn" id="rosterOpenFileBtn" type="button">Отвори Personnel</button>
+    <button id="rosterCreateFileBtn" type="button" hidden>Създай</button>
+    <button class="conn-btn" id="rosterReconnectBtn" type="button" style="display:none">Свържи отново</button>
+    <button class="conn-btn" id="rosterRefreshBtn" type="button" style="display:none">Опресни</button>
+  </div>
+  <input type="file" id="rosterImportFallback" accept="application/json">
+  <p class="conn-note" id="rosterConnNote">Изберете същия personnel.json, който ползва модулът „Смени и хора“.</p>
+</div>
+<main id="hubContent">
+  <section class="panel live-panel">
+    <div><span class="eyebrow">В момента на смяна</span><h2 id="liveShift"></h2><p class="muted" id="liveDate"></p></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><h2>Работна смяна</h2><span class="badge" id="contextBadge"></span><button id="currentShiftBtn" type="button">Текуща смяна</button></div>
+    <div class="context-fields">
+      <label>Дата на започване<input id="contextDate" type="date" required></label>
+      <label>Работни часове<select id="contextShift"><option value="1">1-ва · 06:00–14:00</option><option value="2">2-ра · 14:00–22:00</option><option value="3">Нощна · 22:00–06:00</option></select></label>
+      <label>Екип по график<input id="contextTeam" type="text" readonly></label>
+    </div>
+    <p id="contextNote" class="muted"></p>
+    <div id="shiftTotals" class="totals"></div>
+    <details class="roster-details"><summary id="rosterSummary">Състав на смяната</summary><div id="rosterList" class="roster-list"></div></details>
+  </section>
+  <section class="panel">
+    <div class="section-head"><h2>Двойки за смяната</h2><button id="addPairBtn" class="primary" type="button">+ Нова двойка</button></div>
+    <p id="pageError" class="error" role="alert"></p>
+    <div id="pairsList" class="pair-grid"></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><h2>История по месеци</h2><label>Месец<input id="historyMonth" type="month"></label></div>
+    <div id="historyList"></div>
+  </section>
+</main>
+</div>
+<dialog id="pairDialog" aria-labelledby="dialogTitle">
+  <form id="pairForm">
+    <div class="section-head"><h2 id="dialogTitle"></h2><button type="button" id="closeDialogBtn" aria-label="Затвори">✕</button></div>
+    <p id="dialogContext" class="muted"></p>
+    <div id="planFields" class="form-grid">
+      <label>Първи човек<select id="memberOne"></select></label>
+      <label>Втори човек<select id="memberTwo"></select></label>
+      <label>Таргет · кг<input id="targetKg" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
+      <label>Таргет · каси<input id="targetCrates" type="number" min="1" step="1" inputmode="numeric"></label>
+    </div>
+    <div id="reportFields">
+      <p id="reportTargets" class="target-note"></p>
+      <div class="form-grid">
+        <label>Реално · кг<input id="actualKg" type="number" min="0" step="0.01" inputmode="decimal"></label>
+        <label>Реално · каси<input id="actualCrates" type="number" min="0" step="1" inputmode="numeric"></label>
+      </div>
+      <p id="resultPreview" aria-live="polite"></p>
+      <div id="reasonFields">
+        <label>Причина при непостигнат таргет<select id="reasonKey"></select></label>
+        <label>Обяснение<textarea id="reasonText" rows="3" placeholder="Какво попречи на двойката да постигне целта?"></textarea></label>
+        <p class="muted">Изберете причина, напишете обяснение или използвайте и двете.</p>
+      </div>
+    </div>
+    <fieldset><legend>Къде е работила двойката</legend>
+      <label class="checkbox"><input id="areaAuto" type="checkbox" value="auto">Автоматична опаковка</label>
+      <label class="checkbox"><input id="areaManual" type="checkbox" value="manual">Ръчна опаковка</label>
+      <p class="muted">Може да изберете и двете при преместване през смяната.</p>
+    </fieldset>
+    <p id="dialogError" class="error" role="alert"></p>
+    <div class="dialog-actions"><button type="button" id="cancelDialogBtn">Отказ</button><button id="savePairBtn" type="submit" class="primary">Запази</button></div>
+  </form>
+</dialog>
+<script src="js/file-sync.js"></script>
+<script src="js/shift-schedule.js"></script>
+<script src="js/pair-targets-model.js"></script>
+<script src="js/pair-targets.js"></script>
+</body>
+</html>
