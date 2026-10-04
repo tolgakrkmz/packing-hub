@@ -6,6 +6,7 @@
 <title>Статистики — Package Hub</title>
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/pair-targets-statistics.css">
+<link rel="stylesheet" href="css/statistics-navigation.css">
 <style>
 body{padding:24px 16px 60px;}
 .wrap{max-width:1100px;margin:0 auto;}
@@ -228,6 +229,11 @@ body{padding:24px 16px 60px;}
     <p>Само за администратори</p>
   </header>
 
+  <div class="stats-toolbar">
+    <button class="conn-btn" id="statsFilesBtn" aria-controls="connPanel" aria-expanded="false" hidden>Файлове <span class="stats-files-status" id="statsFilesStatus">0/4 свързани</span></button>
+    <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+  </div>
+
   <div class="panel" id="connPanel" style="display:none;">
     <h2>Споделени файлове (мрежова папка)</h2>
 
@@ -281,9 +287,6 @@ body{padding:24px 16px 60px;}
     <input type="file" id="pairStatsImportFallback" accept="application/json">
     <div class="conn-note" id="pairStatsConnNote">Използва същия pair-targets.json като „Двойки и таргети“. Само за четене.</div>
 
-    <div style="margin-top:16px;">
-      <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
-    </div>
   </div>
 
   <div class="locked-box" id="lockedBox">
@@ -305,12 +308,23 @@ body{padding:24px 16px 60px;}
             <div class="status-chip neutral" id="dashboardStatus">Няма данни</div>
           </div>
         </div>
+        <div class="stats-month-filters">
+    <div class="year-select-row" id="yearSelectRow">
+      <label for="yearSelect">Година</label>
+      <select id="yearSelect"></select>
+    </div>
         <div class="dashboard-filter">
           <label for="dashboardMonthSelect">Месец</label>
           <select class="dashboard-select" id="dashboardMonthSelect"></select>
         </div>
+        </div>
       </div>
 
+      <div class="stats-empty-month" id="monthlyResultEmpty" hidden>
+        Няма тонажни записи за избрания период. Свържете файла от „Тонаж и брак“, за да видите месечния резултат.<br>
+        <button class="conn-btn" id="monthlyConnectBtn">Свържи тонажен дневник</button>
+      </div>
+      <div id="monthlyResultBody">
       <div class="dashboard-main">
         <div class="goal-side">
           <div class="goal-ring" id="goalRing">
@@ -359,6 +373,8 @@ body{padding:24px 16px 60px;}
         </div>
       </div>
 
+      <details class="stats-details" id="monthlyTrendDetails">
+        <summary>Покажи графиката по дни</summary>
       <div class="trend-card">
         <div class="trend-head">
           <div>
@@ -374,15 +390,33 @@ body{padding:24px 16px 60px;}
           <div class="chart-tooltip" id="monthlyChartTooltip"></div>
         </div>
       </div>
+      </details>
+      </div>
     </section>
 
+    <nav class="stats-navigation" role="tablist" aria-label="Раздели на статистиката">
+      <button id="statsTabOverview" role="tab" data-stats-tab="overview" aria-controls="statsOverview" aria-selected="true">Обзор</button>
+      <button id="statsTabProduction" role="tab" data-stats-tab="production" aria-controls="statsProduction" aria-selected="false" tabindex="-1">Производство</button>
+      <button id="statsTabPairs" role="tab" data-stats-tab="pairs" aria-controls="statsPairs" aria-selected="false" tabindex="-1">Двойки и таргети</button>
+      <button id="statsTabDowntime" role="tab" data-stats-tab="downtime" aria-controls="statsDowntime" aria-selected="false" tabindex="-1">Престои</button>
+      <button id="statsTabWorkforce" role="tab" data-stats-tab="workforce" aria-controls="statsWorkforce" aria-selected="false" tabindex="-1">Състав и капацитет</button>
+    </nav>
+    <div class="stats-section" id="statsOverview" data-stats-panel="overview" role="tabpanel" aria-labelledby="statsTabOverview">
+      <p class="stats-overview-note">Изберете раздел за подробна статистика. Месечният резултат остава над всеки раздел.</p>
+    </div>
+    <div id="statsBreakdownControls" hidden>
+      <div class="view-toggle" aria-label="Разбивка по период">
+        <button class="active" data-view="month">По месеци</button>
+        <button data-view="year">По години</button>
+      </div>
+    </div>
 
-
+    <div class="stats-section" id="statsWorkforce" data-stats-panel="workforce" role="tabpanel" aria-labelledby="statsTabWorkforce" hidden>
     <!-- WORKFORCE CAPACITY -->
     <section class="workforce-dashboard" id="workforceDashboard">
       <div class="wf-head">
         <div>
-          <div class="dashboard-eyebrow">Workforce capacity</div>
+          <div class="dashboard-eyebrow">Състав и капацитет</div>
           <div class="wf-title">Персонал спрямо производствената цел</div>
           <div class="wf-subtitle" id="wfSubtitle">Измерена производителност от избрания месец × текущ активен производствен състав.</div>
         </div>
@@ -422,7 +456,7 @@ body{padding:24px 16px 60px;}
             <div class="sub" id="wfCurrentCapacitySub">при измерената производителност</div>
           </div>
           <div class="wf-kpi" id="wfGapKpi">
-            <div class="lab">Staffing gap</div>
+            <div class="lab">Разлика в щата</div>
             <div class="val" id="wfGap">—</div>
             <div class="sub" id="wfGapSub">спрямо щата с резерв</div>
           </div>
@@ -441,7 +475,7 @@ body{padding:24px 16px 60px;}
             <div class="wf-line-metrics">
               <div class="wf-line-metric"><div class="l">Автоматична</div><div class="v" id="wfAutoProd">—</div></div>
               <div class="wf-line-metric"><div class="l">Ръчна</div><div class="v" id="wfManualProd">—</div></div>
-              <div class="wf-line-metric"><div class="l">Supporting — Стикери</div><div class="v" id="wfStickersCount">—</div></div>
+              <div class="wf-line-metric"><div class="l">Стикери</div><div class="v" id="wfStickersCount">—</div></div>
             </div>
           </div>
 
@@ -476,12 +510,14 @@ body{padding:24px 16px 60px;}
               <div class="wf-result"><span>Средно нужни хора / работна смяна</span><b id="wfRequiredPerShift">—</b></div>
             </div>
 
-            <div class="wf-calc-note" id="wfCalcNote">—</div>
+            <details class="stats-details"><summary>Как се изчислява?</summary><div class="wf-calc-note" id="wfCalcNote">—</div></details>
           </div>
         </div>
       </div>
     </section>
 
+    </div>
+    <div class="stats-section" id="statsPairs" data-stats-panel="pairs" role="tabpanel" aria-labelledby="statsTabPairs" hidden>
     <section class="panel pair-stats" aria-labelledby="pairStatsTitle">
       <div class="pair-stats-head">
         <div>
@@ -497,15 +533,9 @@ body{padding:24px 16px 60px;}
       <div id="pairStatsBody"></div>
     </section>
 
-    <div class="view-toggle">
-      <button class="active" data-view="month">По месеци</button>
-      <button data-view="year">По години</button>
     </div>
+    <div class="stats-section" id="statsProduction" data-stats-panel="production" role="tabpanel" aria-labelledby="statsTabProduction" hidden>
 
-    <div class="year-select-row" id="yearSelectRow">
-      <label for="yearSelect">Година</label>
-      <select id="yearSelect"></select>
-    </div>
 
     <div class="kpi-row" id="kpiRow"></div>
 
@@ -514,11 +544,16 @@ body{padding:24px 16px 60px;}
       <div class="chart-legend" id="chartLegend"></div>
     </div>
 
+    <details class="stats-details">
+      <summary>Покажи таблицата по периоди</summary>
     <div class="panel">
       <h2 id="tableTitle">Разбивка</h2>
-      <div id="tableContainer"></div>
+      <div class="stats-table-scroll" id="tableContainer"></div>
     </div>
 
+    </details>
+    <details class="stats-details">
+      <summary>Покажи линиите и смените</summary>
     <div class="panel">
       <div class="line-shift-head">
         <h2 id="lineShiftTitle">Ръчна / автоматична линия по смяна</h2>
@@ -531,13 +566,20 @@ body{padding:24px 16px 60px;}
       <div id="lineShiftContainer" style="overflow-x:auto;"></div>
     </div>
 
+    </details>
+    </div>
+    <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">
       <h2>Престой на автоматична линия</h2>
       <div class="kpi-row" id="avKpiRow"></div>
       <div class="conn-note" id="avHint" style="margin-bottom:14px;"></div>
+      <details class="stats-details">
+        <summary>Покажи периодите и причините</summary>
       <h2 id="avTableTitle">Разбивка</h2>
       <p class="conn-note" style="margin:0 0 10px;">Разгънете „Причини“ под периода, после изберете причина за конкретните записи и бележки. Водещата причина е тази с най-много минути престой.</p>
       <div id="avTableContainer" style="overflow-x:auto;"></div>
+      </details>
+    </div>
     </div>
 
   </div>
@@ -548,6 +590,7 @@ body{padding:24px 16px 60px;}
 <script src="js/pair-targets-model.js"></script>
 <script src="js/pair-targets-statistics-model.js"></script>
 <script src="js/pair-targets-statistics.js"></script>
+<script src="js/statistics-navigation.js"></script>
 <script src="js/statistics.js"></script>
 </body>
 </html>

@@ -48,6 +48,17 @@ connections. Browsers without direct file access use manual import/export.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
 
+## Statistics navigation
+
+The monthly result stays above every statistics section. Switch between Overview,
+Production, Pair Targets, Downtime, and Workforce Capacity; only one section is
+shown at a time. The last section is remembered separately in demo browser storage.
+Choose the monthly year and month at the top. Production and downtime support
+monthly/yearly breakdowns. Detailed tables, the daily trend, and pair comparisons
+expand on demand. The Files button shows connections and keeps the file panel
+closed until requested. Without production records, the monthly result offers a
+connection button while the other sections remain available.
+
 ## Pair target statistics
 
 Statistics reads the same pair-targets file without modifying it. Its independent

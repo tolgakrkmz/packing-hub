@@ -50,11 +50,14 @@ function createPairTargetsStatistics({dbName, localStorageKey}) {
       ${card('Недостиг по отчетите', fmt(result.deficitKg) + ' кг', `${fmt(result.deficitCrates)} каси<br>Сбор на недостига на всяка двойка; преизпълнението не го компенсира.`)}
       ${card('Средно / отчетена двойка', result.averageKg === null ? '—' : fmt(result.averageKg) + ' кг', 'Средно количество за отчетена двойка и смяна.')}
     </div>
+    <details class="stats-details" data-group="analysis"${openGroups.has('analysis') ? ' open' : ''}>
+    <summary>Покажи сравнение по екипи и причини</summary>
     <h3>Сравнение по екипи</h3>
     <div class="pair-stats-scroll"><table class="stats-table"><thead><tr><th>Екип</th><th>План / отчети / чакащи</th><th>Постигнати / отчети</th><th>Успеваемост</th><th>Реално кг</th><th>Изпълнение кг</th><th>Реално каси</th><th>Изпълнение каси</th></tr></thead><tbody>${result.teams.map(group => `<tr><td>${escape(group.team)}</td><td class="num">${group.planned} / ${group.reported} / ${group.pending}</td><td class="num">${group.achieved} / ${group.reported}</td><td class="num">${pct(group.successPct)}</td><td class="num">${fmt(group.actualKg)}</td><td class="num">${pct(group.kgPct)}</td><td class="num">${fmt(group.actualCrates)}</td><td class="num">${pct(group.cratesPct)}</td></tr>`).join('')}</tbody></table></div>
     <h3>Причини за неизпълнение</h3>
     <p class="conn-note">Дял от ${result.missed} непостигнати отчета. Това са посочените причини, а не измерени минути престой.</p>
     ${result.reasons.length ? result.reasons.map(reason => details('reason-' + reason.key, `<div class="pair-reason-title"><span>${escape(reason.label)}</span><strong>${reason.count} · ${pct(reason.count / result.missed * 100)}</strong></div><div class="pair-reason-bar" aria-hidden="true"><span style="width:${reason.count / result.missed * 100}%"></span></div>`, reportsTable(reason.entries))).join('') : '<div class="conn-note">Няма отчетени непостигнати таргети.</div>'}
+    </details>
     <h3>Двойки и отчети</h3>
     ${result.teams.map(group => details('team-' + group.team, `Екип ${escape(group.team)} · ${group.planned} двойки · ${group.pending} очакват отчет`, reportsTable(group.entries))).join('')}`;
   }

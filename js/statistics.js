@@ -336,6 +336,11 @@ const pairStatistics = createPairTargetsStatistics({
   localStorageKey: 'portfolio-pair-targets-fallback'
 });
 
+const statisticsNavigation = createStatisticsNavigation({
+  storageKey: 'portfolio-statistics-section',
+  onChange: renderAll
+});
+
 let syncStarted = false;
 let avSyncStarted = false;
 let personnelSyncStarted = false;
@@ -352,10 +357,7 @@ function applyAdminGate(admin) {
       ? 'block'
       : 'none';
 
-  el.connPanel.style.display =
-    admin
-      ? 'block'
-      : 'none';
+  statisticsNavigation.setAdmin(admin);
 
   if (
     admin &&
@@ -425,11 +427,6 @@ document
             );
           });
 
-        el.yearSelectRow.style.display =
-          currentView === 'month'
-            ? 'flex'
-            : 'none';
-
         renderAll();
       }
     );
@@ -481,7 +478,7 @@ el.lineShiftMonthSelect.addEventListener(
 function getAvailableYears() {
   return Array.from(
     new Set(
-      entries
+      entries.concat(avEntries)
         .map(e =>
           e.date
             ? e.date.slice(0, 4)
@@ -705,11 +702,14 @@ function populateMonthSelectors() {
     el.lineShiftMonthSelect.innerHTML =
       '<option value="">Няма записи</option>';
 
-    selectedDashboardMonth =
-      null;
+    selectedDashboardMonth = null;
+    selectedLineMonth = null;
+    el.dashboardMonthSelect.disabled = true;
 
     return;
   }
+
+  el.dashboardMonthSelect.disabled = false;
 
   const current =
     new Date();
@@ -1196,6 +1196,9 @@ function getDashboardStatus(d) {
 function renderMonthlyDashboard() {
   const d =
     getMonthlyDashboardData();
+
+  document.getElementById('monthlyResultBody').hidden = !d;
+  document.getElementById('monthlyResultEmpty').hidden = !!d;
 
   if (!d) {
     el.dashboardTitle.textContent =
@@ -3247,7 +3250,7 @@ function renderWorkforceDashboard() {
   if (!counts) {
     el.wfNoData.style.display = 'block';
     el.wfBody.style.display = 'none';
-    el.wfNoData.innerHTML = '<strong>Няма свързан Personnel файл.</strong> Свържи <b>personnel.json</b> от панела „Споделени файлове“. Ако вече е отварян в Personnel / Shift на този компютър, връзката обикновено се възстановява автоматично.';
+    el.wfNoData.innerHTML = '<strong>Няма свързан файл за състава.</strong> Свържи <b>personnel.json</b> от панела „Споделени файлове“. Ако вече е отварян в Personnel / Shift на този компютър, връзката обикновено се възстановява автоматично.';
     el.wfStaffSource.textContent = 'не е свързан';
     el.wfStatus.className = 'status-chip neutral';
     el.wfStatus.textContent = 'Няма personnel данни';
@@ -3258,7 +3261,7 @@ function renderWorkforceDashboard() {
   if (!monthData || !monthData.loggedTeamShifts || !monthData.measuredProductivityTons) {
     el.wfNoData.style.display = 'block';
     el.wfBody.style.display = 'none';
-    el.wfNoData.innerHTML = '<strong>Няма достатъчно тонажни записи за избрания месец.</strong> Workforce Capacity се изчислява от реалните записи А / Б / В / Г и текущия активен състав.';
+    el.wfNoData.innerHTML = '<strong>Няма достатъчно тонажни записи за избрания месец.</strong> Капацитетът се изчислява от реалните записи А / Б / В / Г и текущия активен състав.';
     el.wfStaffSource.textContent = `${counts.productionTotal} производствени`;
     el.wfStatus.className = 'status-chip neutral';
     el.wfStatus.textContent = 'Няма база за изчисление';
@@ -3635,8 +3638,15 @@ function renderAll() {
   if (
     !years.length
   ) {
-    el.monthDashboard.style.display =
-      'none';
+    el.monthDashboard.style.display = 'block';
+    selectedYear = null;
+    selectedDashboardMonth = null;
+    selectedLineMonth = null;
+    el.yearSelect.innerHTML = '<option value="">Няма записи</option>';
+    el.yearSelect.disabled = true;
+    el.dashboardMonthSelect.innerHTML = '<option value="">Няма записи</option>';
+    el.dashboardMonthSelect.disabled = true;
+    renderMonthlyDashboard();
 
     el.kpiRow.innerHTML =
       '';
@@ -3653,8 +3663,9 @@ function renderAll() {
     el.lineShiftContainer.innerHTML =
       '';
   } else {
-    el.monthDashboard.style.display =
-      'block';
+    el.monthDashboard.style.display = 'block';
+    el.yearSelect.disabled = false;
+    el.dashboardMonthSelect.disabled = false;
 
     const previous =
       el.yearSelect.value;
