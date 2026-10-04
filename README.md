@@ -26,7 +26,7 @@ in English. The pair targets module opens directly without a role login.
 2. Open `index.html` in Chrome or Edge. No installation or internet connection is required.
 3. Connect the corresponding JSON fixtures from `data/` when opening a module.
 4. For Pair Targets, select both `pair-targets.json` and `personnel.json`.
-5. For Statistics, select the production, downtime and personnel fixtures.
+5. For Statistics, select the production, downtime, personnel and pair-targets fixtures.
 6. For Packing Instructions, select the repository folder containing `data/`.
 
 Some management screens use the public demonstration password **`demo-admin`**.
@@ -48,6 +48,17 @@ connections. Browsers without direct file access use manual import/export.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
 
+## Pair target statistics
+
+Statistics reads the same pair-targets file without modifying it. Its independent
+month and team filters work even when no production or personnel file is connected.
+It shows reporting coverage, success rate, kilograms and crates against reported
+targets, the full plan, per-pair deficits, team comparisons and expandable reasons
+and reports. Pending plans are excluded from success and output ratios. Both
+targets must be met for success. Pair output is never added to production totals.
+Mixed packaging remains one report; actual hours and per-line quantities are not
+available. Reasons count reports, not downtime minutes.
+
 ## Tests
 
 With Node.js 20 or newer:
@@ -57,7 +68,8 @@ node --test tests/*.test.cjs
 ```
 
 The tests cover shift boundaries, rotation, pair allocation, target validation,
-report scope, failure reasons, read-only personnel access and stale file refreshes.
+report scope, failure reasons, read-only personnel access, stale file refreshes,
+and pair statistics including pending plans, weighted ratios and per-pair deficits.
 
 ## Publication safeguards
 

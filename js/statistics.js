@@ -331,11 +331,17 @@ const personnelSync = createFileSync({
   }
 });
 
+const pairStatistics = createPairTargetsStatistics({
+  dbName: 'portfolio-pair-targets-fs-db',
+  localStorageKey: 'portfolio-pair-targets-fallback'
+});
+
 let syncStarted = false;
 let avSyncStarted = false;
 let personnelSyncStarted = false;
 
 function applyAdminGate(admin) {
+  if (admin) pairStatistics.init();
   el.lockedBox.style.display =
     admin
       ? 'none'
@@ -3620,6 +3626,8 @@ function renderAll() {
   ) {
     return;
   }
+
+  pairStatistics.render();
 
   const years =
     getAvailableYears();

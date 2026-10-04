@@ -2,8 +2,10 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Статистики — Package Hub</title>
 <link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/pair-targets-statistics.css">
 <style>
 body{padding:24px 16px 60px;}
 .wrap{max-width:1100px;margin:0 auto;}
@@ -267,6 +269,18 @@ body{padding:24px 16px 60px;}
     <input type="file" id="personnelImportFallback" accept="application/json">
     <div class="conn-note" id="personnelConnNote">Използва същия personnel.json като Personnel / Shift. Статистиката само чете състава.</div>
 
+    <div class="conn-subhead">Двойки и таргети</div>
+    <div class="conn-row" id="pairStatsConnRow">
+      <div class="conn-dot" id="pairStatsConnDot"></div>
+      <div class="conn-text" id="pairStatsConnText">Проверява се връзка…</div>
+      <button class="conn-btn" id="pairStatsOpenFileBtn">Отвори файл от мрежата</button>
+      <button class="conn-btn" id="pairStatsCreateFileBtn" hidden>Създай нов файл</button>
+      <button class="conn-btn primary" id="pairStatsReconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn" id="pairStatsRefreshBtn" style="display:none;">Опресни</button>
+    </div>
+    <input type="file" id="pairStatsImportFallback" accept="application/json">
+    <div class="conn-note" id="pairStatsConnNote">Използва същия pair-targets.json като „Двойки и таргети“. Само за четене.</div>
+
     <div style="margin-top:16px;">
       <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
     </div>
@@ -468,6 +482,21 @@ body{padding:24px 16px 60px;}
       </div>
     </section>
 
+    <section class="panel pair-stats" aria-labelledby="pairStatsTitle">
+      <div class="pair-stats-head">
+        <div>
+          <h2 id="pairStatsTitle">Двойки и таргети — месечен отчет</h2>
+          <a href="pair-targets.html">Отвори „Двойки и таргети“ →</a>
+        </div>
+        <div class="pair-stats-filters">
+          <label for="pairStatsMonth">Месец<select class="dashboard-select" id="pairStatsMonth"></select></label>
+          <label for="pairStatsTeam">Екип<select class="dashboard-select" id="pairStatsTeam"></select></label>
+        </div>
+      </div>
+      <p class="conn-note" id="pairStatsHint"></p>
+      <div id="pairStatsBody"></div>
+    </section>
+
     <div class="view-toggle">
       <button class="active" data-view="month">По месеци</button>
       <button data-view="year">По години</button>
@@ -515,6 +544,10 @@ body{padding:24px 16px 60px;}
 </div>
 
 <script src="js/file-sync.js"></script>
+<script src="js/shift-schedule.js"></script>
+<script src="js/pair-targets-model.js"></script>
+<script src="js/pair-targets-statistics-model.js"></script>
+<script src="js/pair-targets-statistics.js"></script>
 <script src="js/statistics.js"></script>
 </body>
 </html>
