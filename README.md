@@ -16,9 +16,16 @@ instruction in this repository is fictional. No company documents are included.*
 - Automatic shift selection at 06:00, 14:00 and 22:00; overnight shifts retain their start date.
 - Packing instructions with search and a fictional sample profile.
 - Monthly statistics and compact file connection panels.
+- Bulgarian and English interface with a remembered language choice.
 
-The interface is currently in Bulgarian. Source filenames and this README are
-in English. The pair targets module opens directly without a role login.
+Bulgarian is the default. Use the BG / EN buttons at the top of any screen to
+switch languages without reloading or losing unfinished form input. The choice
+is remembered in this browser and applies to every module. Names, notes, document
+contents and saved identifiers retain their original text. The demo stores its
+language preference separately from the production application.
+
+Source filenames and this README are in English. The pair targets module opens
+directly without a role login.
 
 ## Run locally
 
@@ -80,7 +87,8 @@ node --test tests/*.test.cjs
 
 The tests cover shift boundaries, rotation, pair allocation, target validation,
 report scope, failure reasons, read-only personnel access, stale file refreshes,
-and pair statistics including pending plans, weighted ratios and per-pair deficits.
+pair statistics including pending plans, weighted ratios and per-pair deficits,
+and language preferences, dynamic translations and preserved identifiers.
 
 ## Publication safeguards
 

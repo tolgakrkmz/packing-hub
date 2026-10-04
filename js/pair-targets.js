@@ -50,12 +50,12 @@
     const state = PairTargets.status(entry);
     const metric = (target, actual, unit) => `<div class="metric"><span>${actual === undefined ? 'Цел' : 'Реално / цел'} · ${unit}</span><strong>${actual === undefined ? fmt(target) : fmt(actual)+' / '+fmt(target)}</strong></div>${actual === undefined ? '' : `<progress max="${target}" value="${Math.min(actual,target)}" aria-label="Изпълнение в ${unit}"></progress>`}`;
     const reason = PairTargets.REASONS.find(item => item.key === entry.result?.reasonKey);
-    const cause = [reason?.label,entry.result?.reasonText].filter(Boolean).join(' · ');
+    const cause = [reason ? escape(reason.label) : '', entry.result?.reasonText ? `<span translate="no">${escape(entry.result.reasonText)}</span>` : ''].filter(Boolean).join(' · ');
     return `<article class="pair-card">
-      <div class="card-top"><h3>${entry.members.map(person => escape(person.name)).join(' + ')}</h3><span class="badge ${state}">${statusLabels[state]}</span></div>
+      <div class="card-top"><h3 translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</h3><span class="badge ${state}">${statusLabels[state]}</span></div>
       <div class="area-tags">${entry.areas.map(area => `<span class="badge">${areaLabels[area]} опаковка</span>`).join('')}</div>
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
-      ${state === 'missed' ? `<p class="cause"><strong>Причина:</strong> ${escape(cause)}</p>` : ''}
+      ${state === 'missed' ? `<p class="cause"><strong>Причина:</strong> ${cause}</p>` : ''}
       ${actions ? `<div class="card-actions"><button data-action="report" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="delete" data-id="${escape(entry.id)}">Премахни</button>`}</div>` : ''}
     </article>`;
   }
@@ -85,7 +85,7 @@
       [entries.length,`Двойки · ${done} отчетени · ${hit} постигнати`],[`${fmt(actualKg)} / ${fmt(totalKg)}`,`кг · ${fmt(actualCrates)} / ${fmt(totalCrates)} каси`]
     ].map(([value,label]) => `<div class="stat"><strong>${value}</strong>${label}</div>`).join('');
     $('rosterSummary').textContent = `Състав · ${rosterLoaded ? people.length+' човека' : 'изберете Personnel'}${rosterLoaded ? ' · '+available.length+' неразпределени' : ''}`;
-    $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}">${escape(person.name)}<small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
+    $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2;
     $('pairsList').innerHTML = entries.map(entry => pairCard(entry,true)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
@@ -122,7 +122,7 @@
     $('pairForm').reset();
     $('dialogError').textContent = '';
     $('dialogTitle').textContent = mode === 'report' ? 'Отчет на двойката' : entry ? 'Промяна на двойката' : 'Нова двойка';
-    $('dialogContext').textContent = `${fmtDate(scope.date)} · Екип ${scope.team} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode === 'report' ? ' · '+entry.members.map(person => person.name).join(' + ') : ''}`;
+    $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode === 'report' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
     $('planFields').hidden = mode === 'report';
     $('reportFields').hidden = mode !== 'report';
     ['memberOne','memberTwo','targetKg','targetCrates'].forEach(id => { $(id).disabled = mode === 'report'; $(id).required = mode !== 'report'; });
@@ -130,7 +130,7 @@
     const occupied = new Set(selectedEntries().filter(item => item.id !== entry?.id).flatMap(item => item.members.map(person => person.id)));
     const people = PairTargets.roster(personnel.employees,scope.team).filter(person => !occupied.has(person.id));
     (entry?.members || []).forEach(person => { if(!people.some(item => item.id === person.id)) people.push(person); });
-    const options = '<option value="">Изберете човек</option>'+people.map(person => `<option value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
+    const options = '<option value="">Изберете човек</option>'+people.map(person => `<option translate="no" value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
     $('memberOne').innerHTML = options;
     $('memberTwo').innerHTML = options;
     if(entry) {

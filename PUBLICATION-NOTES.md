@@ -4,7 +4,7 @@
 - Real passwords are replaced with the public demo password; unused shift credentials are removed.
 - Real packing documents, product identifiers and customer data are excluded.
 - The browser storage namespace is separate from the production application.
-- Source filenames and README are English; the interface is currently Bulgarian.
+- Source filenames and README are English; the interface supports BG / EN with Bulgarian as the default.
 - No distribution license has been selected.
 - This snapshot is prepared for the public demo repository `tolgakrkmz/packing-hub`.
 - The Node.js suite covers the application, fictional fixtures, and publication safeguards.

@@ -232,7 +232,7 @@ function renderThumbs() {
       fileBox.className = 'thumb-file';
       fileBox.innerHTML = `
         <div class="thumb-file-icon">${fileIconFor(file.name)}</div>
-        <div class="thumb-file-name">${escapeHtml(file.name)}</div>
+        <div class="thumb-file-name" translate="no">${escapeHtml(file.name)}</div>
       `;
       thumb.appendChild(fileBox);
     }
@@ -401,13 +401,13 @@ function createResultCard(profile) {
   const imageCount = (profile.images || []).length;
   const metaText = imageCount ? `${imageCount} файл${imageCount === 1 ? '' : 'а'}` : 'без файлове';
   const clientHtml = profile.client
-    ? `<div class="result-client">${escapeHtml(profile.client)}</div>`
+    ? `<div class="result-client" translate="no">${escapeHtml(profile.client)}</div>`
     : '';
 
   card.innerHTML = `
     <div class="result-head">
       <div class="result-name-wrap">
-        <div class="result-name">${escapeHtml(profile.name || 'Без име')}</div>
+        <div class="result-name" ${profile.name ? 'translate="no"' : ''}>${escapeHtml(profile.name || 'Без име')}</div>
         ${clientHtml}
       </div>
       <div class="result-meta">${metaText}</div>
@@ -495,7 +495,7 @@ function wireCategorySelect(body, card, profile) {
 async function loadProfileDetailsHtml(profile) {
   const profileFolder = await getProfileFolderHandle(profile.folderName);
 
-  const numberHtml = `<div class="result-number-inline">№ ${escapeHtml(profile.number)}</div>`;
+  const numberHtml = `<div class="result-number-inline" translate="no">№ ${escapeHtml(profile.number)}</div>`;
 
   let instructionText = '';
   try {
@@ -507,7 +507,7 @@ async function loadProfileDetailsHtml(profile) {
   }
 
   const textHtml = instructionText
-    ? `<div class="result-text">${escapeHtml(instructionText)}</div>`
+    ? `<div class="result-text" translate="no">${escapeHtml(instructionText)}</div>`
     : '<div class="result-text empty" style="text-align:left;padding:0;">Няма записан текст с инструкции.</div>';
 
   const galleryItems = [];
@@ -520,8 +520,8 @@ async function loadProfileDetailsHtml(profile) {
         const url = URL.createObjectURL(file);
         galleryItems.push(`
           <figure>
-            <img src="${url}" data-full="${url}" data-caption="${escapeHtml(imgName)}" alt="${escapeHtml(imgName)}">
-            <figcaption>${escapeHtml(imgName)}</figcaption>
+            <img translate="no" src="${url}" data-full="${url}" data-caption="${escapeHtml(imgName)}" alt="${escapeHtml(imgName)}">
+            <figcaption translate="no">${escapeHtml(imgName)}</figcaption>
           </figure>
         `);
       } else {
@@ -529,7 +529,7 @@ async function loadProfileDetailsHtml(profile) {
         galleryItems.push(`
           <a class="file-tile" href="${url}" download="${escapeHtml(imgName)}">
             <div class="file-tile-icon">${fileIconFor(imgName)}</div>
-            <div class="file-tile-name">${escapeHtml(imgName)}</div>
+            <div class="file-tile-name" translate="no">${escapeHtml(imgName)}</div>
           </a>
         `);
       }
@@ -816,7 +816,7 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
     const c = bulkCandidates[idx];
     if (!c.number) c.number = generateUniqueFallbackNumber();
 
-    bulkEl.bulkStatus.textContent = `Импортиране ${done + 1} от ${checkedIdxs.length}: ${c.name || c.number}...`;
+    bulkEl.bulkStatus.innerHTML = `Импортиране ${done + 1} от ${checkedIdxs.length}: <span translate="no">${escapeHtml(c.name || c.number)}</span>...`;
 
     try {
       let destPath;

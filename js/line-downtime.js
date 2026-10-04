@@ -137,9 +137,13 @@ reasonSelect.addEventListener('change', ()=>{
 
 function renderReasonSelect(){
   const prev = reasonSelect.value;
-  reasonSelect.innerHTML = reasons.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  reasonSelect.innerHTML = reasons.map(r=>'<option data-i18n-exact value="'+escapeDowntimeText(r)+'">'+escapeDowntimeText(r)+'</option>').join('');
   if(reasons.includes(prev)) reasonSelect.value = prev;
   otherReasonRow.style.display = (reasonSelect.value === 'Друго') ? 'flex' : 'none';
+}
+
+function escapeDowntimeText(value){
+  return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
 
 function renderReasonsAdmin(){
@@ -149,7 +153,7 @@ function renderReasonsAdmin(){
   }
   reasonsAdminPanel.style.display = 'block';
   reasonsList.innerHTML = reasons.filter(r=>r!=='Друго').map(r=>
-    '<span class="reason-chip">'+r+'<button data-reason="'+r+'" title="Изтрий">✕</button></span>'
+    '<span class="reason-chip" data-i18n-exact>'+escapeDowntimeText(r)+'<button data-reason="'+escapeDowntimeText(r)+'" title="Изтрий">✕</button></span>'
   ).join('') || '<span class="note-inline">Все още няма добавени причини.</span>';
   reasonsList.querySelectorAll('button[data-reason]').forEach(b=>{
     b.addEventListener('click', ()=>removeReason(b.dataset.reason));
@@ -318,7 +322,7 @@ function renderReasonBars(){
   wrap.innerHTML = sorted.map(([reason,min])=>{
     const pct = max > 0 ? Math.round(min/max*100) : 0;
     return '<div class="reason-row">'
-      + '<div class="lab" title="'+reason+'">'+reason+'</div>'
+      + '<div class="lab" data-i18n-exact title="'+escapeDowntimeText(reason)+'">'+escapeDowntimeText(reason)+'</div>'
       + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div>'
       + '<div class="val">'+fmtDur(min)+'</div>'
       + '</div>';
@@ -342,7 +346,7 @@ function renderHistory(){
     + '<th>Дата</th><th>Смяна</th><th>Час</th><th style="text-align:right">Продълж.</th><th>Причина</th><th></th>'
     + '</tr></thead><tbody>';
   sorted.forEach(e=>{
-    const reasonText = e.reason + (e.reasonNote ? ' <span class="note-inline">– '+e.reasonNote+'</span>' : '');
+    const reasonText = '<span data-i18n-exact>'+escapeDowntimeText(e.reason)+'</span>' + (e.reasonNote ? ' <span class="note-inline" translate="no">– '+escapeDowntimeText(e.reasonNote)+'</span>' : '');
     const delCell = isAdmin
       ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
       : '<td></td>';
@@ -351,7 +355,7 @@ function renderHistory(){
       + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
       + '<td>'+e.start+'–'+e.end+'</td>'
       + '<td class="num dur">'+fmtDur(e.durationMin)+'</td>'
-      + '<td>'+reasonText+(e.note ? '<br><span class="note-inline">'+e.note+'</span>' : '')+'</td>'
+      + '<td>'+reasonText+(e.note ? '<br><span class="note-inline" translate="no">'+escapeDowntimeText(e.note)+'</span>' : '')+'</td>'
       + delCell
       + '</tr>';
   });

@@ -2304,6 +2304,11 @@ function renderAvReasons(periodKey, openStates) {
 
   const periodStateKey = 'period:' + periodKey;
   const reasonCount = sorted.length;
+  const reasonLabelHtml = group => {
+    const first = group.entries[0];
+    return `<span data-i18n-exact>${escapeHtml(String(first.reason || '').trim() || 'Без посочена причина')}</span>` +
+      (first.reasonNote ? ` — <span translate="no">${escapeHtml(first.reasonNote)}</span>` : '');
+  };
   const reasonsHtml = sorted.map(group => {
     const stateKey = 'reason:' + periodKey + ':' + encodeURIComponent(group.label);
     const records = [...group.entries].sort((a, b) =>
@@ -2315,13 +2320,13 @@ function renderAvReasons(periodKey, openStates) {
       const note = String(entry.note || '').trim();
       return `<li>
         <div class="av-record-meta">${escapeHtml(date)} · Смяна ${escapeHtml(entry.shift || '—')}${time ? ' · ' + escapeHtml(time) : ''} · <b>${fmt(entry.durationMin)} мин</b></div>
-        ${note ? '<div class="av-record-note">' + escapeHtml(note) + '</div>' : ''}
+        ${note ? '<div class="av-record-note" translate="no">' + escapeHtml(note) + '</div>' : ''}
       </li>`;
     }).join('');
 
     return `<details class="av-reason-group" data-av-key="${stateKey}"${openStates.get(stateKey) ? ' open' : ''}>
       <summary>
-        <span class="av-reason-label">${escapeHtml(group.label)}</span>
+        <span class="av-reason-label">${reasonLabelHtml(group)}</span>
         <span class="av-reason-metrics">${group.entries.length} ${group.entries.length === 1 ? 'случай' : 'случая'} · <b>${fmt(group.durationMin)} мин</b></span>
       </summary>
       <ul class="av-reason-records">${recordsHtml}</ul>
@@ -2331,7 +2336,7 @@ function renderAvReasons(periodKey, openStates) {
   return `<tr class="av-reasons-row"><td colspan="4">
     <details class="av-reasons" data-av-key="${periodStateKey}"${openStates.get(periodStateKey) ? ' open' : ''}>
       <summary>
-        <span class="av-reasons-preview">Причини: <strong>${escapeHtml(sorted[0].label)}</strong>${reasonCount > 1 ? ' · още ' + (reasonCount - 1) : ''}</span>
+        <span class="av-reasons-preview">Причини: <strong>${reasonLabelHtml(sorted[0])}</strong>${reasonCount > 1 ? ' · още ' + (reasonCount - 1) : ''}</span>
         <span class="av-reasons-action">Разгъни / свий</span>
       </summary>
       <div class="av-reasons-list">${reasonsHtml}</div>

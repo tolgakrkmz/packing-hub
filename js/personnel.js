@@ -237,7 +237,7 @@ todayDateInput.value=localISODate();
 todayDateInput.addEventListener('change',renderToday);
 function peopleLines(list){
   if(!list.length) return '<span>—</span>';
-  return list.slice().sort(sortPeople).map(p=>`${escapeHTML(p.name)} <span style="opacity:.58">(${escapeHTML(p.role)})</span>`).join('<br>');
+  return list.slice().sort(sortPeople).map(p=>`<span translate="no">${escapeHTML(p.name)}</span> <span style="opacity:.58">(${escapeHTML(p.role)})</span>`).join('<br>');
 }
 function renderToday(){
   const dateObj=parseLocalDate(todayDateInput.value||localISODate());
@@ -307,7 +307,8 @@ function roleRank(p){
 function sortPeople(a,b){ return roleRank(a)-roleRank(b) || a.name.localeCompare(b.name,'bg'); }
 function matchesSearch(p){
   if(!searchTerm) return true;
-  return `${p.name} ${p.role} ${p.note} ${p.team} ${catLabel(p.category)}`.toLowerCase().includes(searchTerm);
+  const original = `${p.name} ${p.role} ${p.note} ${p.team} ${catLabel(p.category)}`;
+  return `${original} ${HubI18n.t(original)}`.toLowerCase().includes(searchTerm);
 }
 const catFiltersEl=document.getElementById('catFilters');
 function renderCatFilters(){
@@ -325,9 +326,9 @@ function renderCatFilters(){
 }
 document.getElementById('searchInput').addEventListener('input',e=>{ searchTerm=e.target.value.trim().toLowerCase(); renderPeople(); });
 function personRow(p){
-  const note=p.note?`<span class="badge note-badge" title="${escapeHTML(p.note)}">${escapeHTML(p.note)}</span>`:'';
+  const note=p.note?`<span class="badge note-badge" translate="no" title="${escapeHTML(p.note)}">${escapeHTML(p.note)}</span>`:'';
   return `<div class="person-row">
-    <div class="person-meta"><div class="person-name">${escapeHTML(p.name)}</div><div class="person-role">${escapeHTML(p.role||'Без зададена роля')}</div></div>
+    <div class="person-meta"><div class="person-name" translate="no">${escapeHTML(p.name)}</div><div class="person-role">${escapeHTML(p.role||'Без зададена роля')}</div></div>
     <div class="person-tags">${note}<button class="edit-btn" data-edit-person="${escapeHTML(p.id)}">Промени</button></div>
   </div>`;
 }
@@ -352,8 +353,8 @@ function renderInactive(){
   return `<section class="category-block">
     <div class="category-heading"><h3>Допълнителна информация</h3><span>${list.length} записа</span></div>
     <div class="inactive-board">${list.map(p=>`<div class="inactive-card">
-      <div class="person-meta"><div class="person-name">${escapeHTML(p.name)}</div><div class="person-role">${escapeHTML(catLabel(p.category))} · ${escapeHTML(p.team)}${p.role?' · '+escapeHTML(p.role):''}</div>
-      <div class="person-tags"><span class="badge status-inactive">Извън състава</span>${p.note?`<span class="badge note-badge">${escapeHTML(p.note)}</span>`:''}</div></div>
+      <div class="person-meta"><div class="person-name" translate="no">${escapeHTML(p.name)}</div><div class="person-role">${escapeHTML(catLabel(p.category))} · ${escapeHTML(p.team)}${p.role?' · '+escapeHTML(p.role):''}</div>
+      <div class="person-tags"><span class="badge status-inactive">Извън състава</span>${p.note?`<span class="badge note-badge" translate="no">${escapeHTML(p.note)}</span>`:''}</div></div>
       <button class="edit-btn" data-edit-person="${escapeHTML(p.id)}">Промени</button>
     </div>`).join('')}</div>
   </section>`;
@@ -475,12 +476,12 @@ function renderLog(){
   const el=document.getElementById('logList');
   if(!moveLog.length){ el.innerHTML='<div class="empty">Все още няма промени.</div>'; return; }
   el.innerHTML=moveLog.slice(0,60).map(m=>{
-    if(m.type==='migration') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name||'Система')}</b> — ${escapeHTML(m.detail||'Миграция')}</span></div>`;
+    if(m.type==='migration') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name||'Система')}</b> — ${escapeHTML(m.detail||'Миграция')}</span></div>`;
     if(m.type==='settings') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>Настройки:</b> ${escapeHTML(m.detail||'')}</span></div>`;
-    if(m.type==='create') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name)}</b> — добавен → ${escapeHTML(m.to||'')}</span></div>`;
-    if(m.type==='update') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name)}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}${m.detail?' · '+escapeHTML(m.detail):''}</span></div>`;
+    if(m.type==='create') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name)}</b> — добавен → ${escapeHTML(m.to||'')}</span></div>`;
+    if(m.type==='update') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name)}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}${m.detail?' · <span translate="no">'+escapeHTML(m.detail)+'</span>':''}</span></div>`;
     // Accept the legacy history shape: {date, name, from, to}.
-    return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>${escapeHTML(m.name||'')}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}</span></div>`;
+    return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name||'')}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}</span></div>`;
   }).join('');
 }
 
