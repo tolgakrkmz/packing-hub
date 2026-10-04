@@ -59,6 +59,26 @@ node --test tests/*.test.cjs
 The tests cover shift boundaries, rotation, pair allocation, target validation,
 report scope, failure reasons, read-only personnel access and stale file refreshes.
 
+## Publication safeguards
+
+Company and employee data must never be uploaded, including to private repositories.
+After cloning, enable the local commit and push checks:
+
+```sh
+node scripts/install-hooks.cjs
+```
+
+The checks inspect the staged Git content and every outgoing commit, including
+older commits beneath a cleaned tip. Only the exact reviewed demo data fixtures
+are accepted. Unknown documents, binaries, changed fixtures, non-demo credentials,
+and known private-source matches are blocked. In the development workspace,
+private references are read locally; their values are never stored in this repo
+or printed by the checker. The checks also apply to feature branches.
+
+Automation cannot identify every possible confidential value. Review the source
+changes before publication; stop if any content is uncertain. Never bypass the
+hooks with `--no-verify`. Local hooks must be installed in every new clone.
+
 ## Project structure
 
 - `*.html`: independent application screens.

@@ -7,5 +7,7 @@
 - Source filenames and README are English; the interface is currently Bulgarian.
 - No distribution license has been selected.
 - This snapshot is prepared for the public demo repository `tolgakrkmz/packing-hub`.
-- The Node.js suite includes 20 tests, including checks of the fictional fixtures.
+- The Node.js suite covers the application, fictional fixtures, and publication safeguards.
+- Local commit and push hooks inspect the index and outgoing history. Install them after cloning.
+- Company and employee data must never be uploaded, including to private repositories.
 - Keep this repository separate from the production folder and its backups.
