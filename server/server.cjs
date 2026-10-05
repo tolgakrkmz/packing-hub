@@ -102,6 +102,15 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
           throw problem(405, 'METHOD_REJECTED');
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
+        if (pathname === '/api/import/production-log/preview' || pathname === '/api/import/production-log/apply') {
+          if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const input = await jsonBody(request);
+          if (pathname.endsWith('/preview')) return json(response, 200, store.previewProductionImport(input, session.user));
+          const result = store.applyProductionImport(input, revisionFor(request), session.user);
+          if (result.added) broadcast('production-log', result.revision);
+          return json(response, 200, result);
+        }
         if (document) {
           if (request.method === 'GET') { const current = store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
           if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request), revisionFor(request), session.user); broadcast(document[1], result.revision); return json(response, 200, result); }
@@ -126,7 +135,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (['/accounts.html', '/production-import.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();

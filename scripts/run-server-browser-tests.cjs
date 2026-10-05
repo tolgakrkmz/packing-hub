@@ -75,14 +75,30 @@ async function main() {
     await admin.locator('#saveBtn').click(); await expect(admin.locator('#formPanel')).toBeHidden();
     await observer.goto(base + '/package-instructions.html'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await expect(observer.locator('#addBtn')).toBeHidden(); await observer.locator('#searchInput').fill('900101'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional instruction from the shared database.'); await expect(observer.locator('.cat-select')).toBeHidden(); await observer.locator('.gallery img').click(); await expect(observer.locator('#lightbox')).toHaveClass(/open/);
     console.log('PASS shared packing instructions and attachments → phone reads them');
+    console.log('RUN production history import → live report, duplicate prevention and stale preview protection');
+    await observer.goto(base + '/statistics.html'); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await admin.getByRole('link', {name: 'Импорт на тонаж', exact: true}).click();
+    const history = {goalTons: 9000, entries: [{id: 'demo-import-history', date: '2026-10-04', shift: 'А', tonnage: 2000, brak: 20, breakdown: null}]};
+    const select = data => admin.locator('#importFile').setInputFiles({name: 'production-log.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data))});
+    await select(history); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=added]')).toHaveText('1');
+    await admin.locator('#applyImport').click(); await expect(admin.locator('#importMessage')).toContainText('Импортът е завършен');
+    await expect(observer.locator('#dashboardActual')).toHaveText('5,0 т'); assert.equal(hub.store.get('production-log').data.goalTons, 3000);
+    await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=duplicates]')).toHaveText('1'); await expect(admin.locator('#applyImport')).toBeDisabled();
+    await select({...history, entries: [{...history.entries[0], tonnage: 1}]}); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=conflicts]')).toHaveText('1'); await expect(admin.locator('#applyImport')).toBeDisabled();
+    await select({...history, entries: [{...history.entries[0], id: 'demo-import-stale'}]}); await admin.locator('#previewImport').click(); await expect(admin.locator('#applyImport')).toBeEnabled();
+    const before = hub.store.get('production-log'); hub.store.put('production-log', {...before.data, goalTons: 4000}, before.revision, {role: 'admin'});
+    await admin.locator('#applyImport').click(); await expect(admin.locator('#importMessage')).toContainText('Базата е променена'); assert.equal(hub.store.get('production-log').data.entries.length, 2);
+    await select({employees: []}); await admin.locator('#previewImport').click(); await expect(admin.locator('#importMessage')).toContainText('Файлът не е валиден'); await expect(admin.locator('#applyImport')).toBeDisabled();
+    const latest = hub.store.get('production-log'); hub.store.put('production-log', {...latest.data, goalTons: 3000}, latest.revision, {role: 'admin'});
+    console.log('PASS production history import → live report, duplicate prevention and stale preview protection');
     console.log('RUN observer controls, page reload persistence and account revocation');
     await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
-    await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('3,0 т');
+    await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('5,0 т');
     await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('input[type=checkbox]').uncheck(); await form.locator('button').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
     await observer.reload(); await expect(observer).toHaveURL(base + '/login.html');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 5 workflows passed.');
+    console.log('Online browser E2E: 6 workflows passed.');
   } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }

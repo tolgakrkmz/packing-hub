@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {randomUUID} = require('node:crypto');
+const {isDeepStrictEqual} = require('node:util');
 const {DatabaseSync} = require('node:sqlite');
 const root = path.resolve(__dirname, '..');
 const sandbox = vm.createContext({});
@@ -89,6 +91,40 @@ function openStore(filename) {
       return get(kind);
     });
   }
+  function productionImport(input, user) {
+    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    validateData('production-log', input);
+    const current = get('production-log');
+    const existing = new Map(current.data.entries.map(entry => [entry.id, entry]));
+    const added = []; let duplicates = 0, conflicts = 0, firstDate = null, lastDate = null, kg = 0, scrapKg = 0;
+    for (const entry of input.entries) {
+      firstDate = firstDate === null || entry.date < firstDate ? entry.date : firstDate;
+      lastDate = lastDate === null || entry.date > lastDate ? entry.date : lastDate;
+      kg += entry.tonnage; scrapKg += entry.brak;
+      const prior = existing.get(entry.id);
+      if (!prior) added.push(entry);
+      else if (isDeepStrictEqual({...prior, breakdown: prior.breakdown ?? null}, {...entry, breakdown: entry.breakdown ?? null})) duplicates++;
+      else conflicts++;
+    }
+    return {current, added, summary: {revision: current.revision, total: input.entries.length, added: added.length, duplicates, conflicts, firstDate, lastDate, kg, scrapKg}};
+  }
+  const previewProductionImport = (input, user) => productionImport(input, user).summary;
+  function applyProductionImport(input, revision, user) {
+    const plan = productionImport(input, user);
+    if (plan.current.revision !== revision) throw problem(409, 'CONFLICT');
+    if (plan.summary.conflicts) throw problem(409, 'IMPORT_CONFLICT');
+    if (!plan.added.length) return {...plan.summary, backup: false};
+    // A private, consistent snapshot lives beside the database, outside static assets.
+    // VACUUM cannot run inside a transaction. put() rechecks the revision atomically.
+    if (filename !== ':memory:') {
+      const directory = path.join(path.dirname(filename), 'import-backups');
+      const backup = path.join(directory, randomUUID() + '.sqlite');
+      try { fs.mkdirSync(directory, {recursive: true, mode: 0o700}); db.prepare('VACUUM INTO ?').run(backup); fs.chmodSync(backup, 0o600); }
+      catch { throw problem(500, 'BACKUP_FAILED'); }
+    }
+    const saved = put('production-log', {...plan.current.data, entries: [...plan.current.data.entries, ...plan.added]}, revision, user);
+    return {...plan.summary, revision: saved.revision, backup: filename !== ':memory:'};
+  }
   function node(name) {
     safePath(name);
     if (name === 'data/package-instructions.json') {
@@ -137,6 +173,6 @@ function openStore(filename) {
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  return {db, get, put, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  return {db, get, put, previewProductionImport, applyProductionImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, defaults, problem};

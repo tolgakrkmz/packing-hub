@@ -109,10 +109,25 @@ unprivileged user, with a read-only application filesystem and a persistent
 `hub-data` volume. Expose only this app through Funnel. The Docker build context
 excludes demo data, databases, environment files, Git history and test artifacts.
 
-Real company files remain local under the publication rules. This implementation
-does not import them. Never put live data, credentials or backups in this source
-checkout, commits, GitHub, tests or attachments. A future local data migration
-needs its own reviewed procedure.
+### Import production history
+
+On the production computer, finish the last entry in the old application and keep
+an untouched local copy of its current `production-log.json`. Sign in to the site
+as an administrator and choose **Production import** in the account bar. Select
+that file (up to 2 MB), check the preview and confirm adding records. Never send
+live files to chat, the source checkout, GitHub, tests or attachments.
+
+The import adds production, scrap and line breakdown records to the shared
+SQLite database. Existing records and the current site goal are retained. Records
+with identical IDs and content are skipped; conflicting IDs block the entire
+import. A changed database revision requires a fresh preview. Each import that
+adds records first creates a private SQLite snapshot in `import-backups` beside
+the database. A failed backup blocks the import. Retention and copies to a second
+local disk remain manual. No backup or source record is served publicly.
+
+After confirming totals in Reports, use the site for all new production entries.
+Changes in the old local application do not synchronize automatically. Other
+module files require a separate migration; this importer handles production only.
 
 ### Backup and updates
 

@@ -75,7 +75,66 @@ test('operator can append reports but cannot change goals, delete reports, manag
   assert.equal((await put('personnel', operator, personnel.data)).status, 403);
   assert.equal((await request('/api/accounts', operator)).status, 403);
   assert.equal((await request('/accounts.html', observer)).status, 403);
+  assert.equal((await request('/production-import.html', observer)).status, 403);
   assert.equal((await request('/api/data/personnel', observer)).status, 200);
+});
+test('production import is admin-only, merges history without replacing live records or goals and is safe to repeat', async t => {
+  const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
+  const entry = id => ({id, date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 10, breakdown: null});
+  const current = {entries: [entry('demo-current')], goalTons: 4000};
+  hub.store.put('production-log', current, 1, admin.user);
+  const source = {entries: [entry('demo-current'), {...entry('demo-history'), date: '2026-10-04'}], goalTons: 9000};
+  const post = (action, data, revision, user = admin) => request('/api/import/production-log/' + action, user, {method: 'POST', data, headers: revision ? {'If-Match': '"' + revision + '"'} : {}});
+  assert.equal((await post('preview', source, null, operator)).status, 403);
+  assert.equal((await post('apply', source, 2, operator)).status, 403);
+  const preview = await (await post('preview', source)).json();
+  assert.deepEqual(preview, {revision: 2, total: 2, added: 1, duplicates: 1, conflicts: 0, firstDate: '2026-10-04', lastDate: '2026-10-05', kg: 2000, scrapKg: 20});
+  assert.equal(hub.store.get('production-log').revision, 2);
+  assert.equal((await post('apply', source)).status, 428);
+  assert.equal((await post('apply', source, 2)).status, 200);
+  assert.deepEqual(hub.store.get('production-log').data, {...current, entries: [...current.entries, source.entries[1]]});
+  assert.equal((await post('apply', source, 2)).status, 409);
+  const retry = await (await post('preview', source)).json();
+  assert.equal(retry.added, 0); assert.equal(retry.duplicates, 2);
+  assert.equal((await post('apply', source, retry.revision)).status, 200);
+  assert.equal(hub.store.get('production-log').revision, 3);
+});
+test('import conflicts, invalid history and intervening writes reject the whole import', async t => {
+  const {hub, request, login} = await setup(t); const admin = await login();
+  const entry = {id: 'demo-existing', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0};
+  hub.store.put('production-log', {entries: [entry], goalTons: 3000}, 1, admin.user);
+  const post = (action, data, revision = 2) => request('/api/import/production-log/' + action, admin, {method: 'POST', data, headers: {'If-Match': '"' + revision + '"'}});
+  const source = {entries: [{...entry, brak: 1}, {...entry, id: 'demo-missing'}]};
+  assert.equal((await (await post('preview', source)).json()).conflicts, 1);
+  const rejected = await post('apply', source); assert.equal(rejected.status, 409); assert.deepEqual(await rejected.json(), {error: 'IMPORT_CONFLICT'});
+  assert.equal(hub.store.get('production-log').data.entries.length, 1);
+  for (const data of [{employees: []}, {module: 'line-downtime', entries: []}, {entries: [entry, entry]}, {entries: [{...entry, date: '2026-02-30'}]}]) {
+    assert.equal((await post('preview', data)).status, 400); assert.equal((await post('apply', data)).status, 400);
+  }
+  const reordered = {entries: [{brak: 0, tonnage: 1000, shift: 'А', date: '2026-10-05', id: 'demo-existing', breakdown: null}]};
+  assert.equal((await (await post('preview', reordered)).json()).duplicates, 1);
+  const fresh = {entries: [{...entry, id: 'demo-history'}]};
+  assert.equal((await (await post('preview', fresh)).json()).revision, 2);
+  hub.store.put('production-log', {entries: [entry, {...entry, id: 'demo-other-device'}], goalTons: 3000}, 2, admin.user);
+  assert.equal((await post('apply', fresh)).status, 409);
+  assert.equal(hub.store.get('production-log').data.entries.length, 2);
+});
+test('imports create private pre-import snapshots; backup failures leave the database unchanged', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-import-demo-')); t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const filename = path.join(dir, 'demo.sqlite'), user = {role: 'admin'};
+  const store = openStore(filename); t.after(() => store.close());
+  const source = {entries: [{id: 'demo-backup', date: '2026-10-04', shift: 'А', tonnage: 1000, brak: 0}]};
+  fs.writeFileSync(path.join(dir, 'import-backups'), 'Fictional obstruction');
+  assert.throws(() => store.applyProductionImport(source, 1, user), error => error.code === 'BACKUP_FAILED');
+  assert.equal(store.get('production-log').revision, 1);
+  fs.unlinkSync(path.join(dir, 'import-backups'));
+  assert.equal(store.applyProductionImport(source, 1, user).backup, true);
+  const backups = fs.readdirSync(path.join(dir, 'import-backups')); assert.equal(backups.length, 1);
+  const backupName = path.join(dir, 'import-backups', backups[0]);
+  assert.equal(fs.statSync(backupName).mode & 0o777, 0o600);
+  const backup = openStore(backupName); assert.equal(backup.get('production-log').data.entries.length, 0); backup.close();
+  assert.equal(store.applyProductionImport(source, 2, user).added, 0);
+  assert.equal(fs.readdirSync(path.join(dir, 'import-backups')).length, 1);
 });
 test('revisions prevent stale replacement and duplicate retries; invalid schemas and missing revisions never modify accepted data', async t => {
   const {request, login} = await setup(t); const user = await login();
