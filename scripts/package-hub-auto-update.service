@@ -1,0 +1,13 @@
+[Unit]
+Description=Update Package Hub from reviewed main source
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/package-hub-auto-update.sh
+TimeoutStartSec=20min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

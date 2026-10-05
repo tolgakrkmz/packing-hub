@@ -29,8 +29,8 @@ test('documents, backups, unknown data files and symlinks are blocked',() => {
   assert.throws(() => inspect('js/example.js',Buffer.from([0,1,2])),/Binary/);
 });
 test('server source and named deployment files are allowed but databases, environment files and deployment backups are blocked',() => {
-  for(const file of ['server/server.cjs','Dockerfile','compose.yaml','.dockerignore']) assert.doesNotThrow(() => inspect(file,Buffer.from('Reviewed source')));
-  for(const file of ['server/hub.sqlite','server/hub.db','server/.env','.env','compose-private.yaml','server-state/backup.sqlite']) assert.throws(() => inspect(file,Buffer.from('Synthetic local data')),/Unapproved/);
+  for(const file of ['server/server.cjs','Dockerfile','compose.yaml','.dockerignore','scripts/auto-update.sh','scripts/install-auto-update.sh','scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer']) assert.doesNotThrow(() => inspect(file,Buffer.from('Reviewed source')));
+  for(const file of ['server/hub.sqlite','server/hub.db','server/.env','.env','compose-private.yaml','server-state/backup.sqlite','scripts/private-update.sh','scripts/private-update.service']) assert.throws(() => inspect(file,Buffer.from('Synthetic local data')),/Unapproved/);
   const restricted = 'Synthetic Restricted Example';
   for(const file of ['server/server.cjs','Dockerfile','compose.yaml']) assert.throws(() => inspect(file,Buffer.from(restricted),[restricted.toLowerCase()]),/Private source/);
 });

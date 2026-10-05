@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Package Hub main for changes every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=10s
+Unit=package-hub-auto-update.service
+
+[Install]
+WantedBy=timers.target

@@ -180,6 +180,75 @@ with a verified snapshot under the container user's ownership, remove obsolete
 WAL/SHM sidecars only while stopped, then restart. Test restore with fictional data
 before relying on backups.
 
+### Automatic updates after merging into main
+
+A host-side systemd timer can check the approved GitHub `main` branch every two
+minutes and deploy changes without uploading site data or exposing a webhook.
+The source checkout, local `.env`, Docker Engine/Compose and systemd remain on
+the CasaOS host. Use the **existing** Compose project and its persistent volume.
+Install from a clean `main` checkout on that host:
+
+```sh
+sudo bash scripts/install-auto-update.sh /absolute/path/to/clean/source/checkout /absolute/path/to/existing/compose/project
+sudo systemctl status package-hub-auto-update.timer
+```
+
+The installer identifies the currently running container's Compose project and
+checks that the supplied deployment directory owns it. The source checkout may
+be separate from the original deployment folder; a root-only build override
+selects that clean source without moving the existing `.env` or data. It installs
+reviewed updater code in
+`/usr/local/libexec` and root-only configuration outside the checkout. The timer
+runs after boot and every two minutes after the previous attempt finishes.
+Successful changes take the polling interval plus build/startup time; container
+replacement causes a short interruption. Open pages then offer the refresh
+button described above. An unchanged `main` does not rebuild or restart anything.
+
+Each update requires a clean `main` checkout, the approved repository origin and
+a fast-forward history. Changes to `compose.yaml` require manual review and
+installation so an automatic update cannot silently change the volume or network
+configuration. The updater builds while the old container stays running and
+checks startup against an isolated in-memory database. Before replacement it
+creates a private SQLite snapshot under the **existing** data volume's
+`auto-backups` directory. Build/startup/backup failures cancel replacement.
+Snapshots contain site data and accounts; keep them on the host. Retention remains
+manual; this timer never deletes backups or sends them to GitHub.
+
+The new container must pass Docker health checks, use the same named data volume
+and built image, and answer the local health endpoint. Failed activation attempts
+restore the previous image and record the failed source revision. That revision
+is blocked on later polls until an administrator intervenes or a newer revision
+arrives. Image rollback preserves the current database; it does not undo schema
+migrations or restore old data. Releases that change database compatibility need
+an administrator-reviewed migration/rollback plan.
+
+Local status and private diagnostics:
+
+```sh
+sudo systemctl status package-hub-auto-update.service
+sudo journalctl -u package-hub-auto-update.service
+sudo cat /var/lib/package-hub-deploy/last-good
+```
+
+Detailed build diagnostics remain in `/var/lib/package-hub-deploy/last-run.log`.
+The latest failed attempt is retained separately in `last-failure.log` so an
+unchanged poll does not erase its diagnostics.
+After fixing a failed revision, an administrator may remove the local
+`last-failed` marker and start the service again. Pause automatic updates with
+`sudo systemctl disable --now package-hub-auto-update.timer`; an already-running
+service finishes separately. Updating the installed updater itself requires
+rerunning the installer from reviewed `main` source.
+
+The behavior is verified with isolated command-boundary tests for successful
+updates, unchanged revisions, locking, local edits, wrong origins, diverged
+history, configuration changes, fetch/build/startup/backup failures, failed
+health checks, changed volumes and image rollback failure. These tests do not
+replace a host-side container update and reboot check.
+
+[Docker Compose update and volume behavior](https://docs.docker.com/reference/cli/docker/compose/up/)
+and [systemd timer semantics](https://github.com/systemd/systemd/blob/main/man/systemd.timer.xml)
+provide the underlying deployment behavior.
+
 Local development can explicitly allow localhost HTTP:
 
 ```sh
