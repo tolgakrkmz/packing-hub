@@ -27,7 +27,7 @@ function createPairTargetsStatistics({dbName, localStorageKey}) {
   }
 
   function render() {
-    if (!isAdminMode()) return;
+    if (typeof HubServer === 'undefined' && !isAdminMode()) return;
     const openGroups = new Set(Array.from($('pairStatsBody').querySelectorAll('details[open]')).map(node => node.dataset.group));
     const months = [...new Set(data.entries.map(entry => entry.date.slice(0,7)))].sort();
     if (!months.includes(selectedMonth)) selectedMonth = months[months.length - 1] || '';

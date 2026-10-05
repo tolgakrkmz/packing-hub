@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!*.html
+!css/
+!css/*.css
+!js/
+!js/*.js
+!server/
+!server/*.cjs
+!scripts/
+!scripts/check-publication.cjs

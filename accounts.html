@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Акаунти · Package Hub</title><link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><script src="js/accounts.js" defer></script></head>
+<body><script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css"><main class="account-wrap"><a href="index.html">← Package Hub</a><h1>Акаунти</h1><p>Само администратор създава и управлява акаунти.</p>
+<form id="accountForm"><h2>Нов акаунт</h2><label>Потребителско име<input id="accountUsername" pattern="[a-z0-9][a-z0-9._-]{2,31}" required autocomplete="off"><small>3–32 знака: латински малки букви, цифри, точка, тире и долна черта.</small></label><label>Начална парола<input id="accountPassword" type="password" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>Роля<select id="accountRole"><option value="operator">Оператор</option><option value="observer">Наблюдател</option><option value="admin">Администратор</option></select></label><button type="submit">Създай акаунт</button></form>
+<p id="accountMessage" role="status" aria-live="polite"></p><div id="accountList"></div></main></body>
+</html>

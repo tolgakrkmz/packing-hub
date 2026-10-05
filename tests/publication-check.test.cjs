@@ -28,6 +28,12 @@ test('documents, backups, unknown data files and symlinks are blocked',() => {
   assert.throws(() => inspect('js/example.js',Buffer.from('synthetic'),[],'120000'),/Unapproved/);
   assert.throws(() => inspect('js/example.js',Buffer.from([0,1,2])),/Binary/);
 });
+test('server source and named deployment files are allowed but databases, environment files and deployment backups are blocked',() => {
+  for(const file of ['server/server.cjs','Dockerfile','compose.yaml','.dockerignore']) assert.doesNotThrow(() => inspect(file,Buffer.from('Reviewed source')));
+  for(const file of ['server/hub.sqlite','server/hub.db','server/.env','.env','compose-private.yaml','server-state/backup.sqlite']) assert.throws(() => inspect(file,Buffer.from('Synthetic local data')),/Unapproved/);
+  const restricted = 'Synthetic Restricted Example';
+  for(const file of ['server/server.cjs','Dockerfile','compose.yaml']) assert.throws(() => inspect(file,Buffer.from(restricted),[restricted.toLowerCase()]),/Private source/);
+});
 test('private reference matches stop publication without revealing the value',() => {
   const syntheticToken = 'Synthetic Restricted Example';
   assert.throws(() => inspect('js/example.js',Buffer.from(syntheticToken),[syntheticToken.toLowerCase()]),error => {

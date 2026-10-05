@@ -80,6 +80,7 @@ function registerConnectionPanel(connDot){
 }
 
 function createFileSync(cfg){
+  if(typeof HubServer !== 'undefined') return HubServer.fileSync(cfg);
   const {
     dbName, suggestedFileName, localStorageKey,
     defaultData, onConnect, onRefresh, getData, render, elements: el
@@ -337,6 +338,7 @@ function createFileSync(cfg){
 /* Directory access for packing instructions and their local assets. */
 
 function createDirectorySync(cfg){
+  if(typeof HubServer !== 'undefined') return HubServer.directorySync(cfg);
   const {
     dbName, defaultData, onConnect, onRefresh, render, elements: el
   } = cfg;
@@ -493,12 +495,19 @@ const ADMIN_STORAGE_KEY = 'portfolioHubAdminMode';
 const ADMIN_PASSWORD = 'demo-admin';
 
 function isAdminMode(){
+  if(typeof HubServer !== 'undefined') return HubServer.user.role === 'admin';
   return sessionStorage.getItem(ADMIN_STORAGE_KEY) === 'true';
 }
 
 // Notify the caller during initialization and whenever admin mode changes.
 function wireAdminToggle(buttonEl, onChange){
   if(!buttonEl) return;
+  if(typeof HubServer !== 'undefined') {
+    buttonEl.hidden = true;
+    const readableGate = ['statistics.html','personnel.html'].includes(location.pathname.split('/').pop());
+    if(onChange) onChange(readableGate || HubServer.user.role === 'admin');
+    return;
+  }
 
   function refresh(){
     const admin = isAdminMode();

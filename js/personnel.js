@@ -132,7 +132,9 @@ function parseLocalDate(str){
   return new Date(y,m-1,d);
 }
 
+let personnelSaving = false;
 const sync = createFileSync({
+  isBusy: () => personnelSaving,
   dbName:'portfolio-personnel-fs-db',
   suggestedFileName:'personnel.json',
   localStorageKey:'portfolio-personnel-fallback',
@@ -401,12 +403,23 @@ function locationText(p){
   return `${catLabel(p.category)} / ${p.team} / ${p.active?'активен':'извън състава'}`;
 }
 async function saveWithFreshData(mutator){
+  if(personnelSaving) return false;
   if(!sync.isReady){ showToast('Първо свържете валиден файл. Записът не е направен.'); return false; }
-  if(sync.fileHandle) await sync.refreshFromDisk();
-  await mutator();
-  await sync.commitData();
-  renderAll();
-  return true;
+  personnelSaving = true;
+  let before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
+  try {
+    if(sync.fileHandle) await sync.refreshFromDisk();
+    before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
+    await mutator();
+    await sync.commitData();
+    renderAll();
+    return true;
+  } catch(error) {
+    loadIncomingData(before,false);
+    renderAll();
+    showToast(error.code === 'REPORT_CONFLICT' ? 'Съставът е променен от друг потребител. Опресни и опитай отново.' : 'Записът не е направен. Опитай отново.');
+    return false;
+  } finally { personnelSaving = false; }
 }
 personForm.addEventListener('submit',async e=>{
   e.preventDefault();
@@ -489,4 +502,4 @@ function renderAll(){
   renderLog();
 }
 
-applyAdminGate(isAdminMode());
+applyAdminGate(typeof HubServer !== 'undefined' || isAdminMode());

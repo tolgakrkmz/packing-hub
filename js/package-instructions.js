@@ -39,6 +39,7 @@ const el = {
 let dbIndex = {};
 let rootDirHandle = null;
 let selectedImageFiles = [];
+let instructionsWriting = false;
 
 const detailsCache = {};
 
@@ -77,6 +78,7 @@ function generateUniqueFallbackNumber() {
 }
 
 const sync = createDirectorySync({
+  isBusy: () => instructionsWriting,
   dbName: 'portfolio-package-instructions-fs',
   defaultData: () => ({}),
   onConnect: async (data, handle) => {
@@ -103,17 +105,17 @@ async function readIndexFromDisk() {
   return HubDataValidation.parse('package-instructions',await file.text());
 }
 
-// Reload the index before applying an edit to reduce stale overwrites.
-// This read/modify/write sequence is not atomic across multiple writers.
+// Keep the same file handle so the server checks the revision read here.
 async function updateIndexOnDisk(mutatorFn) {
   if (!rootDirHandle) return;
-  const latest = await readIndexFromDisk();
+  const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: false });
+  const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
+  const file = await fileHandle.getFile();
+  const latest = HubDataValidation.parse('package-instructions',await file.text());
   mutatorFn(latest);
   HubDataValidation.validate('package-instructions',latest);
 
   try {
-    const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: false });
-    const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
     const writable = await fileHandle.createWritable();
     await writable.write(JSON.stringify(latest, null, 2));
     await writable.close();
@@ -125,11 +127,11 @@ async function updateIndexOnDisk(mutatorFn) {
   dbIndex = latest;
 }
 
-/* Merge the full in-memory index into the latest disk data. Stale local
- * records can still overwrite concurrent edits; scoped mutations are preferable. */
-async function saveIndexDatabase() {
+/* Apply only the profiles edited by this operation to the latest index. */
+async function saveIndexDatabase(numbers) {
+  const edits = Object.fromEntries(numbers.map(number => [number, JSON.parse(JSON.stringify(dbIndex[number]))]));
   await updateIndexOnDisk((latest) => {
-    Object.assign(latest, dbIndex);
+    for (const number of numbers) latest[number] = edits[number];
   });
 }
 
@@ -258,6 +260,7 @@ el.saveBtn.addEventListener('click', async () => {
   }
 
   el.saveBtn.disabled = true;
+  instructionsWriting = true;
   el.saveBtn.textContent = "Запазване...";
   el.formMsg.textContent = "Създаване на папки и запис на файлове...";
 
@@ -294,7 +297,7 @@ el.saveBtn.addEventListener('click', async () => {
       timestamp: Date.now()
     };
 
-    await saveIndexDatabase();
+    await saveIndexDatabase([number]);
     delete detailsCache[number];
 
     el.formMsg.style.color = 'green';
@@ -313,7 +316,7 @@ el.saveBtn.addEventListener('click', async () => {
     el.formMsg.textContent = "Възникна грешка при запазването.";
     el.saveBtn.disabled = false;
     el.saveBtn.textContent = "Запази";
-  }
+  } finally { instructionsWriting = false; }
 });
 
 
@@ -471,14 +474,21 @@ function wireCategorySelect(body, card, profile) {
     const newCategory = e.target.value || null;
     if (!dbIndex[profile.number]) return;
 
-    dbIndex[profile.number].category = newCategory;
-    profile.category = newCategory;
-    await saveIndexDatabase();
-
-    const badge = card.querySelector('.cat-badge');
-    if (badge) badge.outerHTML = categoryBadgeHtml(newCategory);
-
-    delete detailsCache[profile.number];
+    const previous = profile.category;
+    instructionsWriting = true; select.disabled = true;
+    try {
+      await updateIndexOnDisk(latest => {
+        if(!latest[profile.number]) throw new Error('Profile unavailable');
+        latest[profile.number].category = newCategory;
+      });
+      profile.category = newCategory;
+      const badge = card.querySelector('.cat-badge');
+      if (badge) badge.outerHTML = categoryBadgeHtml(newCategory);
+      delete detailsCache[profile.number];
+    } catch {
+      select.value = previous || '';
+      el.resultCount.textContent = 'Записът не е направен. Опитай отново.';
+    } finally { instructionsWriting = false; select.disabled = false; }
   });
 }
 
@@ -798,10 +808,13 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
   }
 
   bulkEl.bulkImportBtn.disabled = true;
+  instructionsWriting = true;
+  try {
   const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
   const profilesDir = await dataDir.getDirectoryHandle('profiles', { create: true });
 
   let done = 0;
+  const completedNumbers = [];
   for (const idx of checkedIdxs) {
     const c = bulkCandidates[idx];
     if (!c.number) c.number = generateUniqueFallbackNumber();
@@ -847,14 +860,14 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
         timestamp: Date.now()
       };
       delete detailsCache[c.number];
-
+      completedNumbers.push(c.number);
       done++;
     } catch (error) {
       console.error(`Грешка при импорт на ${c.number}:`, error);
     }
   }
 
-  await saveIndexDatabase();
+  if(completedNumbers.length) await saveIndexDatabase(completedNumbers);
   bulkEl.bulkStatus.textContent = `Готово — импортирани ${done} от ${checkedIdxs.length}.`;
   bulkEl.bulkImportBtn.disabled = false;
 
@@ -862,4 +875,7 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
     bulkEl.bulkPanel.style.display = 'none';
     renderSearch();
   }, 1200);
+  } catch {
+    bulkEl.bulkStatus.textContent = 'Записът не е направен. Опитай отново.';
+  } finally { instructionsWriting = false; bulkEl.bulkImportBtn.disabled = false; }
 });
