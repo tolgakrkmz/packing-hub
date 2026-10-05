@@ -42,15 +42,11 @@
       <div class="field">
         <label for="dateInput">Дата</label>
         <input type="date" id="dateInput">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" id="yesterdayBtn" class="conn-btn" style="padding:6px 10px;font-size:11px;">← Вчера (нощна смяна)</button>
+          <span id="dateHint" style="font-size:11px;color:var(--amber);"></span>
+        </div>
       </div>
-      <div class="field">
-      <label for="dateInput">Дата</label>
-      <input type="date" id="dateInput">
-    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-    <button type="button" id="yesterdayBtn" class="conn-btn" style="padding:6px 10px;font-size:11px;">← Вчера (нощна смяна)</button>
-    <span id="dateHint" style="font-size:11px;color:var(--amber);"></span>
-    </div>
-  </div>
     </div>
 
     <div class="shift-grid" id="shiftGrid">
@@ -195,6 +191,7 @@
 
 <script src="js/data-validation.js"></script>
 <script src="js/file-sync.js"></script>
+<script src="js/report-date-selection.js"></script>
 <script src="js/production-log.js"></script>
 </body>
 </html>

@@ -43,31 +43,12 @@ function localDateStr(d){
   return y+'-'+m+'-'+day;
 }
 
-const now = new Date();
-const debugHour = new URLSearchParams(location.search).get('testHour');
-const todayStr = localDateStr(now);
-const yesterdayObj = new Date(now);
-yesterdayObj.setDate(yesterdayObj.getDate()-1);
-const yesterdayStr = localDateStr(yesterdayObj);
-
-// Match the production log's delayed night-shift reporting date.
-const effectiveHour = debugHour !== null ? parseInt(debugHour,10) : now.getHours();
-const isLikelyNightReport = effectiveHour < 10;
-dateInput.value = isLikelyNightReport ? yesterdayStr : todayStr;
-
-if(isLikelyNightReport){
-  dateHint.textContent = '🌙 Избрана е вчерашна дата (нощна смяна) — провери дали е вярно.';
-}
-
-document.getElementById('yesterdayBtn').addEventListener('click', ()=>{
-  dateInput.value = yesterdayStr;
-  dateHint.textContent = '';
-  renderDayTotal();
-});
-
-dateInput.addEventListener('change', ()=>{
-  dateHint.textContent = '';
-  renderDayTotal();
+const reportDate = createReportDateSelection({
+  dateInput,
+  dateHint,
+  yesterdayButton: document.getElementById('yesterdayBtn'),
+  onChange: renderDayTotal,
+  hourOverride: new URLSearchParams(location.search).get('testHour')
 });
 
 
@@ -116,6 +97,7 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
   const btn = e.target.closest('.shift-btn');
   if(!btn) return;
   selectedShift = btn.dataset.shift;
+  reportDate.selectShift(selectedShift);
   document.querySelectorAll('.shift-btn').forEach(b=>{
     b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
   });
@@ -284,7 +266,7 @@ function fmtDate(d){
 function renderDayTotal(){
   const d = dateInput.value;
   const totalMin = entries.filter(e=>e.date===d).reduce((a,e)=>a+e.durationMin,0);
-  document.getElementById('dayLabel').textContent = (d===todayStr) ? 'днес' : fmtDate(d);
+  document.getElementById('dayLabel').textContent = (d===localDateStr(new Date())) ? 'днес' : fmtDate(d);
   document.getElementById('dayVal').textContent = fmtDur(totalMin);
 }
 

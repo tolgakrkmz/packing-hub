@@ -67,6 +67,13 @@ is available by opening `data/personnel.json`.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
 
+## Report dates
+
+Production and downtime reports use one date field. Before 10:00, rotating teams
+default to yesterday for delayed night reports; selecting Stickers defaults to
+today. Changing the date or using Yesterday makes the choice manual and preserves
+it when switching teams. The visible date is the date saved in the report.
+
 ## Statistics navigation
 
 The monthly result stays above every statistics section. Switch between Overview,
