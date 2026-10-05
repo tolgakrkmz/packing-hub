@@ -3605,7 +3605,7 @@ function renderLineShiftTable(
 
 function renderAll() {
   if (
-    !isAdminMode()
+    typeof HubServer === 'undefined' && !isAdminMode()
   ) {
     return;
   }
@@ -3780,5 +3780,5 @@ function renderAll() {
 }
 
 applyAdminGate(
-  isAdminMode()
+  typeof HubServer !== 'undefined' || isAdminMode()
 );

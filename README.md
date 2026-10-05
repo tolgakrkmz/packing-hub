@@ -1,8 +1,8 @@
 # Package Hub
 
-An offline production dashboard built with plain HTML, CSS and JavaScript.
-It helps plan shift teams, assign pair targets, record production and downtime,
-and review monthly results without a backend or build step.
+A production dashboard built with plain HTML, CSS and JavaScript. It helps plan
+shift teams, assign pair targets, record production and downtime, and review
+monthly results. It supports offline file mode and shared server mode.
 
 **Portfolio demonstration: every employee, production record and packing
 instruction in this repository is fictional. No company documents are included.**
@@ -24,10 +24,172 @@ is remembered in this browser and applies to every module. Names, notes, documen
 contents and saved identifiers retain their original text. The demo stores its
 language preference separately from the production application.
 
-Source filenames and this README are in English. The pair targets module opens
-directly without a role login.
+Source filenames and this README are in English. In offline mode, the pair
+targets module opens directly without a role login.
 
-## Run locally
+## Shared server mode
+
+The server uses Node.js 24+ and SQLite without npm dependencies. All five module
+documents, accounts, sessions and packing attachments live in one local database.
+A new database starts empty, without employee seeds, reports or default accounts.
+Clients use the same data through a browser, without picking JSON files or
+installing an application. Statistics reads the shared module data.
+
+An administrator creates accounts and assigns these roles:
+
+| Role | Access |
+| --- | --- |
+| Administrator | All modules, corrections, personnel, instructions, goals/reasons and accounts. |
+| Operator | Read all modules; append production/downtime; plan and report pairs. Cannot change existing production/downtime, personnel, instructions, goals/reasons or accounts. |
+| Observer | Read modules, reports and attachments. Cannot write. |
+
+The server checks authorization on every API write. Passwords use salted scrypt
+hashes. Sessions use HttpOnly, SameSite cookies, expire after 12 hours and are
+revoked when an account is changed or disabled. HTTPS also uses Secure cookies.
+Writes require the configured origin, a session CSRF token and the latest
+document/file revision. Stale writes return a conflict instead of replacing
+someone else's changes. Pair planning checks the current packer roster and
+preserves reported plans and historical members.
+
+After a committed change, connected browsers receive an event and reload the
+affected data. Busy report forms finish saving first. Disconnected browsers
+reconnect and fetch current data. A code update requires deploying the new
+container; open pages then offer a refresh button to preserve unfinished input.
+Server/internet outages prevent shared writes. Wait for a confirmed save before
+considering an entry recorded.
+
+### CasaOS and a provided HTTPS address
+
+Use this checked source checkout on the Linux CasaOS host, separately from live
+production files. Docker Engine and the Docker Compose plugin must be available
+on the host. The included Compose file builds the image locally from a terminal.
+The Docker image and external connection must be verified on the target server.
+
+1. Install [Tailscale for Linux](https://tailscale.com/download/linux) on the
+   **server**, sign in with `sudo tailscale up`, and enable MagicDNS/HTTPS for the
+   Tailscale account. Clients only need a browser.
+2. Obtain the server's full `*.ts.net` DNS name from its device details. In a local
+   `.env` beside `compose.yaml`, set `HUB_PUBLIC_ORIGIN` to that exact HTTPS origin,
+   such as `https://demo-hub.example-tailnet.ts.net`, without a trailing slash.
+   This example is a placeholder, not a deployed URL. Keep `.env` local.
+3. Build and start the empty server:
+
+   ```sh
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+4. Create an administrator interactively in the host terminal. Choose your own
+   username; the password is entered invisibly and is never a command argument:
+
+   ```sh
+   docker compose exec package-hub node server/manage.cjs create-admin admin
+   ```
+
+5. Expose only the app's localhost port using
+   [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel):
+
+   ```sh
+   sudo tailscale funnel --bg 3000
+   sudo tailscale funnel status
+   ```
+
+   Complete the first-time Funnel approval. Check that the printed HTTPS address
+   matches `HUB_PUBLIC_ORIGIN`; if it differs, correct `.env` and recreate the
+   service. Funnel provides an HTTPS `*.ts.net` URL for people without Tailscale;
+   `--bg` persists across restarts. Funnel is currently beta and has bandwidth
+   limits. Review those limits before relying on it for daily production.
+6. Sign in at that address and create operator/observer accounts from Accounts.
+   First verify from a phone using mobile data: enter a **fictional** report,
+   check another browser's statistics, view an attachment and verify an observer
+   cannot save. Reboot the host and check persistence and access.
+
+The app port binds to host `127.0.0.1`, not the LAN. The app runs as an
+unprivileged user, with a read-only application filesystem and a persistent
+`hub-data` volume. Expose only this app through Funnel. The Docker build context
+excludes demo data, databases, environment files, Git history and test artifacts.
+
+### Import all legacy module data
+
+Keep an untouched local copy of the current production folder after the last
+entry in the old application. On that computer, sign in as an administrator and
+choose **Data import** in the account bar. Select these current JSON files:
+
+| Module | File |
+| --- | --- |
+| Production and scrap | `production-log.json` |
+| Downtime | `line-downtime.json` |
+| Personnel, shifts and movement history | `personnel.json` |
+| Pair plans and reports | `pair-targets.json` |
+| Packing instruction index | `package-instructions.json` |
+
+For packing instructions, also select the `data` folder, `profiles` folder or the
+old application folder. A selected folder can supply JSON files at its root or
+under `data`. Only files referenced by the instruction index and each profile's
+optional `instruction.txt` are uploaded. Nested customer/profile folders are
+preserved. Code, unrelated files and backup copies in deeper folders are skipped.
+Do not send live files to chat, this source checkout, GitHub, tests or attachments.
+
+Check the preview table, including missing files, settings changes and movement
+history. The settings checkbox controls copying the production goal, adding
+legacy downtime reasons and importing provided Stickers settings. Existing
+reasons are retained. Unselected modules remain unchanged. A full migration needs
+all five files and the instruction folders; missing modules show dashes.
+
+Identical IDs/content and identical attachments are skipped. Different records
+with the same ID, changed attachments at an existing path, overlapping pair
+members or missing referenced attachments block the **whole** import. Legacy
+personnel is normalized through the same model as the Personnel screen.
+Historical pair snapshots and reports remain valid even for retired members.
+Existing site records and movement history are retained.
+
+JSON is limited to 20 MB combined; attachments to 20 MB each, 5000 files and 1 GB
+in total. Uploads are staged privately beside SQLite for up to four hours and
+can be cancelled. Browser data is not written to localStorage/IndexedDB. Only an
+administrator may import, and each upload belongs to its creating administrator.
+A changed database or attachment requires a new preview. Confirmation first
+creates a consistent private snapshot under `import-backups`, then commits all
+selected modules and attachments in one SQLite transaction. Backup failure
+blocks the import. Completed/cancelled staging is removed; expired staging is
+cleared on later imports. Backup retention remains manual.
+
+Verify all modules and Reports, then enter new data only on the site. Old files
+remain an archive; the old application does not synchronize automatically.
+The earlier production-only importer remains available at `production-import.html`.
+
+### Backup and updates
+
+Create a consistent local SQLite snapshot before an update. Use a new destination
+filename each time. The snapshot contains accounts and module data and must stay
+private, outside the source checkout:
+
+```sh
+docker compose exec package-hub node server/manage.cjs backup /var/lib/package-hub/backup-before-update.sqlite
+docker compose cp package-hub:/var/lib/package-hub/backup-before-update.sqlite /srv/hub-backups/backup-before-update.sqlite
+```
+
+Create `/srv/hub-backups` with restricted host permissions first. Keep a protected
+copy on a separate local disk. Backup scheduling and retention are manual in this
+version. Use the snapshot command instead of copying an actively written database.
+
+Deploy reviewed code with `docker compose up -d --build` from the same Compose
+project/directory. The named volume survives container recreation. Keep the
+previous source revision available for rollback. **Do not remove the volume or
+run `docker compose down -v`.** To restore, stop the service, replace its database
+with a verified snapshot under the container user's ownership, remove obsolete
+WAL/SHM sidecars only while stopped, then restart. Test restore with fictional data
+before relying on backups.
+
+Local development can explicitly allow localhost HTTP:
+
+```sh
+HUB_DATABASE=/tmp/hub-demo.sqlite node server/manage.cjs create-admin demo-admin
+HUB_DATABASE=/tmp/hub-demo.sqlite HUB_ALLOW_HTTP=true HUB_PUBLIC_ORIGIN=http://127.0.0.1:3000 node server/server.cjs
+```
+
+Use only fictional development records. HTTP mode refuses non-localhost origins.
+
+## Run locally in offline mode
 
 1. Download or clone the repository into a separate demo folder.
 2. Open `index.html` in Chrome or Edge. No installation or internet connection is required.
@@ -123,6 +285,23 @@ report scope, failure reasons, read-only personnel access, stale file refreshes,
 pair statistics including pending plans, weighted ratios and per-pair deficits,
 and language preferences, dynamic translations and preserved identifiers.
 
+Server checks require **Node.js 24+**:
+
+```sh
+node --test tests/server/*.test.cjs
+node scripts/run-server-browser-tests.cjs
+```
+
+The second command needs the same Chrome and Playwright installation as the
+offline browser runner below and defaults to a **visible Chrome**. Five flows
+cover account creation/login, mobile operator reports and live observer
+statistics, personnel and pair reports, shared instructions/attachments,
+observer controls and revoked access. Each run uses an isolated temporary SQLite
+database and fictional inputs, then removes it. Server tests also check API
+permissions, CSRF/origin rejection, stale and simultaneous writes, roster rules,
+live events, persistence, backups and login throttling. Docker, Funnel and the
+actual CasaOS reboot/restore still require target-host checks.
+
 ### Visible browser tests
 
 Install Node.js 20+, Google Chrome and the test dependency in this **demo** checkout:
@@ -199,6 +378,8 @@ hooks with `--no-verify`. Local hooks must be installed in every new clone.
 - `js/`: application logic, file access and shared models.
 - `data/`: reviewed fictional fixtures only.
 - `tests/`: Node.js tests for scheduling, pair targets and file synchronization.
+- `server/`: shared SQLite storage, account management and authenticated HTTP API.
+- `Dockerfile`, `compose.yaml`: local CasaOS server deployment.
 
 ## Publication
 

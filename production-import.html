@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Импорт на тонаж · Package Hub</title><link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><script src="js/production-import.js" defer></script></head>
+<body><script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css"><main class="account-wrap"><a href="index.html">← Package Hub</a><h1>Импорт на тонаж</h1>
+<p><a href="data-import.html">Импорт на данни от всички модули</a></p>
+<p>Избери актуалния production-log.json от производствения компютър след последния запис в старата програма. Запази копие на оригиналния файл.</p>
+<p>Добавят се тонажът, бракът и разбивката по линии. Съществуващите записи и целта в сайта се запазват. Повторният импорт пропуска еднаквите записи. При конфликт нищо не се добавя.</p>
+<label>Файл с тонаж (JSON, до 2 MB)<input id="importFile" type="file" accept=".json,application/json"></label>
+<button id="previewImport" disabled>Провери файла</button><dl id="importSummary" aria-live="polite" hidden></dl>
+<p>Преди добавяне сървърът създава частно резервно копие на базата.</p>
+<button id="applyImport" disabled>Добави проверените записи</button><p id="importMessage" role="status" aria-live="polite"></p>
+<p>След прехвърлянето въвеждайте новия тонаж само в сайта, за да има една обща база.</p>
+<a href="statistics.html">Отчети</a></main></body>
+</html>

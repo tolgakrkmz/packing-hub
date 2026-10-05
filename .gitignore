@@ -16,6 +16,11 @@ backup/
 backups/
 private/
 local-data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+server-state/
 # Only reviewed demo fixtures belong in this repository.
 data/*
 !data/personnel.json

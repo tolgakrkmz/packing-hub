@@ -43,9 +43,9 @@ function privateTokens(sourceRoot) {
 }
 function allowedFile(file) {
   return Object.hasOwn(fixtures,file) ||
-    ['.gitignore','AGENTS.md','README.md','PUBLICATION-NOTES.md','LICENSE'].includes(file) ||
+    ['.gitignore','.dockerignore','Dockerfile','compose.yaml','AGENTS.md','README.md','PUBLICATION-NOTES.md','LICENSE'].includes(file) ||
     /^[a-z][a-z0-9-]*\.html$/.test(file) ||
-    /^(css|js|tests|scripts)\/[a-z0-9][a-z0-9./-]*\.(css|js|cjs)$/.test(file) ||
+    /^(css|js|tests|scripts|server)\/[a-z0-9][a-z0-9./-]*\.(css|js|cjs)$/.test(file) ||
     /^\.githooks\/(pre-commit|pre-push)$/.test(file);
 }
 function inspect(file,buffer,tokens=[],mode='100644') {

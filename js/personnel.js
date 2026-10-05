@@ -45,55 +45,9 @@ function escapeHTML(value){
 }
 function teamClass(team){ return 'team-'+String(team).replaceAll(' ','_'); }
 function catLabel(key){ return CAT_BY_KEY[key]?.label || key || '—'; }
-function normalizeSettings(value){
-  const raw=value||{};
-  return {
-    stickersStage1: Number.isFinite(Number(raw.stickersStage1)) ? Math.max(0,Math.round(Number(raw.stickersStage1))) : DEFAULT_PERSONNEL_SETTINGS.stickersStage1,
-    stickersStage2: Number.isFinite(Number(raw.stickersStage2)) ? Math.max(0,Math.round(Number(raw.stickersStage2))) : DEFAULT_PERSONNEL_SETTINGS.stickersStage2
-  };
-}
-function cleanRoleKey(value){
-  return String(value||'').trim().toLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');
-}
-function normalizeRole(category, role, name=''){
-  const allowed=ROLE_OPTIONS[category] || ROLE_OPTIONS.auto;
-  const key=cleanRoleKey(role);
-  const exact=allowed.find(r=>cleanRoleKey(r)===key);
-  if(exact) return exact;
-
-  if(category==='stickers'){
-    // Normalize legacy stickers roles to the supported role options.
-    return 'Опаковчик';
-  }
-  if(category==='manual'){
-    if(/началник|отговорник/.test(key)) return 'Началник смяна';
-    if(/кранист|чембер/.test(key)) return 'Кранист/чемберовач';
-    if(/обслужващ/.test(key)) return 'Обслужващ';
-    return 'Опаковчик';
-  }
-
-  if(/началник|н-к смяна|н к смяна/.test(key)) return 'Началник смяна';
-  if(/отговорник\s*1/.test(key) || /оператор\s+пулт\s*1\b/.test(key)) return 'Оператор пулт 1';
-  if(/отговорник\s*2/.test(key) || /оператор\s+пулт\s*2\b/.test(key)) return 'Оператор пулт 2';
-  if(/чембер/.test(key)) return 'Чемберовач';
-  if(/обслужващ/.test(key)) return 'Обслужващ';
-  return 'Опаковчик';
-}
-function normalizeEmployee(p){
-  const category=CAT_BY_KEY[p.category] ? p.category : 'auto';
-  const allowed=CAT_BY_KEY[category].teams;
-  const team=allowed.includes(p.team) ? p.team : allowed[0];
-  const name=String(p.name||'').trim();
-  return {
-    id:String(p.id||''),
-    name,
-    category,
-    team,
-    role:normalizeRole(category,p.role,name),
-    active:p.active !== false,
-    note:String(p.note||'').trim()
-  };
-}
+const normalizeSettings = PersonnelModel.normalizeSettings;
+const normalizeRole = PersonnelModel.normalizeRole;
+const normalizeEmployee = PersonnelModel.normalizeEmployee;
 function createDefaultData(){
   return {
     schemaVersion:SCHEMA_VERSION,
@@ -132,7 +86,9 @@ function parseLocalDate(str){
   return new Date(y,m-1,d);
 }
 
+let personnelSaving = false;
 const sync = createFileSync({
+  isBusy: () => personnelSaving,
   dbName:'portfolio-personnel-fs-db',
   suggestedFileName:'personnel.json',
   localStorageKey:'portfolio-personnel-fallback',
@@ -401,12 +357,23 @@ function locationText(p){
   return `${catLabel(p.category)} / ${p.team} / ${p.active?'активен':'извън състава'}`;
 }
 async function saveWithFreshData(mutator){
+  if(personnelSaving) return false;
   if(!sync.isReady){ showToast('Първо свържете валиден файл. Записът не е направен.'); return false; }
-  if(sync.fileHandle) await sync.refreshFromDisk();
-  await mutator();
-  await sync.commitData();
-  renderAll();
-  return true;
+  personnelSaving = true;
+  let before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
+  try {
+    if(sync.fileHandle) await sync.refreshFromDisk();
+    before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
+    await mutator();
+    await sync.commitData();
+    renderAll();
+    return true;
+  } catch(error) {
+    loadIncomingData(before,false);
+    renderAll();
+    showToast(error.code === 'REPORT_CONFLICT' ? 'Съставът е променен от друг потребител. Опресни и опитай отново.' : 'Записът не е направен. Опитай отново.');
+    return false;
+  } finally { personnelSaving = false; }
 }
 personForm.addEventListener('submit',async e=>{
   e.preventDefault();
@@ -489,4 +456,4 @@ function renderAll(){
   renderLog();
 }
 
-applyAdminGate(isAdminMode());
+applyAdminGate(typeof HubServer !== 'undefined' || isAdminMode());
