@@ -123,6 +123,55 @@ report scope, failure reasons, read-only personnel access, stale file refreshes,
 pair statistics including pending plans, weighted ratios and per-pair deficits,
 and language preferences, dynamic translations and preserved identifiers.
 
+### Visible browser tests
+
+Install Node.js 20+, Google Chrome and the test dependency in this **demo** checkout:
+
+```sh
+npm install --no-save --package-lock=false playwright@1.62.1
+node scripts/run-browser-tests.cjs
+```
+
+The default opens a visible, separate Chrome profile, slows actions by 350 ms,
+and labels the current scenario on screen. Do not click inside the test window
+while it runs. The terminal prints PASS/FAIL for each scenario and exits with a
+nonzero status if any fails. `--headed` is also accepted; use `--headless` only
+when a background run is wanted. Close the browser or stop the terminal to cancel.
+The test window closes when the run completes; each run starts with fresh storage.
+
+The nine scenarios exercise the actual pages and scripts through their controls:
+
+| Module | Browser coverage |
+| --- | --- |
+| Complete reporting flow | Enter tonnage, scrap, automatic/manual kg and crates; write native files; reload; verify daily history, monthly goal, monthly/yearly tables, charts and line/team breakdowns. Check multiple months/years and that pair output does not increase tonnage. |
+| Downtime | Overnight duration, Other validation, notes, reason creation/removal, deletion and report totals. |
+| Personnel | Add, search, move, deactivate, settings, shift calendar, persisted changes and workforce counts/productivity from production data. |
+| Pairs | Packer-only roster, Stickers, plan/edit/remove, prevent reuse, require missed-target reasons, report/correct, history, monthly/team results and deficits. |
+| Packing | Create instructions and attachments, native text files, image preview, attachment download, categories/search, local and external bulk imports and copied instructions. |
+| File access and recovery | Create/refuse overwrite, cancel, reject malformed/wrong-module JSON, refresh/reload, retain another writer's records, failed read/write and ambiguous close, retained draft and retry without duplication; downtime retry. |
+| Manual fallback | Import/export JSON, browser persistence and read-only statistics. |
+| Navigation/languages/mobile | All six hub links, BG/EN switching without losing visible input, 390 px viewport and no page overflow. |
+
+Only the reviewed demo HTML/CSS/JS is served on a temporary `127.0.0.1` port.
+The runner validates served sources with the publication checker and rejects a
+production seed. It does not serve the repository data directory or access a
+personal browser profile. Fixtures are generated in isolated browser storage;
+no real personnel, reports, documents or credentials are needed. External
+network requests are blocked. No screenshots or traces are uploaded or written.
+
+The test replaces the OS file/directory picker with handles to Chrome's
+[origin-private file system](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).
+The DOM, application logic, file reads/writes/closes and IndexedDB handle storage
+are real browser APIs. Failed reads/writes are injected at that API boundary.
+Assertions read the saved fixture files as well as the visible reports; business
+functions are not called directly to skip the UI.
+
+This is broad workflow coverage, not proof of every input combination. Native OS
+choosers/permission prompts, the production `file://` launch and Windows network
+drive behavior still need a manual run on the target computer using a separate
+fictional test folder. Truly simultaneous shared-disk writes are not atomic;
+the second-writer scenario checks refresh-before-save, not transaction isolation.
+
 ## Publication safeguards
 
 Company and employee data must never be uploaded, including to private repositories.
