@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const {expect: baseExpect} = require('playwright/test');
 const {installStorage} = require('./storage.cjs');
+const {assertResponsive} = require('./responsive.cjs');
 const expect = baseExpect.configure({timeout: 8000});
 
 async function run(browser, base, {headed = false} = {}) {
@@ -27,7 +28,15 @@ async function run(browser, base, {headed = false} = {}) {
     await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
     const go = async name => { await page.goto(`${base}/${name}.html`); await page.evaluate(() => window.__browserTest.ready); };
     const read = name => page.evaluate(name => window.__browserTest.read(name), name);
-    const saved = (name, predicate) => expect.poll(async () => predicate(await read(name))).toBe(true);
+    const saved = (name, predicate) => expect.poll(async () => {
+      try { return predicate(await read(name)); }
+      catch (error) {
+        // OPFS can invalidate a File snapshot while createWritable().close() replaces it.
+        // Retry only transient reads; a missing/unreadable final file still times out.
+        if (/NotReadableError|NotFoundError/.test(error.message)) return false;
+        throw error;
+      }
+    }).toBe(true);
     const connect = async (button, name, dot = '#connDot') => {
       await page.evaluate(name => { window.__browserTest.nextFile = name; }, name);
       await page.locator(button).click();
@@ -556,6 +565,51 @@ async function run(browser, base, {headed = false} = {}) {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, `No page overflow: ${module}`);
     }
   }, {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+
+  await scenario('Responsive connected modules, expanded tables and dialogs at 320–1440 px', async t => {
+    const {page, go, connect} = t;
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({width, height: 900});
+      for (const module of ['index', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics']) {
+        await go(module);
+        if (['personnel', 'statistics'].includes(module) && await page.locator('#lockedBox').isVisible()) await page.locator('#lockedAdminBtn').click();
+        if (['production-log', 'line-downtime', 'personnel'].includes(module) && !/\bon\b/.test(await page.locator('#connDot').getAttribute('class'))) await connect('#openFileBtn', module + '.json');
+        if (module === 'pair-targets') {
+          if (!/\bon\b/.test(await page.locator('#pairsConnDot').getAttribute('class'))) await connect('#pairsOpenFileBtn', 'pair-targets.json', '#pairsConnDot');
+          await expect(page.locator('#rosterConnDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
+        }
+        if (module === 'statistics') {
+          await page.locator('#statsFilesBtn').click();
+          for (const tab of ['overview', 'production', 'pairs', 'downtime', 'workforce']) {
+            await page.locator(`[data-stats-tab=${tab}]`).click();
+            await assertResponsive(page, `${module}/${tab} at ${width}px`);
+          }
+        }
+        for (const language of ['en', 'bg']) {
+          await page.locator(`[data-hub-language=${language}]`).click();
+          await assertResponsive(page, `${module}/${language} at ${width}px`);
+        }
+        if (module === 'production-log') {
+          await production(t, '2026-10-05', 'А', 1000, 0, {autoKgInput: 800, autoCrateInput: 32, manKgInput: 200, manCrateInput: 8});
+          await page.locator('.history-month summary').first().click();
+          await assertResponsive(page, `Production breakdown/history at ${width}px`);
+        }
+        if (module === 'personnel') {
+          if (width === 320) {
+            await addPerson(t, 'Demo Responsive Packer One', 'stickers', '1 смяна');
+            await addPerson(t, 'Demo Responsive Packer Two', 'stickers', '1 смяна');
+          }
+          await page.locator('#addPersonBtn').click();
+          await assertResponsive(page, `Personnel dialog at ${width}px`);
+        }
+        if (module === 'pair-targets') {
+          await page.locator('#stickersShiftBtn').click();
+          await page.locator('#addPairBtn').click();
+          await assertResponsive(page, `Pair dialog at ${width}px`);
+        }
+      }
+    }
+  }, {viewport: {width: 320, height: 900}, isMobile: true, hasTouch: true});
 
   console.log(`Browser E2E: ${passed} scenarios passed; ${failures.length} failed.`);
   if (failures.length) throw new Error('Browser E2E failed: ' + failures.join('; '));

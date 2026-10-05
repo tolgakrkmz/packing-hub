@@ -149,9 +149,10 @@ const HubServer = (() => {
     if (selector) document.querySelectorAll(selector).forEach(control => { if (!control.hidden) control.hidden = true; });
   }
   document.addEventListener('DOMContentLoaded', () => {
-    const bar = document.createElement('nav'); bar.className = 'server-bar';
-    const who = document.createElement('span'); who.setAttribute('translate', 'no'); who.textContent = boot.user.username; bar.append(who);
-    const role = document.createElement('span'); role.textContent = roleLabels[boot.user.role]; bar.append(role);
+    document.body.classList.add('server-mode');
+    const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
+    const who = document.createElement('span'); who.className = 'server-user'; who.setAttribute('translate', 'no'); who.textContent = boot.user.username; bar.append(who);
+    const role = document.createElement('span'); role.className = 'server-role'; role.textContent = roleLabels[boot.user.role]; bar.append(role);
     if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/accounts.html'; link.textContent = 'Акаунти'; bar.append(link); }
     if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/data-import.html'; link.textContent = 'Импорт на данни'; bar.append(link); }
     const state = document.createElement('span'); state.id = 'serverState'; state.textContent = 'Свързване…'; bar.append(state);
@@ -168,7 +169,10 @@ const HubServer = (() => {
       }
       for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
     });
-    if (location.pathname === '/' || location.pathname.endsWith('/index.html')) document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
+    if (location.pathname === '/' || location.pathname.endsWith('/index.html')) {
+      document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
+      document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
+    }
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });

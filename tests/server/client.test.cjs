@@ -10,7 +10,7 @@ function client() {
   const context = vm.createContext({
     window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer'}, csrf: 'fictional-csrf', version: 'demo-version'}},
     location: {pathname: '/production-log.html'},
-    document: {addEventListener: (_, callback) => { loaded = callback; }, createElement: element, body: {prepend() {}}, querySelectorAll: () => [], getElementById: () => null},
+    document: {addEventListener: (_, callback) => { loaded = callback; }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },
     EventSource: class { constructor() { events = new Map(); } addEventListener(name, callback) { events.set(name, callback); } },
     registerConnectionPanel: () => () => {},
