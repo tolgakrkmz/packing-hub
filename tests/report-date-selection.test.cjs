@@ -47,7 +47,7 @@ function environment(module, at, search = '') {
       };
     }
   });
-  for(const name of ['data-validation','report-date-selection',module]) {
+  for(const name of ['data-validation','report-date-selection','report-writer',module]) {
     vm.runInContext(fs.readFileSync(path.join(root,'js',name+'.js'),'utf8'),sandbox);
   }
   return {

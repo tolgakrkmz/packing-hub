@@ -1,5 +1,16 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Опитай отново": "Try again",
+  "Промяната не е потвърдена.": "The change could not be confirmed.",
+  "Няма разрешение за запис. Възстановете достъпа до файла и опитайте отново.": "Write access was denied. Restore access to the file and try again.",
+  "Проверете дали е свързан валиден файл и дали въведените данни са правилни.": "Check that a valid file is connected and the entered values are correct.",
+  "Записът е променен. Опреснете данните преди нов опит.": "The record has changed. Refresh the data before trying again.",
+  "Проверете връзката с файла и опитайте отново.": "Check the file connection and try again.",
+  "Записът е изтрит.": "The record was deleted.",
+  "Целта е записана.": "The goal was saved.",
+  "Причината е добавена.": "The reason was added.",
+  "Причината е изтрита.": "The reason was deleted.",
+
   "(изход)": "(log out)",
   "· започнала вчера": "· started yesterday",
   "· още": "· more",

@@ -70,6 +70,8 @@ header h1{letter-spacing:.2px;}
 .save-btn:active{opacity:.85;}
 .save-btn:disabled{background:var(--border);color:var(--text-muted);cursor:not-allowed;}
 .msg{font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px;min-height:16px;}
+.msg[data-state="error"]{color:var(--red);}
+.msg[data-state="success"]{color:var(--teal);}
 
 .summary-grid{
   display:grid;grid-template-columns:repeat(5,1fr);gap:8px;

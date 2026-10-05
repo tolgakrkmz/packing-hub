@@ -52,6 +52,16 @@ const reportDate = createReportDateSelection({
 });
 
 
+const writer = createReportWriter({
+  sync: () => sync,
+  getData: () => ({entries, reasons}),
+  setData(value) { entries = value.entries; reasons = value.reasons; },
+  render, updateControls: updateSaveEnabled,
+  controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
+  message: msg, retryButton: document.getElementById('retrySaveBtn')
+});
+document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
+
 function timeToMin(t){
   const [h,m] = t.split(':').map(Number);
   return h*60+m;
@@ -94,6 +104,8 @@ endInput.addEventListener('input', updateDurationReadout);
 
 
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
+  if(writer.busy) return;
+  writer.clearRetry();
   const btn = e.target.closest('.shift-btn');
   if(!btn) return;
   selectedShift = btn.dataset.shift;
@@ -108,8 +120,8 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
 function updateSaveEnabled(){
   const dur = computeDuration(startInput.value, endInput.value);
   const ok = !!selectedShift && dur !== null;
-  saveBtn.disabled = !ok;
-  saveBtn.textContent = ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
+  saveBtn.disabled = writer.busy || !ok;
+  saveBtn.textContent = writer.busy ? 'Записва се...' : ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
 }
 
 
@@ -143,26 +155,21 @@ function renderReasonsAdmin(){
 }
 
 addReasonBtn.addEventListener('click', async ()=>{
+  if(!isAdmin || writer.busy) return;
   const val = newReasonInput.value.trim();
   if(!val) return;
-  if(reasons.includes(val)){
-    alert('Вече съществува такава причина.');
-    return;
-  }
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  reasons.splice(reasons.length-1, 0, val); // Keep the free-text reason as the final option.
-  await sync.commitData();
-  newReasonInput.value = '';
-  render();
+  await writer.run(current => {
+    if(current.reasons.includes(val)) return null;
+    const next = [...current.reasons];
+    next.splice(Math.max(next.indexOf('Друго'),0),0,val);
+    return {...current,reasons:next};
+  }, () => { newReasonInput.value = ''; }, 'Причината е добавена.');
 });
 
 async function removeReason(r){
-  if(!isAdmin) return;
+  if(!isAdmin || writer.busy) return;
   if(!confirm('Да изтрия причина "'+r+'"? Стари записи с нея остават непроменени.')) return;
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  reasons = reasons.filter(x=>x!==r);
-  await sync.commitData();
-  render();
+  await writer.run(current => ({...current,reasons:current.reasons.filter(value => value !== r)}), () => {}, 'Причината е изтрита.');
 }
 
 
@@ -171,19 +178,20 @@ const sync = createFileSync({
   suggestedFileName: 'line-downtime.json',
   localStorageKey: 'portfolio-downtime-fallback',
   defaultData: () => ({ entries: [], reasons: defaultReasons() }),
+  isBusy: () => writer.busy,
   getData: () => ({ entries, reasons }),
   render: render,
   onConnect: (data)=>{
     entries = data.entries || [];
     reasons = (data.reasons && data.reasons.length) ? data.reasons : defaultReasons();
     if(!reasons.includes('Друго')) reasons.push('Друго');
-    renderReasonSelect();
+    if(!writer.busy) renderReasonSelect();
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
     reasons = (data.reasons && data.reasons.length) ? data.reasons : defaultReasons();
     if(!reasons.includes('Друго')) reasons.push('Друго');
-    renderReasonSelect();
+    if(!writer.busy) renderReasonSelect();
   },
   elements: {
     connDot: document.getElementById('connDot'),
@@ -200,13 +208,14 @@ const sync = createFileSync({
 
 wireAdminToggle(document.getElementById('adminToggleBtn'), (admin)=>{
   isAdmin = admin;
+  writer.clearRetry();
   render();
 });
 
 
 saveBtn.addEventListener('click', async ()=>{
   const dur = computeDuration(startInput.value, endInput.value);
-  if(!selectedShift || dur === null) return;
+  if(writer.busy || !selectedShift || dur === null) return;
 
   const reason = reasonSelect.value;
   const reasonNote = otherReasonInput.value.trim();
@@ -215,8 +224,7 @@ saveBtn.addEventListener('click', async ()=>{
     return;
   }
 
-  const entry = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+  const entry = writer.entry({
     date: dateInput.value,
     shift: selectedShift,
     start: startInput.value,
@@ -225,36 +233,28 @@ saveBtn.addEventListener('click', async ()=>{
     reason: reason,
     reasonNote: (reason === 'Друго') ? reasonNote : '',
     note: noteInput.value.trim()
-  };
-
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Записва се...';
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  entries.push(entry);
-  await sync.commitData();
-  render();
-
-  msg.textContent = 'Записано: смяна '+entry.shift+', '+fmtDur(entry.durationMin)+' престой, причина: '+entry.reason+(entry.reasonNote ? ' – '+entry.reasonNote : '')+'.';
-
-  startInput.value = '';
-  endInput.value = '';
-  noteInput.value = '';
-  otherReasonInput.value = '';
-  durationReadout.textContent = '—';
-  durationReadout.classList.remove('warn');
-  selectedShift = null;
-  document.querySelectorAll('.shift-btn').forEach(b=>{
-    b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
   });
-  updateSaveEnabled();
+
+  await writer.run(current => writer.append(current,entry), () => {
+    writer.confirmEntry(entry);
+    startInput.value = '';
+    endInput.value = '';
+    noteInput.value = '';
+    otherReasonInput.value = '';
+    durationReadout.textContent = '—';
+    durationReadout.classList.remove('warn');
+    selectedShift = null;
+    document.querySelectorAll('.shift-btn').forEach(b=>{
+      b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
+    });
+  }, 'Записано: смяна '+entry.shift+', '+fmtDur(entry.durationMin)+' престой, причина: '+entry.reason+(entry.reasonNote ? ' – '+entry.reasonNote : '')+'.');
 });
 
 async function deleteEntry(id){
-  if(!isAdmin) return;
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  entries = entries.filter(e=>e.id !== id);
-  await sync.commitData();
-  render();
+  if(!isAdmin || writer.busy) return;
+  const original = entries.find(entry => entry.id === id);
+  if(!original) return;
+  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
 }
 
 
@@ -352,6 +352,7 @@ function renderHistory(){
 }
 
 function render(){
+  renderReasonSelect();
   renderDayTotal();
   renderMonthSummary();
   renderReasonBars();

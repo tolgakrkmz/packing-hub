@@ -74,6 +74,15 @@ default to yesterday for delayed night reports; selecting Stickers defaults to
 today. Changing the date or using Yesterday makes the choice manual and preserves
 it when switching teams. The visible date is the date saved in the report.
 
+## Save recovery
+
+Production and downtime keep form input and restore the accepted history and totals
+when file reads, permissions or writes fail. A visible status and Try again button
+allow another attempt, including deletions, the monthly goal and downtime reasons.
+Reports retain the same ID across retries. If a failed close actually saved the
+report, retry confirms the existing entry instead of adding another. Form edits
+clear the old retry action; changed records are refused before deletion.
+
 ## Statistics navigation
 
 The monthly result stays above every statistics section. Switch between Overview,

@@ -49,17 +49,26 @@ const reportDate = createReportDateSelection({
   hourOverride: new URLSearchParams(location.search).get('testHour')
 });
 
+const writer = createReportWriter({
+  sync: () => sync,
+  getData: () => ({entries, goalTons}),
+  setData(value) { entries = value.entries; goalTons = value.goalTons; },
+  render, updateControls: updateSaveEnabled,
+  controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
+  message: msg, retryButton: document.getElementById('retrySaveBtn')
+});
+document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
+
 goalInput.addEventListener('change', async ()=>{
+  if(writer.busy) return;
   let v = parseInt(goalInput.value || '0', 10);
   if(v < 0) v = 0;
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  goalTons = v;
-  goalInput.value = v;
-  await sync.commitData();
-  renderGoal();
+  await writer.run(current => ({...current,goalTons:v}), () => { goalInput.value = v; }, 'Целта е записана.');
 });
 
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
+  if(writer.busy) return;
+  writer.clearRetry();
   const btn = e.target.closest('.shift-btn');
   if(!btn) return;
   selectedShift = btn.dataset.shift;
@@ -68,12 +77,18 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
     b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
   });
   btn.classList.add('sel-'+selectedShift);
-  saveBtn.disabled = false;
-  saveBtn.textContent = 'Запиши смяна ' + selectedShift;
+  updateSaveEnabled();
 });
+
+function updateSaveEnabled(){
+  saveBtn.disabled = writer.busy || !selectedShift;
+  saveBtn.textContent = writer.busy ? 'Записва се...' : selectedShift ? 'Запиши смяна ' + selectedShift : 'Изберете смяна за запис';
+}
 
 document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    if(writer.busy) return;
+    writer.clearRetry();
     const target = document.getElementById(btn.dataset.target);
     if(btn.dataset.set !== undefined){
       target.value = btn.dataset.set;
@@ -97,17 +112,18 @@ const sync = createFileSync({
   suggestedFileName: 'production-log.json',
   localStorageKey: 'portfolio-tonnage-fallback',
   defaultData: () => ({ entries: [], goalTons: 3000 }),
+  isBusy: () => writer.busy,
   getData: () => ({ entries, goalTons }),
   render: render,
   onConnect: (data)=>{
     entries = data.entries || [];
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    goalInput.value = goalTons;
+    if(!writer.busy) goalInput.value = goalTons;
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    goalInput.value = goalTons;
+    if(!writer.busy) goalInput.value = goalTons;
   },
   elements: {
     connDot: document.getElementById('connDot'),
@@ -124,6 +140,7 @@ const sync = createFileSync({
 
 wireAdminToggle(document.getElementById('adminToggleBtn'), (admin) => {
   isAdmin = admin;
+  writer.clearRetry();
   render();
 });
 
@@ -144,6 +161,7 @@ function renderDayTotal(){
 }
 
 function renderGoal(){
+  if(!writer.busy) goalInput.value = goalTons;
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -196,7 +214,7 @@ function renderGoal(){
 }
 
 saveBtn.addEventListener('click', async ()=>{
-  if(!selectedShift) return;
+  if(writer.busy || !selectedShift) return;
   const useBreakdown = breakdownToggle.checked;
   let tonnage, breakdown = null;
   if(useBreakdown){
@@ -209,42 +227,34 @@ saveBtn.addEventListener('click', async ()=>{
   } else {
     tonnage = parseInt(tonInput.value||'0',10);
   }
-  const entry = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+  const entry = writer.entry({
     date: dateInput.value,
     shift: selectedShift,
     tonnage: tonnage,
     brak: parseInt(brakInput.value||'0',10),
     breakdown: breakdown
-  };
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Записва се...';
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  entries.push(entry);
-  await sync.commitData();
-  render();
-  msg.textContent = 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.';
-  tonInput.value = 0;
-  brakInput.value = 0;
-  autoKgInput.value = 0;
-  autoCrateInput.value = 0;
-  manKgInput.value = 0;
-  manCrateInput.value = 0;
-  updateTotalReadout();
-  selectedShift = null;
-  document.querySelectorAll('.shift-btn').forEach(b=>{
-    b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
   });
-  saveBtn.textContent = 'Изберете смяна за запис';
-  setTimeout(()=>{ saveBtn.disabled = true; }, 10);
+  await writer.run(current => writer.append(current,entry), () => {
+    writer.confirmEntry(entry);
+    tonInput.value = 0;
+    brakInput.value = 0;
+    autoKgInput.value = 0;
+    autoCrateInput.value = 0;
+    manKgInput.value = 0;
+    manCrateInput.value = 0;
+    updateTotalReadout();
+    selectedShift = null;
+    document.querySelectorAll('.shift-btn').forEach(b=>{
+      b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
+    });
+  }, 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.');
 });
 
 async function deleteEntry(id){
-  if(!isAdmin) return;
-  if(sync.fileHandle){ await sync.refreshFromDisk(); }
-  entries = entries.filter(e=>e.id !== id);
-  await sync.commitData();
-  render();
+  if(!isAdmin || writer.busy) return;
+  const original = entries.find(entry => entry.id === id);
+  if(!original) return;
+  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
 }
 
 function render(){
