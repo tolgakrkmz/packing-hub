@@ -13,7 +13,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const date = '2026-10-04';
 const team = schedule.teamFor(schedule.parseDate(date),1);
 const context = {date,shiftCode:1,team};
-const employees = ['1','2','3','4'].map((id,index) => ({id,name:'Служител '+id,team,category:index % 2 ? 'manual' : 'auto',active:true}));
+const employees = ['1','2','3','4'].map((id,index) => ({id,name:'Служител '+id,team,category:index % 2 ? 'manual' : 'auto',role:'Опаковчик',active:true}));
 function plan(overrides = {}) {
   return model.plan({data:model.emptyData(),employees,context,memberIds:['1','2'],targetKg:'500.25',targetCrates:'20',workAreas:['auto','manual'],id:'pair-1',now:'2026-10-04T06:00:00Z',...overrides});
 }
@@ -51,6 +51,31 @@ test('two distinct active people, from the scheduled team, are required',() => {
   assert.throws(() => plan({employees:employees.map(person => ({...person,active:false}))}),/активния/);
   assert.throws(() => plan({employees:employees.map(person => ({...person,team:'outside'}))}),/активния/);
   assert.throws(() => plan({context:{...context,shiftCode:2}}),/ротацията/);
+});
+test('only active packers are available and can be added to new pairs in every category',() => {
+  const excludedRoles = ['Началник смяна','Чемберовач','Кранист/чемберовач','Кранист','Оператор пулт 1','Оператор пулт 2','Обслужващ','Unknown','',undefined];
+  for(const category of ['auto','manual','stickers']) {
+    const scope = category === 'stickers' ? {...context,team:'СТИКЕРИ'} : context;
+    const packers = employees.map(person => ({...person,category,role:'  ОПАКОВЧИК  ',team:category === 'stickers' ? '1 смяна' : team}));
+    const others = excludedRoles.map((role,index) => ({...packers[0],id:'other-'+index,name:'Demo Other '+index,role}));
+    const roster = [...packers,...others,{...packers[0],id:'inactive',active:false},
+      {...packers[0],id:'wrong-group',team:'outside',category:category === 'stickers' ? 'auto' : 'stickers'}];
+    const before = JSON.stringify(roster);
+    assert.deepEqual(plain(model.roster(roster,scope.team)).map(person => person.id),['1','2','3','4']);
+    assert.equal(plan({employees:roster,context:scope}).members[0].id,'1');
+    for(const person of others) assert.throws(() => plan({employees:roster,context:scope,memberIds:['1',person.id]}),/активния/);
+    assert.equal(JSON.stringify(roster),before);
+  }
+});
+test('a role changed after opening a new pair prevents saving; saved history remains usable',() => {
+  const entry = plan();
+  const revisedRoster = employees.map(person => person.id === '1' ? {...person,role:'Чемберовач'} : person);
+  assert.throws(() => plan({employees:revisedRoster}),/активния/);
+  const historical = {...entry,members:entry.members.map(person => ({...person,role:'Началник смяна'}))};
+  const data = {...model.emptyData(),entries:[historical]};
+  assert.equal(model.validateData(data),data);
+  assert.equal(model.status(report({},historical)),'achieved');
+  assert.equal(plan({data,employees:[],existingId:entry.id,targetKg:600}).targetKg,600);
 });
 test('a person cannot be assigned twice, including an already reported pair',() => {
   const entry = report();

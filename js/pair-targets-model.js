@@ -28,6 +28,7 @@ const PairTargets = (() => {
   }
   function roster(employees, team) {
     return employees.filter(person => person.active !== false && person.id && person.name &&
+      typeof person.role === 'string' && person.role.trim().toLowerCase() === 'опаковчик' &&
       (team === 'СТИКЕРИ' ? person.category === 'stickers' : person.team === team && ['auto','manual'].includes(person.category))
     ).slice().sort((a,b) => a.name.localeCompare(b.name,'bg'));
   }

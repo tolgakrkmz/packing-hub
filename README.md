@@ -80,6 +80,11 @@ connection button while the other sections remain available.
 
 ## Pair target statistics
 
+New pairs use only active people with the personnel role `Опаковчик` (packer)
+from the selected team, including Stickers. Other roles and people without an
+assigned role are excluded from the roster, counts and new pair selection.
+Existing pairs and reports remain available after personnel roles change.
+
 Statistics reads the same pair-targets file without modifying it. Its independent
 month and team filters work even when no production or personnel file is connected.
 It shows reporting coverage, success rate, kilograms and crates against reported
