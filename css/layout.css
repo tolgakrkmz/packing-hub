@@ -1,0 +1,134 @@
+/* Shared layout, loaded after each screen's styles. Keep module accent colors. */
+:root {
+  color-scheme: dark;
+  --text-muted: #a9acb3;
+  --surface: var(--panel);
+}
+body { line-height: 1.5; padding: 32px 24px 64px; }
+.wrap, .account-wrap { width: 100%; min-width: 0; }
+header { margin-bottom: 28px; }
+header h1 { font-size: clamp(23px, 3vw, 32px); line-height: 1.2; letter-spacing: -.025em; }
+header p { line-height: 1.6; margin-top: 8px; }
+header a, .account-wrap > a { min-height: 44px; display: inline-flex; align-items: center; color: var(--text-muted); font-size: 13px; }
+.panel { border-radius: 16px; padding: 22px; box-shadow: 0 6px 24px #00000012; }
+.panel h2 { line-height: 1.5; }
+button, input, select, textarea { font-family: inherit; }
+button { min-width: 44px; min-height: 44px; touch-action: manipulation; }
+input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { min-height: 44px; min-width: 0; max-width: 100%; }
+input[type=checkbox], input[type=radio] { accent-color: var(--teal); }
+:is(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.hub-language { gap: 6px; }
+.hub-language button { min-width: 44px; min-height: 44px; font-size: 12px; }
+.conn-text { min-width: 0; flex-basis: 180px; overflow-wrap: anywhere; }
+.conn-row { gap: 12px; }
+.conn-note, .note { font-size: 12px; }
+.conn-btn, .action-btn, .edit-btn, .chip, .quick button { min-height: 44px; }
+.stepper { min-width: 0; }
+.stepper input { min-width: 0; width: 0; }
+.bd-card .stepper button { width: 44px; height: 44px; }
+.sum-card, .summary-card, .stat { border-radius: 12px; }
+.sum-card { padding: 14px 8px; }
+.sum-card .val { font-variant-numeric: tabular-nums; }
+.day-card { gap: 12px; flex-wrap: wrap; }
+.goal-edit, .goal-nums, .result-actions, .form-actions, .dialog-actions, .modal-actions { flex-wrap: wrap; }
+.result-name, .result-text, .gallery figcaption, .upload-hint, .account-wrap small { overflow-wrap: anywhere; }
+.history-month-table, .sched-scroll, .stats-table-scroll, .import-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+.modal-card, dialog { max-height: 90dvh; overscroll-behavior: contain; }
+.status-switch:has(input:focus-visible) { outline: 2px solid var(--amber); outline-offset: 3px; }
+.toast { max-width: calc(100% - 36px); overflow-wrap: anywhere; }
+.today-card { min-width: 0; }
+.today-card .tt { flex-wrap: wrap; }
+
+/* Home: a clear module grid that works both offline and with a session bar. */
+body.hub-page { display: block; min-height: 100dvh; }
+.hub-page .wrap { max-width: 1080px; margin: 48px auto 0; }
+.hub-page .eyebrow { margin-bottom: 12px; font-size: 12px; }
+.hub-page h1 { max-width: 800px; font-size: clamp(28px, 4vw, 44px); line-height: 1.15; letter-spacing: -.035em; }
+.hub-page .sub { max-width: 700px; line-height: 1.7; margin: 18px 0 32px; }
+.tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+a.tile { min-width: 0; padding: 26px; border-radius: 16px; border-top: 3px solid var(--tile-accent); }
+.tile .icon { width: 46px; height: 46px; margin-bottom: 24px; border-radius: 12px; }
+.tile h2 { font-size: 18px; line-height: 1.35; }
+.tile p { font-size: 13px; line-height: 1.65; }
+.hub-page footer { border-top: 1px solid var(--border); padding-top: 20px; line-height: 1.6; }
+.server-mode .lock-badge { display: none; }
+
+/* Session and account screens share the same surfaces as the modules. */
+body.server-mode { padding-top: 0; }
+.server-bar { width: 100%; max-width: 1180px; margin: 0 auto 28px; padding: 14px 18px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 14px 14px; background: var(--panel); font: inherit; font-size: 13px; gap: 10px 16px; }
+.server-user { font-weight: 750; min-width: 0; overflow-wrap: anywhere; }
+.server-role { color: var(--text-muted); }
+.server-bar a { min-height: 44px; display: inline-flex; align-items: center; text-underline-offset: 4px; }
+#serverState { margin-left: auto; color: var(--text-muted); font-size: 12px; }
+.server-bar button { background: var(--panel-2); color: var(--text); }
+.server-mode.hub-page .wrap { margin-top: 32px; }
+.account-wrap { padding: 0; margin: 32px auto; }
+.account-wrap h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.025em; }
+.account-wrap > p { color: var(--text-muted); }
+.account-wrap form { border-radius: 16px; padding: 24px; }
+.account-wrap form h2 { font-size: 18px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
+.account-card label:has(input[type=checkbox]) { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.account-card input[type=checkbox] { width: 20px; height: 20px; }
+body.login-page { min-height: 100dvh; display: grid; place-items: center; background: radial-gradient(ellipse at top, var(--blue-dark), transparent 65%), var(--bg); }
+.login-page .account-wrap { max-width: 440px; margin: 0 auto; }
+.login-page h1 { font-size: 36px; }
+.login-page form { box-shadow: 0 20px 60px #0003; }
+
+@media (hover: hover) and (pointer: fine) {
+  a.tile:hover { transform: translateY(-3px); box-shadow: 0 12px 32px #0003; }
+  button:not(:disabled):hover { filter: brightness(1.12); }
+}
+@media (max-width: 900px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hub-page .wrap { margin-top: 24px; }
+  .today-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel-head { flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+  body { padding: 16px 12px max(32px, env(safe-area-inset-bottom)); }
+  .panel { padding: 16px; margin-bottom: 16px; border-radius: 12px; }
+  header { margin-bottom: 20px; }
+  .hub-page .wrap, .server-mode.hub-page .wrap { margin-top: 16px; }
+  .tiles { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  a.tile { padding: 20px; }
+  .tile .icon { margin-bottom: 16px; }
+  .hub-page .sub { margin-bottom: 24px; }
+  input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; }
+  .field { min-width: 0 !important; }
+  .row > .field { flex-basis: 100%; }
+  .quick { flex-wrap: wrap; }
+  .quick button { min-width: 44px; }
+  .shift-grid, .summary-grid { gap: 6px; }
+  .head-row, .live-panel { flex-wrap: wrap; }
+  .today-row { flex-wrap: wrap; flex-shrink: 1; }
+  .today-grid { grid-template-columns: minmax(0, 1fr); }
+  .result-head { flex-wrap: wrap; gap: 8px; padding: 14px; }
+  .result-name-wrap { flex-basis: 50%; }
+  .result-name { overflow-wrap: anywhere; }
+  .search-row input[type=text] { min-width: 0; flex-basis: 100%; }
+  .search-row button { flex: 1; white-space: normal; }
+  .bulk-row { flex-wrap: wrap; }
+  .bulk-name-col, .bulk-row .bulk-name { min-width: 0; flex-basis: 100%; }
+  .bulk-row select, .cat-edit-row select { max-width: 100%; }
+  .reason-row { flex-wrap: wrap; }
+  .reason-row .lab { flex-basis: 100%; }
+  .goal-side { gap: 14px; flex-wrap: wrap; }
+  .goal-value { white-space: normal; overflow-wrap: anywhere; }
+  .pace-meta, .trend-legend { flex-wrap: wrap; }
+  .view-toggle { flex-wrap: wrap; }
+  .server-bar { padding: 12px; gap: 8px 12px; margin-bottom: 20px; }
+  .server-user { flex-basis: 100%; }
+  #serverState { margin-left: 0; }
+  .account-wrap { margin: 20px auto; }
+  .account-wrap form { padding: 18px; }
+  .modal-backdrop { padding: 12px; }
+  .modal-card { padding: 16px; }
+  .icon-btn, .lightbox-close { min-width: 44px; min-height: 44px; }
+  .lightbox-close { display: grid; place-items: center; }
+  .thumb-remove { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .monthly-chart .actual-line { stroke-dashoffset: 0; }
+  .monthly-chart .actual-area { opacity: 1; }
+}

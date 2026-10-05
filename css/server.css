@@ -1,9 +1,9 @@
 [hidden]{display:none!important}
-.server-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:var(--surface,#18202c);color:var(--text,#fff);border-bottom:1px solid var(--border,#344055);font:14px/1.5 sans-serif}
+.server-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 20px;background:var(--panel,#18202c);color:var(--text,#fff);border-bottom:1px solid var(--border,#344055);font:14px/1.5 sans-serif}
 .server-bar a{color:var(--teal,#58d7cb)}
 .server-bar button,.account-wrap button{cursor:pointer;padding:10px 16px;border-radius:8px;border:1px solid var(--border,#344055);background:var(--teal,#58d7cb);color:#10212b;font-weight:600}
 .account-wrap{max-width:650px;margin:36px auto;padding:20px;box-sizing:border-box;font:16px/1.6 sans-serif;color:var(--text,#fff)}
-.account-wrap form{display:grid;gap:16px;padding:24px;background:var(--surface,#18202c);border:1px solid var(--border,#344055);border-radius:12px;margin:20px 0}
+.account-wrap form{display:grid;gap:16px;padding:24px;background:var(--panel,#18202c);border:1px solid var(--border,#344055);border-radius:12px;margin:20px 0}
 .account-wrap label{display:grid;gap:6px}
 .account-wrap input:not([type=checkbox]),.account-wrap select{box-sizing:border-box;width:100%;min-width:0;padding:12px;color:var(--text,#fff);background:var(--bg,#101620);border:1px solid var(--border,#344055);border-radius:6px;font:inherit}
 .account-wrap small{font-size:13px;color:var(--text-muted,#a8b2c2)}

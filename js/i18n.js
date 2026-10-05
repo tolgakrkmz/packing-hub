@@ -84,7 +84,7 @@ const HubI18n = (() => {
         const button = event.target.closest('[data-hub-language]');
         if (button) setLanguage(button.dataset.hubLanguage);
       });
-      (document.querySelector('.wrap') || document.body).prepend(bar);
+      (document.querySelector('.wrap, .account-wrap') || document.body).prepend(bar);
       observer = new MutationObserver(apply);
       apply();
     }

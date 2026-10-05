@@ -8,6 +8,7 @@ const {expect: baseExpect} = require('playwright/test');
 const {createHubServer} = require('../server/server.cjs');
 const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
+const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -117,6 +118,19 @@ async function main() {
     await admin.goto(base + '/personnel.html'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
     await observer.goto(base + '/package-instructions.html'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
     console.log('PASS all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
+    console.log('RUN responsive shared modules, accounts and imports at 320–1440 px');
+    for (const width of [320, 390, 768, 1440]) {
+      await admin.setViewportSize({width, height: 900});
+      for (const module of ['index', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics', 'accounts', 'data-import', 'production-import', 'login']) {
+        await admin.goto(`${base}/${module}.html`);
+        if (module !== 'login') await expect(admin.locator('.server-bar')).toBeVisible();
+        for (const language of ['en', 'bg']) {
+          await admin.locator(`[data-hub-language=${language}]`).click();
+          await assertResponsive(admin, `Online ${module}/${language} at ${width}px`);
+        }
+      }
+    }
+    console.log('PASS responsive shared modules, accounts and imports at 320–1440 px');
     console.log('RUN observer controls, page reload persistence and account revocation');
     await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
     await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('7,0 т');
@@ -124,7 +138,7 @@ async function main() {
     await observer.reload(); await expect(observer).toHaveURL(base + '/login.html');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 7 workflows passed.');
+    console.log('Online browser E2E: 8 workflows passed.');
   } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }

@@ -229,6 +229,20 @@ is available by opening `data/personnel.json`.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
 
+## Responsive interface
+
+The shared layout preserves the dark palette and each module's accent color.
+The home grid adapts from three columns to two and then one on phones. Forms,
+account controls and dialogs fit narrow screens. Buttons have a minimum 44 px
+height; mobile input text is at least 16 px. Wide report tables and the shift
+calendar scroll inside their own containers. Keyboard focus remains visible,
+and reduced-motion preferences disable decorative movement.
+
+Browser checks cover Bulgarian and English at 320, 390, 768 and 1440 px in both
+file and server modes, including accounts and import screens in server mode.
+These are Chrome checks; Safari/iOS and Android devices still need a manual
+check before production deployment.
+
 ## Report dates
 
 Production and downtime reports use one date field. Before 10:00, rotating teams
@@ -293,7 +307,7 @@ node scripts/run-server-browser-tests.cjs
 ```
 
 The second command needs the same Chrome and Playwright installation as the
-offline browser runner below and defaults to a **visible Chrome**. Five flows
+offline browser runner below and defaults to a **visible Chrome**. Eight flows
 cover account creation/login, mobile operator reports and live observer
 statistics, personnel and pair reports, shared instructions/attachments,
 observer controls and revoked access. Each run uses an isolated temporary SQLite
@@ -318,7 +332,7 @@ nonzero status if any fails. `--headed` is also accepted; use `--headless` only
 when a background run is wanted. Close the browser or stop the terminal to cancel.
 The test window closes when the run completes; each run starts with fresh storage.
 
-The nine scenarios exercise the actual pages and scripts through their controls:
+The ten scenarios exercise the actual pages and scripts through their controls:
 
 | Module | Browser coverage |
 | --- | --- |
@@ -329,7 +343,7 @@ The nine scenarios exercise the actual pages and scripts through their controls:
 | Packing | Create instructions and attachments, native text files, image preview, attachment download, categories/search, local and external bulk imports and copied instructions. |
 | File access and recovery | Create/refuse overwrite, cancel, reject malformed/wrong-module JSON, refresh/reload, retain another writer's records, failed read/write and ambiguous close, retained draft and retry without duplication; downtime retry. |
 | Manual fallback | Import/export JSON, browser persistence and read-only statistics. |
-| Navigation/languages/mobile | All six hub links, BG/EN switching without losing visible input, 390 px viewport and no page overflow. |
+| Navigation/languages/mobile | All six hub links and BG/EN switching without losing visible input. Connected pages, expanded history, statistics sections and dialogs at 320, 390, 768 and 1440 px; no page overflow, touch button heights and readable mobile fields. |
 
 Only the reviewed demo HTML/CSS/JS is served on a temporary `127.0.0.1` port.
 The runner validates served sources with the publication checker and rejects a
