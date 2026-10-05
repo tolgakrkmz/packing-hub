@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
+const {createImports, limits: importLimits} = require('./imports.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
 function createHubServer({filename, publicOrigin, allowHttp = false}) {
@@ -11,6 +12,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
+  const imports = createImports(store, filename);
   const assets = new Map();
   for (const dir of ['', 'css', 'js']) for (const leaf of fs.readdirSync(path.join(root, dir))) {
     const file = dir ? dir + '/' + leaf : leaf;
@@ -41,9 +43,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
     }
     return Buffer.concat(chunks);
   }
-  async function jsonBody(request) {
+  async function jsonBody(request, limit) {
     if (!(request.headers['content-type'] || '').startsWith('application/json')) throw problem(415, 'JSON_REQUIRED');
-    try { const value = JSON.parse((await body(request)).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
+    try { const value = JSON.parse((await body(request, limit)).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
     catch (error) { if (error.status) throw error; throw problem(400, 'INVALID_DATA'); }
   }
   function broadcast(module, revision) {
@@ -102,6 +104,20 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
           throw problem(405, 'METHOD_REJECTED');
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
+        const batch = pathname.match(/^\/api\/import\/batches(?:\/([0-9a-f-]{36})(?:\/(preview|apply|files\/\d+))?)?$/);
+        if (batch) {
+          if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+          if (!batch[1] && request.method === 'POST') return json(response, 201, imports.create(await jsonBody(request, importLimits.jsonBytes), session.user));
+          if (batch[1] && !batch[2] && request.method === 'DELETE') return json(response, 200, imports.discard(batch[1], session.user));
+          if (batch[2]?.startsWith('files/') && request.method === 'PUT') return json(response, 200, imports.upload(batch[1], Number(batch[2].split('/')[1]), await body(request, importLimits.fileBytes), session.user));
+          if (batch[2] === 'preview' && request.method === 'POST') return json(response, 200, imports.preview(batch[1], session.user));
+          if (batch[2] === 'apply' && request.method === 'POST') {
+            const input = await jsonBody(request), result = imports.apply(batch[1], input.token, session.user);
+            for (const [module, revision] of Object.entries(result.revisions)) broadcast(module, revision);
+            return json(response, 200, result);
+          }
+          throw problem(405, 'METHOD_REJECTED');
+        }
         if (pathname === '/api/import/production-log/preview' || pathname === '/api/import/production-log/apply') {
           if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
@@ -113,7 +129,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
         }
         if (document) {
           if (request.method === 'GET') { const current = store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
-          if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request), revisionFor(request), session.user); broadcast(document[1], result.revision); return json(response, 200, result); }
+          if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request, importLimits.jsonBytes), revisionFor(request), session.user); broadcast(document[1], result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/folders') {
@@ -125,7 +141,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
         if (pathname === '/api/files') {
           const name = url.searchParams.get('path');
           if (request.method === 'GET') { const file = store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
-          if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, 10 * 1024 * 1024), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), session.user); broadcast('package-instructions', result.revision); return json(response, 200, result); }
+          if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), session.user); broadcast('package-instructions', result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         throw problem(404, 'NOT_FOUND');
@@ -135,7 +151,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (['/accounts.html', '/production-import.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (['/accounts.html', '/production-import.html', '/data-import.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
@@ -145,7 +161,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       else response.end();
     }
   });
-  server.requestTimeout = 30000;
+  server.requestTimeout = 5 * 60 * 1000;
+  server.headersTimeout = 30000;
   server.on('listening', () => {
     if (allowHttp && origin.port === '0') { origin.port = String(server.address().port); publicOrigin = origin.origin; }
   });
@@ -153,8 +170,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const close = async () => { clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); store.close(); };
-  return {server, store, auth, close};
+  const close = async () => { clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
+  return {server, store, auth, imports, close};
 }
 if (require.main === module) {
   process.umask(0o077);

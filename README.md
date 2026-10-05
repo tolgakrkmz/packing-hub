@@ -109,25 +109,53 @@ unprivileged user, with a read-only application filesystem and a persistent
 `hub-data` volume. Expose only this app through Funnel. The Docker build context
 excludes demo data, databases, environment files, Git history and test artifacts.
 
-### Import production history
+### Import all legacy module data
 
-On the production computer, finish the last entry in the old application and keep
-an untouched local copy of its current `production-log.json`. Sign in to the site
-as an administrator and choose **Production import** in the account bar. Select
-that file (up to 2 MB), check the preview and confirm adding records. Never send
-live files to chat, the source checkout, GitHub, tests or attachments.
+Keep an untouched local copy of the current production folder after the last
+entry in the old application. On that computer, sign in as an administrator and
+choose **Data import** in the account bar. Select these current JSON files:
 
-The import adds production, scrap and line breakdown records to the shared
-SQLite database. Existing records and the current site goal are retained. Records
-with identical IDs and content are skipped; conflicting IDs block the entire
-import. A changed database revision requires a fresh preview. Each import that
-adds records first creates a private SQLite snapshot in `import-backups` beside
-the database. A failed backup blocks the import. Retention and copies to a second
-local disk remain manual. No backup or source record is served publicly.
+| Module | File |
+| --- | --- |
+| Production and scrap | `production-log.json` |
+| Downtime | `line-downtime.json` |
+| Personnel, shifts and movement history | `personnel.json` |
+| Pair plans and reports | `pair-targets.json` |
+| Packing instruction index | `package-instructions.json` |
 
-After confirming totals in Reports, use the site for all new production entries.
-Changes in the old local application do not synchronize automatically. Other
-module files require a separate migration; this importer handles production only.
+For packing instructions, also select the `data` folder, `profiles` folder or the
+old application folder. A selected folder can supply JSON files at its root or
+under `data`. Only files referenced by the instruction index and each profile's
+optional `instruction.txt` are uploaded. Nested customer/profile folders are
+preserved. Code, unrelated files and backup copies in deeper folders are skipped.
+Do not send live files to chat, this source checkout, GitHub, tests or attachments.
+
+Check the preview table, including missing files, settings changes and movement
+history. The settings checkbox controls copying the production goal, adding
+legacy downtime reasons and importing provided Stickers settings. Existing
+reasons are retained. Unselected modules remain unchanged. A full migration needs
+all five files and the instruction folders; missing modules show dashes.
+
+Identical IDs/content and identical attachments are skipped. Different records
+with the same ID, changed attachments at an existing path, overlapping pair
+members or missing referenced attachments block the **whole** import. Legacy
+personnel is normalized through the same model as the Personnel screen.
+Historical pair snapshots and reports remain valid even for retired members.
+Existing site records and movement history are retained.
+
+JSON is limited to 20 MB combined; attachments to 20 MB each, 5000 files and 1 GB
+in total. Uploads are staged privately beside SQLite for up to four hours and
+can be cancelled. Browser data is not written to localStorage/IndexedDB. Only an
+administrator may import, and each upload belongs to its creating administrator.
+A changed database or attachment requires a new preview. Confirmation first
+creates a consistent private snapshot under `import-backups`, then commits all
+selected modules and attachments in one SQLite transaction. Backup failure
+blocks the import. Completed/cancelled staging is removed; expired staging is
+cleared on later imports. Backup retention remains manual.
+
+Verify all modules and Reports, then enter new data only on the site. Old files
+remain an archive; the old application does not synchronize automatically.
+The earlier production-only importer remains available at `production-import.html`.
 
 ### Backup and updates
 

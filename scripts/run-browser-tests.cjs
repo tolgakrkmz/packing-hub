@@ -20,6 +20,11 @@ async function main() {
     inspect(file, content, tokens);
     assets.set('/' + file, content);
   }
+  for (const [name, content] of assets) if (name.endsWith('.html')) {
+    for (const match of content.toString('utf8').matchAll(/<script\b[^>]*\bsrc="(js\/[a-z0-9-]+\.js)"/g)) {
+      if (!assets.has('/' + match[1])) throw new Error('Stage the reviewed demo script before running browser tests: ' + match[1]);
+    }
+  }
   // The pinned fictional seed fingerprint also prevents accidentally serving the production checkout.
   inspect('js/employees-seed.js', fs.readFileSync(path.join(root, 'js/employees-seed.js')), tokens);
   const server = http.createServer((request, response) => {

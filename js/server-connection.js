@@ -153,7 +153,7 @@ const HubServer = (() => {
     const who = document.createElement('span'); who.setAttribute('translate', 'no'); who.textContent = boot.user.username; bar.append(who);
     const role = document.createElement('span'); role.textContent = roleLabels[boot.user.role]; bar.append(role);
     if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/accounts.html'; link.textContent = 'Акаунти'; bar.append(link); }
-    if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/production-import.html'; link.textContent = 'Импорт на тонаж'; bar.append(link); }
+    if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/data-import.html'; link.textContent = 'Импорт на данни'; bar.append(link); }
     const state = document.createElement('span'); state.id = 'serverState'; state.textContent = 'Свързване…'; bar.append(state);
     const logout = document.createElement('button'); logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); }; bar.append(logout);
     document.body.prepend(bar);

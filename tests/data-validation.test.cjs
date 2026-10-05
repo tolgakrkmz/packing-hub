@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname,'..');
 const sandbox = vm.createContext({Date});
-for(const name of ['shift-schedule','pair-targets-model','data-validation']) vm.runInContext(fs.readFileSync(path.join(root,'js',name+'.js'),'utf8'),sandbox);
+for(const name of ['shift-schedule','pair-targets-model','data-validation','personnel-model']) vm.runInContext(fs.readFileSync(path.join(root,'js',name+'.js'),'utf8'),sandbox);
 const validation = vm.runInContext('HubDataValidation',sandbox);
 const production = {entries:[{id:'demo-record',date:'2026-10-04',shift:'СТИКЕРИ',tonnage:100,brak:0}],goalTons:1000};
 const downtime = {entries:[{id:'demo-stop',date:'2026-10-04',shift:'А',start:'23:50',end:'00:10',durationMin:20,reason:'Demo reason'}],reasons:['Demo reason']};

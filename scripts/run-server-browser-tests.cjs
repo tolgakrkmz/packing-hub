@@ -7,6 +7,7 @@ const {chromium} = require('playwright');
 const {expect: baseExpect} = require('playwright/test');
 const {createHubServer} = require('../server/server.cjs');
 const expect = baseExpect.configure({timeout: 10000});
+const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -77,7 +78,7 @@ async function main() {
     console.log('PASS shared packing instructions and attachments → phone reads them');
     console.log('RUN production history import → live report, duplicate prevention and stale preview protection');
     await observer.goto(base + '/statistics.html'); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
-    await admin.getByRole('link', {name: 'Импорт на тонаж', exact: true}).click();
+    await admin.goto(base + '/production-import.html');
     const history = {goalTons: 9000, entries: [{id: 'demo-import-history', date: '2026-10-04', shift: 'А', tonnage: 2000, brak: 20, breakdown: null}]};
     const select = data => admin.locator('#importFile').setInputFiles({name: 'production-log.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data))});
     await select(history); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=added]')).toHaveText('1');
@@ -91,14 +92,39 @@ async function main() {
     await select({employees: []}); await admin.locator('#previewImport').click(); await expect(admin.locator('#importMessage')).toContainText('Файлът не е валиден'); await expect(admin.locator('#applyImport')).toBeDisabled();
     const latest = hub.store.get('production-log'); hub.store.put('production-log', {...latest.data, goalTons: 3000}, latest.revision, {role: 'admin'});
     console.log('PASS production history import → live report, duplicate prevention and stale preview protection');
+    console.log('RUN all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
+    const migration = migrationFixture(), migrationDir = path.join(dir, 'migration-demo'); fs.mkdirSync(migrationDir);
+    for (const [kind, data] of Object.entries(migration.payload.documents)) fs.writeFileSync(path.join(migrationDir, kind + '.json'), JSON.stringify(data));
+    for (const [index, file] of migration.payload.files.entries()) { const filename = path.join(migrationDir, file.path); fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, migration.contents[index]); }
+    fs.writeFileSync(path.join(migrationDir, 'unrelated-demo.txt'), 'Fictional unrelated file, must be skipped.');
+    await admin.getByRole('link', {name: 'Импорт на данни', exact: true}).click();
+    await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Data import'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
+    await admin.locator('[data-hub-language=bg]').click();
+    await admin.locator('#moduleFiles').setInputFiles(Object.keys(migration.payload.documents).map(kind => path.join(migrationDir, kind + '.json')));
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('За импорта на инструкции избери и папката с профилите.');
+    const incompleteDir = path.join(dir, 'incomplete-demo'); fs.mkdirSync(incompleteDir); fs.writeFileSync(path.join(incompleteDir, 'unrelated-demo.txt'), 'Fictional unrelated file.');
+    await admin.locator('#legacyFolder').setInputFiles(incompleteDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#missingCount')).toHaveText('2'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
+    await admin.locator('#legacyFolder').setInputFiles(migrationDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Данните са проверени. Потвърди общото добавяне.');
+    await expect(admin.locator('[data-module=personnel]')).toContainText('2'); await expect(admin.locator('[data-module=attachments]')).toContainText('3');
+    await admin.locator('#confirmDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Всички избрани данни са добавени. Провери модулите и отчетите.');
+    await expect(observer.locator('#dashboardActual')).toHaveText('7,0 т'); await observer.locator('[data-stats-tab=pairs]').click(); await expect(observer.locator('#pairStatsBody')).toContainText('Demo Legacy Person 1');
+    assert.equal(hub.store.get('line-downtime').data.entries.length, 2); assert.equal(hub.store.get('personnel').data.settings.stickersStage1, 3); assert.equal(hub.store.get('production-log').data.goalTons, 5000);
+    assert.equal(hub.store.db.prepare('SELECT 1 FROM files WHERE path=?').get('unrelated-demo.txt'), undefined);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
+    await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
+    await admin.goto(base + '/personnel.html'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
+    await observer.goto(base + '/package-instructions.html'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
+    console.log('PASS all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
     console.log('RUN observer controls, page reload persistence and account revocation');
     await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
-    await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('5,0 т');
+    await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('7,0 т');
     await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('input[type=checkbox]').uncheck(); await form.locator('button').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
     await observer.reload(); await expect(observer).toHaveURL(base + '/login.html');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 6 workflows passed.');
+    console.log('Online browser E2E: 7 workflows passed.');
   } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }

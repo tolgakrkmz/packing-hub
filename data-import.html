@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Импорт на данни · Package Hub</title><link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><script src="js/data-import.js" defer></script></head>
+<body><script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css"><main class="account-wrap import-wrap"><a href="index.html">← Package Hub</a><h1>Импорт на данни</h1>
+<p>Избери актуалните файлове от производствения компютър след последния запис в старата програма. Запази копие на оригиналната папка.</p>
+<ol><li>Избери JSON файловете за модулите. Можеш да ги избереш заедно.</li><li>За инструкциите избери и папката data, profiles или цялата папка на старата програма.</li><li>Провери прегледа и потвърди общото добавяне.</li></ol>
+<p>Прехвърлят се само избраните данни за модулите и посочените в инструкциите снимки, приложения и instruction.txt. Кодът и останалите файлове в папката се пропускат.</p>
+<form id="dataImportForm"><label>JSON файлове за модулите<input id="moduleFiles" type="file" accept=".json,application/json" multiple></label>
+<label>Папка с данни и инструкции<input id="legacyFolder" type="file" webkitdirectory multiple></label>
+<label class="import-option"><input id="includeSettings" type="checkbox" checked>Прехвърли и настройките: цел за тонаж, причини за престои и настройки на Стикери.</label>
+<small>До 20 MB общо за JSON, до 20 MB за отделна снимка или приложение, до 1 GB и 5000 приложения общо.</small>
+<button id="checkDataImport" type="submit" disabled>Провери избраните данни</button></form>
+<progress id="importProgress" max="1" value="0" aria-label="Качване на приложения" hidden></progress>
+<div class="import-table-wrap"><table id="dataImportTable"><thead><tr><th>Модул</th><th>Файл</th><th>Нови</th><th>Вече добавени</th><th>Конфликти</th><th>Настройки</th><th>История</th></tr></thead><tbody id="dataImportRows"></tbody></table></div>
+<p id="missingAttachments" hidden>Липсващи приложения: <strong id="missingCount" translate="no">0</strong></p>
+<p>Съществуващите записи се запазват. Различни записи с еднакъв идентификатор или различни приложения със същия път спират целия импорт. Историческите двойки запазват състава и отчетите си.</p>
+<p>Преди потвърденото добавяне сървърът създава частно резервно копие. Избраните модули и приложения се добавят заедно.</p>
+<button id="confirmDataImport" disabled>Добави проверените данни</button> <button id="cancelDataImport" disabled>Откажи импорта</button>
+<p id="dataImportMessage" role="status" aria-live="polite"></p>
+<p>След прехвърлянето работете само в сайта. Старите файлове остават архив и не се синхронизират автоматично.</p><a href="statistics.html">Отчети</a></main></body>
+</html>

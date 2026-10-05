@@ -76,7 +76,32 @@ test('operator can append reports but cannot change goals, delete reports, manag
   assert.equal((await request('/api/accounts', operator)).status, 403);
   assert.equal((await request('/accounts.html', observer)).status, 403);
   assert.equal((await request('/production-import.html', observer)).status, 403);
+  assert.equal((await request('/data-import.html', observer)).status, 403);
   assert.equal((await request('/api/data/personnel', observer)).status, 200);
+});
+test('batch imports require admin, same origin and CSRF; staging uploads are scoped to their administrator', async t => {
+  const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
+  const source = {documents: {'production-log': {entries: [], goalTons: 4000}}, files: [], includeSettings: true};
+  const create = (user, headers) => request('/api/import/batches', user, {method: 'POST', data: source, headers});
+  assert.equal((await create(operator)).status, 403);
+  assert.equal((await create(admin, {'X-CSRF-Token': ''})).status, 403);
+  assert.equal((await create(admin, {Origin: 'https://example.invalid'})).status, 403);
+  await hub.auth.create('demo-second-admin', fixturePassword, 'admin'); const other = await login('demo-second-admin');
+  const id = (await (await create(admin)).json()).id;
+  assert.equal((await request('/api/import/batches/' + id + '/preview', other, {method: 'POST', data: {}})).status, 403);
+  assert.equal((await request('/api/import/batches/' + id, other, {method: 'DELETE', data: {}})).status, 403);
+  const preview = await (await request('/api/import/batches/' + id + '/preview', admin, {method: 'POST', data: {}})).json();
+  const applied = await request('/api/import/batches/' + id + '/apply', admin, {method: 'POST', data: {token: preview.token}}); assert.equal(applied.status, 200);
+  assert.equal(hub.store.get('production-log').data.goalTons, 4000);
+});
+test('a migrated history larger than the old request limit still accepts subsequent operator reports', async t => {
+  const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
+  const entry = {id: 'demo-large-history', date: '2026-10-04', shift: 'А', tonnage: 1000, brak: 0, note: 'Demo'.repeat(600000)};
+  const batch = hub.imports.create({documents: {'production-log': {entries: [entry]}}, files: [], includeSettings: false}, admin.user);
+  hub.imports.apply(batch.id, hub.imports.preview(batch.id, admin.user).token, admin.user);
+  const current = hub.store.get('production-log'); current.data.entries.push({...entry, id: 'demo-next-report', note: ''});
+  const saved = await request('/api/data/production-log', operator, {method: 'PUT', data: current.data, headers: {'If-Match': '"' + current.revision + '"'}});
+  assert.equal(saved.status, 200); assert.equal(hub.store.get('production-log').data.entries.length, 2);
 });
 test('production import is admin-only, merges history without replacing live records or goals and is safe to repeat', async t => {
   const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
