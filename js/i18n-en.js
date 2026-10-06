@@ -55,6 +55,8 @@ const HUB_EN_MESSAGES = {
   "Провери прегледа и потвърди общото добавяне.": "Check the preview and confirm the combined import.",
   "Прехвърлят се само избраните данни за модулите и посочените в инструкциите снимки, приложения и instruction.txt. Кодът и останалите файлове в папката се пропускат.": "Only selected module data and the images, attachments and instruction.txt referenced by the instructions are transferred. Code and other files in the folder are skipped.",
   "JSON файлове за модулите": "Module JSON files",
+  "Избраните отделно JSON файлове имат предимство пред копията в папката. Папката допълва само модулите, за които не си избрал файл.": "Individually selected JSON files take priority over copies in the folder. The folder supplies only modules for which you have not selected a file.",
+  "Избрани са различни копия на JSON файл. Избери актуалното копие отделно в „JSON файлове за модулите“.": "Different copies of a JSON file were selected. Select the current copy separately under “Module JSON files”.",
   "Папка с данни и инструкции": "Data and instructions folder",
   "Прехвърли и настройките: цел за тонаж, причини за престои и настройки на Стикери.": "Also transfer settings: production goal, downtime reasons and Stickers settings.",
   "До 20 MB общо за JSON, до 20 MB за отделна снимка или приложение, до 1 GB и 5000 приложения общо.": "Up to 20 MB of JSON, up to 20 MB per image or attachment, and up to 1 GB and 5000 attachments in total.",
