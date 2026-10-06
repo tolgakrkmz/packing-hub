@@ -1,5 +1,9 @@
 (() => {
   const message = document.getElementById('accountMessage');
+  const list = document.getElementById('accountList');
+  const search = document.getElementById('accountSearch');
+  const filter = document.getElementById('accountFilter');
+  const createForm = document.getElementById('accountForm');
   const roles = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
   const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети'};
   const defaults = {
@@ -7,54 +11,121 @@
     operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false},
     observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false}
   };
-  function permissionControls(form, role, overrides = {}) {
-    const group = document.createElement('fieldset'); group.className = 'account-permissions';
-    const legend = document.createElement('legend'); legend.textContent = 'Права на акаунта'; group.append(legend);
+  const cards = new Map();
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  }
+  function field(text, input) {
+    const label = element('label'); label.append(element('span', '', text), input); return label;
+  }
+  function permissionControls(form, role, initialOverrides = {}) {
+    let overrides = {...initialOverrides};
+    const group = element('fieldset', 'account-permissions');
+    group.append(element('legend', '', 'Права на акаунта'));
     const controls = new Map();
+    const grid = element('div', 'account-permission-grid');
     for (const [key, text] of Object.entries(permissionLabels)) {
-      const label = document.createElement('label'); label.append(document.createTextNode(text));
-      const select = document.createElement('select'); select.dataset.permission = key; select.setAttribute('aria-label', text);
-      for (const [value, name] of [['inherit', 'Според ролята'], ['allow', 'Разрешено'], ['deny', 'Забранено']]) {
-        const option = document.createElement('option'); option.value = value; option.textContent = name; select.append(option);
-      }
-      select.value = Object.hasOwn(overrides, key) ? overrides[key] ? 'allow' : 'deny' : 'inherit';
-      const status = document.createElement('small'); label.append(select, status); group.append(label); controls.set(key, {select, status});
+      const label = element('label', 'account-flag');
+      const input = element('input'); input.type = 'checkbox'; input.dataset.permission = key;
+      const copy = element('span'); const status = element('small');
+      copy.append(element('span', 'account-flag-title', text), status); label.append(input, copy); grid.append(label);
+      controls.set(key, {input, status});
+      input.addEventListener('change', () => { overrides[key] = input.checked; refresh(); });
     }
+    const footer = element('div', 'account-permission-footer');
+    const state = element('small');
+    const reset = element('button', 'account-secondary', 'Върни правата по роля'); reset.type = 'button';
+    footer.append(state, reset); group.append(grid, footer);
+    const allowed = key => key === 'canExportReports' || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
+    const read = () => Object.fromEntries(Object.entries(overrides).filter(([key]) => allowed(key)));
     const refresh = () => {
-      for (const [key, {select, status}] of controls) {
-        const allowed = key === 'canExportReports' || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
-        select.disabled = !allowed;
-        status.textContent = !allowed ? 'Недостъпно за тази роля.' : (select.value === 'inherit' ? defaults[role.value][key] : select.value === 'allow') ? 'Разрешено' : 'Забранено';
+      for (const [key, {input, status}] of controls) {
+        input.disabled = !allowed(key);
+        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : defaults[role.value][key]);
+        status.textContent = !allowed(key) ? key === 'canImportData' ? 'Само за администратори' : 'Недостъпно за наблюдател' : Object.hasOwn(overrides, key) ? 'Индивидуално право' : 'Според ролята';
       }
+      const custom = Object.keys(read()).length > 0;
+      state.textContent = custom ? 'Индивидуални права' : 'Права според ролята'; reset.disabled = !custom;
     };
-    role.addEventListener('change', refresh); group.addEventListener('change', refresh); form.append(group); refresh();
-    return () => Object.fromEntries([...controls].filter(([, {select}]) => !select.disabled && select.value !== 'inherit').map(([key, {select}]) => [key, select.value === 'allow']));
+    reset.addEventListener('click', () => { overrides = {}; refresh(); });
+    role.addEventListener('change', refresh);
+    form.addEventListener('reset', () => { overrides = {}; setTimeout(refresh, 0); });
+    form.insertBefore(group, form.querySelector('.account-actions')); refresh();
+    return read;
   }
-  async function load() {
-    const result = await HubServer.json('/api/accounts');
-    const list = document.getElementById('accountList'); list.replaceChildren();
-    for (const user of result.users) {
-      const form = document.createElement('form'); form.className = 'account-card'; form.dataset.id = user.id;
-      const name = document.createElement('h2'); name.setAttribute('translate', 'no'); name.textContent = user.username; form.append(name);
-      const role = document.createElement('select'); role.setAttribute('aria-label', 'Роля');
-      for (const [value, label] of Object.entries(roles)) { const option = document.createElement('option'); option.value = value; option.textContent = label; role.append(option); }
-      role.value = user.role; form.append(role);
-      const permissions = permissionControls(form, role, user.permissionOverrides);
-      const activeLabel = document.createElement('label'); const active = document.createElement('input'); active.type = 'checkbox'; active.checked = user.active; activeLabel.append(active, document.createTextNode(' Активен')); form.append(activeLabel);
-      const password = document.createElement('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.maxLength = 128; form.append(password);
-      const button = document.createElement('button'); button.textContent = 'Запази'; form.append(button);
-      form.addEventListener('submit', async event => { event.preventDefault(); button.disabled = true; try { await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...(password.value ? {password: password.value} : {})}); message.textContent = 'Акаунтът е обновен.'; await load(); } catch (error) { message.textContent = error.message; } finally { button.disabled = false; } });
-      list.append(form);
+  function applyFilters() {
+    const query = search.value.trim().toLowerCase(); let count = 0;
+    for (const {user, details} of cards.values()) {
+      const matches = user.username.toLowerCase().includes(query) && (filter.value === 'all' || filter.value === 'active' && user.active || filter.value === 'inactive' && !user.active || filter.value === user.role);
+      details.hidden = !matches; if (matches) count++;
     }
+    document.getElementById('accountCount').textContent = `${count} / ${cards.size}`;
+    document.getElementById('accountEmpty').hidden = count > 0;
   }
-  const createForm = document.getElementById('accountForm');
+  function renderUser(user, open = false, feedback = '') {
+    const details = element('details', 'account-entry'); details.open = open;
+    const summary = element('summary', 'account-summary');
+    const identity = element('div', 'account-identity');
+    const name = element('h2', '', user.username); name.setAttribute('translate', 'no');
+    const badges = element('div', 'account-badges');
+    badges.append(element('span', 'account-role-badge', roles[user.role]), element('span', user.active ? 'account-status is-active' : 'account-status', user.active ? 'Активен' : 'Неактивен'));
+    identity.append(name, badges); summary.append(identity, element('span', 'account-manage', 'Управление')); details.append(summary);
+    const form = element('form', 'account-card'); form.dataset.id = user.id;
+    const fields = element('div', 'account-fields account-edit-fields');
+    const role = element('select'); role.setAttribute('aria-label', 'Роля');
+    for (const [value, label] of Object.entries(roles)) { const option = element('option', '', label); option.value = value; role.append(option); }
+    role.value = user.role;
+    const active = element('input'); active.type = 'checkbox'; active.checked = user.active; active.dataset.active = '';
+    const activeLabel = element('label', 'account-active'); activeLabel.append(active, element('span', '', 'Активен профил'));
+    fields.append(field('Роля', role), activeLabel); form.append(fields);
+    const actions = element('div', 'account-actions');
+    const button = element('button', '', 'Запази промените'); button.type = 'submit';
+    actions.append(element('small', '', 'Промените прекратяват сесиите на този профил.'), button); form.append(actions);
+    const permissions = permissionControls(form, role, user.permissionOverrides);
+    const password = element('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.minLength = 12; password.maxLength = 128;
+    const passwordDetails = element('details', 'account-password');
+    passwordDetails.append(element('summary', '', 'Смяна на парола'), field('Нова парола', password), element('small', '', 'Поне 12 знака. Остави празно, за да запазиш текущата парола.'));
+    password.addEventListener('invalid', () => { passwordDetails.open = true; });
+    form.insertBefore(passwordDetails, actions);
+    const status = element('p', 'account-feedback', feedback); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); form.append(status);
+    form.addEventListener('submit', async event => {
+      event.preventDefault(); button.disabled = true; status.textContent = '';
+      try {
+        const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...(password.value ? {password: password.value} : {})});
+        renderUser(result.user, true, 'Акаунтът е обновен.'); message.textContent = 'Акаунтът е обновен.';
+        cards.get(user.id).details.querySelector('button[type=submit]').focus({preventScroll: true});
+      } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }
+    });
+    details.append(form);
+    const previous = cards.get(user.id);
+    if (previous) previous.details.replaceWith(details);
+    else {
+      const next = [...list.children].find(entry => cards.get(Number(entry.querySelector('form').dataset.id)).user.username > user.username);
+      list.insertBefore(details, next || null);
+    }
+    cards.set(user.id, {user, details}); applyFilters();
+  }
+  function setCreateOpen(open) {
+    document.getElementById('accountCreate').hidden = !open;
+    document.getElementById('newAccountButton').setAttribute('aria-expanded', String(open));
+    if (open) document.getElementById('accountUsername').focus();
+    else document.getElementById('newAccountButton').focus({preventScroll: true});
+  }
   const createPermissions = permissionControls(createForm, document.getElementById('accountRole'));
-  createForm.append(createForm.querySelector('button'));
-  createForm.addEventListener('reset', () => setTimeout(() => document.getElementById('accountRole').dispatchEvent(new Event('change')), 0));
+  document.getElementById('newAccountButton').addEventListener('click', () => setCreateOpen(document.getElementById('accountCreate').hidden));
+  document.getElementById('cancelCreate').addEventListener('click', () => { createForm.reset(); setCreateOpen(false); });
+  search.addEventListener('input', applyFilters); filter.addEventListener('change', applyFilters);
   createForm.addEventListener('submit', async event => {
-    event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true;
-    try { await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions()}); event.target.reset(); message.textContent = 'Акаунтът е създаден.'; await load(); }
-    catch (error) { message.textContent = error.message; } finally { button.disabled = false; }
+    event.preventDefault(); const button = createForm.querySelector('button[type=submit]'); button.disabled = true;
+    const status = document.getElementById('accountCreateMessage'); status.textContent = '';
+    try {
+      const result = await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions()});
+      createForm.reset(); setCreateOpen(false); search.value = ''; filter.value = 'all';
+      renderUser(result.user); message.textContent = 'Акаунтът е създаден.';
+    } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }
   });
-  load().catch(error => { message.textContent = error.message; });
+  HubServer.json('/api/accounts').then(result => { for (const user of result.users) renderUser(user); applyFilters(); }).catch(error => { message.textContent = error.message; });
 })();

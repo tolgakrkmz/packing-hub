@@ -335,6 +335,16 @@ is available by opening `data/personnel.json`.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
 
+## Account management
+
+The Accounts screen shows a compact searchable list with filters for activity and
+role. Expand an account to change its role, active status and the four permission
+checkboxes: import, export, report creation and report correction/deletion.
+Unavailable rights stay disabled according to role limits. Unchanged rights keep
+their existing inheritance; Reset permissions to role restores role defaults.
+Password changes and new-account creation expand on demand. Saving one account
+keeps unsaved edits in other accounts. Controls adapt to narrow phone screens.
+
 ## Responsive interface
 
 The shared layout preserves the dark palette and each module's accent color.
@@ -456,7 +466,9 @@ The runner validates served sources with the publication checker and rejects a
 production seed. It does not serve the repository data directory or access a
 personal browser profile. Fixtures are generated in isolated browser storage;
 no real personnel, reports, documents or credentials are needed. External
-network requests are blocked. No screenshots or traces are uploaded or written.
+network requests are blocked. No screenshots or traces are uploaded. Screenshots
+are off by default; the server runner accepts `--screenshots=/tmp/hub-demo-previews`
+to save fictional account views locally, outside the source checkout.
 
 The test replaces the OS file/directory picker with handles to Chrome's
 [origin-private file system](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).
