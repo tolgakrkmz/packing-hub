@@ -37,11 +37,91 @@ async function main() {
     const admin = await device('demo-admin');
     await admin.getByRole('link', {name: 'Акаунти', exact: true}).click();
     for (const [username, role] of [['demo-operator', 'operator'], ['demo-observer', 'observer']]) {
-      await admin.locator('#accountUsername').fill(username); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption(role); await admin.locator('#accountForm button').click();
+      await admin.locator('#newAccountButton').click();
+      await admin.locator('#accountUsername').fill(username); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption(role); await admin.locator('#accountForm button[type=submit]').click();
       await expect(admin.locator('#accountList')).toContainText(username);
     }
     const operator = await device('demo-operator', true), observer = await device('demo-observer', true);
     console.log('PASS accounts and real browser login');
+    console.log('RUN compact account search, role defaults, reset and independent drafts');
+    await expect(admin.locator('#accountCreate')).toBeHidden();
+    await expect(admin.locator('.account-entry[open]')).toHaveCount(0);
+    await admin.locator('#accountSearch').fill('DEMO-OPERATOR');
+    await expect(admin.locator('.account-entry:visible')).toHaveCount(1);
+    await expect(admin.locator('#accountCount')).toHaveText('1 / 3');
+    await admin.locator('#accountFilter').selectOption('observer');
+    await expect(admin.locator('#accountEmpty')).toBeVisible();
+    await admin.locator('#accountSearch').fill(''); await admin.locator('#accountFilter').selectOption('all');
+    const operatorId = hub.auth.list().find(user => user.username === 'demo-operator').id;
+    const operatorForm = admin.locator(`.account-card[data-id="${operatorId}"]`);
+    await operatorForm.locator('..').locator('summary').first().click();
+    await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeChecked();
+    await expect(operatorForm.locator('[data-permission=canImportData]')).toBeDisabled();
+    await operatorForm.locator('[data-permission=canEditReports]').check();
+    await operatorForm.locator('button[type=submit]').click();
+    await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {canEditReports: true});
+    await operatorForm.getByRole('button', {name: 'Върни правата по роля', exact: true}).click();
+    await expect(operatorForm.locator('[data-permission=canEditReports]')).not.toBeChecked();
+    await operatorForm.locator('button[type=submit]').click();
+    await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {});
+    await operatorForm.locator('select').selectOption('observer');
+    await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeDisabled();
+    await expect(operatorForm.locator('[data-permission=canCreateReports]')).not.toBeChecked();
+    await operatorForm.locator('select').selectOption('operator');
+    await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeChecked();
+    await operatorForm.locator('.account-password summary').click();
+    await operatorForm.locator('input[type=password]').fill('short');
+    await operatorForm.locator('.account-password summary').click();
+    await operatorForm.locator('button[type=submit]').click();
+    await expect(operatorForm.locator('input[type=password]')).toBeVisible();
+    await expect(operatorForm.locator('input[type=password]')).toBeFocused();
+    await operatorForm.locator('input[type=password]').fill('Fictional-unsaved-123');
+    const observerId = hub.auth.list().find(user => user.username === 'demo-observer').id;
+    const observerForm = admin.locator(`.account-card[data-id="${observerId}"]`);
+    await observerForm.locator('..').locator('summary').first().click();
+    await observerForm.locator('button[type=submit]').click();
+    await expect(observerForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    await expect(operatorForm.locator('input[type=password]')).toHaveValue('Fictional-unsaved-123');
+    await operatorForm.locator('input[type=password]').fill('');
+    await operatorForm.locator('.account-password summary').click();
+    await observerForm.locator('..').locator('summary').first().click();
+    for (const language of ['bg', 'en']) {
+      await admin.locator(`[data-hub-language=${language}]`).click();
+      for (const width of [320, 390, 768, 1440]) {
+        await admin.setViewportSize({width, height: 900}); await assertResponsive(admin, `Expanded account ${language} at ${width}px`);
+        await admin.locator('#newAccountButton').click(); await assertResponsive(admin, `Create account ${language} at ${width}px`);
+        await admin.locator('#cancelCreate').click();
+      }
+    }
+    await admin.locator('[data-hub-language=bg]').click();
+    const screenshotArgument = process.argv.find(value => value.startsWith('--screenshots='));
+    if (screenshotArgument) {
+      const directory = path.resolve(screenshotArgument.slice('--screenshots='.length));
+      const sourceRoot = path.resolve(__dirname, '..');
+      assert.ok(directory !== sourceRoot && !directory.startsWith(sourceRoot + path.sep), 'Demo screenshots must stay outside the source checkout');
+      fs.mkdirSync(directory, {recursive: true});
+      // Fresh viewports avoid stitched capture artifacts after the responsive checks.
+      const captures = await browser.newContext({storageState: await admin.context().storageState(), viewport: {width: 1280, height: 1600}});
+      await captures.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+      const page = await captures.newPage(); await page.goto(base + '/accounts.html');
+      const entry = page.locator(`.account-entry:has(.account-card[data-id="${operatorId}"])`);
+      await entry.locator('summary').first().click();
+      await page.locator('main').screenshot({path: path.join(directory, 'accounts-desktop.png')});
+      await page.setViewportSize({width: 390, height: 1600});
+      await entry.screenshot({path: path.join(directory, 'accounts-mobile-permissions.png')});
+      await entry.locator('summary').first().click();
+      await page.locator('main').screenshot({path: path.join(directory, 'accounts-mobile-list.png')});
+      await captures.close();
+    }
+    await admin.setViewportSize({width: 1280, height: 900});
+    // The draft checks revoke the demo users' sessions; sign in again for subsequent flows.
+    for (const [page, username] of [[operator, 'demo-operator'], [observer, 'demo-observer']]) {
+      await page.goto(base + '/login.html'); await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
+      await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/index.html');
+    }
+    console.log('PASS compact account search, role defaults, reset and independent drafts');
     console.log('RUN operator entry → shared SQLite → observer report updates without reload');
     await observer.goto(base + '/statistics.html'); await expect(observer.locator('#statsContent')).toBeVisible();
     await operator.goto(base + '/production-log.html'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
@@ -63,13 +143,22 @@ async function main() {
     for (const name of ['Demo Online Packer One', 'Demo Online Packer Two']) {
       await admin.locator('#addPersonBtn').click(); await admin.locator('#personName').fill(name); await admin.locator('#personCategory').selectOption('stickers'); await admin.locator('#personRole').selectOption('Опаковчик'); await admin.locator('#personForm button[type=submit]').click(); await expect(admin.locator('#personModal')).not.toHaveClass(/open/);
     }
-    await operator.goto(base + '/personnel.html'); await expect(operator.locator('#peopleWrap')).toContainText('Demo Online Packer One'); await expect(operator.locator('#addPersonBtn')).toBeHidden();
+    await operator.goto(base + '/index.html'); await expect(operator.locator('a[href="personnel.html"]')).toBeHidden(); await expect(operator.locator('a[href="statistics.html"]')).toBeHidden();
+    assert.equal(await operator.evaluate(async () => (await fetch('/personnel.html')).status), 403);
+    assert.equal(await operator.evaluate(async () => (await fetch('/statistics.html')).status), 403);
+    await observer.goto(base + '/index.html'); await expect(observer.locator('a[href="personnel.html"]')).toBeHidden(); await expect(observer.locator('a[href="statistics.html"]')).toBeVisible();
+    assert.equal(await observer.evaluate(async () => (await fetch('/personnel.html')).status), 403);
+    await observer.goto(base + '/statistics.html');
+    await observer.locator('[data-stats-tab=workforce]').click();
+    await expect(observer.locator('#personnelConnDot')).toHaveClass(/\bon\b/);
+    await expect(observer.locator('#wfStaffSource')).toHaveText('0 производствени');
     await observer.locator('[data-stats-tab=pairs]').click();
     await operator.goto(base + '/pair-targets.html'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
     const employees = hub.store.get('personnel').data.employees;
     await operator.locator('#memberOne').selectOption(employees[0].id); await operator.locator('#memberTwo').selectOption(employees[1].id); await operator.locator('#targetKg').fill('1000'); await operator.locator('#targetCrates').fill('40'); await operator.locator('#areaManual').check(); await operator.locator('#savePairBtn').click();
     await expect(operator.locator('#pairsList')).toContainText('Очаква отчет'); await operator.locator('#pairsList [data-action=report]').click(); await operator.locator('#actualKg').fill('1100'); await operator.locator('#actualCrates').fill('44'); await operator.locator('#savePairBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Постигнат');
     await expect(observer.locator('#pairStatsBody')).toContainText(/1\s?100\s*\/\s*1\s?000/); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await expect(operator.locator('#pairsList [data-action=report]')).toBeHidden();
     console.log('PASS personnel, Stickers pair planning/reporting and live pair statistics');
     console.log('RUN shared packing instructions and attachments → phone reads them');
     await admin.goto(base + '/package-instructions.html'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/); await admin.locator('#addBtn').click(); await admin.locator('#numberInput').fill('900101'); await admin.locator('#nameInput').fill('Demo Online Box'); await admin.locator('#categoryInput').selectOption('standard'); await admin.locator('#textInput').fill('Fictional instruction from the shared database.');
@@ -101,6 +190,20 @@ async function main() {
     await admin.getByRole('link', {name: 'Импорт на данни', exact: true}).click();
     await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Data import'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
     await admin.locator('[data-hub-language=bg]').click();
+    console.log('RUN import JSON equality, conflicting folder copies and explicit-file priority');
+    const duplicateDir = path.join(migrationDir, 'data'); fs.mkdirSync(duplicateDir, {recursive: true});
+    const production = migration.payload.documents['production-log'];
+    const reordered = Object.fromEntries(Object.entries({...production, entries: production.entries.map(entry => Object.fromEntries(Object.entries(entry).reverse()))}).reverse());
+    const duplicateFile = path.join(duplicateDir, 'production-log.json'); fs.writeFileSync(duplicateFile, JSON.stringify(reordered));
+    await admin.locator('#legacyFolder').setInputFiles(migrationDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Данните са проверени. Потвърди общото добавяне.');
+    await admin.locator('#cancelDataImport').click();
+    fs.writeFileSync(duplicateFile, JSON.stringify({...production, entries: production.entries.map(entry => ({...entry, tonnage: 1}))}));
+    await admin.locator('#legacyFolder').setInputFiles(migrationDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Избрани са различни копия на JSON файл.');
+    await expect(admin.locator('#dataImportMessage')).toContainText('(production-log.json)'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
+    assert.equal(hub.store.get('production-log').data.entries.length, 2);
+    await admin.reload(); await expect(admin.locator('#checkDataImport')).toBeDisabled();
     await admin.locator('#moduleFiles').setInputFiles(Object.keys(migration.payload.documents).map(kind => path.join(migrationDir, kind + '.json')));
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('За импорта на инструкции избери и папката с профилите.');
     const incompleteDir = path.join(dir, 'incomplete-demo'); fs.mkdirSync(incompleteDir); fs.writeFileSync(path.join(incompleteDir, 'unrelated-demo.txt'), 'Fictional unrelated file.');
@@ -113,6 +216,7 @@ async function main() {
     await expect(observer.locator('#dashboardActual')).toHaveText('7,0 т'); await observer.locator('[data-stats-tab=pairs]').click(); await expect(observer.locator('#pairStatsBody')).toContainText('Demo Legacy Person 1');
     assert.equal(hub.store.get('line-downtime').data.entries.length, 2); assert.equal(hub.store.get('personnel').data.settings.stickersStage1, 3); assert.equal(hub.store.get('production-log').data.goalTons, 5000);
     assert.equal(hub.store.db.prepare('SELECT 1 FROM files WHERE path=?').get('unrelated-demo.txt'), undefined);
+    console.log('PASS import JSON equality, conflicting folder copies and explicit-file priority');
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
     await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
     await admin.goto(base + '/personnel.html'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
@@ -134,11 +238,50 @@ async function main() {
     console.log('RUN observer controls, page reload persistence and account revocation');
     await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
     await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('7,0 т');
-    await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('input[type=checkbox]').uncheck(); await form.locator('button').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
-    await observer.reload(); await expect(observer).toHaveURL(base + '/login.html');
+    await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('..').locator('summary').first().click(); await form.locator('[data-active]').uncheck(); await form.locator('button[type=submit]').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
+    await expect(observer).toHaveURL(base + '/login.html');
+    console.log('RUN account permissions, mobile restrictions, authorized export and immediate revocation');
+    await admin.locator('#newAccountButton').click();
+    await admin.locator('#accountUsername').fill('demo-permissions'); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption('operator');
+    await admin.locator('#accountForm [data-permission=canExportReports]').uncheck();
+    await admin.locator('#accountForm [data-permission=canCreateReports]').uncheck();
+    await admin.locator('#accountForm [data-permission=canEditReports]').check();
+    await expect(admin.locator('#accountForm [data-permission=canImportData]')).toBeDisabled();
+    await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
+    const limited = await device('demo-permissions', true);
+    await limited.goto(base + '/production-log.html'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
+    await expect(limited.locator('#saveBtn')).toBeHidden(); await expect(limited.locator('#reportExport')).toHaveCount(0); await expect(limited.locator('#goalInput')).toBeDisabled();
+    const firstMonth = limited.locator('.history-month').first();
+    if (!await firstMonth.evaluate(element => element.open)) await firstMonth.locator('summary').click();
+    await expect(firstMonth.locator('.del-btn').first()).toBeVisible();
+    assert.equal(await limited.evaluate(async () => (await fetch('/api/export/production-log')).status), 403);
+    const account = hub.auth.list().find(user => user.username === 'demo-permissions');
+    const limitedForm = admin.locator(`.account-card[data-id="${account.id}"]`);
+    await limitedForm.locator('..').locator('summary').first().click();
+    await limitedForm.locator('[data-permission=canExportReports]').check(); await limitedForm.locator('[data-permission=canCreateReports]').check();
+    await limitedForm.locator('[data-permission=canEditReports]').uncheck(); await limitedForm.locator('button[type=submit]').click();
+    await expect(limited).toHaveURL(base + '/login.html');
+    await limited.locator('#username').fill('demo-permissions'); await limited.locator('#password').fill(demoPassword); await limited.locator('#loginForm button').click();
+    await expect(limited).toHaveURL(base + '/index.html');
+    await limited.goto(base + '/production-log.html'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
+    const downloadPromise = limited.waitForEvent('download'); await limited.locator('#reportExport').click(); const download = await downloadPromise;
+    assert.equal(download.suggestedFilename(), 'production-log.json'); const chunks = []; for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+    assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
+    for (const width of [320, 390]) { await limited.setViewportSize({width, height: 900}); await assertResponsive(limited, `Restricted operator at ${width}px`); }
+    await admin.locator('[data-hub-language=en]').click(); await expect(limitedForm.locator('legend')).toHaveText('Account permissions');
+    await expect(limitedForm.locator('.account-flag').last()).toContainText('Correct and delete reports');
+    await admin.locator('[data-hub-language=bg]').click();
+    const own = hub.auth.list().find(user => user.username === 'demo-admin'), ownForm = admin.locator(`.account-card[data-id="${own.id}"]`);
+    await ownForm.locator('..').locator('summary').first().click();
+    await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login.html');
+    await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button').click();
+    await expect(admin).toHaveURL(base + '/index.html');
+    await expect(admin.getByRole('link', {name: 'Импорт на данни', exact: true})).toHaveCount(0);
+    assert.equal(await admin.evaluate(async () => (await fetch('/data-import.html')).status), 403);
+    console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 8 workflows passed.');
+    console.log('Online browser E2E: 11 workflows passed.');
   } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }

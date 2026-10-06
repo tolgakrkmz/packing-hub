@@ -24,7 +24,10 @@ async function run(browser, base, {headed = false} = {}) {
     const page = await context.newPage();
     page.setDefaultTimeout(8000);
     page.on('pageerror', error => errors.push(error.message));
-    page.on('dialog', dialog => dialog.type() === 'prompt' ? dialog.accept('demo-admin') : dialog.accept());
+    page.on('dialog', dialog => {
+      if (dialog.type() === 'prompt') { errors.push('Unexpected local password prompt'); dialog.dismiss(); }
+      else dialog.accept();
+    });
     await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
     const go = async name => { await page.goto(`${base}/${name}.html`); await page.evaluate(() => window.__browserTest.ready); };
     const read = name => page.evaluate(name => window.__browserTest.read(name), name);
@@ -42,14 +45,10 @@ async function run(browser, base, {headed = false} = {}) {
       await page.locator(button).click();
       await expect(page.locator(dot)).toHaveClass(/(?:^|\s)on(?:\s|$)/);
     };
-    const admin = async () => {
-      if (await page.locator('#lockedBox').isVisible()) await page.locator('#lockedAdminBtn').click();
-      else await page.locator('#adminToggleBtn').click();
-    };
     try {
       console.log(`RUN ${name}`);
       if (headed) await page.bringToFront();
-      await work({page, go, read, saved, connect, admin});
+      await work({page, go, read, saved, connect});
       assert.deepEqual(errors, [], 'No uncaught application errors');
       console.log(`PASS ${name}`);
       passed++;
@@ -87,7 +86,7 @@ async function run(browser, base, {headed = false} = {}) {
   }
 
   await scenario('Tonnage → native file → reopen → monthly/yearly reports, downtime, pairs and workforce', async t => {
-    const {page, go, connect, admin, read, saved} = t;
+    const {page, go, connect, read, saved} = t;
     await go('index');
     await page.locator('a[href="production-log.html"]').click();
     await connect('#openFileBtn', 'production-log.json');
@@ -99,7 +98,6 @@ async function run(browser, base, {headed = false} = {}) {
     assert.deepEqual((await read('production-log.json')).entries.map(row => [row.date, row.shift, row.tonnage, row.brak]), [
       ['2026-10-04', 'А', 3000, 20], ['2026-10-05', 'Б', 2000, 30], ['2026-09-30', 'А', 1000, 10], ['2025-12-31', 'Г', 4000, 40], ['2026-10-05', 'СТИКЕРИ', 500, 5]
     ]);
-    await admin();
     await page.locator('#goalInput').fill('12');
     await page.locator('#goalInput').press('Tab');
     await saved('production-log.json', data => data.goalTons === 12);
@@ -240,10 +238,9 @@ async function run(browser, base, {headed = false} = {}) {
   });
 
   await scenario('Personnel create, move, deactivate, search, settings and shift calendar', async t => {
-    const {page, go, connect, admin, read, saved} = t;
+    const {page, go, connect, read, saved} = t;
     await go('personnel');
-    await expect(page.locator('#lockedBox')).toBeVisible();
-    await admin();
+    await expect(page.locator('#hubContent')).toBeVisible();
     await connect('#openFileBtn', 'personnel.json');
     await addPerson(t, 'E2E Demo Moving Packer', 'auto', 'А');
     await addPerson(t, 'E2E Demo Sticker One', 'stickers', '1 смяна');
@@ -284,8 +281,8 @@ async function run(browser, base, {headed = false} = {}) {
   });
 
   await scenario('Stickers pair planning, editing, deletion, reporting, correction and history', async t => {
-    const {page, go, connect, admin, read, saved} = t;
-    await go('personnel'); await admin();
+    const {page, go, connect, read, saved} = t;
+    await go('personnel');
     await connect('#openFileBtn', 'personnel.json');
     await addPerson(t, 'E2E Demo Sticker One', 'stickers', '1 смяна');
     await addPerson(t, 'E2E Demo Sticker Two', 'stickers', '1 смяна');
@@ -340,8 +337,8 @@ async function run(browser, base, {headed = false} = {}) {
     await expect(page.locator('#pairsList')).toContainText('Fictional missing crate');
   });
 
-  await scenario('Report dates, quick controls, validation, administrator deletion and downtime reasons', async t => {
-    const {page, go, connect, admin, read, saved} = t;
+  await scenario('Report dates, quick controls, validation, deletion and downtime reasons', async t => {
+    const {page, go, connect, read, saved} = t;
     for (const module of ['production-log', 'line-downtime']) {
       await go(module); await connect('#openFileBtn', module + '.json');
       await page.locator('[data-shift="А"]').click();
@@ -366,7 +363,6 @@ async function run(browser, base, {headed = false} = {}) {
     await page.locator('#otherReasonInput').fill('Fictional other cause');
     await page.locator('#saveBtn').click();
     await saved('line-downtime.json', data => data.entries.length === 1);
-    await admin();
     await page.locator('#newReasonInput').fill('E2E Demo extra reason');
     await page.locator('#addReasonBtn').click();
     await saved('line-downtime.json', data => data.reasons.includes('E2E Demo extra reason'));
@@ -390,12 +386,11 @@ async function run(browser, base, {headed = false} = {}) {
   });
 
   await scenario('Packing instruction files, attachment preview/download, categories, search and bulk imports', async t => {
-    const {page, go, admin, read, saved} = t;
+    const {page, go, read, saved} = t;
     await go('package-instructions');
-    await expect(page.locator('#addBtn')).toBeHidden();
+    await expect(page.locator('#addBtn')).toBeVisible();
     await page.locator('#openFileBtn').click();
     await expect(page.locator('#connDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
-    await admin();
     await page.locator('#addBtn').click();
     await page.locator('#numberInput').fill('900001');
     await page.locator('#nameInput').fill('Demo Test Box');
@@ -538,7 +533,6 @@ async function run(browser, base, {headed = false} = {}) {
     await page.reload();
     await expect(page.locator('#goalCur')).toHaveText('2,5 т');
     await go('statistics');
-    await page.locator('#lockedAdminBtn').click();
     await expect(page.locator('#dashboardActual')).toHaveText('2,5 т');
     const before = await page.evaluate(() => localStorage.getItem('portfolio-tonnage-fallback'));
     await page.locator('[data-stats-tab=production]').click();
@@ -572,7 +566,6 @@ async function run(browser, base, {headed = false} = {}) {
       await page.setViewportSize({width, height: 900});
       for (const module of ['index', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics']) {
         await go(module);
-        if (['personnel', 'statistics'].includes(module) && await page.locator('#lockedBox').isVisible()) await page.locator('#lockedAdminBtn').click();
         if (['production-log', 'line-downtime', 'personnel'].includes(module) && !/\bon\b/.test(await page.locator('#connDot').getAttribute('class'))) await connect('#openFileBtn', module + '.json');
         if (module === 'pair-targets') {
           if (!/\bon\b/.test(await page.locator('#pairsConnDot').getAttribute('class'))) await connect('#pairsOpenFileBtn', 'pair-targets.json', '#pairsConnDot');

@@ -56,7 +56,7 @@
       <div class="area-tags">${entry.areas.map(area => `<span class="badge">${areaLabels[area]} опаковка</span>`).join('')}</div>
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
       ${state === 'missed' ? `<p class="cause"><strong>Причина:</strong> ${cause}</p>` : ''}
-      ${actions ? `<div class="card-actions"><button data-action="report" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="delete" data-id="${escape(entry.id)}">Премахни</button>`}</div>` : ''}
+      ${actions ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="delete" data-id="${escape(entry.id)}">Премахни</button>`}</div>` : ''}
     </article>`;
   }
   function render() {

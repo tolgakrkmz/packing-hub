@@ -7,6 +7,10 @@
 .account-wrap label{display:grid;gap:6px}
 .account-wrap input:not([type=checkbox]),.account-wrap select{box-sizing:border-box;width:100%;min-width:0;padding:12px;color:var(--text,#fff);background:var(--bg,#101620);border:1px solid var(--border,#344055);border-radius:6px;font:inherit}
 .account-wrap small{font-size:13px;color:var(--text-muted,#a8b2c2)}
+.account-permissions{display:grid;gap:16px;min-width:0;margin:0;padding:16px;border:1px solid var(--border,#344055);border-radius:8px}
+.account-permissions legend{padding:0 6px}
+.account-permissions select:disabled{opacity:.65}
+.server-bar select{max-width:100%;min-width:0;min-height:44px;padding:8px;border-radius:6px;font:16px/1.5 sans-serif;background:var(--bg,#101620);color:var(--text,#fff);border:1px solid var(--border,#344055)}
 #accountMessage,#loginMessage{min-height:1.5em}
 .import-wrap{max-width:1000px}
 .import-option{display:flex!important;align-items:flex-start;gap:10px!important}

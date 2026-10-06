@@ -29,6 +29,43 @@ targets module opens directly without a role login.
 
 ## Shared server mode
 
+Administrators can set individual account permissions to **Role default**,
+**Allowed**, or **Denied** in Accounts. Existing accounts inherit role defaults
+when the database is upgraded; accounts, reports and sessions are preserved.
+Saving account changes revokes its sessions immediately, including live streams.
+
+| Permission | Administrator | Operator | Observer |
+| --- | --- | --- | --- |
+| Import data | Allowed | Unavailable | Unavailable |
+| Export reports | Allowed | Allowed | Allowed |
+| Add reports | Allowed | Allowed | Unavailable |
+| Correct/delete recorded reports | Allowed | Denied | Unavailable |
+
+Role limits remain enforced even for explicit overrides. Import permission
+controls both import workflows independently of report write permissions.
+Operators with correction permission can correct/delete production and downtime
+entries and correct pair results; goals, downtime reasons, personnel, instructions
+and account management retain administrator restrictions. For pairs, creating or
+changing an unreported plan, removing an unreported plan, and entering its first
+result use the add-report permission. Recorded plans retain validation safeguards.
+Operators now need an explicit correction grant to change an already reported
+pair result.
+
+The Personnel / Shifts module and its full data API are administrator-only.
+Statistics is available to administrators and observers; operators cannot open
+it or access its workforce API. Navigation follows these fixed role limits.
+Pair planning uses a separate read-only list of active packers with only the
+fields needed for selection. Workforce statistics receive aggregate counts,
+not personnel identities, notes, settings or movement history. Both read views
+refresh automatically after administrator changes to personnel.
+
+The server bar offers JSON exports of production, downtime and pair reports via
+authenticated `/api/export/<module>` endpoints. Exports use current server data
+and record only action metadata in the audit log. Denying export removes these
+controls and blocks the export API; it does not prevent copying information the
+account is allowed to view. Instruction attachments keep their separate viewing
+behavior. These permissions apply to shared server mode.
+
 The server uses Node.js 24+ and SQLite without npm dependencies. All five module
 documents, accounts, sessions and packing attachments live in one local database.
 A new database starts empty, without employee seeds, reports or default accounts.
@@ -129,6 +166,13 @@ under `data`. Only files referenced by the instruction index and each profile's
 optional `instruction.txt` are uploaded. Nested customer/profile folders are
 preserved. Code, unrelated files and backup copies in deeper folders are skipped.
 Do not send live files to chat, this source checkout, GitHub, tests or attachments.
+
+Individually selected JSON files take priority over same-named copies in the
+folder; the folder supplies only missing modules. Equivalent JSON copies are
+accepted regardless of object key order. If the folder contains different
+copies of a module with no explicit selection, the error identifies the module
+filename: select its current JSON file separately and check again. Different
+explicitly selected copies also require choosing just one current copy.
 
 Check the preview table, including missing files, settings changes and movement
 history. The settings checkbox controls copying the production goal, adding
@@ -267,9 +311,9 @@ Use only fictional development records. HTTP mode refuses non-localhost origins.
 5. For Statistics, select the production, downtime, personnel and pair-targets fixtures.
 6. For Packing Instructions, select the repository folder containing `data/`.
 
-Some management screens use the public demonstration password **`demo-admin`**.
-This is a browser UI toggle, not a security boundary. Permissions to read or
-write files are provided by the browser and operating system.
+Offline demo mode has no login or role restrictions. Permissions to read or
+write files are provided by the browser and operating system. Use server mode
+for account authentication and enforced role permissions.
 
 Only use the fictional demo files. File connections are remembered in IndexedDB
 and refresh every 20 seconds. Saving changes modifies the selected local files.
@@ -297,6 +341,16 @@ is available by opening `data/personnel.json`.
 - Production and pair reports stay separate to avoid counting output twice.
 - JSON storage is intended for a small local workflow. Multiple writers are not
   coordinated by a transactional server; concurrent saves can still conflict.
+
+## Account management
+
+The Accounts screen shows a compact searchable list with filters for activity and
+role. Expand an account to change its role, active status and the four permission
+checkboxes: import, export, report creation and report correction/deletion.
+Unavailable rights stay disabled according to role limits. Unchanged rights keep
+their existing inheritance; Reset permissions to role restores role defaults.
+Password changes and new-account creation expand on demand. Saving one account
+keeps unsaved edits in other accounts. Controls adapt to narrow phone screens.
 
 ## Responsive interface
 
@@ -419,7 +473,9 @@ The runner validates served sources with the publication checker and rejects a
 production seed. It does not serve the repository data directory or access a
 personal browser profile. Fixtures are generated in isolated browser storage;
 no real personnel, reports, documents or credentials are needed. External
-network requests are blocked. No screenshots or traces are uploaded or written.
+network requests are blocked. No screenshots or traces are uploaded. Screenshots
+are off by default; the server runner accepts `--screenshots=/tmp/hub-demo-previews`
+to save fictional account views locally, outside the source checkout.
 
 The test replaces the OS file/directory picker with handles to Chrome's
 [origin-private file system](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system).

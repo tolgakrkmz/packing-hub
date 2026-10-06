@@ -34,11 +34,9 @@ test('only a fictional customer and packing instruction are bundled',() => {
   assert.deepEqual(fs.readdirSync(path.join(root,'data/profiles')).filter(name => !name.startsWith('.')),['demo-profile-001']);
   assert.deepEqual(fs.readdirSync(path.join(root,'data/profiles/demo-profile-001')).filter(name => !name.startsWith('.')),['instruction.txt']);
 });
-test('demo credentials and file storage cannot reuse production connections',() => {
+test('offline demo has no legacy passwords or sessions and cannot reuse production connections',() => {
   const sync = read('js/file-sync.js');
-  assert.match(sync,/const ADMIN_PASSWORD = 'demo-admin';/);
-  assert.match(sync,/const SHIFT_PASSWORDS = \{\};/);
-  assert.match(sync,/const ADMIN_STORAGE_KEY = 'portfolioHubAdminMode';/);
+  assert.doesNotMatch(sync, /ADMIN_PASSWORD|SHIFT_PASSWORDS|portfolioHubAdminMode|portfolioHubRole|wireAdminToggle|wireRoleLogin|sessionStorage|prompt\(/);
   for(const file of fs.readdirSync(path.join(root,'js')).filter(name => name.endsWith('.js'))) {
     const source = read('js/'+file);
     const names = [...source.matchAll(/(?:dbName|localStorageKey)\s*:\s*['"]([^'"]+)['"]/g)];

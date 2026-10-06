@@ -3,7 +3,7 @@ function createStatisticsNavigation({storageKey, onChange}) {
   const $ = id => document.getElementById(id);
   const tabs = Array.from(document.querySelectorAll('[data-stats-tab]'));
   const panels = Array.from(document.querySelectorAll('[data-stats-panel]'));
-  let selected = 'overview', admin = false, filesOpen = false;
+  let selected = 'overview', filesOpen = false;
   try {
     const saved = localStorage.getItem(storageKey);
     if (tabs.some(tab => tab.dataset.statsTab === saved)) selected = saved;
@@ -35,10 +35,10 @@ function createStatisticsNavigation({storageKey, onChange}) {
 
   function showFiles(open) {
     filesOpen = open;
-    $('connPanel').style.display = admin && filesOpen ? 'block' : 'none';
-    $('statsFilesBtn').setAttribute('aria-expanded', String(admin && filesOpen));
+    $('connPanel').style.display = filesOpen ? 'block' : 'none';
+    $('statsFilesBtn').setAttribute('aria-expanded', String(filesOpen));
     // The outer Files button gives access even when optional sources are disconnected.
-    if (admin && filesOpen) {
+    if (filesOpen) {
       const body = $('connPanel').querySelector('.conn-panel-body');
       const toggle = $('connPanel').querySelector('.conn-panel-toggle');
       if (body) body.hidden = false;
@@ -56,12 +56,5 @@ function createStatisticsNavigation({storageKey, onChange}) {
   new MutationObserver(updateConnections).observe($('connPanel'), {subtree:true, attributes:true, attributeFilter:['class']});
   updateConnections();
   select(selected, false);
-  return {
-    setAdmin(value) {
-      admin = value;
-      $('statsFilesBtn').hidden = !admin;
-      if (!admin) filesOpen = false;
-      showFiles(filesOpen);
-    }
-  };
+  showFiles(false);
 }

@@ -51,7 +51,6 @@ a.tile { min-width: 0; padding: 26px; border-radius: 16px; border-top: 3px solid
 .tile h2 { font-size: 18px; line-height: 1.35; }
 .tile p { font-size: 13px; line-height: 1.65; }
 .hub-page footer { border-top: 1px solid var(--border); padding-top: 20px; line-height: 1.6; }
-.server-mode .lock-badge { display: none; }
 
 /* Session and account screens share the same surfaces as the modules. */
 body.server-mode { padding-top: 0; }

@@ -71,13 +71,14 @@ test('operator can append reports but cannot change goals, delete reports, manag
   assert.equal((await put('production-log', operator, data)).status, 200);
   assert.equal((await put('production-log', operator, {...data, goalTons: 1}, 2)).status, 403);
   assert.equal((await put('production-log', operator, {...data, entries: []}, 2)).status, 403);
-  const personnel = await (await request('/api/data/personnel', operator)).json();
+  const personnel = await (await request('/api/data/personnel', await login())).json();
   assert.equal((await put('personnel', operator, personnel.data)).status, 403);
   assert.equal((await request('/api/accounts', operator)).status, 403);
   assert.equal((await request('/accounts.html', observer)).status, 403);
   assert.equal((await request('/production-import.html', observer)).status, 403);
   assert.equal((await request('/data-import.html', observer)).status, 403);
-  assert.equal((await request('/api/data/personnel', observer)).status, 200);
+  assert.equal((await request('/api/data/personnel', operator)).status, 403);
+  assert.equal((await request('/api/data/personnel', observer)).status, 403);
 });
 test('batch imports require admin, same origin and CSRF; staging uploads are scoped to their administrator', async t => {
   const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
@@ -212,7 +213,7 @@ test('login failures are generic and repeated attempts are throttled', async t =
   assert.equal((await request('/api/login', null, {method: 'POST', data: {username: 'demo-unknown', password: fixturePassword}})).status, 429);
 });
 test('pair writes enforce the active packer roster and preserve reported plans while retaining historical members', async t => {
-  const {request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
+  const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
   const put = (kind, data, revision, user = admin) => request('/api/data/' + kind, user, {method: 'PUT', data, headers: {'If-Match': '"' + revision + '"'}});
   const roster = await (await request('/api/data/personnel', admin)).json();
   roster.data.employees = [1, 2, 3].map(number => ({id: 'demo-person-' + number, name: 'Demo API Person ' + number, category: 'stickers', team: '1 смяна', role: number === 3 ? 'Отговорник' : 'Опаковчик', active: true, note: ''}));
@@ -227,10 +228,13 @@ test('pair writes enforce the active packer roster and preserve reported plans w
   assert.equal((await put('personnel', roster.data, 2)).status, 200);
   entry.result = {kg: 1100, crates: 44, reasonKey: '', reasonText: '', reportedAt: time};
   assert.equal((await put('pair-targets', data, 2, operator)).status, 200);
-  assert.equal((await put('pair-targets', {...data, entries: []}, 3, operator)).status, 400);
+  assert.equal((await put('pair-targets', {...data, entries: []}, 3, operator)).status, 403);
   assert.equal((await put('pair-targets', {...data, entries: [{...entry, targetKg: 50}]}, 3)).status, 400);
-  assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, reasonKey: 'other', reasonText: 'Unneeded fictional reason'}}]}, 3, operator)).status, 400);
+  assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, reasonKey: 'other', reasonText: 'Unneeded fictional reason'}}]}, 3, operator)).status, 403);
   assert.equal((await (await request('/api/data/pair-targets', operator)).json()).data.entries[0].result.kg, 1100);
+  await hub.auth.update(operator.user.id, {permissions: {canEditReports: true}}, admin.user);
+  const corrector = await login('demo-operator');
+  assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, kg: 1200, crates: 48}}]}, 3, corrector)).status, 200);
 });
 test('simultaneous saves accept one revision and a refreshed retry preserves both reports', async t => {
   const {request, login} = await setup(t); const operator = await login('demo-operator');

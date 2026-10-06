@@ -23,7 +23,6 @@ let settings = Object.assign({}, DEFAULT_PERSONNEL_SETTINGS);
 let moveLog = [];
 let activeFilter = 'all';
 let searchTerm = '';
-let syncStarted = false;
 let toastTimer = null;
 
 function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
@@ -109,16 +108,6 @@ const sync = createFileSync({
     connRow:document.querySelector('#connPanel .conn-row')
   }
 });
-
-function applyAdminGate(admin){
-  document.getElementById('lockedBox').style.display=admin?'none':'block';
-  document.getElementById('hubContent').style.display=admin?'block':'none';
-  document.getElementById('connPanel').style.display=admin?'block':'none';
-  if(admin && !syncStarted){ syncStarted=true; sync.init(); }
-}
-wireAdminToggle(document.getElementById('adminToggleBtn'),applyAdminGate);
-const lockedAdminBtn=document.getElementById('lockedAdminBtn');
-if(lockedAdminBtn){ lockedAdminBtn.addEventListener('click',()=>document.getElementById('adminToggleBtn').click()); }
 
 function activePeople(category=null,team=null){
   return employees.filter(p=>p.active && (!category || p.category===category) && (!team || p.team===team));
@@ -456,4 +445,4 @@ function renderAll(){
   renderLog();
 }
 
-applyAdminGate(typeof HubServer !== 'undefined' || isAdminMode());
+sync.init();

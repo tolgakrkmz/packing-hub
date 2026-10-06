@@ -33,12 +33,20 @@
     if (id) await HubServer.send('/api/import/batches/' + id, 'DELETE', {}).catch(() => {});
   }
   for (const input of [fileInput, folderInput, settings]) input.addEventListener('change', () => { sequence++; discard(); progress.hidden = true; table(); say(''); lock(false); });
+  function sameJson(left, right) {
+    if (left === right) return true;
+    if (!left || !right || typeof left !== 'object' || typeof right !== 'object' || Array.isArray(left) !== Array.isArray(right)) return false;
+    const keys = Object.keys(left);
+    return keys.length === Object.keys(right).length && keys.every(key => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
+  }
   async function prepare() {
     const candidates = [...fileInput.files];
+    // Explicit module selections are authoritative; the folder fills missing modules.
+    const explicit = new Set(candidates.map(file => file.name));
     const attachments = new Map();
     for (const file of folderInput.files) {
       const relative = file.webkitRelativePath || file.name, parts = relative.split('/'), root = parts.shift(), tail = parts.join('/');
-      if (/^(?:data\/)?[a-z-]+\.json$/.test(tail) && Object.hasOwn(modules, file.name.replace(/\.json$/, ''))) candidates.push(file);
+      if (/^(?:data\/)?[a-z-]+\.json$/.test(tail) && Object.hasOwn(modules, file.name.replace(/\.json$/, '')) && !explicit.has(file.name)) candidates.push(file);
       let name;
       if (root === 'profiles') name = 'data/profiles/' + tail;
       else if (tail.startsWith('profiles/')) name = 'data/' + tail;
@@ -52,8 +60,7 @@
       if (file.size > 20 * 1024 * 1024) throw new Error('TOO_LARGE');
       let data; try { data = JSON.parse(await file.text()); } catch { throw new Error('INVALID_DATA'); }
       if (Object.hasOwn(documents, kind)) {
-        // The same file may be selected explicitly and found in the chosen folder.
-        if (JSON.stringify(documents[kind]) !== JSON.stringify(data)) throw new Error('IMPORT_DUPLICATE_FILES');
+        if (!sameJson(documents[kind], data)) throw Object.assign(new Error('IMPORT_DUPLICATE_MODULES'), {kind});
       } else { bytes += file.size; if (bytes > 20 * 1024 * 1024) throw new Error('TOO_LARGE'); documents[kind] = data; }
     }
     if (!Object.keys(documents).length) throw new Error('IMPORT_NO_MODULES');
@@ -85,6 +92,7 @@
       IMPORT_FILES_MISSING: 'Липсват посочени приложения. Избери и папката с инструкциите.',
       IMPORT_FOLDER_REQUIRED: 'За импорта на инструкции избери и папката с профилите.',
       IMPORT_DUPLICATE_FILES: 'Избрани са различни копия на един и същ файл. Остави само актуалното копие.',
+      IMPORT_DUPLICATE_MODULES: 'Избрани са различни копия на JSON файл. Избери актуалното копие отделно в „JSON файлове за модулите“.',
       IMPORT_UNKNOWN_FILE: 'Избери JSON файлове с имената, показани в таблицата.',
       IMPORT_NO_MODULES: 'Не са избрани файлове за модулите.',
       IMPORT_EXPIRED: 'Подготвеният импорт е изтекъл. Провери избраните файлове отново.',
@@ -93,7 +101,8 @@
       BACKUP_FAILED: 'Резервното копие не успя. Нищо не е добавено.',
       FORBIDDEN: 'Акаунтът няма право за тази промяна.'
     };
-    say(messages[error.code || error.message] || 'Връзката е прекъсната. Провери импорта отново преди нов опит.');
+    const detail = error.message === 'IMPORT_DUPLICATE_MODULES' && Object.hasOwn(modules, error.kind) ? ' (' + error.kind + '.json)' : '';
+    say((messages[error.code || error.message] || 'Връзката е прекъсната. Провери импорта отново преди нов опит.') + detail);
     if (error.code === 'IMPORT_EXPIRED') { batch = prepared = null; uploaded.clear(); }
   }
   document.getElementById('dataImportForm').addEventListener('submit', async event => {
