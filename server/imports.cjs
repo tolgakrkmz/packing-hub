@@ -5,6 +5,7 @@ const path = require('node:path');
 const {randomUUID} = require('node:crypto');
 const {isDeepStrictEqual} = require('node:util');
 const {defaults, problem, safePath, validateData, personnelModel} = require('./store.cjs');
+const {can} = require('./permissions.cjs');
 const limits = {fileBytes: 20 * 1024 * 1024, totalBytes: 1024 * 1024 * 1024, files: 5000, jsonBytes: 20 * 1024 * 1024};
 const lifetime = 4 * 60 * 60 * 1000;
 const same = (a, b) => isDeepStrictEqual(a, b);
@@ -32,7 +33,7 @@ function createImports(store, filename) {
   const directory = temporary ? fs.mkdtempSync(path.join(os.tmpdir(), 'hub-demo-import-')) : path.join(path.dirname(filename), 'import-staging');
   fs.mkdirSync(directory, {recursive: true, mode: 0o700}); fs.chmodSync(directory, 0o700);
   function read(id, user) {
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
     if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw problem(404, 'IMPORT_EXPIRED');
     let manifest;
     try { manifest = JSON.parse(fs.readFileSync(path.join(directory, id, 'manifest.json'), 'utf8')); }
@@ -42,13 +43,13 @@ function createImports(store, filename) {
     return manifest;
   }
   function discard(id, user) {
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
     // Only managed UUID directories may be removed; no request path is used directly.
     if (!/^[0-9a-f-]{36}$/.test(id)) throw problem(404, 'IMPORT_EXPIRED');
     fs.rmSync(path.join(directory, id), {recursive: true, force: true});
   }
   function create(input, user) {
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
     if (!input || typeof input.documents !== 'object' || !input.documents || Array.isArray(input.documents) || !Object.keys(input.documents).length || !Array.isArray(input.files) || typeof input.includeSettings !== 'boolean') throw problem(400, 'INVALID_DATA');
     for (const [kind, data] of Object.entries(input.documents)) validateData(kind, data);
     const profiles = input.documents['package-instructions'];

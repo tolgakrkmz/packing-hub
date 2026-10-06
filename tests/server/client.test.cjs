@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function client() {
   let loaded, events, fetchData = async () => response(1);
-  const element = () => ({append() {}, setAttribute() {}, hidden: false});
+  const element = () => ({append() {}, setAttribute() {}, addEventListener() {}, hidden: false});
   const context = vm.createContext({
     window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer'}, csrf: 'fictional-csrf', version: 'demo-version'}},
     location: {pathname: '/production-log.html'},

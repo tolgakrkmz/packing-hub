@@ -29,6 +29,35 @@ targets module opens directly without a role login.
 
 ## Shared server mode
 
+Administrators can set individual account permissions to **Role default**,
+**Allowed**, or **Denied** in Accounts. Existing accounts inherit role defaults
+when the database is upgraded; accounts, reports and sessions are preserved.
+Saving account changes revokes its sessions immediately, including live streams.
+
+| Permission | Administrator | Operator | Observer |
+| --- | --- | --- | --- |
+| Import data | Allowed | Unavailable | Unavailable |
+| Export reports | Allowed | Allowed | Allowed |
+| Add reports | Allowed | Allowed | Unavailable |
+| Correct/delete recorded reports | Allowed | Denied | Unavailable |
+
+Role limits remain enforced even for explicit overrides. Import permission
+controls both import workflows independently of report write permissions.
+Operators with correction permission can correct/delete production and downtime
+entries and correct pair results; goals, downtime reasons, personnel, instructions
+and account management retain administrator restrictions. For pairs, creating or
+changing an unreported plan, removing an unreported plan, and entering its first
+result use the add-report permission. Recorded plans retain validation safeguards.
+Operators now need an explicit correction grant to change an already reported
+pair result.
+
+The server bar offers JSON exports of production, downtime and pair reports via
+authenticated `/api/export/<module>` endpoints. Exports use current server data
+and record only action metadata in the audit log. Denying export removes these
+controls and blocks the export API; it does not prevent copying information the
+account is allowed to view. Instruction attachments keep their separate viewing
+behavior. These permissions apply to shared server mode.
+
 The server uses Node.js 24+ and SQLite without npm dependencies. All five module
 documents, accounts, sessions and packing attachments live in one local database.
 A new database starts empty, without employee seeds, reports or default accounts.

@@ -4,6 +4,7 @@ const vm = require('node:vm');
 const {randomUUID} = require('node:crypto');
 const {isDeepStrictEqual} = require('node:util');
 const {DatabaseSync} = require('node:sqlite');
+const {can} = require('./permissions.cjs');
 const root = path.resolve(__dirname, '..');
 const sandbox = vm.createContext({});
 for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', 'personnel-model']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), sandbox);
@@ -38,8 +39,11 @@ function openStore(filename) {
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator','observer')), active INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('file','directory')), content BLOB, mime TEXT, revision INTEGER NOT NULL DEFAULT 1);
-    CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at INTEGER NOT NULL, user_id INTEGER, action TEXT NOT NULL, module TEXT NOT NULL);
-    PRAGMA user_version=1;`);
+    CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at INTEGER NOT NULL, user_id INTEGER, action TEXT NOT NULL, module TEXT NOT NULL);`);
+  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'permissions')) {
+    db.exec("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
+  }
+  db.exec('PRAGMA user_version=2');
   for (const [kind, data] of Object.entries(defaults)) db.prepare('INSERT OR IGNORE INTO documents(kind,data) VALUES(?,?)').run(kind, JSON.stringify(data));
   db.prepare("INSERT OR IGNORE INTO files(path,kind) VALUES('data','directory'),('data/profiles','directory')").run();
   const get = kind => {
@@ -53,17 +57,31 @@ function openStore(filename) {
     try { const result = work(); db.exec('COMMIT'); return result; }
     catch (error) { db.exec('ROLLBACK'); throw error; }
   };
-  function put(kind, data, revision, user) {
+  function put(kind, data, revision, user, mode = 'report') {
     validateData(kind, data);
     return transaction(() => {
       const current = get(kind);
       if (current.revision !== revision) throw problem(409, 'CONFLICT');
+      if (['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !(mode === 'import' && can(user, 'canImportData'))) {
+        if (!can(user, 'canCreateReports') && !can(user, 'canEditReports')) throw problem(403, 'FORBIDDEN');
+        const next = new Map(data.entries.map(entry => [entry.id, entry]));
+        const prior = new Map(current.data.entries.map(entry => [entry.id, entry]));
+        // Planning and a first pair result are ordinary reporting; correcting a
+        // completed result or removing an existing report requires edit rights.
+        const corrected = current.data.entries.some(entry => {
+          const value = next.get(entry.id);
+          return kind === 'pair-targets' ? !!entry.result && !isDeepStrictEqual(entry, value) : !isDeepStrictEqual(entry, value);
+        });
+        const added = data.entries.some(entry => !prior.has(entry.id) || kind === 'pair-targets' && !isDeepStrictEqual(prior.get(entry.id), entry) && !prior.get(entry.id)?.result) || kind === 'pair-targets' && current.data.entries.some(entry => !entry.result && !next.has(entry.id));
+        const metadata = value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'entries'));
+        if ((corrected || !isDeepStrictEqual(metadata(current.data), metadata(data))) && !can(user, 'canEditReports') || added && !can(user, 'canCreateReports')) throw problem(403, 'FORBIDDEN');
+      }
       if (user.role !== 'admin') {
         if (user.role !== 'operator' || !['production-log', 'line-downtime', 'pair-targets'].includes(kind)) throw problem(403, 'FORBIDDEN');
         if (kind !== 'pair-targets') {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
           const prior = new Map(data.entries.map(entry => [entry.id, entry]));
-          if (current.data.entries.some(entry => !same(entry, prior.get(entry.id))) || !same(kind === 'production-log' ? current.data.goalTons : current.data.reasons, kind === 'production-log' ? data.goalTons : data.reasons)) throw problem(403, 'FORBIDDEN');
+          if ((!can(user, 'canEditReports') && current.data.entries.some(entry => !same(entry, prior.get(entry.id)))) || !same(kind === 'production-log' ? current.data.goalTons : current.data.reasons, kind === 'production-log' ? data.goalTons : data.reasons)) throw problem(403, 'FORBIDDEN');
         }
       }
       if (kind === 'pair-targets') {
@@ -93,7 +111,7 @@ function openStore(filename) {
     });
   }
   function productionImport(input, user) {
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
     validateData('production-log', input);
     const current = get('production-log');
     const existing = new Map(current.data.entries.map(entry => [entry.id, entry]));
@@ -126,7 +144,7 @@ function openStore(filename) {
     // A private, consistent snapshot lives beside the database, outside static assets.
     // VACUUM cannot run inside a transaction. put() rechecks the revision atomically.
     const backup = backupForImport();
-    const saved = put('production-log', {...plan.current.data, entries: [...plan.current.data.entries, ...plan.added]}, revision, user);
+    const saved = put('production-log', {...plan.current.data, entries: [...plan.current.data.entries, ...plan.added]}, revision, user, 'import');
     return {...plan.summary, revision: saved.revision, backup};
   }
   function node(name) {

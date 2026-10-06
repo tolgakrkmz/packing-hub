@@ -207,7 +207,7 @@ const sync = createFileSync({
 });
 
 wireAdminToggle(document.getElementById('adminToggleBtn'), (admin)=>{
-  isAdmin = admin;
+  isAdmin = typeof HubServer !== 'undefined' ? HubServer.can('canEditReports') : admin;
   writer.clearRetry();
   render();
 });

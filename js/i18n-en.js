@@ -1,5 +1,18 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Права на акаунта": "Account permissions",
+  "Експорт на отчети": "Export reports",
+  "Добавяне на отчети": "Add reports",
+  "Корекции и изтриване на отчети": "Correct and delete reports",
+  "Според ролята": "Role default",
+  "Разрешено": "Allowed",
+  "Забранено": "Denied",
+  "Недостъпно за тази роля.": "Unavailable for this role.",
+  "Провери правата на акаунта.": "Check the account permissions.",
+  "Отчет за експорт": "Report to export",
+  "Свали отчет (.json)": "Download report (.json)",
+  "Права според ролята или отделни ограничения за акаунта. Импортът е само за администратори; наблюдателите не могат да записват. Промяна на акаунт прекратява активните му сесии.": "Use role defaults or individual account restrictions. Only administrators can import; observers cannot write. Account changes end its active sessions.",
+  "При двойките планирането и първият резултат са добавяне на отчет. Корекция на потвърден резултат изисква право за корекции.": "For pairs, planning and the first result count as adding a report. Correcting a recorded result requires correction permission.",
   "За импорта на инструкции избери и папката с профилите.": "For the instructions import, also select the profiles folder.",
   "Импорт на данни · Package Hub": "Data import · Package Hub",
   "Импорт на данни": "Data import",

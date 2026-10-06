@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
+const {can} = require('./permissions.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
@@ -63,6 +64,17 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       const pathname = url.pathname;
       const token = tokenFor(request);
       const session = auth.session(token);
+      // Request bodies and password hashing may outlive an account change.
+      const currentUser = () => {
+        const fresh = auth.session(token);
+        if (!fresh) throw problem(401, 'LOGIN_REQUIRED');
+        return fresh.user;
+      };
+      const currentAdmin = () => {
+        const user = currentUser();
+        if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+        return user;
+      };
       const mutation = !['GET', 'HEAD'].includes(request.method);
       if (mutation && request.headers.origin !== publicOrigin) throw problem(403, 'ORIGIN_REJECTED');
       if (pathname === '/healthz' && request.method === 'GET') return json(response, 200, {ok: true});
@@ -99,49 +111,62 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
           if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list()});
           const input = await jsonBody(request);
-          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, session.user)});
-          if (request.method === 'PATCH') return json(response, 200, {user: await auth.update(Number(pathname.split('/').pop()), input, session.user)});
+          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, currentAdmin(), input.permissions, currentAdmin)});
+          if (request.method === 'PATCH') {
+            const user = await auth.update(Number(pathname.split('/').pop()), input, currentAdmin(), currentAdmin);
+            broadcast('accounts', 0);
+            return json(response, 200, {user});
+          }
           throw problem(405, 'METHOD_REJECTED');
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
+        const exportReport = pathname.match(/^\/api\/export\/([a-z-]+)$/);
+        if (exportReport) {
+          if (!can(session.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          const kind = exportReport[1];
+          if (!['production-log', 'line-downtime', 'pair-targets'].includes(kind)) throw problem(404, 'NOT_FOUND');
+          store.audit(session.user, 'export', kind);
+          return json(response, 200, store.get(kind).data, {'Content-Disposition': 'attachment; filename="' + kind + '.json"'});
+        }
         const batch = pathname.match(/^\/api\/import\/batches(?:\/([0-9a-f-]{36})(?:\/(preview|apply|files\/\d+))?)?$/);
         if (batch) {
-          if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
-          if (!batch[1] && request.method === 'POST') return json(response, 201, imports.create(await jsonBody(request, importLimits.jsonBytes), session.user));
+          if (!can(session.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
+          if (!batch[1] && request.method === 'POST') return json(response, 201, imports.create(await jsonBody(request, importLimits.jsonBytes), currentUser()));
           if (batch[1] && !batch[2] && request.method === 'DELETE') return json(response, 200, imports.discard(batch[1], session.user));
-          if (batch[2]?.startsWith('files/') && request.method === 'PUT') return json(response, 200, imports.upload(batch[1], Number(batch[2].split('/')[1]), await body(request, importLimits.fileBytes), session.user));
+          if (batch[2]?.startsWith('files/') && request.method === 'PUT') return json(response, 200, imports.upload(batch[1], Number(batch[2].split('/')[1]), await body(request, importLimits.fileBytes), currentUser()));
           if (batch[2] === 'preview' && request.method === 'POST') return json(response, 200, imports.preview(batch[1], session.user));
           if (batch[2] === 'apply' && request.method === 'POST') {
-            const input = await jsonBody(request), result = imports.apply(batch[1], input.token, session.user);
+            const input = await jsonBody(request), result = imports.apply(batch[1], input.token, currentUser());
             for (const [module, revision] of Object.entries(result.revisions)) broadcast(module, revision);
             return json(response, 200, result);
           }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/import/production-log/preview' || pathname === '/api/import/production-log/apply') {
-          if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+          if (!can(session.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
           const input = await jsonBody(request);
-          if (pathname.endsWith('/preview')) return json(response, 200, store.previewProductionImport(input, session.user));
-          const result = store.applyProductionImport(input, revisionFor(request), session.user);
+          if (pathname.endsWith('/preview')) return json(response, 200, store.previewProductionImport(input, currentUser()));
+          const result = store.applyProductionImport(input, revisionFor(request), currentUser());
           if (result.added) broadcast('production-log', result.revision);
           return json(response, 200, result);
         }
         if (document) {
           if (request.method === 'GET') { const current = store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
-          if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request, importLimits.jsonBytes), revisionFor(request), session.user); broadcast(document[1], result.revision); return json(response, 200, result); }
+          if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request, importLimits.jsonBytes), revisionFor(request), currentUser()); broadcast(document[1], result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/folders') {
           const name = url.searchParams.get('path') || '';
           if (request.method === 'GET') return json(response, 200, {entries: store.children(name)});
-          if (request.method === 'POST') { const input = await jsonBody(request); store.createNode(input.path, input.kind, session.user); return json(response, 201, {ok: true}); }
+          if (request.method === 'POST') { const input = await jsonBody(request); store.createNode(input.path, input.kind, currentUser()); return json(response, 201, {ok: true}); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/files') {
           const name = url.searchParams.get('path');
           if (request.method === 'GET') { const file = store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
-          if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), session.user); broadcast('package-instructions', result.revision); return json(response, 200, result); }
+          if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), currentUser()); broadcast('package-instructions', result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         throw problem(404, 'NOT_FOUND');
@@ -151,7 +176,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (['/accounts.html', '/production-import.html', '/data-import.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
