@@ -2,7 +2,7 @@ const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
 let goalTons = 3000;
-let isAdmin = false;
+const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
 const dateInput = document.getElementById('dateInput');
 const tonInput = document.getElementById('tonInput');
@@ -138,12 +138,6 @@ const sync = createFileSync({
   }
 });
 
-wireAdminToggle(document.getElementById('adminToggleBtn'), (admin) => {
-  isAdmin = typeof HubServer !== 'undefined' ? HubServer.can('canEditReports') : admin;
-  writer.clearRetry();
-  render();
-});
-
 function fmtTons(kg){
   return (kg/1000).toLocaleString('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
 }
@@ -251,7 +245,7 @@ saveBtn.addEventListener('click', async ()=>{
 });
 
 async function deleteEntry(id){
-  if(!isAdmin || writer.busy) return;
+  if(!canEditReports || writer.busy) return;
   const original = entries.find(entry => entry.id === id);
   if(!original) return;
   await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
@@ -316,7 +310,7 @@ grid.innerHTML = SHIFTS.map(s=>{
           + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
           + '</td></tr>';
       }
-      const delCell = isAdmin
+      const delCell = canEditReports
         ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
         : '<td></td>';
       html += '<tr>'
@@ -333,7 +327,7 @@ grid.innerHTML = SHIFTS.map(s=>{
   });
   wrap.innerHTML = html;
 
-  if(isAdmin){
+  if(canEditReports){
     wrap.querySelectorAll('.del-btn').forEach(b=>{
       b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
     });

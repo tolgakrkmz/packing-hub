@@ -46,8 +46,6 @@ input[type=file]{display:none;}
 .conn-panel-toggle:focus-visible{outline:2px solid var(--amber);outline-offset:5px;border-radius:3px;}
 .conn-panel-status{font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--amber);}
 .conn-panel-status.ready{color:var(--teal);}
-.conn-panel-actions{display:flex;gap:8px;flex-wrap:wrap;}
-.conn-panel-actions .conn-btn{padding:6px 10px;font-size:11px;}
 .conn-panel-body{margin-top:14px;}
 .conn-panel-body[hidden]{display:none;}
 .conn-panel-body .conn-subhead:first-child{margin-top:0;}

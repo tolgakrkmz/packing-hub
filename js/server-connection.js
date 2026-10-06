@@ -190,10 +190,6 @@ const HubServer = (() => {
     const state = document.createElement('span'); state.id = 'serverState'; state.textContent = 'Свързване…'; bar.append(state);
     const logout = document.createElement('button'); logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); }; bar.append(logout);
     document.body.prepend(bar);
-    if (boot.user.role === 'observer') {
-      const badge = document.querySelector('a[href="statistics.html"] .lock-badge');
-      if (badge) badge.textContent = 'Само за преглед.';
-    }
     const eventSource = new EventSource('/api/events');
     eventSource.onopen = () => { state.textContent = 'Свързан'; };
     eventSource.onerror = () => { state.textContent = 'Възстановяване на връзката…'; };

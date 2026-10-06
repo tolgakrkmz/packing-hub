@@ -33,7 +33,6 @@ function environment(module, at, search = '') {
       querySelector() { return new Control(); },
       querySelectorAll(selector) { return selector === '.shift-btn' ? shifts : []; }
     },
-    wireAdminToggle() {},
     createFileSync(options) {
       return {
         fileHandle:{},

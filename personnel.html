@@ -20,14 +20,7 @@
 <p>Активен състав, екипи, роли, ротация и промени — на едно място.</p>
 </header>
 
-<div class="locked-box" id="lockedBox">
-  <div class="icon">🔒</div>
-  <h2>Тази страница е само за администратори</h2>
-  <p>Влез в admin режим, за да видиш и редактираш персонала.</p>
-  <button id="lockedAdminBtn">Admin вход</button>
-</div>
-
-<div class="panel connection-panel" id="connPanel" style="display:none;">
+<div class="panel connection-panel" id="connPanel">
 <h2>Споделен файл</h2>
 <div class="conn-row">
 <div class="conn-dot" id="connDot"></div>
@@ -36,13 +29,12 @@
 <button class="conn-btn" id="createFileBtn">Създай нов файл</button>
 <button class="conn-btn primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
 <button class="conn-btn" id="refreshBtn" style="display:none;">Опресни</button>
-<button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
 </div>
 <input type="file" id="importFallback" accept="application/json">
 <div class="conn-note" id="connNote">Избери общия <b>personnel.json</b> в мрежовата папка. След първото свързване промените се записват директно в него.</div>
 </div>
 
-<div id="hubContent" style="display:none;">
+<div id="hubContent">
 
 <div class="panel" id="rosterEmptyState" role="status">
   <h2>Заредете състава от файл</h2>

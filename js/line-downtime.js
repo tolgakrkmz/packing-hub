@@ -2,7 +2,7 @@ const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
 let reasons = [];
-let isAdmin = false;
+const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
 function defaultReasons(){
   return [
@@ -35,7 +35,6 @@ const historyMonthInput = document.getElementById('historyMonth');
 historyMonthInput.value = currentMonthPrefix();
 historyMonthInput.addEventListener('change', renderHistory);
 
-
 function localDateStr(d){
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,'0');
@@ -50,7 +49,6 @@ const reportDate = createReportDateSelection({
   onChange: renderDayTotal,
   hourOverride: new URLSearchParams(location.search).get('testHour')
 });
-
 
 const writer = createReportWriter({
   sync: () => sync,
@@ -102,7 +100,6 @@ function updateDurationReadout(){
 startInput.addEventListener('input', updateDurationReadout);
 endInput.addEventListener('input', updateDurationReadout);
 
-
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
   if(writer.busy) return;
   writer.clearRetry();
@@ -124,7 +121,6 @@ function updateSaveEnabled(){
   saveBtn.textContent = writer.busy ? 'Записва се...' : ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
 }
 
-
 reasonSelect.addEventListener('change', ()=>{
   otherReasonRow.style.display = (reasonSelect.value === 'Друго') ? 'flex' : 'none';
 });
@@ -141,7 +137,7 @@ function escapeDowntimeText(value){
 }
 
 function renderReasonsAdmin(){
-  if(!isAdmin){
+  if(!canEditReports){
     reasonsAdminPanel.style.display = 'none';
     return;
   }
@@ -155,7 +151,7 @@ function renderReasonsAdmin(){
 }
 
 addReasonBtn.addEventListener('click', async ()=>{
-  if(!isAdmin || writer.busy) return;
+  if(!canEditReports || writer.busy) return;
   const val = newReasonInput.value.trim();
   if(!val) return;
   await writer.run(current => {
@@ -167,11 +163,10 @@ addReasonBtn.addEventListener('click', async ()=>{
 });
 
 async function removeReason(r){
-  if(!isAdmin || writer.busy) return;
+  if(!canEditReports || writer.busy) return;
   if(!confirm('Да изтрия причина "'+r+'"? Стари записи с нея остават непроменени.')) return;
   await writer.run(current => ({...current,reasons:current.reasons.filter(value => value !== r)}), () => {}, 'Причината е изтрита.');
 }
-
 
 const sync = createFileSync({
   dbName: 'portfolio-downtime-fs-db',
@@ -204,12 +199,6 @@ const sync = createFileSync({
     connNote: document.getElementById('connNote'),
     connRow: document.querySelector('#connPanel .conn-row')
   }
-});
-
-wireAdminToggle(document.getElementById('adminToggleBtn'), (admin)=>{
-  isAdmin = typeof HubServer !== 'undefined' ? HubServer.can('canEditReports') : admin;
-  writer.clearRetry();
-  render();
 });
 
 
@@ -251,12 +240,11 @@ saveBtn.addEventListener('click', async ()=>{
 });
 
 async function deleteEntry(id){
-  if(!isAdmin || writer.busy) return;
+  if(!canEditReports || writer.busy) return;
   const original = entries.find(entry => entry.id === id);
   if(!original) return;
   await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
 }
-
 
 function fmtDate(d){
   const [y,m,day] = d.split('-');
@@ -329,7 +317,7 @@ function renderHistory(){
     + '</tr></thead><tbody>';
   sorted.forEach(e=>{
     const reasonText = '<span data-i18n-exact>'+escapeDowntimeText(e.reason)+'</span>' + (e.reasonNote ? ' <span class="note-inline" translate="no">– '+escapeDowntimeText(e.reasonNote)+'</span>' : '');
-    const delCell = isAdmin
+    const delCell = canEditReports
       ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
       : '<td></td>';
     html += '<tr>'
@@ -344,7 +332,7 @@ function renderHistory(){
   html += '</tbody></table>';
   wrap.innerHTML = html;
 
-  if(isAdmin){
+  if(canEditReports){
     wrap.querySelectorAll('.del-btn').forEach(b=>{
       b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
     });

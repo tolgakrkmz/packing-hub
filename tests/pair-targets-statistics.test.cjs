@@ -82,10 +82,9 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
     querySelectorAll() { return []; }
   }
   const controls = new Map();
-  let config, inits = 0, admin = false;
+  let config, inits = 0;
   const ui = vm.createContext({Date,
     document:{getElementById(id) { if (!controls.has(id)) controls.set(id,new Control()); return controls.get(id); }},
-    isAdminMode:() => admin,
     createFileSync(cfg) { config = cfg; return {init() { inits++; }}; }
   });
   for (const file of ['shift-schedule','pair-targets-model','pair-targets-statistics-model','pair-targets-statistics']) load(ui,file);
@@ -93,8 +92,7 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
   assert.equal(config.readOnly, true);
   assert.equal(config.strictJson, true);
   dashboard.render();
-  assert.equal(controls.get('pairStatsBody'), undefined);
-  admin = true;
+  assert.match(controls.get('pairStatsBody').innerHTML, /Няма свързан файл/);
   dashboard.init(); dashboard.init();
   assert.equal(inits, 1);
   config.onConnect({module:'pair-targets',schemaVersion:1,entries:[

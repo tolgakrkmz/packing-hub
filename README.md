@@ -304,9 +304,9 @@ Use only fictional development records. HTTP mode refuses non-localhost origins.
 5. For Statistics, select the production, downtime, personnel and pair-targets fixtures.
 6. For Packing Instructions, select the repository folder containing `data/`.
 
-Some management screens use the public demonstration password **`demo-admin`**.
-This is a browser UI toggle, not a security boundary. Permissions to read or
-write files are provided by the browser and operating system.
+Offline demo mode has no login or role restrictions. Permissions to read or
+write files are provided by the browser and operating system. Use server mode
+for account authentication and enforced role permissions.
 
 Only use the fictional demo files. File connections are remembered in IndexedDB
 and refresh every 20 seconds. Saving changes modifies the selected local files.

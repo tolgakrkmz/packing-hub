@@ -576,7 +576,7 @@ const bulkEl = {
 };
 
 // Initialize the admin UI after both control groups exist.
-wireAdminToggle(document.getElementById('adminToggleBtn'), applyPackageInstructionsAdminUI);
+applyPackageInstructionsAdminUI(typeof HubServer === 'undefined' || HubServer.user.role === 'admin');
 
 let bulkCandidates = [];
 

@@ -30,8 +30,8 @@ function environment({saved, storageFailure = false} = {}) {
     MutationObserver:class { constructor(callback) { observer = callback; } observe() {} }
   });
   vm.runInContext(source, sandbox);
-  const navigation = sandbox.createStatisticsNavigation({storageKey:'demo-navigation',onChange() { updates++; }});
-  return {navigation,tabs,panels,controls,body,toggle,dots,observe:() => observer(),get updates() { return updates; },get stored() { return stored; }};
+  sandbox.createStatisticsNavigation({storageKey:'demo-navigation',onChange() { updates++; }});
+  return {tabs,panels,controls,body,toggle,dots,observe:() => observer(),get updates() { return updates; },get stored() { return stored; }};
 }
 test('navigation defaults to overview and shows exactly one requested panel', () => {
   const env = environment();
@@ -67,19 +67,18 @@ test('keyboard navigation wraps and supports Home and End with one tab stop', ()
   }
   key(0,'ArrowLeft',4); key(4,'ArrowRight',0); key(0,'End',4); key(4,'Home',0);
 });
-test('files stay closed until requested; logout closes them and connecting focuses the picker', () => {
+test('files stay closed until requested; toggle closes them and connecting focuses the picker', () => {
   const env = environment();
-  env.navigation.setAdmin(true);
   assert.equal(env.controls.connPanel.style.display, 'none');
   env.controls.statsFilesBtn.click();
   assert.equal(env.controls.connPanel.style.display, 'block');
   assert.equal(env.controls.statsFilesBtn.attributes['aria-expanded'], 'true');
   assert.equal(env.body.hidden, false);
   assert.equal(env.toggle.attributes['aria-expanded'], 'true');
-  env.navigation.setAdmin(false);
+  env.controls.statsFilesBtn.click();
   assert.equal(env.controls.connPanel.style.display, 'none');
-  assert.equal(env.controls.statsFilesBtn.hidden, true);
-  env.navigation.setAdmin(true);
+  assert.equal(env.controls.statsFilesBtn.hidden, false);
+  assert.equal(env.controls.statsFilesBtn.attributes['aria-expanded'], 'false');
   assert.equal(env.controls.connPanel.style.display, 'none');
   env.controls.monthlyConnectBtn.click();
   assert.equal(env.controls.connPanel.style.display, 'block');

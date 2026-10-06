@@ -58,10 +58,6 @@ const el = {
   personnelImportFallback: document.getElementById('personnelImportFallback'),
   personnelConnNote: document.getElementById('personnelConnNote'),
 
-  lockedBox: document.getElementById('lockedBox'),
-  lockedAdminBtn: document.getElementById('lockedAdminBtn'),
-  statsContent: document.getElementById('statsContent'),
-
   yearSelectRow: document.getElementById('yearSelectRow'),
   yearSelect: document.getElementById('yearSelect'),
 
@@ -297,7 +293,6 @@ const avSync = createFileSync({
 });
 
 
-
 const personnelSync = createFileSync({
   readOnly: true,
   dbName: 'portfolio-personnel-fs-db',
@@ -338,70 +333,10 @@ const pairStatistics = createPairTargetsStatistics({
   localStorageKey: 'portfolio-pair-targets-fallback'
 });
 
-const statisticsNavigation = createStatisticsNavigation({
+createStatisticsNavigation({
   storageKey: 'portfolio-statistics-section',
   onChange: renderAll
 });
-
-let syncStarted = false;
-let avSyncStarted = false;
-let personnelSyncStarted = false;
-
-function applyAdminGate(admin) {
-  if (admin) pairStatistics.init();
-  el.lockedBox.style.display =
-    admin
-      ? 'none'
-      : 'block';
-
-  el.statsContent.style.display =
-    admin
-      ? 'block'
-      : 'none';
-
-  statisticsNavigation.setAdmin(admin);
-
-  if (
-    admin &&
-    !syncStarted
-  ) {
-    syncStarted = true;
-    sync.init();
-  }
-
-  if (
-    admin &&
-    !avSyncStarted
-  ) {
-    avSyncStarted = true;
-    avSync.init();
-  }
-
-  if (
-    admin &&
-    !personnelSyncStarted
-  ) {
-    personnelSyncStarted = true;
-    personnelSync.init();
-  }
-}
-
-wireAdminToggle(
-  document.getElementById(
-    'adminToggleBtn'
-  ),
-  applyAdminGate
-);
-
-el.lockedAdminBtn.addEventListener(
-  'click',
-  () =>
-    document
-      .getElementById(
-        'adminToggleBtn'
-      )
-      .click()
-);
 
 /* Dashboard controls */
 
@@ -468,7 +403,6 @@ el.lineShiftMonthSelect.addEventListener(
     renderLineShiftForSelectedMonth();
   }
 );
-
 
 
 /* Production aggregation */
@@ -2937,7 +2871,6 @@ function renderKpis(
   `;
 }
 
-
 /* Workforce capacity assumes three operating shifts per day. Stickers are
  * excluded from production headcount. Historical periods use the current roster
  * because dated roster snapshots are not available. */
@@ -3609,12 +3542,6 @@ function renderLineShiftTable(
 /* Dashboard rendering */
 
 function renderAll() {
-  if (
-    typeof HubServer === 'undefined' && !isAdminMode()
-  ) {
-    return;
-  }
-
   pairStatistics.render();
 
   const years =
@@ -3784,6 +3711,7 @@ function renderAll() {
   }
 }
 
-applyAdminGate(
-  typeof HubServer !== 'undefined' || isAdminMode()
-);
+pairStatistics.init();
+sync.init();
+avSync.init();
+personnelSync.init();

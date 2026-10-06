@@ -13,10 +13,6 @@
 <style>body{padding:24px 16px 60px;}
 .wrap{max-width:1100px;margin:0 auto;}
 
-.locked-box{text-align:center;padding:60px 20px;color:var(--text-muted);}
-.locked-box .icon{font-size:40px;margin-bottom:14px;}
-.locked-box h2{color:var(--text);font-size:16px;margin:0 0 8px;}
-.locked-box button{margin-top:16px;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;}
 
 .view-toggle{display:flex;gap:8px;margin-bottom:18px;}
 .view-toggle button{background:var(--panel-2);border:1px solid var(--border);color:var(--text-muted);border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:.18s ease;}
@@ -225,12 +221,11 @@
   <header>
     <a href="index.html">← Package Hub</a>
     <h1>Статистики — Package Hub</h1>
-    <p>Само за администратори</p>
+    <p>Преглед на резултати и показатели</p>
   </header>
 
   <div class="stats-toolbar">
-    <button class="conn-btn" id="statsFilesBtn" aria-controls="connPanel" aria-expanded="false" hidden>Файлове <span class="stats-files-status" id="statsFilesStatus">0/4 свързани</span></button>
-    <button class="conn-btn" id="adminToggleBtn">🔒 Admin</button>
+    <button class="conn-btn" id="statsFilesBtn" aria-controls="connPanel" aria-expanded="false">Файлове <span class="stats-files-status" id="statsFilesStatus">0/4 свързани</span></button>
   </div>
 
   <div class="panel" id="connPanel" style="display:none;">
@@ -288,14 +283,7 @@
 
   </div>
 
-  <div class="locked-box" id="lockedBox">
-    <div class="icon">🔒</div>
-    <h2>Тази страница е само за администратори</h2>
-    <p>Влез в admin режим, за да видиш статистиките.</p>
-    <button id="lockedAdminBtn">Admin вход</button>
-  </div>
-
-  <div id="statsContent" style="display:none;">
+  <div id="statsContent">
 
     <section class="month-dashboard" id="monthDashboard">
       <div class="dashboard-top">
