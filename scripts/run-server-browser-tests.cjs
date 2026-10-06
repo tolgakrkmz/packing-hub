@@ -190,6 +190,20 @@ async function main() {
     await admin.getByRole('link', {name: 'Импорт на данни', exact: true}).click();
     await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Data import'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
     await admin.locator('[data-hub-language=bg]').click();
+    console.log('RUN import JSON equality, conflicting folder copies and explicit-file priority');
+    const duplicateDir = path.join(migrationDir, 'data'); fs.mkdirSync(duplicateDir, {recursive: true});
+    const production = migration.payload.documents['production-log'];
+    const reordered = Object.fromEntries(Object.entries({...production, entries: production.entries.map(entry => Object.fromEntries(Object.entries(entry).reverse()))}).reverse());
+    const duplicateFile = path.join(duplicateDir, 'production-log.json'); fs.writeFileSync(duplicateFile, JSON.stringify(reordered));
+    await admin.locator('#legacyFolder').setInputFiles(migrationDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Данните са проверени. Потвърди общото добавяне.');
+    await admin.locator('#cancelDataImport').click();
+    fs.writeFileSync(duplicateFile, JSON.stringify({...production, entries: production.entries.map(entry => ({...entry, tonnage: 1}))}));
+    await admin.locator('#legacyFolder').setInputFiles(migrationDir);
+    await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Избрани са различни копия на JSON файл.');
+    await expect(admin.locator('#dataImportMessage')).toContainText('(production-log.json)'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
+    assert.equal(hub.store.get('production-log').data.entries.length, 2);
+    await admin.reload(); await expect(admin.locator('#checkDataImport')).toBeDisabled();
     await admin.locator('#moduleFiles').setInputFiles(Object.keys(migration.payload.documents).map(kind => path.join(migrationDir, kind + '.json')));
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('За импорта на инструкции избери и папката с профилите.');
     const incompleteDir = path.join(dir, 'incomplete-demo'); fs.mkdirSync(incompleteDir); fs.writeFileSync(path.join(incompleteDir, 'unrelated-demo.txt'), 'Fictional unrelated file.');
@@ -202,6 +216,7 @@ async function main() {
     await expect(observer.locator('#dashboardActual')).toHaveText('7,0 т'); await observer.locator('[data-stats-tab=pairs]').click(); await expect(observer.locator('#pairStatsBody')).toContainText('Demo Legacy Person 1');
     assert.equal(hub.store.get('line-downtime').data.entries.length, 2); assert.equal(hub.store.get('personnel').data.settings.stickersStage1, 3); assert.equal(hub.store.get('production-log').data.goalTons, 5000);
     assert.equal(hub.store.db.prepare('SELECT 1 FROM files WHERE path=?').get('unrelated-demo.txt'), undefined);
+    console.log('PASS import JSON equality, conflicting folder copies and explicit-file priority');
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
     await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
     await admin.goto(base + '/personnel.html'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
@@ -266,7 +281,7 @@ async function main() {
     console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 10 workflows passed.');
+    console.log('Online browser E2E: 11 workflows passed.');
   } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }

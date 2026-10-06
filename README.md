@@ -167,6 +167,13 @@ optional `instruction.txt` are uploaded. Nested customer/profile folders are
 preserved. Code, unrelated files and backup copies in deeper folders are skipped.
 Do not send live files to chat, this source checkout, GitHub, tests or attachments.
 
+Individually selected JSON files take priority over same-named copies in the
+folder; the folder supplies only missing modules. Equivalent JSON copies are
+accepted regardless of object key order. If the folder contains different
+copies of a module with no explicit selection, the error identifies the module
+filename: select its current JSON file separately and check again. Different
+explicitly selected copies also require choosing just one current copy.
+
 Check the preview table, including missing files, settings changes and movement
 history. The settings checkbox controls copying the production goal, adding
 legacy downtime reasons and importing provided Stickers settings. Existing
