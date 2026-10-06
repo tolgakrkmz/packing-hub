@@ -1,9 +1,10 @@
-/* Task content lives only in the local database. APIs expose each supervisor's assignments. */
+/* Task content lives only in the local database. Supervisors see their assignments; permitted readers see the overview. */
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const {randomUUID, createHash} = require('node:crypto');
 const {problem} = require('./store.cjs');
+const {can} = require('./permissions.cjs');
 const sandbox = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/shift-schedule.js'), 'utf8'), sandbox);
 const schedule = vm.runInContext('ShiftSchedule', sandbox);
@@ -37,13 +38,18 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS task_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
-  const admin = user => { if (user.role !== 'admin') throw problem(403, 'FORBIDDEN'); };
-  const access = user => { if (user.role !== 'admin' && !(user.role === 'operator' && user.taskSupervisor)) throw problem(403, 'FORBIDDEN'); };
+  const access = user => { if (!can(user, 'canViewTasks')) throw problem(403, 'FORBIDDEN'); };
+  const supervisor = user => user.role === 'operator' && user.taskSupervisor === true;
+  const admin = user => { access(user); if (user.role !== 'admin') throw problem(403, 'FORBIDDEN'); };
   function text(value, max, required = false) {
     if (typeof value !== 'string' || value.length > max || required && !value.trim()) throw problem(400, 'INVALID_TASK');
     return value.trim();
   }
-  function roster() { return db.prepare("SELECT id,username,task_team FROM users WHERE active=1 AND role='operator' AND task_supervisor=1 ORDER BY username").all().map(row => ({id: row.id, username: row.username, team: row.task_team})); }
+  function roster() {
+    return db.prepare("SELECT id,username,role,permissions,task_team FROM users WHERE active=1 AND role='operator' AND task_supervisor=1 ORDER BY username").all()
+      .filter(row => can({...row, taskSupervisor: true, permissionOverrides: JSON.parse(row.permissions)}, 'canViewTasks'))
+      .map(row => ({id: row.id, username: row.username, team: row.task_team}));
+  }
   function assignments(input) {
     if (!Number.isSafeInteger(input.assigneeId) || !Array.isArray(input.participantIds) || input.participantIds.length > 30 || input.participantIds.some(id => !Number.isSafeInteger(id)) || new Set(input.participantIds).size !== input.participantIds.length) throw problem(400, 'INVALID_TASK');
     const people = roster(), owner = people.find(person => person.id === input.assigneeId);
@@ -68,7 +74,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     return row(table, id);
   }
   function revision(value, expected) { if (value.revision !== expected) throw problem(409, 'CONFLICT'); }
-  const visible = (item, user) => user.role === 'admin' || item.owner.id === user.id || item.participants.some(person => person.id === user.id);
+  const visible = (item, user) => !supervisor(user) || item.owner.id === user.id || item.participants.some(person => person.id === user.id);
   function event(user, action, note, at) { return {at, actor: {id: user.id, username: user.username}, action, note}; }
   function itemFrom(source, period, at) {
     const events = source.events.map(entry => entry.action === 'created' ? {...entry, snapshot: {...entry.snapshot, due: period.due}} : entry);
@@ -141,6 +147,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   }
   function change(id, input, expected, user, isSchedule = false) {
     access(user); const at = now();
+    if (user.role !== 'admin' && !supervisor(user)) throw problem(403, 'FORBIDDEN');
     return store.transaction(() => {
       materialize(at);
       const table = isSchedule ? 'task_schedules' : 'task_items', item = row(table, id);

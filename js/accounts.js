@@ -5,11 +5,11 @@
   const filter = document.getElementById('accountFilter');
   const createForm = document.getElementById('accountForm');
   const roles = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
-  const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети'};
+  const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети', canViewTasks: 'Преглед на „Задачи“'};
   const defaults = {
-    admin: {canImportData: true, canExportReports: true, canCreateReports: true, canEditReports: true},
-    operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false},
-    observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false}
+    admin: {canImportData: true, canExportReports: true, canCreateReports: true, canEditReports: true, canViewTasks: true},
+    operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false, canViewTasks: false},
+    observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false, canViewTasks: false}
   };
   const cards = new Map();
   function element(tag, className, text) {
@@ -28,8 +28,8 @@
     const team = element('select'); team.setAttribute('aria-label', 'Екип за задачи'); team.dataset.taskTeam = '';
     for (const value of ['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ']) { const option = element('option', '', value || 'Избери екип'); option.value = value; team.append(option); }
     team.value = initial.taskTeam || '';
-    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'));
-    const refresh = () => { flag.disabled = role.value !== 'operator'; if (flag.disabled) flag.checked = false; team.disabled = !flag.checked; team.required = flag.checked; };
+    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи. Друг акаунт с право за преглед вижда всички задачи без промени. Изключеният преглед блокира достъпа и възлагането към този акаунт.'));
+    const refresh = () => { flag.disabled = role.value !== 'operator'; if (flag.disabled) flag.checked = false; team.disabled = !flag.checked; team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
     role.addEventListener('change', refresh); flag.addEventListener('change', refresh);
     form.addEventListener('reset', () => setTimeout(() => { flag.checked = false; team.value = ''; refresh(); }, 0));
     form.insertBefore(group, form.querySelector('.account-actions')); refresh();
@@ -53,12 +53,13 @@
     const state = element('small');
     const reset = element('button', 'account-secondary', 'Върни правата по роля'); reset.type = 'button';
     footer.append(state, reset); group.append(grid, footer);
-    const allowed = key => key === 'canExportReports' || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
+    const allowed = key => ['canExportReports', 'canViewTasks'].includes(key) || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
+    const inherited = key => defaults[role.value][key] || key === 'canViewTasks' && role.value === 'operator' && !!form.querySelector('[data-task-supervisor]')?.checked;
     const read = () => Object.fromEntries(Object.entries(overrides).filter(([key]) => allowed(key)));
     const refresh = () => {
       for (const [key, {input, status}] of controls) {
         input.disabled = !allowed(key);
-        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : defaults[role.value][key]);
+        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : inherited(key));
         status.textContent = !allowed(key) ? key === 'canImportData' ? 'Само за администратори' : 'Недостъпно за наблюдател' : Object.hasOwn(overrides, key) ? 'Индивидуално право' : 'Според ролята';
       }
       const custom = Object.keys(read()).length > 0;
@@ -66,6 +67,7 @@
     };
     reset.addEventListener('click', () => { overrides = {}; refresh(); });
     role.addEventListener('change', refresh);
+    form.addEventListener('taskprofilechange', refresh);
     form.addEventListener('reset', () => { overrides = {}; setTimeout(refresh, 0); });
     form.insertBefore(group, form.querySelector('.account-actions')); refresh();
     return read;
@@ -86,6 +88,7 @@
     const name = element('h2', '', user.username); name.setAttribute('translate', 'no');
     const badges = element('div', 'account-badges');
     badges.append(element('span', 'account-role-badge', roles[user.role]), element('span', user.active ? 'account-status is-active' : 'account-status', user.active ? 'Активен' : 'Неактивен'));
+    if (user.taskSupervisor) badges.append(element('span', 'account-role-badge', 'Началник смяна'), element('span', 'account-role-badge', 'Екип: ' + user.taskTeam));
     identity.append(name, badges); summary.append(identity, element('span', 'account-manage', 'Управление')); details.append(summary);
     const form = element('form', 'account-card'); form.dataset.id = user.id;
     const fields = element('div', 'account-fields account-edit-fields');

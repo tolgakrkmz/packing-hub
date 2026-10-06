@@ -27,7 +27,7 @@ async function setup(t, filename = ':memory:') {
   const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', data, {'If-Match': '"' + revision + '"'});
   return {hub, admin, chief, other, request, login, payload, create, list, change, time: value => { time = Date.parse(value); }};
 }
-test('task access requires a supervisor profile; admin alone assigns; each supervisor sees only their assignments', async t => {
+test('task viewing defaults to admin and supervisors; admin alone assigns; each supervisor sees only their assignments', async t => {
   const s = await setup(t), operator = await s.login('demo-operator'), observer = await s.login('demo-observer');
   for (const user of [operator, observer]) {
     for (const route of ['/tasks.html', '/api/tasks']) assert.equal((await s.request(route, user)).status, 403);
@@ -40,6 +40,67 @@ test('task access requires a supervisor profile; admin alone assigns; each super
   assert.equal((await s.change(id, s.chief, {action: 'cancel', note: 'Fictional cancellation'})).status, 403);
   assert.equal((await s.request('/api/tasks', s.chief, 'POST', s.payload())).status, 403);
   for (const route of ['/api/data/tasks', '/api/export/tasks']) assert.equal((await s.request(route, s.chief)).status, 404);
+});
+test('explicit viewing grants a read-only overview without supervisor, assignment or personnel access', async t => {
+  const s = await setup(t), shiftId = await s.create();
+  const globalId = await s.create(s.payload({kind: 'global', assigneeId: s.other.user.id, dueDate: '2026-12-04', dueTime: '17:00'}));
+  await s.create(s.payload({repeat: 'every-shift', until: '2026-12-05'}));
+  const before = await s.list();
+  for (const role of ['operator', 'observer']) {
+    const original = await s.login('demo-' + role);
+    assert.equal(original.user.permissions.canViewTasks, false);
+    assert.equal((await s.request('/api/accounts/' + original.user.id, s.admin, 'PATCH', {permissions: {canViewTasks: true}})).status, 200);
+    const reader = await s.login('demo-' + role);
+    assert.equal(reader.user.taskSupervisor, false);
+    for (const method of ['GET', 'HEAD']) assert.equal((await s.request('/tasks.html', reader, method)).status, 200);
+    const view = await s.list(reader);
+    assert.deepEqual(view.items, before.items); assert.deepEqual(view.schedules, before.schedules); assert.deepEqual(view.supervisors, []);
+    assert.equal((await s.request('/api/tasks', reader, 'POST', s.payload())).status, 403);
+    for (const id of [shiftId, globalId]) {
+      for (const action of ['report', 'progress', 'cancel', 'approve', 'return', 'reopen', 'edit']) {
+        assert.equal((await s.change(id, reader, {action, status: 'completed', note: 'Fictional read-only attempt'})).status, 403);
+      }
+    }
+    assert.equal((await s.change(view.schedules[0].id, reader, {action: 'stop', note: 'Fictional stop'}, 1, true)).status, 403);
+    for (const route of ['/api/accounts', '/api/data/personnel', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, reader)).status, 403);
+    assert.throws(() => s.hub.tasks.change(globalId, {action: 'progress', note: 'Fictional direct attempt'}, 1, reader.user), error => error.status === 403);
+  }
+  assert.deepEqual(await s.list(), before);
+});
+test('disabling task viewing revokes sessions and blocks supervisor reads, reports and new assignments', async t => {
+  const s = await setup(t), id = await s.create();
+  assert.equal(s.chief.user.permissions.canViewTasks, true);
+  assert.equal((await s.request('/api/accounts/' + s.chief.user.id, s.admin, 'PATCH', {permissions: {canViewTasks: false}})).status, 200);
+  assert.equal((await s.request('/api/tasks', s.chief)).status, 401);
+  const denied = await s.login('demo-chief-a');
+  assert.equal(denied.user.taskSupervisor, true); assert.equal(denied.user.taskTeam, 'А');
+  for (const route of ['/tasks.html', '/tasks.html?role=admin', '/api/tasks']) assert.equal((await s.request(route, denied)).status, 403);
+  assert.equal((await s.request('/tasks.html', denied, 'HEAD')).status, 403);
+  assert.equal((await s.change(id, denied, {action: 'report', status: 'completed', note: ''})).status, 403);
+  assert.ok(!(await s.list()).supervisors.some(person => person.id === denied.user.id));
+  assert.equal((await s.request('/api/tasks', s.admin, 'POST', s.payload())).status, 400);
+  assert.equal((await s.request('/api/tasks/preview?date=2026-12-01&assigneeId=' + denied.user.id, s.admin)).status, 400);
+  await s.hub.auth.update(denied.user.id, {permissions: {canViewTasks: true}}, s.admin.user);
+  const enabled = await s.login('demo-chief-a'); assert.equal((await s.list(enabled)).items.length, 1);
+  assert.ok((await s.list()).supervisors.some(person => person.id === enabled.user.id));
+});
+test('removing supervisor status retains an explicit read-only grant but prevents reporting former assignments', async t => {
+  const s = await setup(t), id = await s.create();
+  await s.hub.auth.update(s.chief.user.id, {taskSupervisor: false, permissions: {canViewTasks: true}}, s.admin.user);
+  const reader = await s.login('demo-chief-a');
+  assert.equal(reader.user.taskSupervisor, false); assert.equal(reader.user.taskTeam, '');
+  assert.equal((await s.list(reader)).items.length, 1);
+  assert.equal((await s.change(id, reader, {action: 'report', status: 'completed', note: ''})).status, 403);
+});
+test('an explicit restriction also gates admin task creation and previews while account management remains available', async t => {
+  const s = await setup(t);
+  await s.hub.auth.update(s.admin.user.id, {permissions: {canViewTasks: false}}, s.admin.user);
+  const denied = await s.login();
+  for (const route of ['/tasks.html', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, denied)).status, 403);
+  assert.equal((await s.request('/api/tasks', denied, 'POST', s.payload())).status, 403);
+  assert.equal((await s.request('/api/accounts', denied)).status, 200);
+  assert.throws(() => s.hub.tasks.create(s.payload(), denied.user), error => error.status === 403);
+  assert.throws(() => s.hub.tasks.preview('2026-12-01', s.chief.user.id, denied.user), error => error.status === 403);
 });
 test('shift deadline and grace use server time; night shifts keep their start date; late reports retain their time and history', async t => {
   const s = await setup(t); const id = await s.create();
@@ -156,4 +217,10 @@ test('tasks, supervisor profiles, event history and recurring catch-up survive a
   store = openStore(filename); t.after(() => store.close()); tasks = createTasks(store, {now: () => Date.parse('2026-12-04T07:00:00+02:00')});
   const view = tasks.list(admin); assert.equal(view.items.length, 2); assert.ok(view.items.every(item => item.displayStatus === 'unreported')); assert.equal(view.items[0].events[0].snapshot.owner.username, 'demo-chief');
   assert.equal(accounts(store).list().find(user => user.id === chief.id).taskSupervisor, true);
+  const reopenedAuth = accounts(store);
+  assert.equal(reopenedAuth.list().find(user => user.id === chief.id).permissions.canViewTasks, true);
+  await reopenedAuth.update(chief.id, {permissions: {canViewTasks: false}}, admin); store.close();
+  store = openStore(filename);
+  assert.equal(accounts(store).list().find(user => user.id === chief.id).permissions.canViewTasks, false);
+  assert.equal(createTasks(store).list(admin).items.length, view.items.length);
 });

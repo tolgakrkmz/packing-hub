@@ -150,7 +150,7 @@ const HubServer = (() => {
     let selector = '';
     if (boot.user.role !== 'admin') selector = 'a[href="personnel.html"],a[href="/personnel.html"]';
     if (boot.user.role === 'operator') selector += ',a[href="statistics.html"],a[href="/statistics.html"]';
-    if (boot.user.role !== 'admin' && !(boot.user.role === 'operator' && boot.user.taskSupervisor)) selector += ',a[href="tasks.html"],a[href="/tasks.html"]';
+    if (!can('canViewTasks')) selector += ',a[href="tasks.html"],a[href="/tasks.html"]';
     if (boot.user.role !== 'admin' && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
     if (boot.user.role !== 'admin' && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
     if (['production-log.html', 'line-downtime.html'].includes(module)) {
@@ -205,7 +205,7 @@ const HubServer = (() => {
     });
     if (location.pathname === '/' || location.pathname.endsWith('/index.html')) {
       const tasksLink = document.querySelector('a[href="tasks.html"]');
-      if (tasksLink && (boot.user.role === 'admin' || boot.user.role === 'operator' && boot.user.taskSupervisor)) tasksLink.hidden = false;
+      if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
       document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
     }

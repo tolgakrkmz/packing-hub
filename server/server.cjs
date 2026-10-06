@@ -206,7 +206,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
       if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
-      if (assetName === '/tasks.html' && session?.user.role !== 'admin' && !(session?.user.role === 'operator' && session?.user.taskSupervisor)) throw problem(403, 'FORBIDDEN');
+      if (assetName === '/tasks.html' && !canViewModule(session?.user, 'tasks')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
       if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');

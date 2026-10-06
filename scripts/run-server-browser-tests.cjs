@@ -275,7 +275,7 @@ async function main() {
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
     for (const width of [320, 390]) { await limited.setViewportSize({width, height: 900}); await assertResponsive(limited, `Restricted operator at ${width}px`); }
     await admin.locator('[data-hub-language=en]').click(); await expect(limitedForm.locator('legend').first()).toHaveText('Account permissions');
-    await expect(limitedForm.locator('.account-flag').last()).toContainText('Correct and delete reports');
+    await expect(limitedForm.locator('[data-permission=canEditReports]').locator('..')).toContainText('Correct and delete reports');
     await admin.locator('[data-hub-language=bg]').click();
     const own = hub.auth.list().find(user => user.username === 'demo-admin'), ownForm = admin.locator(`.account-card[data-id="${own.id}"]`);
     await ownForm.locator('..').locator('summary').first().click();

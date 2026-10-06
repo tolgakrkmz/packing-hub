@@ -9,7 +9,9 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   for (const username of ['demo-task-chief', 'demo-task-participant']) {
     await admin.locator('#newAccountButton').click(); await admin.locator('#accountUsername').fill(username);
     await admin.locator('#accountPassword').fill('Fictional-password-123'); await admin.locator('#accountRole').selectOption('operator');
+    await expect(admin.locator('#accountForm [data-permission=canViewTasks]')).not.toBeChecked();
     await admin.locator('#accountForm [data-task-supervisor]').check(); await admin.locator('#accountForm [data-task-team]').selectOption('В');
+    await expect(admin.locator('#accountForm [data-permission=canViewTasks]')).toBeChecked();
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText(username);
   }
   const chiefUser = hub.auth.list().find(user => user.username === 'demo-task-chief'), participantUser = hub.auth.list().find(user => user.username === 'demo-task-participant');
@@ -69,6 +71,49 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await admin.locator('.task-card').filter({hasText: 'Fictional recurring check one'}).getByRole('button', {name: 'Спри повторението'}).click();
   await admin.locator('#actionNote').fill('Fictional stop reason'); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
   await expect(admin.locator('#taskContent')).toContainText('Повторението е спряно');
+  // A separate viewing permission grants an overview, without supervisor powers.
+  await admin.goto(base + '/accounts.html'); await admin.locator('#newAccountButton').click();
+  await admin.locator('#accountUsername').fill('demo-task-reader'); await admin.locator('#accountPassword').fill('Fictional-password-123');
+  await admin.locator('#accountRole').selectOption('observer');
+  await expect(admin.locator('#accountForm [data-permission=canViewTasks]')).not.toBeChecked();
+  await expect(admin.locator('#accountForm [data-permission=canViewTasks]')).toBeEnabled();
+  await admin.locator('#accountForm [data-permission=canViewTasks]').check(); await admin.locator('#accountForm button[type=submit]').click();
+  await expect(admin.locator('#accountList')).toContainText('demo-task-reader');
+  const readerUser = hub.auth.list().find(user => user.username === 'demo-task-reader'), reader = await device(readerUser.username, true);
+  await expect(reader.locator('a[href="tasks.html"]')).toBeVisible(); await reader.goto(base + '/tasks.html');
+  await expect(reader.locator('#taskSubtitle')).toContainText('Преглед на всички задачи');
+  await expect(reader.locator('#newTask')).toBeHidden(); await expect(reader.locator('#ownerFilterLabel')).toBeVisible();
+  await expect(reader.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
+  await expect(reader.getByRole('button', {name: 'Добави напредък', exact: true})).toHaveCount(0);
+  await expect(reader.locator('#taskContent')).toContainText('Fictional recurring check two');
+  await reader.locator('[data-view=history]').click(); await reader.locator('#statsUntil').fill('2026-12-05');
+  await expect(reader.locator('#taskContent')).toContainText('Fictional global packing problem');
+  const readerForm = admin.locator(`.account-card[data-id="${readerUser.id}"]`);
+  await readerForm.locator('..').locator('summary').first().click();
+  await admin.locator('[data-hub-language=en]').click(); await expect(readerForm.locator('[data-permission=canViewTasks]').locator('..')).toContainText('View Tasks');
+  await admin.locator('[data-hub-language=bg]').click();
+  await readerForm.locator('[data-permission=canViewTasks]').uncheck(); await readerForm.locator('button[type=submit]').click();
+  await expect(reader).toHaveURL(base + '/login.html');
+  await reader.locator('#username').fill(readerUser.username); await reader.locator('#password').fill('Fictional-password-123'); await reader.locator('#loginForm button').click();
+  await expect(reader).toHaveURL(base + '/index.html'); await expect(reader.locator('a[href="tasks.html"]')).toBeHidden();
+  assert.equal(await reader.evaluate(async () => (await fetch('/tasks.html')).status), 403);
+  const chiefForm = admin.locator(`.account-card[data-id="${chiefUser.id}"]`);
+  await chiefForm.locator('..').locator('summary').first().click();
+  await chiefForm.locator('[data-permission=canViewTasks]').uncheck();
+  await chiefForm.locator('[data-task-supervisor]').uncheck(); await chiefForm.locator('[data-task-supervisor]').check();
+  await expect(chiefForm.locator('[data-permission=canViewTasks]')).not.toBeChecked();
+  await chiefForm.locator('button').filter({hasText: 'Върни правата по роля'}).click();
+  await expect(chiefForm.locator('[data-permission=canViewTasks]')).toBeChecked();
+  for (const width of [320, 390, 1440]) {
+    await admin.setViewportSize({width, height: 900});
+    await assertResponsive(admin, `Task account permissions at ${width}px`);
+  }
+  if (screenshotDir) {
+    fs.mkdirSync(screenshotDir, {recursive: true});
+    await admin.setViewportSize({width: 1280, height: 1000});
+    await chiefForm.screenshot({path: path.join(screenshotDir, 'accounts-task-access.png')});
+  }
+  await admin.goto(base + '/tasks.html');
   for (const width of [320, 390, 768, 1440]) {
     await admin.setViewportSize({width, height: 900});
     for (const language of ['en', 'bg']) {

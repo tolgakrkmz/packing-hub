@@ -31,13 +31,24 @@ targets module opens directly without a role login.
 
 ### Tasks for shift supervisors
 
-The **Tasks** tile is available in server mode to administrators and designated
-shift supervisors. In **Accounts**, set an operator's **Shift supervisor (tasks)**
-flag and team. Use personal accounts: the authenticated account identifies each
-reporter. This task profile is independent of production-report permissions and
+The **Tasks** tile is controlled by the account's **View Tasks** permission in
+server mode. Administrators and designated supervisors inherit access by default;
+an explicit restriction blocks the tile, direct page URLs and all task APIs.
+Other operators and observers default to no access. Enable **View Tasks** to give
+them a read-only overview of all tasks, history and statistics. This does not grant
+assignment, reporting, approval or personnel access. Disabling access revokes the
+account's sessions immediately and removes it from new-assignment choices.
+
+In **Accounts**, set an operator's **Shift supervisor (tasks)** flag and team,
+and keep **View Tasks** enabled. Use one personal account per supervisor: the
+account ID is the responsible person, and the team determines the shift schedule.
+Multiple personal accounts may belong to the same team; an assignment is always
+to the selected account, not everyone on that team. There is no automatic match
+by employee name and no personnel import is needed. This task profile is
+independent of production-report permissions and
 does not grant personnel, statistics, account or import access. Existing accounts
-remain unmarked when the database migrates. Disabling/changing an account revokes
-its sessions and task access; existing assignment snapshots remain in history.
+remain unmarked when the database migrates. Account changes revoke active
+sessions; existing assignment snapshots remain in history.
 
 Only administrators assign tasks. A shift task has one responsible supervisor and
 uses that team's scheduled shift, with a preview of its start and deadline. Assign
@@ -90,6 +101,7 @@ Saving account changes revokes its sessions immediately, including live streams.
 | Export reports | Allowed | Allowed | Allowed |
 | Add reports | Allowed | Allowed | Unavailable |
 | Correct/delete recorded reports | Allowed | Denied | Unavailable |
+| View Tasks | Allowed | Denied (allowed for designated supervisors) | Denied |
 
 Role limits remain enforced even for explicit overrides. Import permission
 controls both import workflows independently of report write permissions.
