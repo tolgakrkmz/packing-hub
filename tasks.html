@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Задачи · Package Hub</title>
+<link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/tasks.css"><link rel="stylesheet" href="css/i18n.css">
+<script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
+<script src="js/tasks.js" defer></script>
+</head>
+<body>
+<main class="wrap tasks-wrap">
+<header class="tasks-heading"><div><a href="index.html">← Package Hub</a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Задачи</h1><p id="taskSubtitle">Сменни ангажименти и общи проблеми за решаване.</p></div><button id="newTask" type="button" hidden>+ Възложи задача</button></header>
+<p id="taskMessage" role="status" aria-live="polite"></p>
+<section id="taskOverview" class="task-overview" aria-label="Обобщение"></section>
+<nav id="taskTabs" class="task-tabs" aria-label="Раздели на задачите">
+<button type="button" data-view="shift" aria-pressed="true">Сменни задачи</button><button type="button" data-view="global" aria-pressed="false">Глобални задачи</button><button type="button" data-view="history" aria-pressed="false">История</button><button type="button" data-view="stats" aria-pressed="false">Статистика</button><button type="button" data-view="schedules" aria-pressed="false">Повтарящи се</button>
+</nav>
+<div class="task-toolbar"><label id="ownerFilterLabel" hidden>Отговорник<select id="ownerFilter"><option value="">Всички отговорници</option></select></label><label>Търсене<input id="taskSearch" type="search" placeholder="Търси задача…"></label><button id="refreshTasks" type="button" class="secondary">Опресни</button></div>
+<div id="taskPeriod" class="task-toolbar" hidden><label>От дата<input id="statsFrom" type="date" required></label><label>До дата<input id="statsUntil" type="date" required></label><p>Сменните отчети са по датата на започване на смяната. Глобалните задачи са по срока.</p></div>
+<section id="taskContent" aria-live="polite"></section>
+<p class="task-help" id="taskHelp">Неизпълнена и неотчетена са различни състояния. Липсващ отчет се отбелязва 30 минути след края на смяната. Закъснелите отчети остават видими в историята.</p>
+<dialog id="taskEditor" class="task-dialog">
+<form id="taskForm"><div class="dialog-heading"><h2 id="editorTitle">Възложи задача</h2><button type="button" data-close="taskEditor" class="secondary" aria-label="Затвори">×</button></div>
+<label>Заглавие<input id="taskTitle" required maxlength="180"></label><label>Описание<textarea id="taskDescription" maxlength="4000" rows="3"></textarea></label>
+<div class="task-fields"><label>Тип<select id="taskKind"><option value="shift">Сменна задача</option><option value="global">Глобална задача</option></select></label><label>Приоритет<select id="taskPriority"><option value="normal">Нормален</option><option value="high">Висок</option></select></label></div>
+<label>Основен отговорник<select id="taskOwner" required></select></label><p id="ownerTeam" class="task-muted"></p>
+<fieldset id="taskParticipants"><legend>Други участници</legend><div id="participantOptions"></div></fieldset>
+<section id="shiftFields"><label>Повторение<select id="taskRepeat"><option value="once">Само конкретната смяна</option><option value="every-shift">Всяка работна смяна по графика на А–Г</option></select></label><div class="task-fields"><label>Дата на смяната / начало<input id="taskFrom" type="date"></label><label id="taskUntilLabel" hidden>Последна дата<input id="taskUntil" type="date"></label></div><p id="shiftPreview" class="task-muted"></p><p>За Стикери се възлага конкретна 1-ва смяна. Повтарянето е за период до 366 дни.</p></section>
+<section id="globalFields" hidden><div class="task-fields"><label>Краен срок — дата<input id="taskDueDate" type="date"></label><label>Час<input id="taskDueTime" type="time" value="17:00"></label></div><p id="taskTimezone"></p></section>
+<label id="editReasonLabel" hidden>Причина за промяната<textarea id="editReason" maxlength="4000" rows="2"></textarea></label>
+<p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button id="saveTask" type="submit">Възложи</button><button type="button" data-close="taskEditor" class="secondary">Отказ</button></div>
+</form></dialog>
+<dialog id="taskAction" class="task-dialog"><form id="actionForm"><div class="dialog-heading"><h2 id="actionTitle"></h2><button type="button" data-close="taskAction" class="secondary" aria-label="Затвори">×</button></div><p id="actionTaskTitle" translate="no"></p><label id="reportStatusLabel">Резултат<select id="reportStatus"></select></label><label>Бележка / причина<textarea id="actionNote" maxlength="4000" rows="4"></textarea></label><p id="actionFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Запази</button><button type="button" data-close="taskAction" class="secondary">Отказ</button></div></form></dialog>
+<dialog id="taskHistory" class="task-dialog"><div class="dialog-heading"><h2>История на задачата</h2><button type="button" data-close="taskHistory" class="secondary" aria-label="Затвори">×</button></div><div id="historyContent"></div></dialog>
+</main></body></html>

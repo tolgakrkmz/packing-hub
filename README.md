@@ -29,6 +29,67 @@ targets module opens directly without a role login.
 
 ## Shared server mode
 
+### Tasks for shift supervisors
+
+The **Tasks** tile is controlled by the account's **View Tasks** permission in
+server mode. Administrators and designated supervisors inherit access by default;
+an explicit restriction blocks the tile, direct page URLs and all task APIs.
+Other operators and observers default to no access. Enable **View Tasks** to give
+them a read-only overview of all tasks, history and statistics. This does not grant
+assignment, reporting, approval or personnel access. Disabling access revokes the
+account's sessions immediately and removes it from new-assignment choices.
+
+In **Accounts**, set an operator's **Shift supervisor (tasks)** flag and team,
+and keep **View Tasks** enabled. Use one personal account per supervisor: the
+account ID is the responsible person, and the team determines the shift schedule.
+Multiple personal accounts may belong to the same team; an assignment is always
+to the selected account, not everyone on that team. There is no automatic match
+by employee name and no personnel import is needed. This task profile is
+independent of production-report permissions and
+does not grant personnel, statistics, account or import access. Existing accounts
+remain unmarked when the database migrates. Account changes revoke active
+sessions; existing assignment snapshots remain in history.
+
+Only administrators assign tasks. A shift task has one responsible supervisor and
+uses that team's scheduled shift, with a preview of its start and deadline. Assign
+a specific shift or repeat over a period of up to 366 days in the A–D rotation.
+Rest days are skipped. Stickers tasks use a specific first shift; their recurring
+calendar is deliberately not inferred. Recurring plans can be edited for future
+instances or stopped with a reason. Already started instances keep their original
+content, team, owner and deadlines. Individual unreported shift tasks can be
+amended before their deadline; past reports require an explicit reopen and reason.
+
+A global task has one primary owner, optional supervisor participants and a
+deadline. Participants add progress/handover notes; only the owner reports its
+state. The owner marks it **Ready for review**, then an administrator approves
+completion or returns it with a reason. Administrators can amend active tasks,
+cancel or reopen them; changes and reasons remain in each task's event history.
+
+Task clocks use **Europe/Sofia** on the server, including daylight-saving changes.
+Night shifts retain their start date. An unreported shift task becomes
+**Unreported** 30 minutes after the shift deadline. **Not done** and **Not
+applicable** require an explanation. Late reports retain the actual server time
+and a late flag. Missed recurring shifts are materialized at the next server read
+or write, including after an outage, so no browser needs to remain open.
+
+The task dashboard separates active shift tasks, global tasks, history, recurring
+plans and statistics. Period statistics count ended applicable shift tasks,
+completed/not-done/unreported results, distinct shifts with missing reports and
+late reports per owner. Several missing tasks in one shift count as one missing
+shift. Cancelled and inapplicable tasks are excluded from the completion rate.
+Consecutive misses are shown separately for not-done and unreported recurring
+tasks in the selected period. Global totals use deadline dates and show overdue,
+closed and ready-for-review tasks separately.
+
+Task content, assignment snapshots and events are local SQLite tables, included
+in normal database snapshots. Supervisor reads are scoped to their assigned tasks
+and global participation, with no personnel data or other account roster. Writes
+require the active session, CSRF, origin and per-task revision; creation retries
+use an idempotency key. Drafts stay in memory across save errors. Tasks are not
+part of legacy imports, generic module replacement, report exports or offline
+file mode. Deploy the reviewed server code/container to enable them; the legacy
+production folder and its live files remain independent.
+
 Administrators can set individual account permissions to **Role default**,
 **Allowed**, or **Denied** in Accounts. Existing accounts inherit role defaults
 when the database is upgraded; accounts, reports and sessions are preserved.
@@ -40,6 +101,7 @@ Saving account changes revokes its sessions immediately, including live streams.
 | Export reports | Allowed | Allowed | Allowed |
 | Add reports | Allowed | Allowed | Unavailable |
 | Correct/delete recorded reports | Allowed | Denied | Unavailable |
+| View Tasks | Allowed | Denied (allowed for designated supervisors) | Denied |
 
 Role limits remain enforced even for explicit overrides. Import permission
 controls both import workflows independently of report write permissions.

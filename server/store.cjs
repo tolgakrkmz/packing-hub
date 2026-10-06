@@ -43,7 +43,10 @@ function openStore(filename) {
   if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'permissions')) {
     db.exec("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
   }
-  db.exec('PRAGMA user_version=2');
+  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'task_supervisor')) {
+    db.exec("ALTER TABLE users ADD COLUMN task_supervisor INTEGER NOT NULL DEFAULT 0; ALTER TABLE users ADD COLUMN task_team TEXT NOT NULL DEFAULT ''");
+  }
+  db.exec('PRAGMA user_version=3');
   for (const [kind, data] of Object.entries(defaults)) db.prepare('INSERT OR IGNORE INTO documents(kind,data) VALUES(?,?)').run(kind, JSON.stringify(data));
   db.prepare("INSERT OR IGNORE INTO files(path,kind) VALUES('data','directory'),('data/profiles','directory')").run();
   const get = kind => {

@@ -5,11 +5,11 @@
   const filter = document.getElementById('accountFilter');
   const createForm = document.getElementById('accountForm');
   const roles = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
-  const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети'};
+  const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети', canViewTasks: 'Преглед на „Задачи“'};
   const defaults = {
-    admin: {canImportData: true, canExportReports: true, canCreateReports: true, canEditReports: true},
-    operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false},
-    observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false}
+    admin: {canImportData: true, canExportReports: true, canCreateReports: true, canEditReports: true, canViewTasks: true},
+    operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false, canViewTasks: false},
+    observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false, canViewTasks: false}
   };
   const cards = new Map();
   function element(tag, className, text) {
@@ -20,6 +20,20 @@
   }
   function field(text, input) {
     const label = element('label'); label.append(element('span', '', text), input); return label;
+  }
+  function taskProfileControls(form, role, initial = {}) {
+    const group = element('fieldset', 'account-permissions'); group.append(element('legend', '', 'Отговорност за задачи'));
+    const flag = element('input'); flag.type = 'checkbox'; flag.dataset.taskSupervisor = ''; flag.checked = !!initial.taskSupervisor;
+    const label = element('label', 'account-active'); label.append(flag, element('span', '', 'Началник смяна (задачи)'));
+    const team = element('select'); team.setAttribute('aria-label', 'Екип за задачи'); team.dataset.taskTeam = '';
+    for (const value of ['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ']) { const option = element('option', '', value || 'Избери екип'); option.value = value; team.append(option); }
+    team.value = initial.taskTeam || '';
+    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи. Друг акаунт с право за преглед вижда всички задачи без промени. Изключеният преглед блокира достъпа и възлагането към този акаунт.'));
+    const refresh = () => { flag.disabled = role.value !== 'operator'; if (flag.disabled) flag.checked = false; team.disabled = !flag.checked; team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
+    role.addEventListener('change', refresh); flag.addEventListener('change', refresh);
+    form.addEventListener('reset', () => setTimeout(() => { flag.checked = false; team.value = ''; refresh(); }, 0));
+    form.insertBefore(group, form.querySelector('.account-actions')); refresh();
+    return () => ({taskSupervisor: flag.checked, taskTeam: flag.checked ? team.value : ''});
   }
   function permissionControls(form, role, initialOverrides = {}) {
     let overrides = {...initialOverrides};
@@ -39,12 +53,13 @@
     const state = element('small');
     const reset = element('button', 'account-secondary', 'Върни правата по роля'); reset.type = 'button';
     footer.append(state, reset); group.append(grid, footer);
-    const allowed = key => key === 'canExportReports' || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
+    const allowed = key => ['canExportReports', 'canViewTasks'].includes(key) || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
+    const inherited = key => defaults[role.value][key] || key === 'canViewTasks' && role.value === 'operator' && !!form.querySelector('[data-task-supervisor]')?.checked;
     const read = () => Object.fromEntries(Object.entries(overrides).filter(([key]) => allowed(key)));
     const refresh = () => {
       for (const [key, {input, status}] of controls) {
         input.disabled = !allowed(key);
-        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : defaults[role.value][key]);
+        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : inherited(key));
         status.textContent = !allowed(key) ? key === 'canImportData' ? 'Само за администратори' : 'Недостъпно за наблюдател' : Object.hasOwn(overrides, key) ? 'Индивидуално право' : 'Според ролята';
       }
       const custom = Object.keys(read()).length > 0;
@@ -52,6 +67,7 @@
     };
     reset.addEventListener('click', () => { overrides = {}; refresh(); });
     role.addEventListener('change', refresh);
+    form.addEventListener('taskprofilechange', refresh);
     form.addEventListener('reset', () => { overrides = {}; setTimeout(refresh, 0); });
     form.insertBefore(group, form.querySelector('.account-actions')); refresh();
     return read;
@@ -72,6 +88,7 @@
     const name = element('h2', '', user.username); name.setAttribute('translate', 'no');
     const badges = element('div', 'account-badges');
     badges.append(element('span', 'account-role-badge', roles[user.role]), element('span', user.active ? 'account-status is-active' : 'account-status', user.active ? 'Активен' : 'Неактивен'));
+    if (user.taskSupervisor) badges.append(element('span', 'account-role-badge', 'Началник смяна'), element('span', 'account-role-badge', 'Екип: ' + user.taskTeam));
     identity.append(name, badges); summary.append(identity, element('span', 'account-manage', 'Управление')); details.append(summary);
     const form = element('form', 'account-card'); form.dataset.id = user.id;
     const fields = element('div', 'account-fields account-edit-fields');
@@ -85,6 +102,7 @@
     const button = element('button', '', 'Запази промените'); button.type = 'submit';
     actions.append(element('small', '', 'Промените прекратяват сесиите на този профил.'), button); form.append(actions);
     const permissions = permissionControls(form, role, user.permissionOverrides);
+    const taskProfile = taskProfileControls(form, role, user);
     const password = element('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.minLength = 12; password.maxLength = 128;
     const passwordDetails = element('details', 'account-password');
     passwordDetails.append(element('summary', '', 'Смяна на парола'), field('Нова парола', password), element('small', '', 'Поне 12 знака. Остави празно, за да запазиш текущата парола.'));
@@ -94,7 +112,7 @@
     form.addEventListener('submit', async event => {
       event.preventDefault(); button.disabled = true; status.textContent = '';
       try {
-        const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...(password.value ? {password: password.value} : {})});
+        const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...taskProfile(), ...(password.value ? {password: password.value} : {})});
         renderUser(result.user, true, 'Акаунтът е обновен.'); message.textContent = 'Акаунтът е обновен.';
         cards.get(user.id).details.querySelector('button[type=submit]').focus({preventScroll: true});
       } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }
@@ -115,6 +133,7 @@
     else document.getElementById('newAccountButton').focus({preventScroll: true});
   }
   const createPermissions = permissionControls(createForm, document.getElementById('accountRole'));
+  const createTaskProfile = taskProfileControls(createForm, document.getElementById('accountRole'));
   document.getElementById('newAccountButton').addEventListener('click', () => setCreateOpen(document.getElementById('accountCreate').hidden));
   document.getElementById('cancelCreate').addEventListener('click', () => { createForm.reset(); setCreateOpen(false); });
   search.addEventListener('input', applyFilters); filter.addEventListener('change', applyFilters);
@@ -122,7 +141,7 @@
     event.preventDefault(); const button = createForm.querySelector('button[type=submit]'); button.disabled = true;
     const status = document.getElementById('accountCreateMessage'); status.textContent = '';
     try {
-      const result = await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions()});
+      const result = await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions(), ...createTaskProfile()});
       createForm.reset(); setCreateOpen(false); search.value = ''; filter.value = 'all';
       renderUser(result.user); message.textContent = 'Акаунтът е създаден.';
     } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }

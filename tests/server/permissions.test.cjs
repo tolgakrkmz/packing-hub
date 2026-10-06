@@ -43,7 +43,7 @@ test('role defaults and explicit restrictions survive a reopen; migration preser
   assert.equal(auth.session(session.token), null); store.close();
   store = openStore(filename); t.after(() => store.close());
   assert.equal(accounts(store).list()[0].permissions.canExportReports, false);
-  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 3);
 });
 test('only administrators manage permissions; values are strictly boolean and role ceilings cannot be bypassed', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), operator = await login('operator');

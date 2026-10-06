@@ -9,10 +9,12 @@ const {createHubServer} = require('../server/server.cjs');
 const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
+const {exerciseTasks} = require('../tests/browser/tasks.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
-  const hub = createHubServer({filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
+  let taskTime = Date.now();
+  const hub = createHubServer({filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime});
   let browser;
   const errors = [];
   try {
@@ -35,6 +37,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--tasks-only')) {
+      await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;
+    }
     await admin.getByRole('link', {name: 'Акаунти', exact: true}).click();
     for (const [username, role] of [['demo-operator', 'operator'], ['demo-observer', 'observer']]) {
       await admin.locator('#newAccountButton').click();
@@ -66,10 +72,10 @@ async function main() {
     await operatorForm.locator('button[type=submit]').click();
     await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
     assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {});
-    await operatorForm.locator('select').selectOption('observer');
+    await operatorForm.locator('select[aria-label="Роля"]').selectOption('observer');
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeDisabled();
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).not.toBeChecked();
-    await operatorForm.locator('select').selectOption('operator');
+    await operatorForm.locator('select[aria-label="Роля"]').selectOption('operator');
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeChecked();
     await operatorForm.locator('.account-password summary').click();
     await operatorForm.locator('input[type=password]').fill('short');
@@ -268,8 +274,8 @@ async function main() {
     assert.equal(download.suggestedFilename(), 'production-log.json'); const chunks = []; for await (const chunk of await download.createReadStream()) chunks.push(chunk);
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
     for (const width of [320, 390]) { await limited.setViewportSize({width, height: 900}); await assertResponsive(limited, `Restricted operator at ${width}px`); }
-    await admin.locator('[data-hub-language=en]').click(); await expect(limitedForm.locator('legend')).toHaveText('Account permissions');
-    await expect(limitedForm.locator('.account-flag').last()).toContainText('Correct and delete reports');
+    await admin.locator('[data-hub-language=en]').click(); await expect(limitedForm.locator('legend').first()).toHaveText('Account permissions');
+    await expect(limitedForm.locator('[data-permission=canEditReports]').locator('..')).toContainText('Correct and delete reports');
     await admin.locator('[data-hub-language=bg]').click();
     const own = hub.auth.list().find(user => user.username === 'demo-admin'), ownForm = admin.locator(`.account-card[data-id="${own.id}"]`);
     await ownForm.locator('..').locator('summary').first().click();
@@ -279,10 +285,21 @@ async function main() {
     await expect(admin.getByRole('link', {name: 'Импорт на данни', exact: true})).toHaveCount(0);
     assert.equal(await admin.evaluate(async () => (await fetch('/data-import.html')).status), 403);
     console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
+    console.log('RUN shift and global tasks, approvals, missed reports and responsive task screens');
+    const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
+    await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
+    console.log('PASS shift and global tasks, approvals, missed reports and responsive task screens');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 11 workflows passed.');
-  } catch (error) { if (errors.length) console.error('Browser errors:', errors); throw error;
+    console.log('Online browser E2E: 12 workflows passed.');
+  } catch (error) {
+    const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
+    if (screenshotDir && browser) {
+      fs.mkdirSync(screenshotDir, {recursive: true});
+      const page = browser.contexts()[0]?.pages()[0];
+      if (page) { await page.screenshot({path: path.join(screenshotDir, 'browser-failure.png'), fullPage: true}); console.log(await page.evaluate(() => ({width: innerWidth, scrollWidth: document.documentElement.scrollWidth, bodyWidth: document.body.scrollWidth, wide: [...document.querySelectorAll('body *')].filter(el => el.checkVisibility() && el.scrollWidth > el.clientWidth + 3).map(el => ({tag: el.tagName, id: el.id, cls: el.className, width: el.clientWidth, scroll: el.scrollWidth, rect: {left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right}})).slice(0, 12)}))); }
+    }
+    if (errors.length) console.error('Browser errors:', errors); throw error;
   } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }
 main().catch(error => { console.error(error.stack); process.exitCode = 1; });
