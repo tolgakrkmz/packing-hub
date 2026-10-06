@@ -10,7 +10,7 @@ async function assertResponsive(page, description) {
       viewport: document.querySelector('meta[name=viewport]')?.content,
       overflow: document.documentElement.scrollWidth > innerWidth + 1,
       overflowingElements: [...document.querySelectorAll('body *')].filter(visible).filter(element => {
-        if (element.closest('.sched-scroll, .history-month-table, .stats-table-scroll, .import-table-wrap, .chart-wrap, #avTableContainer, #lineShiftContainer, #historyWrap')) return false;
+        if (element.closest('.sched-scroll, .history-month-table, .stats-table-scroll, .import-table-wrap, .task-table-wrap, .chart-wrap, #avTableContainer, #lineShiftContainer, #historyWrap')) return false;
         const rect = element.getBoundingClientRect();
         return rect.right > innerWidth + 1;
       }).map(element => element.id || element.className).slice(0, 8),

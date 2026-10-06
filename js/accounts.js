@@ -21,6 +21,20 @@
   function field(text, input) {
     const label = element('label'); label.append(element('span', '', text), input); return label;
   }
+  function taskProfileControls(form, role, initial = {}) {
+    const group = element('fieldset', 'account-permissions'); group.append(element('legend', '', 'Отговорност за задачи'));
+    const flag = element('input'); flag.type = 'checkbox'; flag.dataset.taskSupervisor = ''; flag.checked = !!initial.taskSupervisor;
+    const label = element('label', 'account-active'); label.append(flag, element('span', '', 'Началник смяна (задачи)'));
+    const team = element('select'); team.setAttribute('aria-label', 'Екип за задачи'); team.dataset.taskTeam = '';
+    for (const value of ['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ']) { const option = element('option', '', value || 'Избери екип'); option.value = value; team.append(option); }
+    team.value = initial.taskTeam || '';
+    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'));
+    const refresh = () => { flag.disabled = role.value !== 'operator'; if (flag.disabled) flag.checked = false; team.disabled = !flag.checked; team.required = flag.checked; };
+    role.addEventListener('change', refresh); flag.addEventListener('change', refresh);
+    form.addEventListener('reset', () => setTimeout(() => { flag.checked = false; team.value = ''; refresh(); }, 0));
+    form.insertBefore(group, form.querySelector('.account-actions')); refresh();
+    return () => ({taskSupervisor: flag.checked, taskTeam: flag.checked ? team.value : ''});
+  }
   function permissionControls(form, role, initialOverrides = {}) {
     let overrides = {...initialOverrides};
     const group = element('fieldset', 'account-permissions');
@@ -85,6 +99,7 @@
     const button = element('button', '', 'Запази промените'); button.type = 'submit';
     actions.append(element('small', '', 'Промените прекратяват сесиите на този профил.'), button); form.append(actions);
     const permissions = permissionControls(form, role, user.permissionOverrides);
+    const taskProfile = taskProfileControls(form, role, user);
     const password = element('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.minLength = 12; password.maxLength = 128;
     const passwordDetails = element('details', 'account-password');
     passwordDetails.append(element('summary', '', 'Смяна на парола'), field('Нова парола', password), element('small', '', 'Поне 12 знака. Остави празно, за да запазиш текущата парола.'));
@@ -94,7 +109,7 @@
     form.addEventListener('submit', async event => {
       event.preventDefault(); button.disabled = true; status.textContent = '';
       try {
-        const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...(password.value ? {password: password.value} : {})});
+        const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...taskProfile(), ...(password.value ? {password: password.value} : {})});
         renderUser(result.user, true, 'Акаунтът е обновен.'); message.textContent = 'Акаунтът е обновен.';
         cards.get(user.id).details.querySelector('button[type=submit]').focus({preventScroll: true});
       } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }
@@ -115,6 +130,7 @@
     else document.getElementById('newAccountButton').focus({preventScroll: true});
   }
   const createPermissions = permissionControls(createForm, document.getElementById('accountRole'));
+  const createTaskProfile = taskProfileControls(createForm, document.getElementById('accountRole'));
   document.getElementById('newAccountButton').addEventListener('click', () => setCreateOpen(document.getElementById('accountCreate').hidden));
   document.getElementById('cancelCreate').addEventListener('click', () => { createForm.reset(); setCreateOpen(false); });
   search.addEventListener('input', applyFilters); filter.addEventListener('change', applyFilters);
@@ -122,7 +138,7 @@
     event.preventDefault(); const button = createForm.querySelector('button[type=submit]'); button.disabled = true;
     const status = document.getElementById('accountCreateMessage'); status.textContent = '';
     try {
-      const result = await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions()});
+      const result = await HubServer.send('/api/accounts', 'POST', {username: document.getElementById('accountUsername').value.trim(), password: document.getElementById('accountPassword').value, role: document.getElementById('accountRole').value, permissions: createPermissions(), ...createTaskProfile()});
       createForm.reset(); setCreateOpen(false); search.value = ''; filter.value = 'all';
       renderUser(result.user); message.textContent = 'Акаунтът е създаден.';
     } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }

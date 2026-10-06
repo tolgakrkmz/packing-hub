@@ -6,6 +6,7 @@ const HubServer = (() => {
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
   messages.INVALID_PERMISSIONS = 'Провери правата на акаунта.';
+  Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да е оператор с избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
   async function request(url, options = {}) {
     const headers = {...options.headers};
     if (options.method && options.method !== 'GET') headers['X-CSRF-Token'] = boot.csrf;
@@ -149,6 +150,7 @@ const HubServer = (() => {
     let selector = '';
     if (boot.user.role !== 'admin') selector = 'a[href="personnel.html"],a[href="/personnel.html"]';
     if (boot.user.role === 'operator') selector += ',a[href="statistics.html"],a[href="/statistics.html"]';
+    if (boot.user.role !== 'admin' && !(boot.user.role === 'operator' && boot.user.taskSupervisor)) selector += ',a[href="tasks.html"],a[href="/tasks.html"]';
     if (boot.user.role !== 'admin' && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
     if (boot.user.role !== 'admin' && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
     if (['production-log.html', 'line-downtime.html'].includes(module)) {
@@ -202,11 +204,13 @@ const HubServer = (() => {
       for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
     });
     if (location.pathname === '/' || location.pathname.endsWith('/index.html')) {
+      const tasksLink = document.querySelector('a[href="tasks.html"]');
+      if (tasksLink && (boot.user.role === 'admin' || boot.user.role === 'operator' && boot.user.taskSupervisor)) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
       document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
     }
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });
-  return {user: boot.user, can, fileSync, directorySync, json, send};
+  return {user: boot.user, can, fileSync, directorySync, json, send, watch};
 })();

@@ -7,13 +7,15 @@ const {accounts} = require('./accounts.cjs');
 const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
+const {createTasks} = require('./tasks.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
+  const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
   const imports = createImports(store, filename);
   const assets = new Map();
   for (const dir of ['', 'css', 'js']) for (const leaf of fs.readdirSync(path.join(root, dir))) {
@@ -112,11 +114,28 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
           if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list()});
           const input = await jsonBody(request);
-          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, currentAdmin(), input.permissions, currentAdmin)});
+          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, currentAdmin(), input.permissions, currentAdmin, input)});
           if (request.method === 'PATCH') {
             const user = await auth.update(Number(pathname.split('/').pop()), input, currentAdmin(), currentAdmin);
             broadcast('accounts', 0);
             return json(response, 200, {user});
+          }
+          throw problem(405, 'METHOD_REJECTED');
+        }
+        if (pathname === '/api/tasks/preview') {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, tasks.preview(url.searchParams.get('date'), Number(url.searchParams.get('assigneeId')), currentUser()));
+        }
+        const taskRoute = pathname.match(/^\/api\/tasks(?:\/(items|schedules)\/([0-9a-f:-]+))?$/);
+        if (taskRoute) {
+          if (!taskRoute[1] && request.method === 'GET') return json(response, 200, tasks.list(currentUser()));
+          if (!taskRoute[1] && request.method === 'POST') {
+            const input = await jsonBody(request), result = tasks.create(input, currentUser());
+            broadcast('tasks', 0); return json(response, 201, result);
+          }
+          if (taskRoute[1] && request.method === 'PATCH') {
+            const input = await jsonBody(request), result = tasks.change(taskRoute[2], input, revisionFor(request), currentUser(), taskRoute[1] === 'schedules');
+            broadcast('tasks', 0); return json(response, 200, result);
           }
           throw problem(405, 'METHOD_REJECTED');
         }
@@ -187,6 +206,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
       if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (assetName === '/tasks.html' && session?.user.role !== 'admin' && !(session?.user.role === 'operator' && session?.user.taskSupervisor)) throw problem(403, 'FORBIDDEN');
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
       if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
@@ -209,7 +229,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
   }, 20000);
   heartbeat.unref();
   const close = async () => { clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, close};
+  return {server, store, auth, imports, tasks, close};
 }
 if (require.main === module) {
   process.umask(0o077);

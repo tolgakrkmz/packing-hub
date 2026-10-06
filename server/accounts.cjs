@@ -6,7 +6,7 @@ const scrypt = promisify(crypto.scrypt);
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const publicUser = row => {
   const permissionOverrides = validateOverrides(JSON.parse(row.permissions || '{}'));
-  const user = {id: row.id, username: row.username, role: row.role, active: !!row.active, permissionOverrides};
+  const user = {id: row.id, username: row.username, role: row.role, active: !!row.active, permissionOverrides, taskSupervisor: !!row.task_supervisor && row.role === 'operator', taskTeam: row.task_team || ''};
   return {...user, permissions: permissionsFor(user)};
 };
 async function passwordHash(password) {
@@ -23,12 +23,19 @@ async function checkPassword(password, stored) {
 function accounts(store) {
   const {db} = store;
   const dummy = crypto.randomBytes(16).toString('hex') + ':' + crypto.randomBytes(64).toString('hex');
-  async function create(username, password, role, actor, permissions = {}, authorize = () => {}) {
+  function taskProfile(values, role, previous = {}) {
+    const supervisor = values.taskSupervisor === undefined ? !!previous.task_supervisor : values.taskSupervisor;
+    const team = values.taskTeam === undefined ? previous.task_team || '' : values.taskTeam;
+    if (typeof supervisor !== 'boolean' || typeof team !== 'string' || !['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ'].includes(team) || supervisor && role !== 'operator' || supervisor && !team) throw problem(400, 'INVALID_TASK_PROFILE');
+    return {supervisor: supervisor ? 1 : 0, team: supervisor ? team : ''};
+  }
+  async function create(username, password, role, actor, permissions = {}, authorize = () => {}, profile = {}) {
     if (typeof username !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username) || !['admin', 'operator', 'observer'].includes(role)) throw problem(400, 'INVALID_ACCOUNT');
     const overrides = validateOverrides(permissions);
+    const tasks = taskProfile(profile, role);
     const hash = await passwordHash(password);
     authorize();
-    try { db.prepare('INSERT INTO users(username,hash,role,permissions) VALUES(?,?,?,?)').run(username, hash, role, JSON.stringify(overrides)); }
+    try { db.prepare('INSERT INTO users(username,hash,role,permissions,task_supervisor,task_team) VALUES(?,?,?,?,?,?)').run(username, hash, role, JSON.stringify(overrides), tasks.supervisor, tasks.team); }
     catch { throw problem(409, 'ACCOUNT_EXISTS'); }
     store.audit(actor, 'account-create', 'accounts');
     return publicUser(db.prepare('SELECT * FROM users WHERE username=?').get(username));
@@ -59,17 +66,18 @@ function accounts(store) {
     if (!['admin', 'operator', 'observer'].includes(role) || values.active !== undefined && typeof values.active !== 'boolean') throw problem(400, 'INVALID_ACCOUNT');
     const hash = values.password === undefined ? row.hash : await passwordHash(values.password);
     const overrides = values.permissions === undefined ? JSON.parse(row.permissions) : validateOverrides(values.permissions);
+    const tasks = taskProfile({...values, ...(role !== 'operator' ? {taskSupervisor: false, taskTeam: ''} : {})}, role, row);
     authorize();
     store.transaction(() => {
       const current = db.prepare('SELECT * FROM users WHERE id=?').get(id);
-      if (current.hash !== row.hash || current.role !== row.role || current.active !== row.active || current.permissions !== row.permissions) throw problem(409, 'CONFLICT');
+      if (current.hash !== row.hash || current.role !== row.role || current.active !== row.active || current.permissions !== row.permissions || current.task_supervisor !== row.task_supervisor || current.task_team !== row.task_team) throw problem(409, 'CONFLICT');
       if (row.role === 'admin' && row.active && (role !== 'admin' || !active) && db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1").get().n <= 1) throw problem(409, 'LAST_ADMIN');
-      db.prepare('UPDATE users SET hash=?,role=?,active=?,permissions=? WHERE id=?').run(hash, role, active, JSON.stringify(overrides), id);
+      db.prepare('UPDATE users SET hash=?,role=?,active=?,permissions=?,task_supervisor=?,task_team=? WHERE id=?').run(hash, role, active, JSON.stringify(overrides), tasks.supervisor, tasks.team, id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       store.audit(actor, 'account-update', 'accounts');
     });
     return publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(id));
   }
-  return {create, login, session, update, logout: token => db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(token)), list: () => db.prepare('SELECT id,username,role,active,permissions FROM users ORDER BY username').all().map(publicUser)};
+  return {create, login, session, update, logout: token => db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(token)), list: () => db.prepare('SELECT id,username,role,active,permissions,task_supervisor,task_team FROM users ORDER BY username').all().map(publicUser)};
 }
 module.exports = {accounts};
