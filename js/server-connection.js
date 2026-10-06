@@ -41,6 +41,9 @@ const HubServer = (() => {
   }
   function fileSync(cfg) {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
+    const page = location.pathname.split('/').pop();
+    const readURL = kind === 'personnel' && page === 'pair-targets.html' ? '/api/pair-roster'
+      : kind === 'personnel' && page === 'statistics.html' ? '/api/statistics/workforce' : '/api/data/' + kind;
     let ready = false, initialized = false, revision = 0, sequence = 0;
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
@@ -52,7 +55,7 @@ const HubServer = (() => {
     async function refresh() {
       const current = ++sequence;
       try {
-        const result = await json('/api/data/' + kind);
+        const result = await json(readURL);
         if (current !== sequence) return;
         if (initialized) await cfg.onRefresh(result.data); else await cfg.onConnect(result.data);
         initialized = true; revision = result.revision; ready = true;
@@ -144,8 +147,10 @@ const HubServer = (() => {
     const module = location.pathname.split('/').pop();
     const observer = boot.user.role === 'observer';
     let selector = '';
-    if (boot.user.role !== 'admin' && module === 'personnel.html') selector = '#addPersonBtn,#settingsBtn,[data-edit-person]';
-    if (boot.user.role !== 'admin' && module === 'package-instructions.html') selector = '#addBtn,#bulkBtn,.cat-select';
+    if (boot.user.role !== 'admin') selector = 'a[href="personnel.html"],a[href="/personnel.html"]';
+    if (boot.user.role === 'operator') selector += ',a[href="statistics.html"],a[href="/statistics.html"]';
+    if (boot.user.role !== 'admin' && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
+    if (boot.user.role !== 'admin' && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
     if (['production-log.html', 'line-downtime.html'].includes(module)) {
       if (!can('canCreateReports')) selector += ',#saveBtn,#retrySaveBtn';
       if (!can('canEditReports')) selector += ',.del-btn';
@@ -185,6 +190,10 @@ const HubServer = (() => {
     const state = document.createElement('span'); state.id = 'serverState'; state.textContent = 'Свързване…'; bar.append(state);
     const logout = document.createElement('button'); logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); }; bar.append(logout);
     document.body.prepend(bar);
+    if (boot.user.role === 'observer') {
+      const badge = document.querySelector('a[href="statistics.html"] .lock-badge');
+      if (badge) badge.textContent = 'Само за преглед.';
+    }
     const eventSource = new EventSource('/api/events');
     eventSource.onopen = () => { state.textContent = 'Свързан'; };
     eventSource.onerror = () => { state.textContent = 'Възстановяване на връзката…'; };

@@ -63,7 +63,15 @@ async function main() {
     for (const name of ['Demo Online Packer One', 'Demo Online Packer Two']) {
       await admin.locator('#addPersonBtn').click(); await admin.locator('#personName').fill(name); await admin.locator('#personCategory').selectOption('stickers'); await admin.locator('#personRole').selectOption('Опаковчик'); await admin.locator('#personForm button[type=submit]').click(); await expect(admin.locator('#personModal')).not.toHaveClass(/open/);
     }
-    await operator.goto(base + '/personnel.html'); await expect(operator.locator('#peopleWrap')).toContainText('Demo Online Packer One'); await expect(operator.locator('#addPersonBtn')).toBeHidden();
+    await operator.goto(base + '/index.html'); await expect(operator.locator('a[href="personnel.html"]')).toBeHidden(); await expect(operator.locator('a[href="statistics.html"]')).toBeHidden();
+    assert.equal(await operator.evaluate(async () => (await fetch('/personnel.html')).status), 403);
+    assert.equal(await operator.evaluate(async () => (await fetch('/statistics.html')).status), 403);
+    await observer.goto(base + '/index.html'); await expect(observer.locator('a[href="personnel.html"]')).toBeHidden(); await expect(observer.locator('a[href="statistics.html"]')).toBeVisible();
+    assert.equal(await observer.evaluate(async () => (await fetch('/personnel.html')).status), 403);
+    await observer.goto(base + '/statistics.html');
+    await observer.locator('[data-stats-tab=workforce]').click();
+    await expect(observer.locator('#personnelConnDot')).toHaveClass(/\bon\b/);
+    await expect(observer.locator('#wfStaffSource')).toHaveText('0 производствени');
     await observer.locator('[data-stats-tab=pairs]').click();
     await operator.goto(base + '/pair-targets.html'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
     const employees = hub.store.get('personnel').data.employees;

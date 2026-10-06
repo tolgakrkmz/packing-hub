@@ -71,13 +71,14 @@ test('operator can append reports but cannot change goals, delete reports, manag
   assert.equal((await put('production-log', operator, data)).status, 200);
   assert.equal((await put('production-log', operator, {...data, goalTons: 1}, 2)).status, 403);
   assert.equal((await put('production-log', operator, {...data, entries: []}, 2)).status, 403);
-  const personnel = await (await request('/api/data/personnel', operator)).json();
+  const personnel = await (await request('/api/data/personnel', await login())).json();
   assert.equal((await put('personnel', operator, personnel.data)).status, 403);
   assert.equal((await request('/api/accounts', operator)).status, 403);
   assert.equal((await request('/accounts.html', observer)).status, 403);
   assert.equal((await request('/production-import.html', observer)).status, 403);
   assert.equal((await request('/data-import.html', observer)).status, 403);
-  assert.equal((await request('/api/data/personnel', observer)).status, 200);
+  assert.equal((await request('/api/data/personnel', operator)).status, 403);
+  assert.equal((await request('/api/data/personnel', observer)).status, 403);
 });
 test('batch imports require admin, same origin and CSRF; staging uploads are scoped to their administrator', async t => {
   const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');

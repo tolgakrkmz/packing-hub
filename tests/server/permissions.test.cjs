@@ -138,3 +138,45 @@ test('revoking permissions during a slow request body prevents the in-flight wri
   await received; await change(admin, operator, {canCreateReports: false}); pending.end(payload.slice(4));
   assert.equal(await result, 401); assert.equal(hub.store.get('production-log').revision, 1);
 });
+test('personnel is administrator-only and statistics is administrator/observer-only for direct URLs and APIs', async t => {
+  const {login, request} = await setup(t);
+  const admin = await login(), operator = await login('operator'), observer = await login('observer');
+  for (const user of [operator, observer]) {
+    for (const route of ['/personnel.html', '/personnel.html?role=admin', '/api/data/personnel', '/api/files?path=data%2Fpersonnel.json', '/api/files?path=personnel.json']) {
+      assert.equal((await request(route, user)).status, 403);
+    }
+    assert.equal((await request('/personnel.html', user, 'HEAD')).status, 403);
+    assert.equal((await request('/api/data/personnel', user, 'PUT', {employees: []}, {'If-Match': '"1"'})).status, 403);
+  }
+  for (const user of [admin, observer]) {
+    assert.equal((await request('/statistics.html', user)).status, 200);
+    assert.equal((await request('/api/statistics/workforce', user)).status, 200);
+    assert.equal((await request('/api/statistics/workforce', user, 'POST', {})).status, 405);
+  }
+  for (const route of ['/statistics.html', '/statistics.html?role=observer', '/api/statistics/workforce']) assert.equal((await request(route, operator)).status, 403);
+  assert.equal((await request('/statistics.html', operator, 'HEAD')).status, 403);
+  assert.equal((await request('/personnel.html', admin)).status, 200);
+  assert.equal((await request('/api/data/personnel', admin)).status, 200);
+});
+test('pair selection uses a minimal active-packer roster and workforce counts disclose no personnel records', async t => {
+  const {hub, login, request} = await setup(t); const admin = await login(), operator = await login('operator'), observer = await login('observer');
+  const person = (id, category, team, role = 'Опаковчик', active = true) => ({id, name: 'Demo View ' + id, category, team, role, active, note: 'Fictional private personnel note'});
+  const roster = {schemaVersion: 3, employees: [person('demo-auto', 'auto', 'А'), person('demo-manual', 'manual', 'А'), person('demo-stickers', 'stickers', '1 смяна'), person('demo-inactive', 'auto', 'Б', 'Опаковчик', false), person('demo-supervisor', 'auto', 'В', 'Началник смяна')], settings: {stickersStage1: 3, stickersStage2: 5}, moveLog: []};
+  hub.store.put('personnel', roster, 1, admin.user);
+  for (const user of [operator, observer, admin]) {
+    const response = await request('/api/pair-roster', user); assert.equal(response.status, 200); const view = await response.json();
+    assert.equal(view.revision, 2); assert.deepEqual(Object.keys(view.data), ['employees']);
+    assert.deepEqual(view.data.employees.map(person => person.id), ['demo-auto', 'demo-manual', 'demo-stickers']);
+    assert.ok(view.data.employees.every(person => Object.keys(person).sort().join(',') === 'active,category,id,name,role,team'));
+    assert.equal((await request('/api/pair-roster', user, 'PUT', {})).status, 405);
+  }
+  const summary = await (await request('/api/statistics/workforce', observer)).json();
+  assert.deepEqual(Object.keys(summary.data), ['counts']);
+  assert.equal(summary.data.counts.totalActive, 4); assert.equal(summary.data.counts.productionTotal, 3);
+  assert.equal(summary.data.counts.stickers, 1); assert.equal(summary.data.counts.additional, 1);
+  assert.equal(summary.data.counts.production['А'], 2); assert.equal(summary.data.counts.production['В'], 1);
+  assert.ok(!JSON.stringify(summary).includes('Demo View')); assert.ok(!JSON.stringify(summary).includes('personnel note'));
+  const updated = {...roster, employees: roster.employees.map(person => ({...person, active: false}))}; hub.store.put('personnel', updated, 2, admin.user);
+  const current = await (await request('/api/statistics/workforce', observer)).json(); assert.equal(current.revision, 3); assert.equal(current.data.counts.totalActive, 0);
+  assert.equal((await (await request('/api/pair-roster', operator)).json()).data.employees.length, 0);
+});

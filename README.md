@@ -51,6 +51,14 @@ result use the add-report permission. Recorded plans retain validation safeguard
 Operators now need an explicit correction grant to change an already reported
 pair result.
 
+The Personnel / Shifts module and its full data API are administrator-only.
+Statistics is available to administrators and observers; operators cannot open
+it or access its workforce API. Navigation follows these fixed role limits.
+Pair planning uses a separate read-only list of active packers with only the
+fields needed for selection. Workforce statistics receive aggregate counts,
+not personnel identities, notes, settings or movement history. Both read views
+refresh automatically after administrator changes to personnel.
+
 The server bar offers JSON exports of production, downtime and pair reports via
 authenticated `/api/export/<module>` endpoints. Exports use current server data
 and record only action metadata in the audit log. Denying export removes these

@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
 const {can} = require('./permissions.cjs');
+const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
@@ -119,7 +120,15 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
           }
           throw problem(405, 'METHOD_REJECTED');
         }
+        if (pathname === '/api/pair-roster' || pathname === '/api/statistics/workforce') {
+          if (pathname === '/api/statistics/workforce' && !canViewModule(session.user, 'statistics')) throw problem(403, 'FORBIDDEN');
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          const current = store.get('personnel');
+          const data = pathname === '/api/pair-roster' ? {employees: pairRoster(current.data.employees)} : {counts: workforceCounts(current.data.employees)};
+          return json(response, 200, {data, revision: current.revision});
+        }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
+        if (document?.[1] === 'personnel' && !canViewModule(session.user, 'personnel')) throw problem(403, 'FORBIDDEN');
         const exportReport = pathname.match(/^\/api\/export\/([a-z-]+)$/);
         if (exportReport) {
           if (!can(session.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
@@ -165,6 +174,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
         }
         if (pathname === '/api/files') {
           const name = url.searchParams.get('path');
+          if (['personnel.json', 'data/personnel.json'].includes(name) && !canViewModule(session.user, 'personnel')) throw problem(403, 'FORBIDDEN');
           if (request.method === 'GET') { const file = store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
           if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), currentUser()); broadcast('package-instructions', result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
@@ -177,6 +187,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false}) {
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
       if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
+      if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
       if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});

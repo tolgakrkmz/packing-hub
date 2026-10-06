@@ -17,6 +17,7 @@ let avEntries = [];
 let goalTons = 3000;
 
 let personnelEmployees = [];
+let personnelCounts = null;
 let personnelLoaded = false;
 
 let currentView = 'month';
@@ -298,6 +299,7 @@ const avSync = createFileSync({
 
 
 const personnelSync = createFileSync({
+  readOnly: true,
   dbName: 'portfolio-personnel-fs-db',
   suggestedFileName: 'personnel.json',
   localStorageKey: 'portfolio-personnel-fallback',
@@ -305,12 +307,14 @@ const personnelSync = createFileSync({
   getData: () => ({ employees: personnelEmployees }),
   render: renderAll,
   onConnect: (data) => {
+    personnelCounts = data?.counts || null;
     personnelEmployees = Array.isArray(data && data.employees)
       ? data.employees
       : [];
     personnelLoaded = true;
   },
   onRefresh: (data) => {
+    personnelCounts = data?.counts || null;
     personnelEmployees = Array.isArray(data && data.employees)
       ? data.employees
       : [];
@@ -2964,6 +2968,7 @@ function wfShiftCodeFor(team, dateObj) {
 }
 
 function getPersonnelSnapshot() {
+  if (personnelCounts) return personnelCounts;
   if (!personnelLoaded || !personnelEmployees.length) return null;
 
   const active = personnelEmployees.filter(p => p && p.active !== false);
