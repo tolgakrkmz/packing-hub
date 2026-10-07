@@ -543,10 +543,15 @@ async function run(browser, base, {headed = false} = {}) {
   await scenario('Mobile navigation and BG/EN switching preserve live form values', async t => {
     const {page, go} = t;
     await go('index');
-    await expect(page.locator('a.tile')).toHaveCount(6);
+    await expect(page.locator('a.tile:visible')).toHaveCount(6);
+    await expect(page.locator('a.tile.tasks')).toBeHidden();
     for (const module of ['production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics']) {
       await go('index');
       await page.locator(`a[href="${module}.html"]`).click();
+      const brand = page.locator('.hub-brand');
+      await expect(brand).toBeVisible();
+      assert.equal(await brand.locator('img').evaluate(image => image.complete && image.naturalWidth > 0), true, `Local logo loads: ${module}`);
+      await expect(page.locator('link[rel=icon]')).toHaveAttribute('href', 'assets/package-hub-mark.svg');
       const editable = page.locator('#tonInput, #noteInput, #searchInput').first();
       if (await editable.isVisible()) await editable.fill(module === 'production-log' ? '567' : 'Fictional search');
       const original = await editable.count() && await editable.isVisible() ? await editable.inputValue() : null;
@@ -557,6 +562,8 @@ async function run(browser, base, {headed = false} = {}) {
       await expect(page.locator('html')).toHaveAttribute('lang', 'bg');
       if (original !== null) await expect(editable).toHaveValue(original);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, `No page overflow: ${module}`);
+      await brand.click();
+      await expect(page.locator('a.tile:visible')).toHaveCount(6);
     }
   }, {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
 

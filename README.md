@@ -413,6 +413,19 @@ that file appear; creating a new file starts with an empty roster. Adding people
 and changing settings requires a valid connection. The bundled fictional roster
 is available by opening `data/personnel.json`.
 
+## Branding
+
+The shared package mark is a local, scalable SVG in the project amber/teal colors.
+Every screen uses it as its browser icon. File-mode pages link home through the
+wordmark; server-mode pages use the authenticated toolbar, with role-aware links,
+report export, connection status and language controls. Login keeps the same
+authentication flow and uses the shared palette. No remote fonts or images are
+required. Deploy the `assets` directory with HTML/CSS/JS; retain live data files.
+
+The publication guard permits only the exact reviewed logo source fingerprint.
+A logo revision requires source review and an updated `approvedAssets` fingerprint
+in `scripts/check-publication.cjs`; arbitrary images remain blocked.
+
 ## Technical choices
 
 - Plain scripts support opening the project through `file://` without module CORS issues.
@@ -513,6 +526,7 @@ Server checks require **Node.js 24+**:
 ```sh
 node --test tests/server/*.test.cjs
 node scripts/run-server-browser-tests.cjs
+node scripts/run-server-browser-tests.cjs --branding-only
 ```
 
 The second command needs the same Chrome and Playwright installation as the

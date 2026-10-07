@@ -4,6 +4,7 @@ WORKDIR /app
 COPY --chown=node:node *.html ./
 COPY --chown=node:node css ./css
 COPY --chown=node:node js ./js
+COPY --chown=node:node assets/package-hub-mark.svg ./assets/package-hub-mark.svg
 COPY --chown=node:node server ./server
 COPY --chown=node:node scripts/check-publication.cjs ./scripts/check-publication.cjs
 RUN mkdir -p /var/lib/package-hub && chown node:node /var/lib/package-hub

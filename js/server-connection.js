@@ -183,12 +183,29 @@ const HubServer = (() => {
   document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('server-mode');
     const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
-    const who = document.createElement('span'); who.className = 'server-user'; who.setAttribute('translate', 'no'); who.textContent = boot.user.username; bar.append(who);
-    const role = document.createElement('span'); role.className = 'server-role'; role.textContent = roleLabels[boot.user.role]; bar.append(role);
-    if (can('canViewTasks')) { const link = document.createElement('a'); link.href = '/tasks.html'; link.textContent = 'Задачи'; bar.append(link); }
-    if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/accounts.html'; link.textContent = 'Акаунти'; bar.append(link); }
-    if (can('canImportData')) { const link = document.createElement('a'); link.href = '/data-import.html'; link.textContent = 'Импорт на данни'; bar.append(link); }
+    const top = document.createElement('div'); top.className = 'server-top';
+    const brand = document.createElement('a'); brand.className = 'hub-brand'; brand.href = '/index.html'; brand.setAttribute('translate', 'no');
+    const mark = document.createElement('img'); mark.src = '/assets/package-hub-mark.svg'; mark.alt = ''; mark.width = 44; mark.height = 44;
+    const wordmark = document.createElement('span'); wordmark.className = 'hub-wordmark'; wordmark.textContent = 'Package ';
+    const hubName = document.createElement('span'); hubName.className = 'brand-hub'; hubName.textContent = 'Hub'; wordmark.append(hubName); brand.append(mark, wordmark);
+    const session = document.createElement('div'); session.className = 'server-session';
+    const identity = document.createElement('div'); identity.className = 'server-identity';
+    const who = document.createElement('span'); who.className = 'server-user'; who.setAttribute('translate', 'no'); who.textContent = boot.user.username;
+    const role = document.createElement('span'); role.className = 'server-role'; role.textContent = roleLabels[boot.user.role]; identity.append(who, role);
+    top.append(brand, session);
+    const tools = document.createElement('div'); tools.className = 'server-tools';
+    const links = document.createElement('div'); links.className = 'server-links';
+    const addLink = (href, label) => {
+      const link = document.createElement('a'); link.href = href; link.textContent = label;
+      if (location.pathname === href) link.setAttribute('aria-current', 'page');
+      links.append(link);
+    };
+    if (can('canViewTasks')) addLink('/tasks.html', 'Задачи');
+    if (boot.user.role === 'admin') addLink('/accounts.html', 'Акаунти');
+    if (can('canImportData')) addLink('/data-import.html', 'Импорт на данни');
+    tools.append(links);
     if (can('canExportReports')) {
+      const exports = document.createElement('div'); exports.className = 'server-export';
       const select = document.createElement('select'); select.id = 'reportExportKind'; select.setAttribute('aria-label', 'Отчет за експорт');
       for (const [kind, label] of Object.entries({'production-log': 'Тонаж и брак', 'line-downtime': 'Престои', 'pair-targets': 'Двойки и таргети'})) {
         const option = document.createElement('option'); option.value = kind; option.textContent = label; select.append(option);
@@ -197,19 +214,22 @@ const HubServer = (() => {
       if (['production-log', 'line-downtime', 'pair-targets'].includes(current)) select.value = current;
       const link = document.createElement('a'); link.id = 'reportExport'; link.textContent = 'Свали отчет (.json)';
       const updateExport = () => { link.href = '/api/export/' + select.value; link.download = select.value + '.json'; };
-      select.addEventListener('change', updateExport); updateExport(); bar.append(select, link);
+      select.addEventListener('change', updateExport); updateExport(); exports.append(select, link); tools.append(exports);
     }
-    const state = document.createElement('span'); state.id = 'serverState'; state.textContent = 'Свързване…'; bar.append(state);
-    const logout = document.createElement('button'); logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); }; bar.append(logout);
+    const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
+    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); };
+    session.append(identity, state, logout); bar.append(top, tools);
     document.body.prepend(bar);
+    // The language switch is initialized by i18n after the injected server script.
+    setTimeout(() => { const language = document.querySelector('.hub-language'); if (language) tools.append(language); }, 0);
     const eventSource = new EventSource('/api/events');
-    eventSource.onopen = () => { state.textContent = 'Свързан'; refreshTaskCount(); };
-    eventSource.onerror = () => { state.textContent = 'Възстановяване на връзката…'; };
+    eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
+    eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
     eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login.html'); });
     eventSource.addEventListener('version', event => {
       if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
-        const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); bar.append(button);
+        const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
       }
       for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
     });

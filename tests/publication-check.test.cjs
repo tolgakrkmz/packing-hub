@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
-const {fixtures,inspect,privateTokens,checkSnapshot,commitsForPush} = require('../scripts/check-publication.cjs');
+const {fixtures,approvedAssets,inspect,privateTokens,checkSnapshot,commitsForPush} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname,'..');
 const git = (cwd,args) => execFileSync('git',args,{cwd,stdio:['pipe','pipe','pipe']}).toString('utf8').trim();
 function repo() {
@@ -20,6 +20,23 @@ test('only unchanged, reviewed demo fixtures are accepted',() => {
     assert.doesNotThrow(() => inspect(file,content));
     assert.throws(() => inspect(file,Buffer.concat([content,Buffer.from(' ')])),/fixture has changed/);
   }
+});
+test('only the exact reviewed static logo source is approved; arbitrary images and SVG changes are blocked',() => {
+  const file = 'assets/package-hub-mark.svg';
+  assert.deepEqual(Object.keys(approvedAssets), [file]);
+  const content = fs.readFileSync(path.join(root,file));
+  assert.doesNotThrow(() => inspect(file,content));
+  for(const other of ['assets/other.svg','assets/package-hub-mark.png','assets/private/logo.svg','js/logo.svg']) assert.throws(() => inspect(other,content),/Unapproved/);
+  assert.throws(() => inspect(file,content,[],'120000'),/Unapproved/);
+  // Pinning rejects every altered source, including executable or resource-loading SVG.
+  for(const addition of ['<script>alert(1)</script>', '<rect onload="alert(1)"/>', '<foreignObject/>', '<image href="https://example.invalid/image.png"/>', '<use href="data:image/svg+xml,example"/>', '<style>rect{fill:url(https://example.invalid/image.svg)}</style>', '<!DOCTYPE svg [<!ENTITY source SYSTEM "file:///example">]>']) {
+    const altered = Buffer.from(content.toString('utf8').replace('</svg>', addition + '</svg>'));
+    assert.throws(() => inspect(file,altered),/static asset has changed/);
+  }
+  assert.throws(() => inspect(file,Buffer.concat([content,Buffer.from(' ')])),/static asset has changed/);
+  const restricted = 'Synthetic Restricted Example';
+  assert.throws(() => inspect(file,content,[path.basename(file).toLowerCase()]),/Private source/);
+  assert.throws(() => inspect(file,Buffer.from(restricted)),error => !error.message.includes(restricted));
 });
 test('documents, backups, unknown data files and symlinks are blocked',() => {
   for(const file of ['data/personnel-copy.json','data/profiles/company.pdf','backup/report.json','private/config.js','js/archive.zip']) {

@@ -1,0 +1,30 @@
+/* One static vector mark and wordmark across file and server modes. */
+.hub-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.2;
+}
+.hub-brand img { display: block; width: 44px; height: 44px; flex-shrink: 0; }
+.hub-brand .brand-hub { color: var(--amber); }
+.hub-brand:focus-visible { outline: 2px solid var(--amber); outline-offset: 5px; border-radius: 10px; }
+.module-brand { margin-bottom: 18px; }
+.home-brand { margin-bottom: 24px; }
+.home-brand img { width: 56px; height: 56px; }
+.home-brand { font-size: 23px; }
+/* The authenticated toolbar already supplies the same home destination. */
+.server-mode .module-brand, .server-mode .home-brand { display: none; }
+@media (max-width: 600px) {
+  .home-brand { margin-bottom: 20px; }
+}
+
+/* Server-only tiles stay hidden even when the file-mode tile rule sets display. */
+.hub-page .tile[hidden] { display: none; }
