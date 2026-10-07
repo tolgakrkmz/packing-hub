@@ -176,6 +176,7 @@ const HubServer = (() => {
     const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
     const who = document.createElement('span'); who.className = 'server-user'; who.setAttribute('translate', 'no'); who.textContent = boot.user.username; bar.append(who);
     const role = document.createElement('span'); role.className = 'server-role'; role.textContent = roleLabels[boot.user.role]; bar.append(role);
+    if (can('canViewTasks')) { const link = document.createElement('a'); link.href = '/tasks.html'; link.textContent = 'Задачи'; bar.append(link); }
     if (boot.user.role === 'admin') { const link = document.createElement('a'); link.href = '/accounts.html'; link.textContent = 'Акаунти'; bar.append(link); }
     if (can('canImportData')) { const link = document.createElement('a'); link.href = '/data-import.html'; link.textContent = 'Импорт на данни'; bar.append(link); }
     if (can('canExportReports')) {
@@ -193,7 +194,7 @@ const HubServer = (() => {
     const logout = document.createElement('button'); logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); }; bar.append(logout);
     document.body.prepend(bar);
     const eventSource = new EventSource('/api/events');
-    eventSource.onopen = () => { state.textContent = 'Свързан'; };
+    eventSource.onopen = () => { state.textContent = 'Свързан'; refreshTaskCount(); };
     eventSource.onerror = () => { state.textContent = 'Възстановяване на връзката…'; };
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
     eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login.html'); });
@@ -208,6 +209,33 @@ const HubServer = (() => {
       if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
       document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
+    }
+    const taskBadges = [];
+    let taskCountSequence = 0;
+    if (can('canViewTasks')) {
+      for (const link of document.querySelectorAll('a[href="tasks.html"],a[href="/tasks.html"]')) {
+        const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
+        badge.setAttribute('role', 'status'); (link.querySelector('h2') || link).append(badge); taskBadges.push(badge);
+      }
+      watch('tasks', refreshTaskCount); watch('accounts', refreshTaskCount);
+      setInterval(() => { if (!document.hidden) refreshTaskCount(); }, 30000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTaskCount(); });
+      refreshTaskCount();
+    }
+    async function refreshTaskCount() {
+      if (!taskBadges.length) return;
+      const sequence = ++taskCountSequence;
+      try {
+        const {count} = await json('/api/tasks/summary');
+        if (sequence !== taskCountSequence) return;
+        for (const badge of taskBadges) {
+          badge.textContent = String(count); badge.hidden = count === 0;
+          const label = (boot.user.role === 'admin' ? 'Задачи за проверка:' : 'Чакащи задачи:') + ' ' + count;
+          badge.setAttribute('aria-label', label); badge.title = label;
+        }
+      } catch {
+        if (sequence === taskCountSequence) for (const badge of taskBadges) badge.hidden = true;
+      }
     }
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});

@@ -27,6 +27,44 @@ async function setup(t, filename = ':memory:') {
   const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', data, {'If-Match': '"' + revision + '"'});
   return {hub, admin, chief, other, request, login, payload, create, list, change, time: value => { time = Date.parse(value); }};
 }
+test('task badges count only work awaiting the account, and expose no task content', async t => {
+  const s = await setup(t);
+  const count = async user => {
+    const response = await s.request('/api/tasks/summary', user);
+    assert.equal(response.status, 200); const result = await response.json();
+    assert.deepEqual(Object.keys(result), ['count']); return result.count;
+  };
+  const denied = await s.login('demo-observer');
+  assert.equal((await s.request('/api/tasks/summary', denied)).status, 403);
+  assert.equal((await s.request('/api/tasks/summary', s.admin, 'POST', {})).status, 405);
+  assert.equal(await count(s.chief), 0);
+  const shift = await s.create();
+  const future = await s.create(s.payload({from: '2026-12-02'}));
+  const global = await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00', participantIds: [s.other.user.id]}));
+  assert.equal(await count(s.chief), 1); // Today's night shift has not started yet.
+  s.time('2026-12-01T23:00:00+02:00');
+  assert.equal(await count(s.chief), 2); assert.equal(await count(s.other), 1); assert.equal(await count(s.admin), 0);
+  await s.create(s.payload({assigneeId: s.other.user.id, kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
+  assert.equal(await count(s.chief), 2); assert.equal(await count(s.other), 2);
+  assert.equal((await s.change(shift, s.chief, {action: 'report', status: 'completed', note: ''})).status, 200);
+  assert.equal(await count(s.chief), 1);
+  assert.equal((await s.change(global, s.chief, {action: 'report', status: 'blocked', note: 'Fictional blocker'})).status, 200);
+  assert.equal(await count(s.chief), 1);
+  assert.equal((await s.change(global, s.chief, {action: 'report', status: 'review', note: 'Fictional solution'}, 2)).status, 200);
+  assert.equal(await count(s.chief), 0); assert.equal(await count(s.other), 1); assert.equal(await count(s.admin), 1);
+  assert.equal((await s.change(global, s.admin, {action: 'return', note: 'Fictional correction'}, 3)).status, 200);
+  assert.equal(await count(s.chief), 1); assert.equal(await count(s.admin), 0);
+  assert.equal((await s.change(global, s.admin, {action: 'cancel', note: 'Fictional cancellation'}, 4)).status, 200);
+  s.time('2026-12-03T23:00:00+02:00');
+  assert.equal(await count(s.chief), 1); // The started, unreported shift still needs attention after its deadline.
+  assert.equal((await s.change(future, s.chief, {action: 'report', status: 'not-done', note: 'Fictional reason'})).status, 200);
+  assert.equal(await count(s.chief), 0);
+  assert.equal((await s.request('/api/accounts/' + denied.user.id, s.admin, 'PATCH', {permissions: {canViewTasks: true}})).status, 200);
+  assert.equal(await count(await s.login('demo-observer')), 0);
+  assert.equal((await s.request('/api/accounts/' + s.chief.user.id, s.admin, 'PATCH', {permissions: {canViewTasks: false}})).status, 200);
+  assert.equal((await s.request('/api/tasks/summary', s.chief)).status, 401);
+  assert.equal((await s.request('/api/tasks/summary', await s.login('demo-chief-a'))).status, 403);
+});
 test('task viewing defaults to admin and supervisors; admin alone assigns; each supervisor sees only their assignments', async t => {
   const s = await setup(t), operator = await s.login('demo-operator'), observer = await s.login('demo-observer');
   for (const user of [operator, observer]) {

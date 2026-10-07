@@ -972,7 +972,7 @@ const HUB_EN_MESSAGES = {
 Object.assign(HUB_EN_MESSAGES, {
   'Първо обозначи личните акаунти като началник-смени и избери екип в „Акаунти“.': 'First mark personal accounts as shift supervisors and select their teams in Accounts.',
   'Екипът е в почивка на тази дата. При повторение се включват следващите работни смени.': 'The team is off on this date. Recurrence includes the following working shifts.',
-  'Задачи': 'Tasks', 'Организация на опаковката': 'Packing organization',
+  'Задачи': 'Tasks', 'Чакащи задачи:': 'Pending tasks:', 'Задачи за проверка:': 'Tasks awaiting review:', 'Организация на опаковката': 'Packing organization',
   'Сменни ангажименти и общи проблеми за решаване.': 'Shift duties and shared problems to resolve.',
   '+ Възложи задача': '+ Assign task', 'Възложи задача': 'Assign task', 'Възложи': 'Assign',
   'Сменни задачи': 'Shift tasks', 'Глобални задачи': 'Global tasks', 'Повтарящи се': 'Recurring',

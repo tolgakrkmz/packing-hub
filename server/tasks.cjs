@@ -109,6 +109,18 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), supervisors: user.role === 'admin' ? roster() : [],
       items: all('task_items').filter(item => visible(item, user)).map(item => derived(item, at)), schedules: all('task_schedules').filter(item => visible(item, user))};
   }
+  function summary(user) {
+    access(user); const at = now();
+    store.transaction(() => materialize(at));
+    // Count work awaiting this account, without sending task content to other pages.
+    const count = all('task_items').filter(item => {
+      if (user.role === 'admin') return item.status === 'review';
+      if (!supervisor(user) || !visible(item, user)) return false;
+      if (item.kind === 'shift') return item.status === 'pending' && item.shift.start <= at;
+      return ['pending', 'in-progress', 'blocked'].includes(item.status);
+    }).length;
+    return {count};
+  }
   function idempotent(input, user, work) {
     if (typeof input.requestId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.requestId)) throw problem(400, 'INVALID_TASK');
     const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
@@ -208,6 +220,6 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     if (!owner) throw problem(400, 'INVALID_TASK_ASSIGNEE');
     return {shift: shift(date, owner.team), timezone};
   }
-  return {list, create, change, shift, instant, localDate, currentShift, preview};
+  return {list, summary, create, change, shift, instant, localDate, currentShift, preview};
 }
 module.exports = {createTasks};

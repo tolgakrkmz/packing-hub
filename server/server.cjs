@@ -122,6 +122,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           }
           throw problem(405, 'METHOD_REJECTED');
         }
+        if (pathname === '/api/tasks/summary') {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, tasks.summary(currentUser()));
+        }
         if (pathname === '/api/tasks/preview') {
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           return json(response, 200, tasks.preview(url.searchParams.get('date'), Number(url.searchParams.get('assigneeId')), currentUser()));

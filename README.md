@@ -65,6 +65,18 @@ state. The owner marks it **Ready for review**, then an administrator approves
 completion or returns it with a reason. Administrators can amend active tasks,
 cancel or reopen them; changes and reasons remain in each task's event history.
 
+The Tasks tile and the Tasks link in the server toolbar show a small count of
+work awaiting the signed-in account. Supervisors see started, unreported shift
+tasks (including overdue ones), plus pending/in-progress/blocked global tasks
+they own or participate in. Future shifts and final reports are excluded. Ready
+for review leaves the supervisors' count and enters the administrator's count;
+read-only viewers have no action count. Zero hides the badge. Counts refresh on
+task changes, reconnection, returning to a tab and every 30 seconds while visible.
+The authenticated summary API returns only a count, without task details. A
+failed refresh hides the badge until the connection succeeds again.
+
+System browser notifications and Web Push subscriptions are not implemented.
+
 Task clocks use **Europe/Sofia** on the server, including daylight-saving changes.
 Night shifts retain their start date. An unreported shift task becomes
 **Unreported** 30 minutes after the shift deadline. **Not done** and **Not
