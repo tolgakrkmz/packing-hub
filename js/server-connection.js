@@ -161,6 +161,13 @@ const HubServer = (() => {
         selector += ',#reasonsAdminPanel';
       }
     }
+    if (module === 'production-log.html' && !can('canCreateReports')) {
+      selector += ',#reportEntryPanel';
+      const dateRow = document.getElementById('reportDateRow'), filter = document.getElementById('dayFilter');
+      if (dateRow && filter && dateRow.parentElement !== filter) {
+        filter.append(dateRow); filter.hidden = false;
+      }
+    }
     if (module === 'pair-targets.html') {
       if (!can('canCreateReports')) selector += ',#addPairBtn,[data-action=edit],[data-action=delete]';
       document.querySelectorAll('[data-action=report]').forEach(control => {

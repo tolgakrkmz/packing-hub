@@ -156,6 +156,11 @@ An administrator creates accounts and assigns these roles:
 | Operator | Read all modules; append production/downtime; plan and report pairs. Cannot change existing production/downtime, personnel, instructions, goals/reasons or accounts. |
 | Observer | Read modules, reports and attachments. Cannot write. |
 
+In Production and scrap, accounts without permission to create reports see no
+New entry panel. The date selector remains available beside the daily total;
+monthly progress, team totals and history remain visible. This includes observers
+and operators restricted to viewing or correcting existing reports.
+
 The server checks authorization on every API write. Passwords use salted scrypt
 hashes. Sessions use HttpOnly, SameSite cookies, expire after 12 hours and are
 revoked when an account is changed or disabled. HTTPS also uses Secure cookies.

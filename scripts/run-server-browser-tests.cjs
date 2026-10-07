@@ -131,6 +131,7 @@ async function main() {
     console.log('RUN operator entry → shared SQLite → observer report updates without reload');
     await observer.goto(base + '/statistics.html'); await expect(observer.locator('#statsContent')).toBeVisible();
     await operator.goto(base + '/production-log.html'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
+    await expect(operator.locator('#reportEntryPanel')).toBeVisible(); await expect(operator.locator('#dayFilter')).toBeHidden();
     await operator.locator('[data-shift="А"]').click();
     await operator.locator('#dateInput').fill('2026-10-05');
     await operator.locator('#breakdownToggle').check();
@@ -243,7 +244,22 @@ async function main() {
     console.log('PASS responsive shared modules, accounts and imports at 320–1440 px');
     console.log('RUN observer controls, page reload persistence and account revocation');
     await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
+    await expect(observer.locator('#reportEntryPanel')).toBeHidden();
+    await expect(observer.locator('#dayFilter #dateInput')).toBeVisible();
+    await expect(observer.locator('#tonInput')).toBeHidden(); await expect(observer.locator('#shiftGrid')).toBeHidden();
+    await observer.locator('#dateInput').fill('2026-10-04'); await expect(observer.locator('#dayVal')).toHaveText('4000 кг');
+    await observer.locator('#dateInput').fill('2026-10-05'); await expect(observer.locator('#dayVal')).toHaveText('3000 кг');
+    await expect(observer.locator('#summaryGrid')).toBeVisible(); await expect(observer.locator('#historyWrap')).toContainText('2026');
+    for (const width of [320, 390, 1440]) {
+      await observer.setViewportSize({width, height: 900});
+      for (const language of ['en', 'bg']) {
+        await observer.locator(`[data-hub-language=${language}]`).click();
+        await expect(observer.locator('#dayVal')).toHaveText('3000 ' + (language === 'en' ? 'kg' : 'кг'));
+        await assertResponsive(observer, `Observer tonnage view ${language} at ${width}px`);
+      }
+    }
     await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('7,0 т');
+    await expect(observer.locator('#reportEntryPanel')).toBeHidden(); await expect(observer.locator('#dayFilter #dateInput')).toBeVisible();
     await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('..').locator('summary').first().click(); await form.locator('[data-active]').uncheck(); await form.locator('button[type=submit]').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
     await expect(observer).toHaveURL(base + '/login.html');
     console.log('RUN account permissions, mobile restrictions, authorized export and immediate revocation');
@@ -256,6 +272,7 @@ async function main() {
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
     const limited = await device('demo-permissions', true);
     await limited.goto(base + '/production-log.html'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
+    await expect(limited.locator('#reportEntryPanel')).toBeHidden(); await expect(limited.locator('#dayFilter #dateInput')).toBeVisible();
     await expect(limited.locator('#saveBtn')).toBeHidden(); await expect(limited.locator('#reportExport')).toHaveCount(0); await expect(limited.locator('#goalInput')).toBeDisabled();
     const firstMonth = limited.locator('.history-month').first();
     if (!await firstMonth.evaluate(element => element.open)) await firstMonth.locator('summary').click();
@@ -270,6 +287,7 @@ async function main() {
     await limited.locator('#username').fill('demo-permissions'); await limited.locator('#password').fill(demoPassword); await limited.locator('#loginForm button').click();
     await expect(limited).toHaveURL(base + '/index.html');
     await limited.goto(base + '/production-log.html'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
+    await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
     const downloadPromise = limited.waitForEvent('download'); await limited.locator('#reportExport').click(); const download = await downloadPromise;
     assert.equal(download.suggestedFilename(), 'production-log.json'); const chunks = []; for await (const chunk of await download.createReadStream()) chunks.push(chunk);
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
