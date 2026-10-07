@@ -140,6 +140,36 @@ test('an explicit restriction also gates admin task creation and previews while 
   assert.throws(() => s.hub.tasks.create(s.payload(), denied.user), error => error.status === 403);
   assert.throws(() => s.hub.tasks.preview('2026-12-01', s.chief.user.id, denied.user), error => error.status === 403);
 });
+test('Stickers tasks use 09:00–17:00 local time for previews, reports, grace and badges', async t => {
+  const s = await setup(t);
+  const account = await s.hub.auth.create('demo-stickers-chief', password, 'operator', s.admin.user, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
+  const chief = await s.login('demo-stickers-chief');
+  const response = await s.request('/api/tasks/preview?date=2026-12-01&assigneeId=' + account.id, s.admin);
+  assert.equal(response.status, 200);
+  const {shift} = await response.json();
+  assert.equal(shift.start, Date.parse('2026-12-01T09:00:00+02:00'));
+  assert.equal(shift.due, Date.parse('2026-12-01T17:00:00+02:00'));
+  for (const date of ['2026-03-29', '2026-10-25']) {
+    const period = s.hub.tasks.shift(date, 'СТИКЕРИ');
+    assert.equal(period.start, s.hub.tasks.instant(date, '09:00'));
+    assert.equal(period.due - period.start, 8 * 3600000);
+  }
+  const id = await s.create(s.payload({assigneeId: account.id}));
+  const item = () => s.hub.tasks.list(chief.user).items.find(item => item.id === id);
+  const count = () => s.hub.tasks.summary(chief.user).count;
+  assert.deepEqual(item().shift, shift); assert.equal(item().due, shift.due);
+  s.time('2026-12-01T08:59:00+02:00'); assert.equal(count(), 0);
+  assert.equal((await s.change(id, chief, {action: 'report', status: 'completed', note: ''})).status, 409);
+  s.time('2026-12-01T09:00:00+02:00'); assert.equal(count(), 1);
+  s.time('2026-12-01T15:00:00+02:00'); assert.equal(item().displayStatus, 'pending');
+  const afternoon = await s.create(s.payload({assigneeId: account.id}));
+  assert.equal((await s.change(afternoon, chief, {action: 'report', status: 'completed', note: ''})).status, 200);
+  assert.equal(s.hub.tasks.list(chief.user).items.find(item => item.id === afternoon).late, false);
+  s.time('2026-12-01T17:30:00+02:00'); assert.equal(item().displayStatus, 'pending');
+  s.time('2026-12-01T17:31:00+02:00'); assert.equal(item().displayStatus, 'unreported'); assert.equal(count(), 1);
+  assert.equal((await s.change(id, chief, {action: 'report', status: 'completed', note: ''})).status, 200);
+  assert.equal(item().late, true); assert.equal(count(), 0);
+});
 test('shift deadline and grace use server time; night shifts keep their start date; late reports retain their time and history', async t => {
   const s = await setup(t); const id = await s.create();
   const item = (await s.list()).items[0]; assert.equal(item.shift.code, 3); assert.equal(item.shift.date, '2026-12-01');

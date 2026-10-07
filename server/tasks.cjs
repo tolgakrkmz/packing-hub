@@ -29,8 +29,9 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   }
   function shift(date, team) {
     if (!dateKey(date) || !TEAMS.includes(team)) throw problem(400, 'INVALID_TASK_DATE');
+    if (team === 'СТИКЕРИ') return {date, team, code: 1, start: instant(date, '09:00'), due: instant(date, '17:00')};
     const [y, m, d] = date.split('-').map(Number);
-    const code = team === 'СТИКЕРИ' ? 1 : schedule.shiftCodeFor(team, new Date(y, m - 1, d));
+    const code = schedule.shiftCodeFor(team, new Date(y, m - 1, d));
     if (code === 'Н') return null;
     return {date, team, code, start: instant(date, {1: '06:00', 2: '14:00', 3: '22:00'}[code]), due: instant(code === 3 ? nextDate(date) : date, {1: '14:00', 2: '22:00', 3: '06:00'}[code])};
   }

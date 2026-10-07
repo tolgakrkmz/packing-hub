@@ -147,6 +147,36 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
     await chief.setViewportSize({width: 390, height: 844}); await chief.locator('[data-view=shift]').click();
     await chief.screenshot({path: path.join(screenshotDir, 'tasks-supervisor-mobile.png'), fullPage: true});
   }
+  // Stickers follow regular 09:00–17:00 hours, rather than the rotating first shift.
+  setTime('2026-12-01T07:00:00+02:00');
+  const stickersUser = await hub.auth.create('demo-stickers-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
+  await admin.goto(base + '/tasks.html'); await admin.locator('[data-hub-language=bg]').click();
+  await admin.locator('#newTask').click(); await admin.locator('#taskTitle').fill('Fictional Stickers shift check');
+  await admin.locator('#taskOwner').selectOption(String(stickersUser.id));
+  await expect(admin.locator('#shiftPreview')).toContainText('Редовна смяна');
+  await expect(admin.locator('#shiftPreview')).toContainText('9:00'); await expect(admin.locator('#shiftPreview')).toContainText('17:00');
+  await admin.locator('#saveTask').click();
+  await expect(admin.locator('#taskEditor')).not.toBeVisible();
+  await admin.locator('[data-hub-language=en]').click();
+  await expect(admin.locator('.task-card').filter({hasText: 'Fictional Stickers shift check'})).toContainText('Regular shift');
+  await admin.locator('[data-hub-language=bg]').click();
+  const stickers = await device(stickersUser.username, true); await stickers.goto(base + '/tasks.html');
+  const stickersCard = stickers.locator('.task-card').filter({hasText: 'Fictional Stickers shift check'});
+  await expect(stickersCard.locator('.task-meta').last()).toContainText('Редовна смяна');
+  await expect(stickersCard.locator('.task-meta').last()).toContainText('9:00'); await expect(stickersCard.locator('.task-meta').last()).toContainText('17:00');
+  await expect(stickersCard.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
+  await expect(stickers.locator('.server-bar .task-count')).toBeHidden();
+  setTime('2026-12-01T09:00:00+02:00'); await stickers.reload();
+  await expect(stickers.locator('.server-bar .task-count')).toHaveText('1');
+  await expect(stickersCard.getByRole('button', {name: 'Отчети', exact: true})).toBeVisible();
+  setTime('2026-12-01T15:00:00+02:00'); await stickers.locator('#refreshTasks').click();
+  await expect(stickersCard).not.toContainText('Неотчетена');
+  await stickersCard.getByRole('button', {name: 'Отчети', exact: true}).click();
+  await stickers.locator('#actionForm button[type=submit]').click(); await expect(stickers.locator('#taskAction')).not.toBeVisible();
+  await expect(stickers.locator('.server-bar .task-count')).toBeHidden();
+  await stickers.locator('[data-view=history]').click();
+  await expect(stickersCard).toContainText('Изпълнена'); await expect(stickersCard).not.toContainText('Закъснял отчет');
+  await assertResponsive(stickers, 'Regular Stickers task on mobile');
   assert.equal(hub.tasks.list({role: 'admin'}).items.filter(item => item.report?.note === 'Fictional blocker explanation').length, 1);
 }
 module.exports = {exerciseTasks};

@@ -53,10 +53,12 @@ sessions; existing assignment snapshots remain in history.
 Only administrators assign tasks. A shift task has one responsible supervisor and
 uses that team's scheduled shift, with a preview of its start and deadline. Assign
 a specific shift or repeat over a period of up to 366 days in the A–D rotation.
-Rest days are skipped. Stickers tasks use a specific first shift; their recurring
-calendar is deliberately not inferred. Recurring plans can be edited for future
-instances or stopped with a reason. Already started instances keep their original
-content, team, owner and deadlines. Individual unreported shift tasks can be
+Rest days are skipped. Stickers tasks use a specific regular shift, 09:00–17:00
+in Europe/Sofia, on the selected date; their recurring calendar is deliberately
+not inferred. Existing task snapshots retain their recorded hours. Recurring
+plans can be edited for future instances or stopped with a reason. Already
+started instances keep their original content, team, owner and deadlines.
+Individual unreported shift tasks can be
 amended before their deadline; past reports require an explicit reopen and reason.
 
 A global task has one primary owner, optional supervisor participants and a

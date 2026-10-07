@@ -11,6 +11,7 @@
   function el(tag, text = '', cls = '', custom = false) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; if (custom) node.setAttribute('translate', 'no'); return node; }
   function date(at) { return new Intl.DateTimeFormat('en-CA', {timeZone: state.timezone, year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(at)); }
   function clock(at) { return new Intl.DateTimeFormat('bg-BG', {timeZone: state.timezone, dateStyle: 'short', timeStyle: 'short'}).format(new Date(at)); }
+  function shiftLabel(shift) { return shift.team === 'СТИКЕРИ' ? 'Редовна смяна' : {1: '1-ва смяна', 2: '2-ра смяна', 3: 'Нощна смяна'}[shift.code]; }
   function button(label, fn, cls = 'secondary') { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', fn); return node; }
   function selectedOwner(item) { return !$('ownerFilter').value || String(item.owner.id) === $('ownerFilter').value; }
   function selected(item) { return selectedOwner(item) && (item.title + ' ' + item.description).toLowerCase().includes($('taskSearch').value.trim().toLowerCase()); }
@@ -60,7 +61,7 @@
     if (item.priority === 'high') badges.append(el('span', 'Висок приоритет', 'task-badge alert'));
     if (item.overdue) badges.append(el('span', 'Просрочена', 'task-badge alert')); if (item.late) badges.append(el('span', 'Закъснял отчет', 'task-badge alert'));
     node.append(badges, el('p', item.description, 'task-description', true));
-    node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${{1: '1-ва смяна', 2: '2-ра смяна', 3: 'Нощна смяна'}[item.shift.code]} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
+    node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
     if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
     const lastNote = [...item.events].reverse().find(entry => entry.note); if (lastNote) node.append(el('p', lastNote.note, 'task-description', true));
     const actions = el('div', '', 'task-actions'); actions.append(button('История', () => history(item)));
@@ -116,7 +117,7 @@
       const sequence = ++previewSequence;
       HubServer.json('/api/tasks/preview?date=' + encodeURIComponent($('taskFrom').value) + '&assigneeId=' + owner.id).then(value => {
         if (sequence !== previewSequence || !$('taskEditor').open) return;
-        $('shiftPreview').textContent = value.shift ? `${{1: '1-ва смяна', 2: '2-ра смяна', 3: 'Нощна смяна'}[value.shift.code]} · ${clock(value.shift.start)} – ${clock(value.shift.due)}` : 'Екипът е в почивка на тази дата. При повторение се включват следващите работни смени.';
+        $('shiftPreview').textContent = value.shift ? `${shiftLabel(value.shift)} · ${clock(value.shift.start)} – ${clock(value.shift.due)}` : 'Екипът е в почивка на тази дата. При повторение се включват следващите работни смени.';
       }).catch(error => { if (sequence === previewSequence && $('taskEditor').open) $('shiftPreview').textContent = error.message; });
     } else ++previewSequence;
   }
