@@ -15,6 +15,10 @@ const fixtures = {
   'data/profiles/demo-profile-001/instruction.txt':'098345f15b33c99a28ac61eaf91c0dea8b809a4008602dc948c8cfa9dc4232fd',
   'js/employees-seed.js':'3d94d043f1918159e8e7fc4b39cdb93515c1531ebe16bfb9d80c30dad9ea71da'
 };
+// Only this exact, reviewed static SVG source is approved; no general image allowance.
+const approvedAssets = {
+  'assets/package-hub-mark.svg':'9820e0a8deccf0562f38808c1a1a6599c3cba3147dc773fb368624049a5368b6'
+};
 const git = (args,cwd=root) => execFileSync('git',args,{cwd,maxBuffer:32*1024*1024});
 function privateTokens(sourceRoot) {
   const tokens = new Set();
@@ -42,7 +46,7 @@ function privateTokens(sourceRoot) {
   return [...tokens];
 }
 function allowedFile(file) {
-  return Object.hasOwn(fixtures,file) ||
+  return Object.hasOwn(fixtures,file) || Object.hasOwn(approvedAssets,file) ||
     ['.gitignore','.dockerignore','Dockerfile','compose.yaml','AGENTS.md','README.md','PUBLICATION-NOTES.md','LICENSE',
       'scripts/auto-update.sh','scripts/install-auto-update.sh',
       'scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer'].includes(file) ||
@@ -55,6 +59,7 @@ function inspect(file,buffer,tokens=[],mode='100644') {
   if(Object.hasOwn(fixtures,file)) {
     if(crypto.createHash('sha256').update(buffer).digest('hex') !== fixtures[file]) throw new Error('Approved demo fixture has changed: '+file);
   }
+  if(Object.hasOwn(approvedAssets,file) && crypto.createHash('sha256').update(buffer).digest('hex') !== approvedAssets[file]) throw new Error('Approved static asset has changed: '+file);
   const text = buffer.toString('utf8');
   if(buffer.includes(0) || !Buffer.from(text,'utf8').equals(buffer)) throw new Error('Binary content is not approved: '+file);
   const lower = (file+'\n'+text).toLowerCase();
@@ -107,7 +112,7 @@ function main() {
     console.log('Publication check passed for '+checkSnapshot('--staged',tokens)+' staged files.');
   }
 }
-module.exports = {fixtures,inspect,privateTokens,checkSnapshot,commitsForPush};
+module.exports = {fixtures,approvedAssets,inspect,privateTokens,checkSnapshot,commitsForPush};
 if(require.main === module) {
   try { main(); } catch(error) {
     console.error('PUBLICATION BLOCKED: '+error.message);

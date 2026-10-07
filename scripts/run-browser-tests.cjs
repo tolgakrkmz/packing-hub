@@ -14,7 +14,7 @@ async function main() {
   const assets = new Map();
   const files = execFileSync('git', ['ls-files', '-z'], {cwd: root}).toString().split('\0');
   for (const file of files) {
-    if (!/^[a-z-]+\.html$|^(?:js|css)\/[a-z0-9/-]+\.(?:js|css)$/.test(file)) continue;
+    if (file !== 'assets/package-hub-mark.svg' && !/^[a-z-]+\.html$|^(?:js|css)\/[a-z0-9/-]+\.(?:js|css)$/.test(file)) continue;
     if (!fs.lstatSync(path.join(root, file)).isFile()) throw new Error('Only regular demo source files may be served: ' + file);
     const content = fs.readFileSync(path.join(root, file));
     inspect(file, content, tokens);
@@ -31,10 +31,10 @@ async function main() {
     const name = request.url === '/' ? '/index.html' : request.url;
     const body = assets.get(name);
     response.writeHead(body ? 200 : 404, {
-      'Content-Type': name.endsWith('.js') ? 'text/javascript; charset=utf-8' : name.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8',
+      'Content-Type': name.endsWith('.js') ? 'text/javascript; charset=utf-8' : name.endsWith('.css') ? 'text/css; charset=utf-8' : name === '/assets/package-hub-mark.svg' ? 'image/svg+xml; charset=utf-8' : 'text/html; charset=utf-8',
       'Cache-Control': 'no-store'
     });
-    response.end(body || 'Not found');
+    response.end(request.method === 'HEAD' ? undefined : body || 'Not found');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   let browser;

@@ -1,7 +1,42 @@
 <!DOCTYPE html>
 <html lang="bg">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Вход · Package Hub</title><link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><script src="js/login.js" defer></script><link rel="stylesheet" href="css/layout.css">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход · Package Hub</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/server.css">
+  <link rel="stylesheet" href="css/i18n.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <script src="js/i18n-en.js"></script>
+  <script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
+  <script src="js/login.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="stylesheet" href="css/brand.css">
+  <link rel="stylesheet" href="css/brand-shell.css">
 </head>
-<body class="login-page"><script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css"><main class="account-wrap"><h1>Package Hub</h1><p>Влезте с акаунта, предоставен от администратора.</p>
-<form id="loginForm"><label>Потребителско име<input id="username" name="username" autocomplete="username" required maxlength="32"></label><label>Парола<input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128"></label><button type="submit">Вход</button><p id="loginMessage" role="status" aria-live="polite"></p></form></main></body>
+<body class="login-page">
+  <main class="account-wrap login-wrap">
+    <div class="hub-brand login-brand" translate="no">
+      <img src="assets/package-hub-mark.svg" alt="" width="64" height="64">
+      <span class="hub-wordmark">Package <span class="brand-hub">Hub</span></span>
+    </div>
+    <div class="login-heading">
+      <p class="login-eyebrow">Работно пространство</p>
+      <h1>Добре дошли</h1>
+      <p>Влезте с акаунта, предоставен от администратора.</p>
+    </div>
+    <form id="loginForm">
+      <label for="username">Потребителско име
+        <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="32">
+      </label>
+      <label for="password">Парола
+        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+      </label>
+      <button type="submit">Вход</button>
+      <p id="loginMessage" role="status" aria-live="polite"></p>
+    </form>
+    <p class="login-note">Нямате достъп? Свържете се с администратора.</p>
+  </main>
+</body>
 </html>

@@ -11,6 +11,7 @@ const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs'
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
+const {exerciseBranding} = require('../tests/browser/branding.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -38,6 +39,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--branding-only')) {
+      await exerciseBranding({admin, hub, base, device, expect, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); console.log('PASS branding browser workflows'); return;
+    }
     if (process.argv.includes('--accounts-only')) {
       await exerciseAccountDeletion({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); console.log('PASS account deletion browser workflow'); return;

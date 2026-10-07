@@ -5,6 +5,8 @@
 !css/*.css
 !js/
 !js/*.js
+!assets/
+!assets/package-hub-mark.svg
 !server/
 !server/*.cjs
 !scripts/

@@ -26,6 +26,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     inspect(file, body);
     assets.set('/' + file, body);
   }
+  const markFile = 'assets/package-hub-mark.svg';
+  if (!fs.lstatSync(path.join(root, markFile)).isFile()) throw new Error('Unapproved static source.');
+  const mark = fs.readFileSync(path.join(root, markFile));
+  inspect(markFile, mark);
+  assets.set('/' + markFile, mark);
   const version = crypto.createHash('sha256').update(Buffer.concat([...assets.values()])).digest('hex').slice(0, 12);
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
   const clients = new Set(), attempts = new Map();
@@ -219,7 +224,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
       if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
-      const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : 'text/html';
+      const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
       return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/server-connection.js"></script>\n<link rel="stylesheet" href="/css/server.css">') : asset);

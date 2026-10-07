@@ -124,6 +124,9 @@ const HUB_EN_MESSAGES = {
 
   "Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.": "The pair has changed or its roster is no longer valid. Refresh and try again.",
   "Вход · Package Hub": "Login · Package Hub",
+  "Работно пространство": "Workspace",
+  "Добре дошли": "Welcome",
+  "Нямате достъп? Свържете се с администратора.": "Need access? Contact your administrator.",
   "Акаунти · Package Hub": "Accounts · Package Hub",
   "Влезте с акаунта, предоставен от администратора.": "Sign in with the account provided by your administrator.",
   "Потребителско име": "Username",
