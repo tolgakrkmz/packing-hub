@@ -1,6 +1,7 @@
 const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
+let addedHistoryMonth = null;
 let goalTons = 3000;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
@@ -230,6 +231,7 @@ saveBtn.addEventListener('click', async ()=>{
   });
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    addedHistoryMonth = entry.date.slice(0,7);
     tonInput.value = 0;
     brakInput.value = 0;
     autoKgInput.value = 0;
@@ -277,10 +279,8 @@ grid.innerHTML = SHIFTS.map(s=>{
     wrap.innerHTML = '<div class="empty">Все още няма записи.</div>';
     return;
   }
-  const sorted = [...entries].sort((a,b)=>{
-    if(a.date !== b.date) return a.date < b.date ? 1 : -1;
-    return b.id.localeCompare(a.id);
-  });
+  // Reports are appended on save; show the latest addition first, including backdated reports.
+  const sorted = [...entries].reverse();
   const months = new Map();
   sorted.forEach(entry=>{
     const monthKey = entry.date ? entry.date.slice(0,7) : '';
@@ -294,7 +294,7 @@ grid.innerHTML = SHIFTS.map(s=>{
     const [year, month] = monthKey.split('-');
     const label = monthKey ? monthNames[Number(month)-1]+' '+year : 'Без дата';
     const tonnage = rows.reduce((total, entry)=>total+entry.tonnage, 0);
-    const isOpen = monthOpenStates.has(monthKey) ? monthOpenStates.get(monthKey) : monthKey === latestMonth;
+    const isOpen = monthKey === addedHistoryMonth || (monthOpenStates.has(monthKey) ? monthOpenStates.get(monthKey) : monthKey === latestMonth);
     html += '<details class="history-month" data-month="'+monthKey+'"'+(isOpen ? ' open' : '')+'>'
       + '<summary><span class="history-month-title">'+label+'</span>'
       + '<span class="history-month-stats"><b>'+fmt(tonnage)+' кг</b> · '+rows.length+' '+(rows.length===1 ? 'запис' : 'записа')+'</span></summary>'
@@ -326,6 +326,7 @@ grid.innerHTML = SHIFTS.map(s=>{
     html += '</tbody></table></div></details>';
   });
   wrap.innerHTML = html;
+  addedHistoryMonth = null;
 
   if(canEditReports){
     wrap.querySelectorAll('.del-btn').forEach(b=>{
