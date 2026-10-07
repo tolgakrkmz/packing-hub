@@ -970,6 +970,11 @@ const HUB_EN_MESSAGES = {
 };
 
 Object.assign(HUB_EN_MESSAGES, {
+  'Изтрий акаунта': 'Delete account', 'Да изтриеш акаунта': 'Delete account',
+  'Достъпът му ще бъде прекратен. Историята се запазва, а потребителското име остава заето.': 'Access will be revoked. History is retained and the username remains reserved.',
+  'Акаунтът е изтрит.': 'Account deleted.',
+  'Не можеш да изтриеш акаунта, с който си влязъл.': 'You cannot delete the account you are signed in with.',
+  'Записът вече не е наличен. Опресни страницата.': 'The record is no longer available. Refresh the page.',
   'Първо обозначи личните акаунти като началник-смени и избери екип в „Акаунти“.': 'First mark personal accounts as shift supervisors and select their teams in Accounts.',
   'Екипът е в почивка на тази дата. При повторение се включват следващите работни смени.': 'The team is off on this date. Recurrence includes the following working shifts.',
   'Задачи': 'Tasks', 'Чакащи задачи:': 'Pending tasks:', 'Задачи за проверка:': 'Tasks awaiting review:', 'Редовна смяна': 'Regular shift', 'Организация на опаковката': 'Packing organization',

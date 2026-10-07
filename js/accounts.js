@@ -100,7 +100,11 @@
     fields.append(field('Роля', role), activeLabel); form.append(fields);
     const actions = element('div', 'account-actions');
     const button = element('button', '', 'Запази промените'); button.type = 'submit';
-    actions.append(element('small', '', 'Промените прекратяват сесиите на този профил.'), button); form.append(actions);
+    const deleteButton = element('button', 'account-danger', 'Изтрий акаунта'); deleteButton.type = 'button'; deleteButton.dataset.deleteAccount = '';
+    const ownAccount = user.id === HubServer.user.id;
+    deleteButton.disabled = ownAccount;
+    if (ownAccount) deleteButton.title = 'Не можеш да изтриеш акаунта, с който си влязъл.';
+    actions.append(element('small', '', 'Промените прекратяват сесиите на този профил.'), button, deleteButton); form.append(actions);
     const permissions = permissionControls(form, role, user.permissionOverrides);
     const taskProfile = taskProfileControls(form, role, user);
     const password = element('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.minLength = 12; password.maxLength = 128;
@@ -110,12 +114,22 @@
     form.insertBefore(passwordDetails, actions);
     const status = element('p', 'account-feedback', feedback); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); form.append(status);
     form.addEventListener('submit', async event => {
-      event.preventDefault(); button.disabled = true; status.textContent = '';
+      event.preventDefault(); button.disabled = true; deleteButton.disabled = true; status.textContent = '';
       try {
         const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...taskProfile(), ...(password.value ? {password: password.value} : {})});
         renderUser(result.user, true, 'Акаунтът е обновен.'); message.textContent = 'Акаунтът е обновен.';
         cards.get(user.id).details.querySelector('button[type=submit]').focus({preventScroll: true});
-      } catch (error) { status.textContent = error.message; } finally { button.disabled = false; }
+      } catch (error) { status.textContent = error.message; } finally { button.disabled = false; deleteButton.disabled = ownAccount; }
+    });
+    deleteButton.addEventListener('click', async () => {
+      if (!confirm('Да изтриеш акаунта "' + user.username + '"? Достъпът му ще бъде прекратен. Историята се запазва, а потребителското име остава заето.')) return;
+      button.disabled = true; deleteButton.disabled = true; status.textContent = '';
+      try {
+        await HubServer.send('/api/accounts/' + user.id, 'DELETE', {});
+        details.remove(); cards.delete(user.id); applyFilters();
+        message.textContent = 'Акаунтът е изтрит.'; search.focus({preventScroll: true});
+      } catch (error) { status.textContent = error.message; }
+      finally { button.disabled = false; deleteButton.disabled = ownAccount; }
     });
     details.append(form);
     const previous = cards.get(user.id);

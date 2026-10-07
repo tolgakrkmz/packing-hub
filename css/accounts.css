@@ -52,6 +52,7 @@
 .account-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px}
 .account-actions small{margin-right:auto;max-width:360px}
 .account-actions button{flex-shrink:0}
+.accounts-page button.account-danger{background:transparent;color:var(--red,#ff7373);border-color:var(--red,#ff7373)}
 .account-feedback{margin:0;color:var(--teal);font-size:13px;overflow-wrap:anywhere}
 .account-feedback:empty{display:none}
 .account-help{margin:18px 2px;color:var(--text-muted);font-size:12px;max-width:700px}
@@ -74,4 +75,5 @@
   .account-actions{flex-wrap:wrap}
   .account-actions small{max-width:none;flex-basis:100%}
   .account-actions button[type=submit]{width:100%}
+  .account-actions .account-danger{width:100%}
 }

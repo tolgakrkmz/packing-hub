@@ -10,6 +10,7 @@ const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
+const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -37,6 +38,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--accounts-only')) {
+      await exerciseAccountDeletion({admin, hub, base, device, expect});
+      assert.deepEqual(errors, []); console.log('PASS account deletion browser workflow'); return;
+    }
     if (process.argv.includes('--tasks-only')) {
       await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;
@@ -307,9 +312,12 @@ async function main() {
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
     await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
     console.log('PASS shift and global tasks, approvals, missed reports and responsive task screens');
+    console.log('RUN account deletion, confirmation, retry, independent drafts and live logout');
+    await exerciseAccountDeletion({admin, hub, base, device, expect});
+    console.log('PASS account deletion, confirmation, retry, independent drafts and live logout');
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 12 workflows passed.');
+    console.log('Online browser E2E: 13 workflows passed.');
   } catch (error) {
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
     if (screenshotDir && browser) {

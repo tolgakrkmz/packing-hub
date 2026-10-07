@@ -114,6 +114,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list()});
           const input = await jsonBody(request);
+          if (request.method === 'DELETE' && pathname !== '/api/accounts') {
+            const result = auth.remove(Number(pathname.split('/').pop()), currentAdmin(), currentAdmin);
+            broadcast('accounts', 0);
+            return json(response, 200, result);
+          }
           if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, currentAdmin(), input.permissions, currentAdmin, input)});
           if (request.method === 'PATCH') {
             const user = await auth.update(Number(pathname.split('/').pop()), input, currentAdmin(), currentAdmin);

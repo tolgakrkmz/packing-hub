@@ -432,6 +432,11 @@ Unavailable rights stay disabled according to role limits. Unchanged rights keep
 their existing inheritance; Reset permissions to role restores role defaults.
 Password changes and new-account creation expand on demand. Saving one account
 keeps unsaved edits in other accounts. Controls adapt to narrow phone screens.
+Administrators can delete another account after confirmation. Deletion immediately
+revokes its sessions and removes it from the account list and assignment choices.
+The identity and username remain reserved to preserve task/report history; its
+password is discarded. Deleted accounts cannot be restored through account edits.
+The signed-in account and the last active administrator cannot be deleted.
 
 ## Responsive interface
 

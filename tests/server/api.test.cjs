@@ -27,6 +27,43 @@ async function setup(t, filename = ':memory:') {
   }
   return {hub, base, login, request};
 }
+test('account deletion requires administrator, origin and CSRF; revokes every session and reserves identity', async t => {
+  const {hub, login, request} = await setup(t);
+  const admin = await login(), operator = await login('demo-operator'), observer = await login('demo-observer'), anotherSession = await login('demo-observer');
+  const route = '/api/accounts/' + observer.user.id;
+  const remove = (actor, headers) => request(route, actor, {method: 'DELETE', data: {}, headers});
+  for (const actor of [undefined, operator, observer]) assert.equal((await remove(actor)).status, actor ? 403 : 401);
+  assert.equal((await remove(admin, {Origin: 'https://example.invalid'})).status, 403);
+  assert.equal((await remove(admin, {'X-CSRF-Token': ''})).status, 403);
+  const dataBefore = hub.store.get('production-log');
+  const original = hub.store.db.prepare('SELECT hash FROM users WHERE id=?').get(observer.user.id);
+  assert.equal((await remove(admin)).status, 200);
+  const list = await (await request('/api/accounts', admin)).json();
+  assert.ok(!list.users.some(user => user.id === observer.user.id));
+  for (const actor of [observer, anotherSession]) assert.equal((await request('/api/session', actor)).status, 401);
+  assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id=?').get(observer.user.id).n, 0);
+  assert.equal((await request('/api/login', null, {method: 'POST', data: {username: 'demo-observer', password: fixturePassword}})).status, 401);
+  assert.equal((await remove(admin)).status, 404);
+  assert.equal((await request(route, admin, {method: 'PATCH', data: {active: true}})).status, 404);
+  assert.equal((await request('/api/accounts', admin, {method: 'POST', data: {username: 'demo-observer', password: fixturePassword, role: 'observer'}})).status, 409);
+  const deleted = hub.store.db.prepare('SELECT * FROM users WHERE id=?').get(observer.user.id);
+  assert.equal(deleted.active, 0); assert.ok(deleted.deleted_at); assert.notEqual(deleted.hash, original.hash);
+  assert.equal(hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE user_id=? AND action='login'").get(observer.user.id).n, 2);
+  assert.equal(hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action='account-delete' AND user_id=?").get(admin.user.id).n, 1);
+  assert.deepEqual(hub.store.get('production-log'), dataBefore);
+  const next = await hub.auth.create('demo-new-identity', fixturePassword, 'observer');
+  assert.ok(next.id > observer.user.id);
+});
+test('account deletion protects self and the last administrator, but permits removing another administrator', async t => {
+  const {hub, login, request} = await setup(t); const admin = await login();
+  const remove = actor => request('/api/accounts/' + admin.user.id, actor, {method: 'DELETE', data: {}});
+  assert.equal((await (await remove(admin)).json()).error, 'LAST_ADMIN');
+  await hub.auth.create('demo-second-admin', fixturePassword, 'admin'); const other = await login('demo-second-admin');
+  const self = await remove(admin); assert.equal(self.status, 409); assert.equal((await self.json()).error, 'SELF_DELETE');
+  assert.equal((await remove(other)).status, 200);
+  assert.equal((await request('/api/session', admin)).status, 401);
+  assert.equal((await request('/api/session', other)).status, 200);
+});
 test('authentication gates pages, data, attachments and administration; sessions are HttpOnly and logout revokes access', async t => {
   const {request, login} = await setup(t);
   assert.equal((await request('/production-log.html')).status, 302);
