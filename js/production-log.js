@@ -279,8 +279,8 @@ grid.innerHTML = SHIFTS.map(s=>{
     wrap.innerHTML = '<div class="empty">Все още няма записи.</div>';
     return;
   }
-  // Reports are appended on save; show the latest addition first, including backdated reports.
-  const sorted = [...entries].reverse();
+  // Newest report dates first; preserve newest additions first within the same day.
+  const sorted = [...entries].reverse().sort((a,b)=>(b.date || '').localeCompare(a.date || ''));
   const months = new Map();
   sorted.forEach(entry=>{
     const monthKey = entry.date ? entry.date.slice(0,7) : '';
