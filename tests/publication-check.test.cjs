@@ -55,6 +55,12 @@ test('only named backup service sources are allowed; host configuration and arch
   for (const file of ['server/backups.cjs', 'server/backup-cli.cjs', 'server/restore.cjs', 'server/restore-cli.cjs', 'scripts/backup.sh', 'scripts/install-backups.sh', 'scripts/restore-rehearsal.sh', 'scripts/package-hub-backup.service', 'scripts/package-hub-backup.timer']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
   for (const file of ['scripts/package-hub-backup.conf', 'scripts/private-backup.sh', 'scripts/private-backup.timer', 'backups/status.json', 'backups/host-failure', 'data/backup.sqlite']) assert.throws(() => inspect(file, Buffer.from('Fictional local state')), /Unapproved/);
 });
+test('only the named technical recovery scenario document is allowed and private content is still blocked', () => {
+  const file = 'BACKUP-RECOVERY-SCENARIOS.md', restricted = 'Synthetic Restricted Example';
+  assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed technical scenarios')));
+  assert.throws(() => inspect(file, Buffer.from(restricted), [restricted.toLowerCase()]), /Private source/);
+  for (const other of ['RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
+});
 test('private reference matches stop publication without revealing the value',() => {
   const syntheticToken = 'Synthetic Restricted Example';
   assert.throws(() => inspect('js/example.js',Buffer.from(syntheticToken),[syntheticToken.toLowerCase()]),error => {

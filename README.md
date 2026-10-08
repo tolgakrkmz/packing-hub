@@ -308,6 +308,9 @@ before relying on backups.
 
 ### Scheduled backups to two local disks
 
+For plain-language Bulgarian scenarios and the automated/manual coverage matrix,
+see [Backup and recovery scenarios](BACKUP-RECOVERY-SCENARIOS.md).
+
 After deploying the reviewed backup-capable image, install the host-side systemd
 service from the source checkout. It runs independently of the update timer, every
 four hours in UTC; a missed scheduled run executes after the host returns. No

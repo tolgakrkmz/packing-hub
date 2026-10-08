@@ -30,15 +30,18 @@ else if(name==='docker') {
   if(a[0]==='compose') out=mode==='missing-app'?'':'c'.repeat(64);
   else if(a[0]==='inspect') {
     const f=a[2];
-    if(f.includes('.State.Running')) out='true';
-    else if(f.includes('.State.ExitCode')) out=mode==='worker-fails'?'1':'0';
-    else if(f.includes('.Image')) out='sha256:'+'a'.repeat(64);
-    else if(f.includes('.Config.Labels')) out='demo-hub';
-    else if(f.includes('.Mounts')) out='demo-hub-data';
-    else if(f.includes('.Config.Env')) out='/var/lib/package-hub/hub.sqlite';
+    if(mode==='inspect-fails') status=1;
+    if(f.includes('.State.Running')) out=mode==='stopped-app'?'false':'true';
+    else if(f.includes('.State.ExitCode')) out=['worker-fails','bad-exit'].includes(mode)?'1':'0';
+    else if(f.includes('.Image')) out=mode==='mutable-image'?'fictional:latest':'sha256:'+'a'.repeat(64);
+    else if(f.includes('.Config.Labels')) out=mode==='wrong-project'?'fictional-other-project':'demo-hub';
+    else if(f.includes('.Mounts')) out=mode==='missing-volume'?'':'demo-hub-data';
+    else if(f.includes('.Config.Env')) out=mode==='different-database'?'/fictional/unsupported.sqlite':'/var/lib/package-hub/hub.sqlite';
   } else if(a[0]==='create') {
-    if(mode==='orphan-worker') status=1;else out='d'.repeat(64);
+    if(mode==='orphan-worker') status=1;else out=mode==='invalid-worker'?'fictional-invalid-id':'d'.repeat(64);
   } else if(a[0]==='start'&&mode==='worker-fails') status=1;
+  else if(a[0]==='start'&&mode==='interrupted') process.kill(process.ppid,'SIGTERM');
+  else if(a[0]==='rm'&&mode==='cleanup-fails') status=1;
 } else if(name==='chown') status=0;
 if(status) process.stderr.write('fictional-sensitive-configuration');
 if(out) process.stdout.write(out+'\\n');process.exit(status);
@@ -63,7 +66,8 @@ test('host worker uses the running image, a read-only existing volume and two ex
   assert.equal(fs.existsSync(path.join(demo.primary, 'host-failure')), false);
   assert.ok(!result.commands.some(a => a.includes('push') || a.includes('down') || a.includes('restart')));
 });
-for (const scenario of ['missing-disk', 'replaced-disk', 'same-disk', 'missing-app', 'worker-fails', 'orphan-worker']) {
+for (const scenario of ['missing-disk', 'replaced-disk', 'same-disk', 'missing-app', 'worker-fails', 'orphan-worker',
+  'stopped-app', 'wrong-project', 'mutable-image', 'missing-volume', 'different-database', 'invalid-worker', 'bad-exit', 'inspect-fails', 'cleanup-fails', 'interrupted']) {
   test(scenario + ' fails visibly, keeps previous backup files and suppresses private tool errors', t => {
     const demo = environment(t, scenario), previous = path.join(demo.primary, 'previous.sqlite');
     fs.writeFileSync(previous, 'Fictional previous backup boundary');
@@ -72,8 +76,15 @@ for (const scenario of ['missing-disk', 'replaced-disk', 'same-disk', 'missing-a
     assert.ok(!result.stderr.includes('fictional-sensitive-configuration'));
     assert.equal(fs.readFileSync(previous, 'utf8'), 'Fictional previous backup boundary');
     assert.ok(fs.existsSync(path.join(demo.primary, 'host-failure')));
+    assert.ok(!result.stdout.includes('Scheduled backup completed'));
     if (scenario === 'worker-fails') assert.ok(result.commands.some(a => a[0] === 'docker' && a[1] === 'stop'));
     if (['missing-disk', 'replaced-disk', 'same-disk'].includes(scenario)) assert.ok(!result.commands.some(a => a[0] === 'docker'));
+    if (['stopped-app', 'wrong-project', 'mutable-image', 'missing-volume', 'different-database', 'inspect-fails'].includes(scenario)) assert.ok(!result.commands.some(a => a[0] === 'docker' && a[1] === 'create'));
+    if (scenario === 'interrupted') {
+      assert.ok(fs.readFileSync(path.join(demo.primary, 'host-failure'), 'utf8').includes('BACKUP_INTERRUPTED'));
+      assert.ok(result.commands.some(a => a[0] === 'docker' && a[1] === 'stop'));
+      assert.ok(result.commands.some(a => a[0] === 'docker' && a[1] === 'rm'));
+    }
   });
 }
 test('overlapping host runs do not start a worker or overwrite its status', t => {
@@ -81,6 +92,12 @@ test('overlapping host runs do not start a worker or overwrite its status', t =>
   assert.equal(result.status, 0);
   assert.ok(!result.commands.some(a => a[0] === 'docker'));
   assert.equal(fs.existsSync(path.join(demo.primary, 'host-failure')), false);
+});
+test('a successful host retry removes a previous failure marker', t => {
+  const demo = environment(t);
+  fs.writeFileSync(path.join(demo.primary, 'host-failure'), '2026-10-08T08:00:00.000Z\nBACKUP_WORKER_FAILED\n');
+  const result = demo.run();
+  assert.equal(result.status, 0); assert.equal(fs.existsSync(path.join(demo.primary, 'host-failure')), false);
 });
 test('status is read-only and remains available with a missing secondary disk', t => {
   const demo = environment(t, 'missing-disk'), result = demo.run(['status']);

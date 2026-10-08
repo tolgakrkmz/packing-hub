@@ -9,8 +9,9 @@ worker=
 cleanup() {
   if [[ $worker =~ ^[0-9a-f]{12,64}$ ]]; then
     docker stop --time 30 "$worker" >/dev/null || true
-    docker rm -f "$worker" >/dev/null || true
+    docker rm -f "$worker" >/dev/null || return 1
   fi
+  return 0
 }
 failed() {
   if [[ $locked == true ]]; then
@@ -25,8 +26,15 @@ failed() {
   echo "Scheduled backup failed ($code). Check the private host configuration."
 }
 abort() { failed; exit 1; }
+finish() {
+  local result=$?
+  trap - EXIT ERR TERM INT
+  if ! cleanup; then code=BACKUP_WORKER_FAILED; failed; result=1; fi
+  if [[ $result == 0 && $locked == true ]]; then echo 'Scheduled backup completed; both local copies verified.'; fi
+  exit "$result"
+}
 trap failed ERR
-trap cleanup EXIT
+trap finish EXIT
 trap 'code=BACKUP_INTERRUPTED; failed; exit 1' TERM INT
 config=${HUB_BACKUP_CONFIG:-/etc/package-hub-backup.conf}
 [[ -f $config && ! -L $config && $(stat -c '%u:%a' "$config") == 0:600 ]] || abort
@@ -87,4 +95,3 @@ docker start -a "$worker"
 # docker start --attach propagates the process exit status; verify it explicitly too.
 [[ $(docker inspect --format '{{.State.ExitCode}}' "$worker") == 0 ]] || abort
 rm -f -- "$PRIMARY_DIR/host-failure"
-echo 'Scheduled backup completed; both local copies verified.'

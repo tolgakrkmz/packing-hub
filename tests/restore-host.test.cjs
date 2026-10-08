@@ -18,14 +18,20 @@ function environment(t, scenario = 'success') {
 const fs=require('node:fs'),a=process.argv.slice(2),mode=process.env.DEMO_SCENARIO;
 const file=process.env.DEMO_COMMANDS,s=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):{commands:[],created:false};
 s.commands.push(a);let out='',status=0;
-if(a[0]==='run') out='${token}';
+if(a[0]==='run') out=mode==='bad-token'?'fictional-invalid-token':'${token}';
 else if(a[0]==='volume') {
   if(a[1]==='inspect') {
     if(!s.created&&mode!=='existing-volume') status=1;
-    else if(a.includes('--format')) out=mode==='wrong-owner'?'fictional-other-owner':'${token}';
-  } else if(a[1]==='create') s.created=true;
-} else if(a[0]==='create') out='c'.repeat(64);
+    else if(a.includes('--format')) {
+      if(mode==='owner-check-fails') status=1;
+      out=mode==='wrong-owner'?'fictional-other-owner':'${token}';
+    }
+  } else if(a[1]==='create') { if(mode==='volume-create-fails') status=1; else s.created=true; }
+  else if(a[1]==='rm'&&mode==='volume-cleanup-fails') status=1;
+} else if(a[0]==='create') { if(mode==='worker-create-fails') status=1; else out='c'.repeat(64); }
 else if(a[0]==='start'&&mode==='drill-fails') status=1;
+else if(a[0]==='start'&&mode==='interrupted') process.kill(process.ppid,'SIGTERM');
+else if(a[0]==='rm'&&mode==='worker-cleanup-fails') status=1;
 else if(a[0]==='inspect') out=mode==='bad-exit'?'1':'0';
 fs.writeFileSync(file,JSON.stringify(s));
 if(status) process.stderr.write('fictional-private-infrastructure');
@@ -53,14 +59,26 @@ test('host preflight rejects live database sidecars before a file-only bind coul
   fs.writeFileSync(demo.archive + '-wal', 'Fictional live WAL sidecar');
   const result = demo.run(); assert.notEqual(result.status, 0); assert.deepEqual(result.commands, []);
 });
-for (const scenario of ['existing-volume', 'wrong-owner', 'drill-fails', 'bad-exit']) {
+for (const scenario of ['existing-volume', 'wrong-owner', 'drill-fails', 'bad-exit', 'bad-token', 'volume-create-fails',
+  'worker-create-fails', 'owner-check-fails', 'volume-cleanup-fails', 'worker-cleanup-fails', 'interrupted']) {
   test(scenario + ' fails without touching a pre-existing or differently owned volume', t => {
     const result = environment(t, scenario).run(); assert.notEqual(result.status, 0);
     assert.ok(!result.stderr.includes('fictional-private-infrastructure'));
-    if (['existing-volume', 'wrong-owner'].includes(scenario)) {
+    assert.ok(!result.stdout.includes('rehearsal passed'));
+    if (['existing-volume', 'wrong-owner', 'bad-token', 'volume-create-fails', 'owner-check-fails'].includes(scenario)) {
       assert.ok(!result.commands.some(a => a[0] === 'create' || a[0] === 'volume' && a[1] === 'rm'));
     } else {
       assert.ok(result.commands.some(a => a[0] === 'volume' && a[1] === 'rm'));
     }
+    if (scenario === 'interrupted') {
+      assert.ok(result.commands.some(a => a[0] === 'stop'));
+      assert.ok(result.commands.some(a => a[0] === 'rm'));
+    }
+  });
+}
+for (const suffix of ['-shm', '-journal']) {
+  test('an archive with ' + suffix + ' is rejected before Docker resources are created', t => {
+    const demo = environment(t); fs.writeFileSync(demo.archive + suffix, 'Fictional live sidecar');
+    const result = demo.run(); assert.notEqual(result.status, 0); assert.deepEqual(result.commands, []);
   });
 }

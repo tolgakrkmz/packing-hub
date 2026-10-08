@@ -5,7 +5,7 @@ const path = require('node:path');
 const {createHash, randomUUID} = require('node:crypto');
 const {DatabaseSync} = require('node:sqlite');
 const {restoreArchive, rehearse} = require('../../server/restore.cjs');
-const {snapshot, verifyDatabase} = require('../../server/backups.cjs');
+const {snapshot, copyVerified, verifyDatabase} = require('../../server/backups.cjs');
 const {backupFixture} = require('./backup-fixture.cjs');
 const {accounts} = require('../../server/accounts.cjs');
 const {createTasks} = require('../../server/tasks.cjs');
@@ -110,4 +110,77 @@ test('restored application starts, authenticates, enforces permissions, material
   const attachment = await request('/api/files?path=data/demo-document.txt', restoredAdmin);
   assert.equal(attachment.status, 200); assert.equal(await attachment.text(), 'Fictional document for backup verification.');
   assert.equal(demo.store.get('production-log').data.entries.length, 2);
+});
+for (const stage of ['ready-write', 'ready-flush', 'lock-removal']) {
+  test('restore ' + stage + ' failure leaves the copy blocked from rehearsal and preserves the archive', async t => {
+    const demo = backupFixture(t), archive = path.join(demo.primary, 'snapshot.sqlite'), target = path.join(demo.directory, 'interrupted');
+    snapshot(demo.database, archive); const before = hash(archive), lock = path.join(target, '.restore-in-progress'), ready = path.join(target, 'recovery-ready.json');
+    if (stage === 'ready-write') {
+      const write = fs.writeFileSync;
+      t.mock.method(fs, 'writeFileSync', (filename, ...args) => { if (filename === ready) throw new Error('Fictional marker write failure'); return write(filename, ...args); });
+    } else if (stage === 'ready-flush') {
+      const sync = fs.fsyncSync;
+      t.mock.method(fs, 'fsyncSync', fd => {
+        if (fs.existsSync(ready) && fs.fstatSync(fd).ino === fs.statSync(ready).ino) throw new Error('Fictional marker flush failure');
+        return sync(fd);
+      });
+    } else {
+      const unlink = fs.unlinkSync;
+      t.mock.method(fs, 'unlinkSync', (filename, ...args) => { if (filename === lock) throw new Error('Fictional lock removal failure'); return unlink(filename, ...args); });
+    }
+    assert.throws(() => restoreArchive(archive, target)); assert.ok(fs.existsSync(lock));
+    await assert.rejects(() => rehearse(target));
+    assert.throws(() => restoreArchive(archive, target), /TARGET_NOT_EMPTY/);
+    assert.equal(hash(archive), before); assert.equal(demo.store.db.prepare('SELECT count(*) AS n FROM sessions').get().n, 1);
+  });
+}
+test('a broken sidecar symlink is still refused before any recovery destination is created', t => {
+  const demo = backupFixture(t), archive = path.join(demo.primary, 'snapshot.sqlite'), target = path.join(demo.directory, 'recovered');
+  snapshot(demo.database, archive); fs.symlinkSync(path.join(demo.directory, 'absent'), archive + '-wal');
+  assert.throws(() => restoreArchive(archive, target), /NOT_STANDALONE_ARCHIVE/);
+  assert.equal(fs.existsSync(target), false);
+});
+test('a damaged newer archive can be replaced by an older verified recovery point in another empty destination', t => {
+  const demo = backupFixture(t), old = path.join(demo.primary, 'older.sqlite'), newer = path.join(demo.primary, 'newer.sqlite');
+  snapshot(demo.database, old); const oldHash = hash(old), expected = demo.store.get('production-log');
+  demo.store.db.prepare("UPDATE documents SET data=? WHERE kind='production-log'").run(JSON.stringify({...expected.data, entries: []}));
+  snapshot(demo.database, newer); fs.writeFileSync(newer, 'Fictional damaged recent archive');
+  const failed = path.join(demo.directory, 'failed'), recovered = path.join(demo.directory, 'recovered');
+  assert.throws(() => restoreArchive(newer, failed)); assert.equal(fs.existsSync(failed), false);
+  restoreArchive(old, recovered);
+  const db = new DatabaseSync(path.join(recovered, 'hub.sqlite'), {readOnly: true});
+  try { assert.deepEqual(JSON.parse(db.prepare("SELECT data FROM documents WHERE kind='production-log'").get().data), expected.data); }
+  finally { db.close(); }
+  assert.equal(hash(old), oldHash); assert.equal(demo.store.get('production-log').data.entries.length, 0);
+});
+test('rehearsal refuses revived sessions and invalid readiness metadata', async t => {
+  const demo = backupFixture(t), archive = path.join(demo.primary, 'snapshot.sqlite'), target = path.join(demo.directory, 'recovered');
+  snapshot(demo.database, archive); restoreArchive(archive, target);
+  const db = new DatabaseSync(path.join(target, 'hub.sqlite'));
+  const user = db.prepare('SELECT id FROM users LIMIT 1').get().id;
+  db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run('fictional-revived-session', user, 'fictional-csrf', 1); db.close();
+  await assert.rejects(() => rehearse(target), /RECOVERY_SESSIONS_PRESENT/);
+  const ready = path.join(target, 'recovery-ready.json');
+  fs.writeFileSync(ready, JSON.stringify({version: 99, sessionsRevoked: true}));
+  await assert.rejects(() => rehearse(target), /RECOVERY_NOT_READY/);
+  fs.writeFileSync(ready, '{'); await assert.rejects(() => rehearse(target));
+});
+test('failed application health checks cannot pass a rehearsal and allow a later clean retry', async t => {
+  const demo = backupFixture(t), archive = path.join(demo.primary, 'snapshot.sqlite'), target = path.join(demo.directory, 'recovered');
+  snapshot(demo.database, archive); restoreArchive(archive, target);
+  const mock = t.mock.method(globalThis, 'fetch', async () => new Response('', {status: 503}));
+  await assert.rejects(() => rehearse(target), /RECOVERY_STARTUP_FAILED/);
+  mock.mock.restore(); assert.equal((await rehearse(target)).ok, true);
+});
+test('recovery can use the secondary archive after the primary archive is lost', t => {
+  const demo = backupFixture(t), primary = path.join(demo.primary, 'snapshot.sqlite'), secondary = path.join(demo.secondary, 'snapshot.sqlite');
+  snapshot(demo.database, primary); copyVerified(primary, secondary);
+  fs.unlinkSync(primary);
+  const target = path.join(demo.directory, 'from-secondary'); restoreArchive(secondary, target);
+  verifyDatabase(path.join(target, 'hub.sqlite')); verifyDatabase(secondary);
+  const db = new DatabaseSync(path.join(target, 'hub.sqlite'), {readOnly: true});
+  try {
+    assert.deepEqual(db.prepare('SELECT * FROM documents ORDER BY kind').all(), demo.store.db.prepare('SELECT * FROM documents ORDER BY kind').all());
+    assert.equal(db.prepare('SELECT count(*) AS n FROM sessions').get().n, 0);
+  } finally { db.close(); }
 });

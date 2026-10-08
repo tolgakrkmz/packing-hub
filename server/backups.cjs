@@ -8,7 +8,7 @@ const {validateData} = require('./store.cjs');
 const ARCHIVE = /^hub-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-[a-f0-9-]{36}\.sqlite$/;
 const TABLES = ['documents', 'users', 'sessions', 'files', 'audit', 'task_items', 'task_schedules', 'task_requests'];
 const CODES = new Set(['SNAPSHOT_FAILED', 'SECONDARY_UNAVAILABLE', 'SECONDARY_NOT_SEPARATE', 'SECONDARY_COPY_FAILED', 'RETENTION_FAILED',
-  'CONFIGURATION_FAILED', 'APPLICATION_UNAVAILABLE', 'DATABASE_CONFIGURATION_UNSUPPORTED', 'BACKUP_WORKER_FAILED', 'BACKUP_INTERRUPTED', 'HOST_BACKUP_FAILED']);
+  'CONFIGURATION_FAILED', 'APPLICATION_UNAVAILABLE', 'DATABASE_CONFIGURATION_UNSUPPORTED', 'BACKUP_WORKER_FAILED', 'BACKUP_INTERRUPTED', 'HOST_BACKUP_FAILED', 'STATUS_UNREADABLE']);
 function failure(code) { return Object.assign(new Error(code), {code}); }
 function regularFile(filename) {
   const stat = fs.lstatSync(filename);
@@ -130,16 +130,23 @@ function prune(directory, newest) {
 }
 function readStatus(directory) {
   const filename = path.join(directory, 'status.json');
-  let value = {};
+  let value = {}, unreadable = false;
   if (fs.existsSync(filename)) {
     regularFile(filename);
-    value = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    const text = fs.readFileSync(filename, 'utf8');
+    try { value = JSON.parse(text); } catch { unreadable = true; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) { value = {}; unreadable = true; }
   }
-  const timestamp = item => typeof item === 'string' && Number.isFinite(Date.parse(item)) ? new Date(item).toISOString() : null;
+  const timestamp = item => typeof item === 'string' && Number.isFinite(Date.parse(item)) && new Date(item).toISOString() === item ? item : null;
   const status = {state: ['ok', 'failed'].includes(value.state) ? value.state : 'unknown',
     lastAttempt: timestamp(value.lastAttempt), lastSuccess: timestamp(value.lastSuccess),
     lastPrimary: timestamp(value.lastPrimary), lastSecondary: timestamp(value.lastSecondary),
     code: CODES.has(value.code) ? value.code : null};
+  // Status is a replaceable summary, never a prerequisite for creating a backup.
+  // A truncated summary must neither stop the next run nor claim a verified pair.
+  if (status.state === 'ok' && (!status.lastAttempt || value.code !== null ||
+      [status.lastSuccess, status.lastPrimary, status.lastSecondary].some(at => at !== status.lastAttempt))) unreadable = true;
+  if (unreadable) { status.state = 'unknown'; status.code = 'STATUS_UNREADABLE'; }
   const hostFailure = path.join(directory, 'host-failure');
   if (fs.existsSync(hostFailure)) {
     regularFile(hostFailure);

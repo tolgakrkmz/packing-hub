@@ -6,7 +6,7 @@ const {DatabaseSync} = require('node:sqlite');
 const {copyVerified, verifyDatabase, privateDirectory, syncFile, syncDirectory} = require('./backups.cjs');
 function restoreArchive(archive, directory) {
   const started = performance.now();
-  if (['-wal', '-shm', '-journal'].some(suffix => fs.existsSync(archive + suffix))) throw new Error('NOT_STANDALONE_ARCHIVE');
+  if (['-wal', '-shm', '-journal'].some(suffix => fs.lstatSync(archive + suffix, {throwIfNoEntry: false}))) throw new Error('NOT_STANDALONE_ARCHIVE');
   verifyDatabase(archive); // Check the archive before creating any recovery files.
   if (!fs.existsSync(directory)) fs.mkdirSync(directory, {mode: 0o700});
   privateDirectory(directory);
