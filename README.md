@@ -373,6 +373,86 @@ of the private Compose `.env`, backup/update configuration and recovery access
 instructions on the second disk as well; database archives do not include host
 configuration. Do not upload those files or archives to GitHub, Trello or chat.
 
+### Isolated recovery rehearsal and emergency procedure
+
+Use the matching reviewed application image already present on the **local host**.
+The rehearsal script accepts an absolute local archive path and an immutable local
+`sha256:` image ID. It allocates a uniquely labelled disposable Docker volume,
+mounts the archive read-only, restores the database, revokes copied sessions and
+starts an isolated loopback server inside the container. No network, host port,
+live application volume or private host configuration is mounted. It checks module
+reads, accounts/permissions, schedules, database integrity, process health and
+unauthenticated API denial. It prints only fixed messages and recovery/startup
+durations, then removes its own container and labelled test volume.
+
+```sh
+bash scripts/restore-rehearsal.sh /absolute/local/verified-archive.sqlite sha256:LOCAL_IMAGE_ID
+```
+
+The archived file must be readable by UID 1000 and have no WAL/SHM/journal sidecars:
+use a completed snapshot, never an actively written database. The real archive
+stays on the protected host. Rehearsal is repeatable; the image must support archive
+schema version 4. Unsupported schemas, invalid data, partial copies, existing
+destination files and missing recovery administration fail instead of being
+silently migrated or overwritten. A failed recovery destination is retained by
+the core command for local review, without a ready marker; the disposable Docker
+drill removes its private test copy on exit.
+
+For a persistent recovery copy, Node.js 24+ provides the same local-only core:
+
+```sh
+node server/restore-cli.cjs restore /absolute/local/verified-archive.sqlite /absolute/new/private/recovery-directory
+```
+
+The parent must exist; the destination must be new or completely empty, owned by
+the executing user and mode 700. Output database files are mode 600. The command
+never accepts a populated destination. `recovery-ready.json` is a private technical
+marker, not a published report. Old sessions are revoked in the **copy**; usernames,
+password hashes, permissions, module records, task history and documents are kept.
+An authenticated acceptance check still requires the administrator's locally held
+credentials; do not put passwords in command arguments, logs or external services.
+
+During an actual incident:
+
+1. Stop new input and inform local users. Disable the backup and automatic update
+   timers during controlled recovery. Stop the live service only in the agreed
+   maintenance window. Preserve the existing data volume and original archive;
+   never run `docker compose down -v` or copy over an active SQLite database.
+2. On the protected host, select a completed verified archive and note its time
+   against the last confirmed entry. Rehearse it with the matching local image.
+   The gap after the snapshot is the potential loss window; do not infer zero loss
+   from successful integrity checks. Keep older copies available for comparison.
+3. Restore into a **new empty private directory or newly allocated volume** using
+   `restore-cli.cjs restore`. Do not reuse the live volume. Preserve UID 1000 and
+   mode 700/600 when preparing Docker storage. Never move old WAL/SHM files into
+   the restored storage. Keep the recovered database path at `hub.sqlite` in the
+   application's `/var/lib/package-hub` volume for backup compatibility.
+4. Start the recovered copy in isolation. Sign in with a known recovery
+   administrator and check every module, the last confirmed entry, individual
+   rights, tasks/recurring schedules and an attachment. Confirm old sessions are
+   rejected. Record only technical timings/validation locally. If account access
+   is unavailable, use `server/manage.cjs create-admin` interactively **on the
+   isolated restored copy**, then validate before exposing it.
+5. Switch the controlled deployment to the accepted new storage and matching
+   image, then verify user access before reopening input. If the copy is wrong,
+   stop the recovered service and return to the preserved previous volume/image
+   when healthy, or repeat recovery from an older archive into another new volume.
+   Avoid independent parallel writing; reconcile records entered after reopening
+   before any subsequent switch or rollback.
+6. Restore the protected private Compose `.env`, public-origin/proxy settings,
+   backup/update configuration and local recovery access if the old host is lost.
+   Keep these separately on the second disk; the database cannot reconstruct host
+   configuration. Check the disk UUID and mount, perform a fresh two-copy backup,
+   and re-enable the timers only after acceptance. Keep the preserved old storage
+   until the recovery has been reviewed.
+
+Automated fictional tests cover authenticated APIs, preserved account rights and
+documents, recurring task materialization, old-session revocation and the exact
+snapshot boundary. The measured timings are for tiny fictional databases and do
+not predict production recovery time. Actual Docker mounts, host replacement,
+private configuration recovery and a real archive rehearsal require a local
+target-host exercise; no real archive is needed in development or GitHub.
+
 ### Automatic updates after merging into main
 
 A host-side systemd timer can check the approved GitHub `main` branch every two

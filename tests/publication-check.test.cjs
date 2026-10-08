@@ -52,7 +52,7 @@ test('server source and named deployment files are allowed but databases, enviro
   for(const file of ['server/server.cjs','Dockerfile','compose.yaml']) assert.throws(() => inspect(file,Buffer.from(restricted),[restricted.toLowerCase()]),/Private source/);
 });
 test('only named backup service sources are allowed; host configuration and archives remain blocked', () => {
-  for (const file of ['server/backups.cjs', 'server/backup-cli.cjs', 'scripts/backup.sh', 'scripts/install-backups.sh', 'scripts/package-hub-backup.service', 'scripts/package-hub-backup.timer']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
+  for (const file of ['server/backups.cjs', 'server/backup-cli.cjs', 'server/restore.cjs', 'server/restore-cli.cjs', 'scripts/backup.sh', 'scripts/install-backups.sh', 'scripts/restore-rehearsal.sh', 'scripts/package-hub-backup.service', 'scripts/package-hub-backup.timer']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
   for (const file of ['scripts/package-hub-backup.conf', 'scripts/private-backup.sh', 'scripts/private-backup.timer', 'backups/status.json', 'backups/host-failure', 'data/backup.sqlite']) assert.throws(() => inspect(file, Buffer.from('Fictional local state')), /Unapproved/);
 });
 test('private reference matches stop publication without revealing the value',() => {

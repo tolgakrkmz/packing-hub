@@ -50,7 +50,7 @@ function allowedFile(file) {
     ['.gitignore','.dockerignore','Dockerfile','compose.yaml','AGENTS.md','README.md','PUBLICATION-NOTES.md','LICENSE',
       'scripts/auto-update.sh','scripts/install-auto-update.sh',
       'scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer',
-      'scripts/backup.sh','scripts/install-backups.sh',
+      'scripts/backup.sh','scripts/install-backups.sh','scripts/restore-rehearsal.sh',
       'scripts/package-hub-backup.service','scripts/package-hub-backup.timer'].includes(file) ||
     /^[a-z][a-z0-9-]*\.html$/.test(file) ||
     /^(css|js|tests|scripts|server)\/[a-z0-9][a-z0-9./-]*\.(css|js|cjs)$/.test(file) ||

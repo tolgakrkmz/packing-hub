@@ -10,6 +10,12 @@ function backupFixture(t) {
   for (const folder of [primary, secondary]) fs.mkdirSync(folder, {mode: 0o700});
   const store = openStore(database);
   createTasks(store);
+  // These are the repository's already-approved fictional fixtures, never the
+  // production folder. Exercise nonempty data in every module during recovery.
+  for (const kind of ['personnel', 'line-downtime', 'pair-targets', 'package-instructions']) {
+    const data = fs.readFileSync(path.resolve(__dirname, '../../data', kind + '.json'), 'utf8');
+    store.db.prepare('UPDATE documents SET data=? WHERE kind=?').run(data, kind);
+  }
   const id = store.db.prepare("INSERT INTO users(username,hash,role,permissions) VALUES('demo-backup-admin','fictional-disabled-hash','admin','{\"canEditReports\":false}')").run().lastInsertRowid;
   store.db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run('fictional-session', id, 'fictional-csrf', 1);
   const entry = {id: 'demo-confirmed', date: '2026-10-08', shift: 'А', tonnage: 100, brak: 2, breakdown: null};

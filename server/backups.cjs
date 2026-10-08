@@ -180,4 +180,4 @@ function runBackup({database, primary, secondary, now = new Date()}) {
   writeStatus(primary, status);
   return status;
 }
-module.exports = {snapshot, copyVerified, verifyDatabase, runBackup, readStatus, retainedArchives, archiveTime, privateDirectory};
+module.exports = {snapshot, copyVerified, verifyDatabase, runBackup, readStatus, retainedArchives, archiveTime, privateDirectory, syncFile, syncDirectory};
