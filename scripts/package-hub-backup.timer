@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up Package Hub every four hours
+
+[Timer]
+OnCalendar=*-*-* 00/4:00:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=package-hub-backup.service
+
+[Install]
+WantedBy=timers.target

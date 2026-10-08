@@ -294,8 +294,9 @@ docker compose cp package-hub:/var/lib/package-hub/backup-before-update.sqlite /
 ```
 
 Create `/srv/hub-backups` with restricted host permissions first. Keep a protected
-copy on a separate local disk. Backup scheduling and retention are manual in this
-version. Use the snapshot command instead of copying an actively written database.
+copy on a separate local disk. This command creates an additional manual snapshot;
+scheduled, verified two-copy backups are described below. Use the snapshot command
+instead of copying an actively written database.
 
 Deploy reviewed code with `docker compose up -d --build` from the same Compose
 project/directory. The named volume survives container recreation. Keep the
@@ -304,6 +305,73 @@ run `docker compose down -v`.** To restore, stop the service, replace its databa
 with a verified snapshot under the container user's ownership, remove obsolete
 WAL/SHM sidecars only while stopped, then restart. Test restore with fictional data
 before relying on backups.
+
+### Scheduled backups to two local disks
+
+After deploying the reviewed backup-capable image, install the host-side systemd
+service from the source checkout. It runs independently of the update timer, every
+four hours in UTC; a missed scheduled run executes after the host returns. No
+backup, database content, storage path or credential is sent to an external service.
+
+First mount a **separate physical local disk**, with a stable filesystem UUID.
+The administrator must confirm that it is physically separate; software checks
+different filesystem devices, the mountpoint and the configured UUID on every run.
+Two partitions on the same physical disk are not sufficient protection.
+Create application-specific private directories on each disk, owned by the image's
+Node user (UID/GID 1000), with mode 700. The example paths are placeholders; keep
+the real paths and configuration on the host, outside this repository:
+
+```sh
+sudo install -d -o 1000 -g 1000 -m 700 /srv/hub-backups /mnt/backup-disk/hub-backups
+sudo bash scripts/install-backups.sh /absolute/existing/compose/project /srv/hub-backups /mnt/backup-disk/hub-backups 4
+```
+
+The installer requires an existing mounted secondary directory and a successful
+first backup before enabling the timer. It records protected local configuration
+in `/etc/package-hub-backup.conf` (root-owned, mode 600). Supported intervals are
+1, 2, 3, 4, 6, 8, 12 or 24 hours; rerun the installer to change the interval or
+intentionally replace the disk. It does not alter the application's Compose file,
+existing volume, update service, accounts or live data.
+
+The worker uses the **currently running image** and mounts only its verified named
+data volume read-only. It creates a consistent `VACUUM INTO` snapshot, checks SQLite
+integrity, foreign keys, the supported schema and required module/task tables,
+then flushes it and publishes the completed archive without overwriting a previous
+file. The secondary copy passes the same checks and an internal byte digest
+comparison; digests and data never enter logs or manifests. Files are mode 600.
+Only after both copies verify does rotation retain the newest backup from each of
+7 most recent UTC days, 4 ISO weeks and 3 months (the union, at most 14 files per
+disk). Unmanaged files and incomplete work are preserved for local review. A
+damaged historical managed archive stops rotation until administrator review.
+
+Missing/replaced disks, copy errors and failed verification make the service fail;
+previous archives and the last successful timestamp remain. A failed secondary
+copy retains the newly verified primary snapshot too. Host preflight failures
+create a generic private failure marker; they never masquerade as verified copies.
+Overlapping jobs are locked. A timed-out worker is stopped and removed; a worker
+left behind by an abrupt host failure blocks the next run until local review.
+
+```sh
+sudo systemctl start package-hub-backup.service
+sudo systemctl status package-hub-backup.service package-hub-backup.timer
+sudo bash /usr/local/libexec/package-hub-backup.sh status
+```
+
+Status reports only state, fixed error codes and timestamps. `unknown` means no
+verified run; `ok` describes the last completed run, not perpetual protection.
+Check the timestamp and timer/service state: failures can make the recovery point
+older than four hours. At a healthy four-hour cadence, up to four hours of newer
+records may need to be re-entered after loss of the live disk. No automatic UI
+notification is added by this maintenance service; the administrator status screen
+is a separate task.
+
+Validate physical mounts, permissions, a scheduled run, missing-disk behavior and
+actual Docker read-only WAL access locally on the target Linux host before relying
+on the service. Development tests use fictional SQLite data and isolated host-tool
+boundaries; they do not claim to test real hardware. Keep a protected local copy
+of the private Compose `.env`, backup/update configuration and recovery access
+instructions on the second disk as well; database archives do not include host
+configuration. Do not upload those files or archives to GitHub, Trello or chat.
 
 ### Automatic updates after merging into main
 
