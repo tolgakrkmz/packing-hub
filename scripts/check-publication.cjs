@@ -47,10 +47,11 @@ function privateTokens(sourceRoot) {
 }
 function allowedFile(file) {
   return Object.hasOwn(fixtures,file) || Object.hasOwn(approvedAssets,file) ||
-    ['.gitignore','.dockerignore','Dockerfile','compose.yaml','AGENTS.md','README.md','PUBLICATION-NOTES.md','BACKUP-RECOVERY-SCENARIOS.md','LICENSE',
+    ['.gitignore','.dockerignore','Dockerfile','compose.yaml','compose.maintenance.yaml','AGENTS.md','README.md','PUBLICATION-NOTES.md','BACKUP-RECOVERY-SCENARIOS.md','SYSTEM-STATUS-SCENARIOS.md','LICENSE',
       'scripts/auto-update.sh','scripts/install-auto-update.sh',
       'scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer',
       'scripts/backup.sh','scripts/install-backups.sh','scripts/restore-rehearsal.sh',
+      'scripts/maintenance-host.py','scripts/install-maintenance.sh','scripts/package-hub-maintenance.socket','scripts/package-hub-maintenance.service','tests/maintenance-host-test.py',
       'scripts/package-hub-backup.service','scripts/package-hub-backup.timer'].includes(file) ||
     /^[a-z][a-z0-9-]*\.html$/.test(file) ||
     /^(css|js|tests|scripts|server)\/[a-z0-9][a-z0-9./-]*\.(css|js|cjs)$/.test(file) ||

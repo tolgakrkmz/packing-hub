@@ -73,7 +73,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
       await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/index.html');
       await assertMark();
       await expect(admin.locator('.server-bar .hub-language')).toHaveCount(1);
-      if (['tasks', 'accounts', 'data-import'].includes(name)) {
+      if (['system-status', 'accounts', 'data-import'].includes(name)) {
         await expect(admin.locator(`.server-links a[href="/${name}.html"]`)).toHaveAttribute('aria-current', 'page');
       } else await expect(admin.locator('.server-links [aria-current=page]')).toHaveCount(0);
       for (const language of ['en', 'bg']) {
@@ -88,17 +88,17 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
 
   console.log('RUN toolbar task badges, report selection and permission boundaries');
   await admin.goto(base + '/index.html');
-  await expect(admin.locator('.server-links a[href="/tasks.html"] .task-count')).toHaveCount(1);
-  await expect(admin.locator('.server-links .task-count')).toBeHidden();
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveCount(1);
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeHidden();
   // Exercise live count rendering without creating or modifying task records.
   await admin.route('**/api/tasks/summary', route => route.fulfill({json: {count: 3}}));
   await admin.reload();
-  await expect(admin.locator('.server-links .task-count')).toHaveText('3');
-  await expect(admin.locator('.server-links .task-count')).toBeVisible();
-  await expect(admin.locator('.server-links .task-count')).toHaveAttribute('aria-label', 'Задачи за проверка: 3');
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveText('3');
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeVisible();
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveAttribute('aria-label', 'Задачи за проверка: 3');
   await admin.unroute('**/api/tasks/summary');
   await admin.reload();
-  await expect(admin.locator('.server-links .task-count')).toBeHidden();
+  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeHidden();
 
   for (const kind of ['production-log', 'line-downtime', 'pair-targets']) {
     await admin.goto(`${base}/${kind}.html`);

@@ -456,6 +456,68 @@ not predict production recovery time. Actual Docker mounts, host replacement,
 private configuration recovery and a real archive rehearsal require a local
 target-host exercise; no real archive is needed in development or GitHub.
 
+### Administrator system status
+
+The authenticated header replaces its Tasks shortcut with **System status** for
+administrators. Tasks remain available from the home module tile, with their
+pending counter also shown in the Tasks heading. Operators and observers cannot
+open the status page or use either administration API, including direct requests.
+The page uses the shared Package Hub theme and supports BG/EN and small screens.
+The Bulgarian [practical scenarios and test coverage](SYSTEM-STATUS-SCENARIOS.md)
+explain how this task complements backup and recovery.
+
+The page checks SQLite and the space available to the database's user. It warns
+below 1 GiB or 10% free space. Backup timestamps, the second disk's mount/UUID and
+update results come from an optional local host adapter. Backups become overdue
+after their configured interval plus 15 minutes. Unknown, failed and overdue
+checks are distinct; a failed refresh hides the previous successful summary.
+There are no public archive links, host paths, revisions, account details or log
+contents in the status response. `/healthz` keeps its minimal public response.
+
+After installing and accepting the two-disk backup service, install the adapter
+on the Linux host during a planned deployment. It needs `/usr/bin/python3` 3.8+
+and uses only the Python standard library, existing host tools and the installed
+backup service:
+
+```sh
+sudo bash scripts/install-maintenance.sh
+sudo docker compose --project-directory /absolute/existing/compose/project -f /absolute/existing/compose/project/compose.yaml -f /etc/package-hub-maintenance.compose.yaml up -d --no-build --no-deps package-hub
+```
+
+Use the existing project's exact name and any existing local build overrides
+when applying that command. Deploy the reviewed status-capable image first.
+Preserve the existing named data volume. The adapter installs a protected Unix
+socket, activated by systemd, and an optional read-only directory mount for the
+application. It adds no network listener, timer, external notification or Docker
+socket inside the application. Its only operations are status reads and starting
+`package-hub-backup.service`; API request data cannot supply commands or paths.
+The application never mounts the backup disks or private host configuration.
+For the socket activation contract, see the official
+[systemd socket documentation](https://github.com/systemd/systemd/blob/main/man/systemd.socket.xml).
+
+**Create backup** returns an asynchronous status, then the screen polls progress.
+Concurrent requests and an active scheduled backup are refused. Success requires
+a newly confirmed successful pair. Closing the browser does not cancel the host
+service. Missing configuration leaves the relevant cards unknown and the action
+unavailable; the standalone/offline application offers no maintenance controls.
+
+The auto-update script now records a private fixed-state `last-attempt` marker,
+including failures before build/deployment, while `last-good` retains the actual
+successful deployment time. No-op update checks do not claim a new deployment.
+Older installed updater scripts must be replaced with the reviewed version using
+the existing installer. The updater preserves the installed maintenance Compose
+override. Changes to either Compose source require a reviewed manual deployment.
+
+Validate socket ownership/access, actual Docker reads, manual and scheduled
+overlap, disk removal, update failure and reboot locally before acceptance. The
+automated tests use fictional state and local command boundaries; the Chrome
+workflow checks rendering, roles, warnings, manual requests, reconnect, BG/EN and
+320/390/768/1440 px layouts:
+
+```sh
+node scripts/run-server-browser-tests.cjs --status-only --headless
+```
+
 ### Automatic updates after merging into main
 
 A host-side systemd timer can check the approved GitHub `main` branch every two

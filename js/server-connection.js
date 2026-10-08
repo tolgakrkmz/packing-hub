@@ -17,7 +17,7 @@ const HubServer = (() => {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) location.assign('/login.html');
       const error = new Error(messages[data.error] || 'Връзката със сървъра е прекъсната. Опитай отново.');
-      error.code = response.status === 409 ? 'REPORT_CONFLICT' : data.error;
+      error.code = response.status === 409 && data.error === 'CONFLICT' ? 'REPORT_CONFLICT' : data.error;
       error.status = response.status;
       throw error;
     }
@@ -200,7 +200,7 @@ const HubServer = (() => {
       if (location.pathname === href) link.setAttribute('aria-current', 'page');
       links.append(link);
     };
-    if (can('canViewTasks')) addLink('/tasks.html', 'Задачи');
+    if (boot.user.role === 'admin') addLink('/system-status.html', 'Статус на системата');
     if (boot.user.role === 'admin') addLink('/accounts.html', 'Акаунти');
     if (can('canImportData')) addLink('/data-import.html', 'Импорт на данни');
     tools.append(links);
@@ -242,7 +242,7 @@ const HubServer = (() => {
     const taskBadges = [];
     let taskCountSequence = 0;
     if (can('canViewTasks')) {
-      for (const link of document.querySelectorAll('a[href="tasks.html"],a[href="/tasks.html"]')) {
+      for (const link of document.querySelectorAll('a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
         const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
         badge.setAttribute('role', 'status'); (link.querySelector('h2') || link).append(badge); taskBadges.push(badge);
       }

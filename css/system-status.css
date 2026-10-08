@@ -1,0 +1,40 @@
+.system-page{max-width:1080px;font-family:inherit;font-size:14px;line-height:1.5}
+.system-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin:8px 0 26px}
+.system-heading h1{margin:4px 0 8px}
+.system-heading p{margin:0;color:var(--text-muted)}
+.system-heading .system-eyebrow{color:var(--teal);font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.system-page button.system-secondary{background:var(--panel-2);color:var(--text)}
+.system-message{color:var(--coral);margin:0 0 16px}
+.system-message:empty,#manualMessage:empty{display:none}
+.system-summary{display:flex;align-items:center;gap:16px;padding:20px 22px;background:var(--panel);border:1px solid var(--border);border-radius:14px;margin-bottom:16px}
+.system-summary strong{font-size:16px}.system-summary p{margin:4px 0 0;font-size:12px;color:var(--text-muted)}
+.system-summary>.system-badge{margin-left:auto}
+.system-dot{height:10px;width:10px;border-radius:50%;flex-shrink:0;background:var(--text-muted)}
+.system-summary[data-state=ok] .system-dot{background:var(--teal);box-shadow:0 0 0 6px #3fbfa012}
+.system-summary[data-state=warning] .system-dot{background:var(--amber)}
+.system-summary[data-state=failed] .system-dot{background:var(--red)}
+.system-badge{display:inline-flex;align-items:center;flex-shrink:0;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:650;background:var(--panel-2);color:var(--text-muted)}
+.system-badge[data-state=ok]{background:var(--teal-dark);color:var(--teal)}
+.system-badge[data-state=warning]{background:var(--amber-dark);color:var(--amber)}
+.system-badge[data-state=failed]{background:var(--coral-dark);color:var(--coral)}
+.system-warnings{padding:14px 18px 14px 34px;margin:0 0 18px;border:1px solid #f5a62333;border-radius:12px;background:#f5a62308;color:var(--text);font-size:13px}
+.system-warnings li+li{margin-top:8px}
+.system-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.system-card{min-width:0;padding:22px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.system-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+.system-card h2,.system-backup-action h2{margin:0;font-size:14px;line-height:1.4}
+.system-card p{margin:10px 0 0;font-size:12px;color:var(--text-muted)}
+.system-value{display:block;font-size:28px;line-height:1.3;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.system-time{display:block;margin-top:6px;font-size:20px;line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.system-card .system-label,.system-label{font-size:12px;color:var(--text-muted)}
+.system-card dl{display:grid;gap:12px;margin:22px 0 0;font-size:12px}
+.system-card dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.system-card dt{color:var(--text-muted)}.system-card dd{margin:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.system-update{grid-column:1/-1}.system-update dl{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0;gap:28px}
+.system-update dl>div{display:grid;gap:6px}.system-update dd{text-align:left;font-size:16px}
+#diskMeter{width:100%;height:8px;margin-top:18px;accent-color:var(--teal)}
+.system-backup-action{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding:22px;margin-top:20px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.system-backup-action p{margin:6px 0 0;color:var(--text-muted);font-size:13px}.system-backup-action #manualMessage{flex-basis:100%;margin:0;color:var(--teal)}
+.system-backup-action #manualMessage[data-state=failed]{color:var(--coral)}
+.system-footnote{max-width:720px;margin:20px 2px 0;color:var(--text-muted);font-size:12px;line-height:1.7}
+@media(max-width:600px){.system-heading{align-items:flex-start;gap:12px}.system-heading h1{font-size:26px}.system-heading button{flex-shrink:0;padding:9px 12px}.system-grid{grid-template-columns:minmax(0,1fr);gap:12px}.system-card{padding:18px}.system-summary{padding:16px;gap:12px;flex-wrap:wrap}.system-summary>.system-badge{margin-left:22px}.system-card-heading{margin-bottom:18px}.system-time{font-size:18px}.system-update dl{grid-template-columns:minmax(0,1fr);gap:16px}.system-backup-action{padding:18px}.system-backup-action button{width:100%}.system-card dl>div{flex-wrap:wrap}.system-card dd{text-align:left}}

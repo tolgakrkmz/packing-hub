@@ -15,6 +15,11 @@ function environment(t, scenario = 'success') {
   for (const name of [bin, source, state]) fs.mkdirSync(name);
   const config = path.join(dir, 'config');
   fs.writeFileSync(config, `SOURCE_DIR='${source}'\nDEPLOY_DIR='${dir}/existing-project'\nBUILD_OVERRIDE='${dir}/build-override'\nCOMPOSE_PROJECT=demo-hub\nSTATE_DIR='${state}'\n`);
+  const maintenance = path.join(dir, 'maintenance-override');
+  if (scenario === 'maintenance-enabled') {
+    fs.writeFileSync(maintenance, 'Fictional Compose boundary');
+    fs.appendFileSync(config, `MAINTENANCE_OVERRIDE='${maintenance}'\n`);
+  }
   const mock = path.join(dir, 'boundary.cjs');
   fs.writeFileSync(mock, `#!/usr/bin/env node
 const fs = require('node:fs'), path = require('node:path');
@@ -55,7 +60,7 @@ if (name === 'git') {
   else if (args[0] === 'run' && mode === 'smoke-fails') status = 1;
 } else if (name === 'curl' && mode === 'health-fails') status = 1;
 else if (name === 'flock' && mode === 'locked') status = 1;
-else if (name === 'date') out = '20261006T000000Z';
+else if (name === 'date') out = args.includes('+%Y-%m-%dT%H:%M:%S.000Z') ? '2026-10-06T00:00:00.000Z' : '20261006T000000Z';
 fs.writeFileSync(file, JSON.stringify(state));
 if (out) process.stdout.write(out + '\\n');
 process.exit(status);
@@ -64,7 +69,7 @@ process.exit(status);
   for (const command of ['git', 'docker', 'curl', 'flock', 'date']) fs.symlinkSync(mock, path.join(bin, command));
   const boundary = path.join(dir, 'boundary-state');
   return {
-    state,
+    state, maintenance,
     run() {
       const result = spawnSync('bash', [updater], {encoding: 'utf8', env: {...process.env, PATH: bin + path.delimiter + process.env.PATH, HUB_UPDATE_CONFIG: config, DEMO_SCENARIO: scenario, DEMO_BOUNDARY_STATE: boundary}});
       return {...result, commands: JSON.parse(fs.readFileSync(boundary)).commands};
@@ -77,6 +82,8 @@ test('deploy builds and checks the candidate, backs up locally, preserves the vo
   const demo = environment(t), result = demo.run();
   assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(path.join(demo.state, 'last-good'), 'utf8').trim(), candidate);
+  assert.ok(fs.readFileSync(path.join(demo.state, 'last-attempt'), 'utf8').endsWith('\nok\n'));
+  assert.match(fs.readFileSync(path.join(demo.state, 'last-attempt'), 'utf8'), /^2026-10-06T00:00:00\.000Z\nok\n$/);
   const commands = result.commands;
   const smoke = commands.findIndex(a => a[0] === 'docker' && a[1] === 'run');
   const backup = commands.findIndex(a => a.includes('backup'));
@@ -103,11 +110,17 @@ test('unchanged successful main and an overlapping run never rebuild or restart 
 
 for (const scenario of ['wrong-branch', 'dirty', 'wrong-origin', 'offline', 'diverged', 'config-change', 'build-fails', 'smoke-fails', 'backup-fails']) {
   test(scenario + ' blocks deployment before replacing the running container', t => {
-    const result = environment(t, scenario).run();
+    const demo = environment(t, scenario), result = demo.run();
     assert.notEqual(result.status, 0);
     assert.equal(up(result.commands).length, 0);
+    assert.ok(fs.readFileSync(path.join(demo.state, 'last-attempt'), 'utf8').endsWith('\nfailed\n'));
   });
 }
+test('automatic deployment preserves the explicitly configured local maintenance mount', t => {
+  const demo = environment(t, 'maintenance-enabled'), result = demo.run();
+  assert.equal(result.status, 0, result.stderr);
+  for (const args of result.commands.filter(args => args[0] === 'docker' && args[1] === 'compose')) assert.ok(args.includes(demo.maintenance));
+});
 
 for (const scenario of ['unhealthy', 'health-fails', 'volume-change', 'rollback-fails']) {
   test(scenario + ' restores the previous image and blocks repeat deployment of that revision', t => {

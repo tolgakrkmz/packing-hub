@@ -1,0 +1,12 @@
+# Apply only after installing the local Unix-socket adapter on the existing host.
+services:
+  package-hub:
+    environment:
+      HUB_MAINTENANCE_SOCKET: /run/package-hub-maintenance/control.sock
+    volumes:
+      - type: bind
+        source: /run/package-hub-maintenance
+        target: /run/package-hub-maintenance
+        read_only: true
+        bind:
+          create_host_path: false

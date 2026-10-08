@@ -8,15 +8,17 @@ const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createTasks} = require('./tasks.cjs');
+const {createMaintenance} = require('./maintenance.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, maintenanceSocket}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
   const imports = createImports(store, filename);
+  const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
   const assets = new Map();
   for (const dir of ['', 'css', 'js']) for (const leaf of fs.readdirSync(path.join(root, dir))) {
     const file = dir ? dir + '/' + leaf : leaf;
@@ -107,6 +109,20 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if (pathname === '/api/admin/status' || pathname === '/api/admin/backup') {
+          currentAdmin();
+          if (pathname === '/api/admin/status' && request.method === 'GET') {
+            const result = await maintenance.status(); currentAdmin();
+            return json(response, 200, result);
+          }
+          if (pathname === '/api/admin/backup' && request.method === 'POST') {
+            const input = await jsonBody(request, 1024); currentAdmin();
+            if (Object.keys(input).length) throw problem(400, 'INVALID_DATA');
+            const result = await maintenance.backup();
+            return json(response, 202, result);
+          }
+          throw problem(405, 'METHOD_REJECTED');
+        }
         if (pathname === '/api/logout' && request.method === 'POST') { auth.logout(token); return json(response, 200, {ok: true}, {'Set-Cookie': cookie('', 0)}); }
         if (pathname === '/api/events' && request.method === 'GET') {
           response.writeHead(200, {'Content-Type': 'text/event-stream', Connection: 'keep-alive', 'X-Accel-Buffering': 'no'});
@@ -219,7 +235,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (assetName === '/accounts.html' && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (['/accounts.html', '/system-status.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
       if (assetName === '/tasks.html' && !canViewModule(session?.user, 'tasks')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
@@ -243,12 +259,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   }, 20000);
   heartbeat.unref();
   const close = async () => { clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, tasks, close};
+  return {server, store, auth, imports, tasks, maintenance, close};
 }
 if (require.main === module) {
   process.umask(0o077);
   try {
-    const hub = createHubServer({filename: process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite', publicOrigin: process.env.HUB_PUBLIC_ORIGIN || '', allowHttp: process.env.HUB_ALLOW_HTTP === 'true'});
+    const hub = createHubServer({filename: process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite', publicOrigin: process.env.HUB_PUBLIC_ORIGIN || '', allowHttp: process.env.HUB_ALLOW_HTTP === 'true', maintenanceSocket: process.env.HUB_MAINTENANCE_SOCKET});
     hub.server.listen(Number(process.env.PORT || 3000), '0.0.0.0', () => console.log('Package Hub server started.'));
     for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => hub.close().then(() => process.exit(0)));
   } catch { console.error('Server startup failed. Check Node.js 24+, database permissions and HUB_PUBLIC_ORIGIN.'); process.exitCode = 1; }
