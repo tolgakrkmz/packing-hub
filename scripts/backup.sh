@@ -60,8 +60,15 @@ done
 [[ $# == 0 || $# == 1 && $1 == status ]] || abort
 if [[ ${1:-} == status ]]; then
   code=STATUS_UNAVAILABLE
-  container=$(docker compose --project-directory "$DEPLOY_DIR" -f "$DEPLOY_DIR/compose.yaml" -p "$COMPOSE_PROJECT" ps -q package-hub)
+  # The socket adapter hides home directories. Read only Docker's existing
+  # container labels so a deployment under /home needs no filesystem access.
+  container=$(docker ps --quiet --no-trunc \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+    --filter 'label=com.docker.compose.service=package-hub' --filter status=running)
   [[ $container =~ ^[0-9a-f]{12,64}$ ]] || abort
+  [[ $(docker inspect --format '{{.State.Running}}' "$container") == true ]] || abort
+  [[ $(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container") == "$COMPOSE_PROJECT" ]] || abort
+  [[ $(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container") == package-hub ]] || abort
   image=$(docker inspect --format '{{.Image}}' "$container")
   [[ $image =~ ^sha256:[0-9a-f]{64}$ ]] || abort
   docker run --rm --pull never --network none --read-only --tmpfs /tmp \

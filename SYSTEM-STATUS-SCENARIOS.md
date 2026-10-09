@@ -66,6 +66,7 @@
 | Втори диск, монтиране, UUID и еднакви файлови устройства | `tests/maintenance-host-test.py`; контролирани системни команди |
 | Частна конфигурация, липсваща услуга, повреден статус и осемте интервала | `tests/maintenance-host-test.py` |
 | Инсталирани файлове и права; отказ при небезопасна конфигурация, липсваща услуга или неуспешно включване | `tests/maintenance-install.test.cjs`; истински копия във временна папка и контролирани systemd команди |
+| Compose проект в защитена домашна папка; липсващ, спрял, двусмислен или чужд контейнер | `tests/backups-host.test.cjs`; статусът използва точните Docker етикети без четене на Compose файловете, а `ProtectHome=true` остава включено |
 | Ръчно изпълнение, застъпване, отказ на услугата и стар успешен резултат | `tests/maintenance-host-test.py` |
 | Действителен Unix HTTP адрес, фиксирани маршрути и ограничено тяло | `tests/maintenance-host-test.py`, `tests/server/maintenance.test.cjs` |
 | Прекъснато тяло, дублирани заглавки, chunked заявка, невалиден JSON или грешен media type | `tests/maintenance-host-test.py`, `tests/server/maintenance.test.cjs` |

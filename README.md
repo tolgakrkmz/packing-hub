@@ -547,6 +547,10 @@ Install while the backup service is idle. Preflight rejects an active backup,
 unsafe or linked configuration/worker/unit files, and a missing service. Re-running
 the installer refreshes an already active adapter with `try-restart`; a failed
 copy, reload, enable or restart never reports a successful installation.
+Status reads identify the existing running application through its exact Docker
+Compose project and service labels. They do not open the deployment directory,
+so a project under a home directory works with the adapter's `ProtectHome=true`
+restriction intact. Missing, ambiguous or mismatched containers remain unknown.
 For the socket activation contract, see the official
 [systemd socket documentation](https://github.com/systemd/systemd/blob/main/man/systemd.socket.xml).
 
