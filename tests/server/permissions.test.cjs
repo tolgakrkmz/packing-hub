@@ -77,6 +77,30 @@ test('export permission gates every supported download, retains viewing and reco
   assert.equal((await request('/api/data/production-log', limited)).status, 200);
   assert.equal(hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action='export'").get().n, 3);
 });
+test('the transfer screen requires import or export rights; the legacy production URL keeps import authorization', async t => {
+  const {base, login, request, change} = await setup(t);
+  assert.equal((await fetch(base + '/data-import.html', {redirect:'manual'})).status, 302);
+  for (const role of ['admin','operator','observer']) {
+    const user = await login(role);
+    for (const method of ['GET','HEAD']) assert.equal((await request('/data-import.html', user, method)).status, 200);
+    const legacy = await request('/production-import.html', user);
+    assert.equal(legacy.status, role === 'admin' ? 302 : 403);
+    if (role === 'admin') assert.equal(legacy.headers.get('location'), '/data-import.html#production');
+  }
+  const admin = await login(), operator = await login('operator');
+  await change(admin, operator, {canExportReports:false});
+  const denied = await login('operator');
+  assert.equal((await request('/data-import.html', denied)).status, 403);
+  assert.equal((await request('/data-import.html', denied, 'HEAD')).status, 403);
+  await change(admin, admin, {canExportReports:false});
+  const importOnly = await login();
+  assert.equal((await request('/data-import.html', importOnly)).status, 200);
+  assert.equal((await request('/api/export/production-log', importOnly)).status, 403);
+  assert.equal((await request('/production-import.html', importOnly)).status, 302);
+  await change(importOnly, importOnly, {canImportData:false, canExportReports:false});
+  const neither = await login();
+  assert.equal((await request('/data-import.html', neither)).status, 403);
+});
 test('report creation and correction rights are independent and cannot grant operator settings or personnel access', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), original = await login('operator');
   const put = (kind, user, data, revision) => request('/api/data/' + kind, user, 'PUT', data, {'If-Match': '"' + revision + '"'});
@@ -93,13 +117,14 @@ test('report creation and correction rights are independent and cannot grant ope
   assert.equal((await put('production-log', reader, hub.store.get('production-log').data, 4)).status, 403);
   assert.equal(hub.store.get('production-log').revision, 4);
 });
-test('restricted administrators cannot import through pages, batch stages or legacy endpoints; permitted import is independent of report write rights', async t => {
+test('restricted administrators retain export access while every import stage stays blocked; import is independent of report write rights', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login();
   await hub.auth.create('demo-second-admin', password, 'admin');
   const source = {documents: {'production-log': {entries: [entry('demo-import')]}}, files: [], includeSettings: false};
   const id = (await (await request('/api/import/batches', admin, 'POST', source)).json()).id;
   await change(admin, admin, {canImportData: false}); const restricted = await login();
-  for (const route of ['/data-import.html', '/production-import.html']) assert.equal((await request(route, restricted)).status, 403);
+  assert.equal((await request('/data-import.html', restricted)).status, 200);
+  assert.equal((await request('/production-import.html', restricted)).status, 403);
   for (const [route, method, data] of [
     ['/api/import/batches', 'POST', source], ['/api/import/batches/' + id + '/preview', 'POST', {}],
     ['/api/import/batches/' + id + '/apply', 'POST', {token: 'fictional'}], ['/api/import/batches/' + id + '/files/0', 'PUT', {}],

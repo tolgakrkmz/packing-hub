@@ -197,25 +197,17 @@ const HubServer = (() => {
     const links = document.createElement('div'); links.className = 'server-links';
     const addLink = (href, label) => {
       const link = document.createElement('a'); link.href = href; link.textContent = label;
-      if (location.pathname === href) link.setAttribute('aria-current', 'page');
+      if (location.pathname === href.split('?')[0]) link.setAttribute('aria-current', 'page');
       links.append(link);
     };
     if (boot.user.role === 'admin') addLink('/system-status.html', 'Статус на системата');
     if (boot.user.role === 'admin') addLink('/accounts.html', 'Акаунти');
-    if (can('canImportData')) addLink('/data-import.html', 'Импорт на данни');
-    tools.append(links);
-    if (can('canExportReports')) {
-      const exports = document.createElement('div'); exports.className = 'server-export';
-      const select = document.createElement('select'); select.id = 'reportExportKind'; select.setAttribute('aria-label', 'Отчет за експорт');
-      for (const [kind, label] of Object.entries({'production-log': 'Тонаж и брак', 'line-downtime': 'Престои', 'pair-targets': 'Двойки и таргети'})) {
-        const option = document.createElement('option'); option.value = kind; option.textContent = label; select.append(option);
-      }
+    if (can('canImportData') || can('canExportReports')) {
       const current = location.pathname.split('/').pop().replace(/\.html$/, '');
-      if (['production-log', 'line-downtime', 'pair-targets'].includes(current)) select.value = current;
-      const link = document.createElement('a'); link.id = 'reportExport'; link.textContent = 'Свали отчет (.json)';
-      const updateExport = () => { link.href = '/api/export/' + select.value; link.download = select.value + '.json'; };
-      select.addEventListener('change', updateExport); updateExport(); exports.append(select, link); tools.append(exports);
+      const query = ['production-log', 'line-downtime', 'pair-targets'].includes(current) ? '?module=' + current : '';
+      addLink('/data-import.html' + query, 'Импорт / експорт');
     }
+    tools.append(links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
     const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); };
     session.append(identity, state, logout); bar.append(top, tools);

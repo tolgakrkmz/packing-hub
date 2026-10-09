@@ -73,8 +73,9 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
       await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/index.html');
       await assertMark();
       await expect(admin.locator('.server-bar .hub-language')).toHaveCount(1);
-      if (['system-status', 'accounts', 'data-import'].includes(name)) {
-        await expect(admin.locator(`.server-links a[href="/${name}.html"]`)).toHaveAttribute('aria-current', 'page');
+      if (['system-status', 'accounts', 'data-import', 'production-import'].includes(name)) {
+        const active = name === 'production-import' ? 'data-import' : name;
+        await expect(admin.locator(`.server-links a[href="/${active}.html"]`)).toHaveAttribute('aria-current', 'page');
       } else await expect(admin.locator('.server-links [aria-current=page]')).toHaveCount(0);
       for (const language of ['en', 'bg']) {
         await admin.locator(`[data-hub-language=${language}]`).click();
@@ -86,7 +87,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     }
   }
 
-  console.log('RUN toolbar task badges, report selection and permission boundaries');
+  console.log('RUN toolbar task badges, transfer navigation and permission boundaries');
   await admin.goto(base + '/index.html');
   await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveCount(1);
   await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeHidden();
@@ -102,6 +103,8 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
 
   for (const kind of ['production-log', 'line-downtime', 'pair-targets']) {
     await admin.goto(`${base}/${kind}.html`);
+    await expect(admin.locator('.server-bar #reportExport')).toHaveCount(0);
+    await admin.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
     await expect(admin.locator('#reportExportKind')).toHaveValue(kind);
     await expect(admin.locator('#reportExport')).toHaveAttribute('href', '/api/export/' + kind);
     await expect(admin.locator('#reportExport')).toHaveAttribute('download', kind + '.json');
@@ -121,12 +124,15 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     await hub.auth.create(username, password, role);
     const page = await device(username, true);
     await expect(page.locator('.server-links a[href="/accounts.html"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/data-import.html"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/data-import.html"]')).toBeVisible();
     await expect(page.locator('.server-links a[href="/tasks.html"]')).toHaveCount(0);
+    await expect(page.locator('.server-bar #reportExportKind')).toHaveCount(0);
+    await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
     await expect(page.locator('#reportExportKind')).toBeVisible();
+    await expect(page.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(page.locator('.server-user')).toHaveText(username);
     assert.equal(await page.evaluate(async () => (await fetch('/accounts.html')).status), 403);
-    assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 403);
+    assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 200);
     for (const language of ['en', 'bg']) {
       await page.locator(`[data-hub-language=${language}]`).click();
       await assertResponsive(page, `Brand ${role}/${language} at 390px`);

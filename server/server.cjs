@@ -239,7 +239,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (assetName === '/tasks.html' && !canViewModule(session?.user, 'tasks')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
-      if (['/production-import.html', '/data-import.html'].includes(assetName) && !can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
+      if (assetName === '/data-import.html' && !can(session?.user, 'canImportData') && !can(session?.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
+      if (assetName === '/production-import.html') {
+        if (!can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
+        response.writeHead(302, {Location: '/data-import.html#production'}); return response.end();
+      }
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();

@@ -1,5 +1,6 @@
 /* File contents go only to the authenticated private server, never into browser storage. */
 (() => {
+  if (typeof HubServer === 'undefined' || !HubServer.can('canImportData')) return;
   const modules = {'production-log': 'Тонаж и брак', 'line-downtime': 'Престои', personnel: 'Смени и хора', 'pair-targets': 'Двойки и таргети', 'package-instructions': 'Инструкции за опаковка'};
   const fileInput = document.getElementById('moduleFiles'), folderInput = document.getElementById('legacyFolder'), settings = document.getElementById('includeSettings');
   const check = document.getElementById('checkDataImport'), confirm = document.getElementById('confirmDataImport'), cancel = document.getElementById('cancelDataImport');
@@ -16,6 +17,7 @@
     cancel.disabled = value || !batch;
   }
   function table(result = {}) {
+    document.getElementById('batchPreview').hidden = !result.documents;
     rows.replaceChildren();
     for (const [kind, label] of Object.entries(modules)) {
       const value = result.documents?.[kind], tr = document.createElement('tr'); tr.dataset.module = kind;
@@ -111,7 +113,7 @@
     try {
       if (!prepared) prepared = await prepare();
       if (!batch) { const created = await request('/api/import/batches', 'POST', prepared.payload); batch = created.id; }
-      progress.hidden = false; progress.max = Math.max(1, prepared.files.length); progress.value = uploaded.size;
+      progress.hidden = !prepared.files.length; progress.max = Math.max(1, prepared.files.length); progress.value = uploaded.size;
       for (const [index, file] of prepared.files.entries()) {
         if (!uploaded.has(index)) { await request(route('files/' + index), 'PUT', file, true); uploaded.add(index); progress.value = uploaded.size; }
       }

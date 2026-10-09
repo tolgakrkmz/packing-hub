@@ -1,4 +1,5 @@
 (() => {
+  if (typeof HubServer === 'undefined' || !HubServer.can('canImportData')) return;
   const file = document.getElementById('importFile'), preview = document.getElementById('previewImport'), apply = document.getElementById('applyImport');
   const summary = document.getElementById('importSummary'), message = document.getElementById('importMessage');
   let input = null, checked = null, sequence = 0;
@@ -8,7 +9,8 @@
     summary.replaceChildren(); summary.hidden = false;
     for (const [key, label] of Object.entries(labels)) {
       const term = document.createElement('dt'), value = document.createElement('dd');
-      term.textContent = label; value.setAttribute('translate', 'no'); value.dataset.field = key; value.textContent = result[key] ?? '—'; summary.append(term, value);
+      term.textContent = label; value.setAttribute('translate', 'no'); value.dataset.field = key; value.textContent = result[key] ?? '—';
+      const item = document.createElement('div'); item.append(term, value); summary.append(item);
     }
   }
   file.addEventListener('change', () => { sequence++; input = checked = null; summary.hidden = true; apply.disabled = true; preview.disabled = !file.files.length; say(''); });
