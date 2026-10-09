@@ -6,10 +6,13 @@
     BACKUP_FAILED: 'Последният опит за архивиране е неуспешен.', BACKUP_OVERDUE: 'Архивът е по-стар от зададения график.',
     SECONDARY_COPY_OVERDUE: 'Второто копие е по-старо от зададения график.',
     BACKUP_STATUS_UNKNOWN: 'Няма потвърдени данни за защитата с два архива.', UPDATE_FAILED: 'Последната проверка или обновяване е неуспешно.',
-    UPDATE_STATUS_UNKNOWN: 'Няма потвърдени данни за последното обновяване.', MANUAL_BACKUP_FAILED: 'Ръчният архив е неуспешен. Провери местната настройка.'};
+    UPDATE_STATUS_UNKNOWN: 'Няма потвърдени данни за последното обновяване.', MANUAL_BACKUP_FAILED: 'Ръчният архив е неуспешен. Провери местната настройка.',
+    MANUAL_BACKUP_UNAVAILABLE: 'Ръчният архив не е достъпен. Провери местната настройка.',
+    MANUAL_BACKUP_STATUS_UNKNOWN: 'Резултатът от ръчния архив не може да бъде потвърден.'};
   const clock = value => value ? new Intl.DateTimeFormat(document.documentElement.lang === 'en' ? 'en-GB' : 'bg-BG', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : '—';
   const bytes = value => value === null ? '—' : new Intl.NumberFormat(document.documentElement.lang === 'en' ? 'en-GB' : 'bg-BG', {maximumFractionDigits: 1}).format(value / 1024 ** 3) + ' GiB';
-  let current, pending = false, manualPending = false, destroyed = false, manualError = '', renderedLanguage = document.documentElement.lang;
+  const uncertainBackup = 'Не можем да потвърдим заявката за архив. Опресни статуса, преди нов опит.';
+  let current, refreshController, manualController, timer, manualPending = false, destroyed = false, manualError = '', renderedLanguage = document.documentElement.lang;
   function badge(id, state) { $(id).dataset.state = state; $(id).textContent = states[state] || states.unknown; }
   function render(data) {
     current = data; $('systemContent').hidden = false;
@@ -31,6 +34,7 @@
     for (const code of data.warnings) if (warnings[code]) { const item = document.createElement('li'); item.textContent = warnings[code]; $('systemWarnings').append(item); }
     $('systemWarnings').hidden = !$('systemWarnings').childElementCount;
     const running = manualPending || data.manual.state === 'running';
+    if (data.manual.state === 'running') manualError = '';
     $('manualBackup').disabled = !data.manual.available || running;
     $('manualBackup').textContent = running ? 'Архивиране…' : 'Създай архив';
     $('manualHint').textContent = data.manual.available ? 'Резултатът се показва тук. Архивите остават на сървъра.' : 'Контролът на архивите не е настроен.';
@@ -40,36 +44,75 @@
     else if (data.manual.state === 'running') $('manualMessage').textContent = 'Архивът се създава и проверява. Можеш да оставиш екрана отворен.';
     else if (data.manual.state === 'ok') $('manualMessage').textContent = 'Ръчният архив е завършен. Провери статуса на двете копия.';
     else if (data.manual.state === 'failed') $('manualMessage').textContent = warnings.MANUAL_BACKUP_FAILED;
+    else if (data.manual.state === 'unknown') $('manualMessage').textContent = warnings.MANUAL_BACKUP_STATUS_UNKNOWN;
     else $('manualMessage').textContent = '';
   }
   async function refresh() {
-    if (pending || destroyed) return;
-    pending = true; $('refreshSystem').disabled = true; $('systemContent').setAttribute('aria-busy', 'true');
-    try { render(await HubServer.json('/api/admin/status')); $('systemMessage').textContent = ''; }
+    if (refreshController || destroyed) return;
+    const operation = new AbortController(); refreshController = operation;
+    const timeout = setTimeout(() => operation.abort(), 20000);
+    $('refreshSystem').disabled = true; $('systemContent').setAttribute('aria-busy', 'true');
+    try {
+      const data = await HubServer.json('/api/admin/status', {signal: operation.signal});
+      if (destroyed || refreshController !== operation) return;
+      render(data); $('systemMessage').textContent = '';
+    }
     catch {
+      if (destroyed || refreshController !== operation) return;
       // Hide the last green summary immediately after a failed refresh.
       $('systemContent').hidden = true; current = null;
       $('systemMessage').textContent = 'Статусът не може да се прочете. Опитай отново.';
-    } finally { pending = false; $('refreshSystem').disabled = false; $('systemContent').removeAttribute('aria-busy'); }
+    } finally {
+      clearTimeout(timeout);
+      if (refreshController === operation) {
+        refreshController = null; $('refreshSystem').disabled = false; $('systemContent').removeAttribute('aria-busy');
+      }
+    }
+  }
+  function cancelRefresh() {
+    const previous = refreshController; refreshController = null; previous?.abort();
   }
   if (typeof HubServer === 'undefined' || HubServer.user.role !== 'admin') {
     $('systemMessage').textContent = 'Този екран е достъпен само за администратор в сървърната версия.'; $('refreshSystem').disabled = true; return;
   }
   $('refreshSystem').addEventListener('click', refresh);
   $('manualBackup').addEventListener('click', async () => {
-    if (manualPending || !current?.manual.available) return;
+    if (destroyed || manualPending || !current?.manual.available || current.manual.state === 'running') return;
     manualError = '';
+    const operation = new AbortController(); manualController = operation;
+    const timeout = setTimeout(() => operation.abort(), 20000);
     manualPending = true; $('manualBackup').disabled = true; $('manualBackup').textContent = 'Архивиране…';
     $('manualMessage').textContent = 'Заявката за архив е изпратена.';
-    try { await HubServer.send('/api/admin/backup', 'POST', {}); }
-    catch (error) { manualError = error.code === 'BACKUP_BUSY' ? 'Вече се изпълнява архив. Изчакай и опресни.' : 'Архивът не може да се стартира. Провери местната настройка.'; }
-    finally { manualPending = false; await refresh(); }
+    try {
+      const result = await HubServer.json('/api/admin/backup', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}', signal: operation.signal});
+      if (result?.state !== 'running') throw new Error();
+    }
+    catch (error) {
+      if (manualController === operation) manualError = error.code === 'BACKUP_BUSY' ? 'Вече се изпълнява архив. Изчакай и опресни.' : uncertainBackup;
+    }
+    finally {
+      clearTimeout(timeout);
+      if (manualController === operation) { manualController = null; manualPending = false; cancelRefresh(); await refresh(); }
+    }
   });
-  const timer = setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+  function startPolling() {
+    clearInterval(timer);
+    timer = setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+  }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   new MutationObserver(() => {
     if (renderedLanguage !== document.documentElement.lang) { renderedLanguage = document.documentElement.lang; if (current) render(current); }
   }).observe(document.documentElement, {attributes: true, attributeFilter: ['lang']});
-  window.addEventListener('pagehide', () => { destroyed = true; clearInterval(timer); });
+  window.addEventListener('pagehide', () => {
+    destroyed = true; clearInterval(timer);
+    cancelRefresh();
+    if (manualPending) manualError = uncertainBackup;
+    manualController?.abort(); manualController = null; manualPending = false;
+    current = null; $('systemContent').hidden = true;
+  });
+  window.addEventListener('pageshow', event => {
+    if (event.persisted) { destroyed = false; startPolling(); refresh(); }
+  });
+  startPolling();
   refresh();
 })();

@@ -5,6 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const {summarize, capacity, createMaintenance, hostRequest} = require('../../server/maintenance.cjs');
 const {createHubServer} = require('../../server/server.cjs');
+const {openStore} = require('../../server/store.cjs');
 const now = Date.parse('2026-10-08T12:00:00.000Z'), at = new Date(now).toISOString();
 const healthy = () => ({backups: {state: 'ok', lastAttempt: at, lastSuccess: at, lastPrimary: at, lastSecondary: at, code: null, intervalHours: 4, secondaryAvailable: true},
   updates: {state: 'ok', lastSuccess: at, lastAttempt: at}, manual: {available: true, state: 'idle'}});
@@ -70,7 +71,7 @@ test('a failed database check is reported without returning SQLite error text', 
 test('simultaneous host reads are shared and a later failure clears previous green status', async () => {
   let calls = 0, release;
   const maintenance = createMaintenance({filename: ':memory:', socketPath: 'fictional', now: () => now,
-    store: {db: {prepare: () => ({all: () => [{quick_check: 'ok'}]})}}, request: () => { calls++; return calls === 1 ? new Promise(resolve => { release = resolve; }) : Promise.reject(new Error('Fictional host failure')); }});
+    store: {db: {prepare: () => ({get: () => ({readable: 1})})}}, request: () => { calls++; return calls === 1 ? new Promise(resolve => { release = resolve; }) : Promise.reject(new Error('Fictional host failure')); }});
   const first = maintenance.status(), second = maintenance.status(); assert.equal(calls, 1); release(healthy());
   assert.equal((await first).backups.state, 'ok'); assert.equal((await second).backups.state, 'ok');
   assert.equal((await maintenance.status()).backups.state, 'unknown'); assert.equal(calls, 2);
@@ -143,4 +144,166 @@ test('the Unix-socket client refuses oversized or malformed host responses witho
   t.after(async () => { await new Promise(resolve => server.close(resolve)); fs.rmSync(directory, {recursive: true, force: true}); });
   await assert.rejects(() => hostRequest(socket, '/status'), /MAINTENANCE_UNAVAILABLE/);
   body = 'x'.repeat(9000); await assert.rejects(() => hostRequest(socket, '/status'));
+});
+
+test('Unix responses require the exact status code, JSON content type and an object body', async t => {
+  const directory = fs.mkdtempSync('/tmp/hub-status-protocol-'), socket = path.join(directory, 'socket');
+  let status = 200, type = 'application/json', body = '{}';
+  const server = http.createServer((req, res) => { res.writeHead(status, {'Content-Type': type}); res.end(body); });
+  await new Promise(resolve => server.listen(socket, resolve));
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); fs.rmSync(directory, {recursive: true, force: true}); });
+  const rejected = () => assert.rejects(() => hostRequest(socket, '/status'), error => error.status === 503 && error.code === 'MAINTENANCE_UNAVAILABLE');
+  for (const code of [202, 204, 301, 403, 409, 500]) { status = code; await rejected(); }
+  status = 200; type = 'text/html'; await rejected(); type = 'application/json';
+  for (const value of ['null', '[]', 'true', '42', '"Fictional private response"', '{']) { body = value; await rejected(); }
+  body = '{}'; type = 'application/json; charset=utf-8'; assert.deepEqual(await hostRequest(socket, '/status'), {});
+  body = '{"state":"running"}';
+  await assert.rejects(() => hostRequest(socket, '/backup', 'POST'), {code: 'MAINTENANCE_UNAVAILABLE'});
+  status = 202; assert.deepEqual(await hostRequest(socket, '/backup', 'POST'), {state: 'running'});
+  status = 409; await assert.rejects(() => hostRequest(socket, '/backup', 'POST'), {status: 409, code: 'BACKUP_BUSY'});
+});
+
+test('the Unix client bounds a continuously trickling response and sanitizes disconnects and missing sockets', async t => {
+  const directory = fs.mkdtempSync('/tmp/hub-status-timeout-'), socket = path.join(directory, 'socket');
+  let disconnect = false, chunks = 0;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, {'Content-Type': 'application/json'}); res.write('{');
+    if (disconnect) return setImmediate(() => res.destroy());
+    const interval = setInterval(() => { chunks++; res.write(' '); }, 10);
+    res.once('close', () => clearInterval(interval));
+  });
+  await new Promise(resolve => server.listen(socket, resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); fs.rmSync(directory, {recursive: true, force: true}); });
+  const failure = error => error.status === 503 && error.message === 'MAINTENANCE_UNAVAILABLE' && !error.message.includes(directory);
+  const started = Date.now(); await assert.rejects(() => hostRequest(socket, '/status', 'GET', 75), failure);
+  assert.ok(chunks > 0); assert.ok(Date.now() - started < 2000);
+  disconnect = true; await assert.rejects(() => hostRequest(socket, '/status', 'GET', 500), failure);
+  await assert.rejects(() => hostRequest(path.join(directory, 'missing.sock'), '/status'), failure);
+});
+
+test('many simultaneous requests share host, database and capacity work and do not retain the result afterward', async t => {
+  let reads = 0, databaseReads = 0, diskReads = 0, release;
+  t.mock.method(fs, 'statfsSync', () => { diskReads++; return {bsize: 1n, blocks: 20n * 1024n ** 3n, bavail: 10n * 1024n ** 3n}; });
+  t.mock.method(fs, 'lstatSync', () => ({dev: 1n, ino: 1n, size: 4096n, nlink: 1n, isFile: () => true}));
+  t.mock.method(fs, 'accessSync', () => {});
+  const maintenance = createMaintenance({filename: '/fictional/hub.sqlite', socketPath: 'fictional', now: () => now,
+    store: {db: {prepare: () => ({get: () => { databaseReads++; return {readable: 1}; }})}},
+    request: () => { reads++; return new Promise(resolve => { release = resolve; }); }});
+  const requests = Array.from({length: 40}, () => maintenance.status());
+  assert.equal(reads, 1); release(healthy());
+  for (const result of await Promise.all(requests)) assert.equal(result.state, 'ok');
+  assert.equal(databaseReads, 1); assert.equal(diskReads, 1);
+  const fresh = maintenance.status(); assert.equal(reads, 2); release(null);
+  assert.equal((await fresh).backups.state, 'unknown'); assert.equal(databaseReads, 2); assert.equal(diskReads, 2);
+});
+
+test('a manual action invalidates an older status snapshot without cancelling a newer shared read', async () => {
+  let reads = 0, releaseOld, releaseNew;
+  const maintenance = createMaintenance({filename: ':memory:', socketPath: 'fictional', now: () => now,
+    store: {db: {prepare: () => ({get: () => ({readable: 1})})}},
+    request: (socket, route) => route === '/backup' ? Promise.resolve({state: 'running'}) : new Promise(resolve => {
+      reads++; if (reads === 1) releaseOld = resolve; else releaseNew = resolve;
+    })});
+  const before = maintenance.status();
+  await maintenance.backup();
+  const fresh = maintenance.status(); assert.equal(reads, 2);
+  releaseOld(healthy()); assert.equal((await before).backups.state, 'unknown');
+  assert.equal(maintenance.status(), fresh); assert.equal(reads, 2);
+  const running = healthy(); running.manual = {available: true, state: 'running', startedAt: at, finishedAt: null};
+  releaseNew(running); assert.equal((await fresh).manual.state, 'running');
+});
+
+test('a live cached SQLite connection cannot hide a missing, replaced, empty or linked database file', async t => {
+  const directory = fs.mkdtempSync('/tmp/hub-status-database-'), filename = path.join(directory, 'demo.sqlite');
+  const store = openStore(filename), maintenance = createMaintenance({store, filename});
+  t.after(() => { try { store.close(); } finally { fs.rmSync(directory, {recursive: true, force: true}); } });
+  assert.equal((await maintenance.status()).database.state, 'ok');
+  const saved = path.join(directory, 'saved.sqlite'); fs.renameSync(filename, saved);
+  assert.equal((await maintenance.status()).database.state, 'failed');
+  fs.copyFileSync(saved, filename); assert.equal((await maintenance.status()).database.state, 'failed');
+  fs.unlinkSync(filename); fs.symlinkSync(saved, filename); assert.equal((await maintenance.status()).database.state, 'failed');
+  fs.unlinkSync(filename); fs.renameSync(saved, filename);
+  fs.linkSync(filename, path.join(directory, 'linked.sqlite')); assert.equal((await maintenance.status()).database.state, 'failed');
+  fs.unlinkSync(path.join(directory, 'linked.sqlite'));
+  t.mock.method(fs, 'accessSync', () => { throw new Error('Fictional private filesystem detail'); });
+  const inaccessible = await maintenance.status(); assert.equal(inaccessible.database.state, 'failed');
+  assert.ok(!JSON.stringify(inaccessible).includes('Fictional private'));
+  t.mock.restoreAll(); fs.truncateSync(filename, 0); assert.equal((await maintenance.status()).database.state, 'failed');
+});
+
+test('capacity thresholds include their exact boundaries and fail closed for impossible or unreadable filesystems', t => {
+  let result = {bsize: 1n, blocks: 10n * 1024n ** 3n, bavail: 1024n ** 3n};
+  t.mock.method(fs, 'statfsSync', () => { if (result instanceof Error) throw result; return result; });
+  assert.equal(capacity('/fictional/hub.sqlite').state, 'ok');
+  result.bavail--; assert.equal(capacity('/fictional/hub.sqlite').state, 'warning');
+  for (const invalid of [
+    {bsize: 1n, blocks: 0n, bavail: 0n}, {bsize: 1n, blocks: 100n, bavail: -1n},
+    {bsize: 1n, blocks: 100n, bavail: 101n}, {bsize: 2n ** 54n, blocks: 1n, bavail: 1n},
+    new Error('Fictional private filesystem details')
+  ]) {
+    result = invalid; const value = capacity('/fictional/hub.sqlite');
+    assert.deepEqual(value, {state: 'unknown', freeBytes: null, totalBytes: null});
+  }
+});
+
+test('all permitted cadences and malformed timestamps are handled without inventing successful protection', () => {
+  for (const intervalHours of [1, 2, 3, 4, 6, 8, 12, 24]) {
+    const input = healthy(); input.backups.intervalHours = intervalHours;
+    for (const key of ['lastAttempt', 'lastSuccess', 'lastPrimary', 'lastSecondary']) input.backups[key] = new Date(now - intervalHours * 3600000 - 900001).toISOString();
+    assert.equal(checked(input).backups.state, 'warning');
+    assert.equal(checked(input).secondary.state, 'warning');
+  }
+  for (const value of [null, 0, true, {}, [], '', 'invalid', '2026-02-30T00:00:00.000Z', '2026-10-08T12:00:00Z', '2099-01-01T00:00:00.000Z']) {
+    for (const key of ['lastAttempt', 'lastSuccess', 'lastPrimary', 'lastSecondary']) {
+      const input = healthy(); input.backups[key] = value;
+      assert.notEqual(checked(input).backups.state, 'ok');
+    }
+    const input = healthy(); input.updates.lastSuccess = value;
+    assert.equal(checked(input).updates.state, 'unknown');
+  }
+});
+
+test('an unavailable manual service or an unconfirmed manual result cannot produce an entirely green summary', () => {
+  const unavailable = healthy(); unavailable.manual.available = false;
+  assert.equal(checked(unavailable).state, 'unknown'); assert.ok(checked(unavailable).warnings.includes('MANUAL_BACKUP_UNAVAILABLE'));
+  for (const manual of [
+    {available: true, state: 'ok'}, {available: true, state: 'running'}, {available: true, state: 'fictional'},
+    {available: true, state: 'ok', startedAt: at, finishedAt: '2026-10-08T11:00:00.000Z'},
+    {available: true, state: 'ok', startedAt: at, finishedAt: '2099-01-01T00:00:00.000Z'},
+    {available: true, state: 'running', startedAt: at, finishedAt: at}
+  ]) {
+    const value = healthy(); value.manual = manual; const result = checked(value);
+    assert.equal(result.manual.state, 'unknown'); assert.equal(result.state, 'unknown');
+    assert.ok(result.warnings.includes('MANUAL_BACKUP_STATUS_UNKNOWN'));
+  }
+  const value = healthy(); value.manual = {available: true, state: 'ok', startedAt: at, finishedAt: at};
+  assert.equal(checked(value).state, 'ok');
+});
+
+test('all malformed backup bodies and unsupported administration methods are refused without contacting the host', async t => {
+  const demo = await setup(t), admin = await demo.login('admin');
+  for (const body of ['', 'null', '[]', 'true', '42', '"{}"', '{', '{"command":"fictional"}']) {
+    const response = await demo.request('/api/admin/backup', admin, {method: 'POST', headers: {'Content-Type': 'application/json'}, body});
+    assert.equal(response.status, 400);
+  }
+  for (const type of ['', 'text/plain', 'application/octet-stream', 'application/json-private']) {
+    assert.equal((await demo.request('/api/admin/backup', admin, {method: 'POST', headers: {'Content-Type': type}, body: '{}'})).status, 415);
+  }
+  for (const [route, methods] of [['/api/admin/status', ['HEAD', 'POST', 'PUT', 'DELETE']], ['/api/admin/backup', ['HEAD', 'GET', 'PUT', 'DELETE']]]) {
+    for (const method of methods) assert.equal((await demo.request(route, admin, {method})).status, 405);
+  }
+  assert.equal(demo.count(), 0);
+  const page = await demo.request('/system-status.html', admin, {method: 'HEAD'}); assert.equal(page.status, 200); assert.equal(await page.text(), '');
+  assert.equal((await demo.request('/system-status.html', await demo.login('observer'), {method: 'HEAD'})).status, 403);
+});
+
+test('revoking the session while the backup body arrives prevents starting the host action', async t => {
+  const demo = await setup(t), admin = await demo.login('admin');
+  const request = http.request(demo.base + '/api/admin/backup', {method: 'POST', headers: {Origin: demo.base, Cookie: 'hub-local-session=' + admin.token,
+    'X-CSRF-Token': admin.csrf, 'Content-Type': 'application/json', 'Content-Length': 2}});
+  const response = new Promise((resolve, reject) => { request.on('response', reply => { reply.resume(); resolve(reply.statusCode); }); request.on('error', reject); });
+  request.flushHeaders(); request.write('{');
+  await new Promise(resolve => setTimeout(resolve, 20));
+  demo.hub.auth.logout(admin.token); request.end('}');
+  assert.equal(await response, 401); assert.equal(demo.count(), 0);
 });

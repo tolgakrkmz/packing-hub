@@ -55,7 +55,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     return Buffer.concat(chunks);
   }
   async function jsonBody(request, limit) {
-    if (!(request.headers['content-type'] || '').startsWith('application/json')) throw problem(415, 'JSON_REQUIRED');
+    if ((request.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') throw problem(415, 'JSON_REQUIRED');
     try { const value = JSON.parse((await body(request, limit)).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
     catch (error) { if (error.status) throw error; throw problem(400, 'INVALID_DATA'); }
   }

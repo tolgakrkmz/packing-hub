@@ -6,23 +6,31 @@ const {problem} = require('./store.cjs');
 const CODES = new Set(['SNAPSHOT_FAILED', 'SECONDARY_UNAVAILABLE', 'SECONDARY_NOT_SEPARATE', 'SECONDARY_COPY_FAILED', 'RETENTION_FAILED',
   'CONFIGURATION_FAILED', 'APPLICATION_UNAVAILABLE', 'DATABASE_CONFIGURATION_UNSUPPORTED', 'BACKUP_WORKER_FAILED', 'BACKUP_INTERRUPTED', 'HOST_BACKUP_FAILED', 'STATUS_UNREADABLE']);
 const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value ? value : null;
-function hostRequest(socketPath, route, method = 'GET') {
+function hostRequest(socketPath, route, method = 'GET', timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const request = http.request({socketPath, path: route, method, headers: method === 'POST' ? {'Content-Type': 'application/json', 'Content-Length': 2} : {}}, response => {
+      if (method === 'POST' && response.statusCode === 409) return request.destroy(problem(409, 'BACKUP_BUSY'));
+      if (response.statusCode !== (method === 'POST' ? 202 : 200) || response.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+        return request.destroy(problem(503, 'MAINTENANCE_UNAVAILABLE'));
+      }
       let size = 0; const chunks = [];
       response.on('data', chunk => {
         size += chunk.length;
-        if (size > 8192) request.destroy(new Error('MAINTENANCE_UNAVAILABLE')); else chunks.push(chunk);
+        if (size > 8192) request.destroy(problem(503, 'MAINTENANCE_UNAVAILABLE')); else chunks.push(chunk);
       });
-      response.on('error', reject);
+      response.on('error', () => reject(problem(503, 'MAINTENANCE_UNAVAILABLE')));
+      response.on('aborted', () => reject(problem(503, 'MAINTENANCE_UNAVAILABLE')));
       response.on('end', () => {
-        if (response.statusCode === 409) return reject(problem(409, 'BACKUP_BUSY'));
-        if (![200, 202].includes(response.statusCode)) return reject(problem(503, 'MAINTENANCE_UNAVAILABLE'));
-        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { reject(problem(503, 'MAINTENANCE_UNAVAILABLE')); }
+        try {
+          const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error();
+          resolve(value);
+        } catch { reject(problem(503, 'MAINTENANCE_UNAVAILABLE')); }
       });
     });
-    const timer = setTimeout(() => request.destroy(problem(503, 'MAINTENANCE_UNAVAILABLE')), 15000);
-    request.once('close', () => clearTimeout(timer)); request.once('error', reject);
+    const timer = setTimeout(() => request.destroy(problem(503, 'MAINTENANCE_UNAVAILABLE')), timeoutMs);
+    request.once('close', () => clearTimeout(timer));
+    request.once('error', error => reject(problem(error.status === 409 ? 409 : 503, error.status === 409 ? 'BACKUP_BUSY' : 'MAINTENANCE_UNAVAILABLE')));
     request.end(method === 'POST' ? '{}' : undefined);
   });
 }
@@ -56,8 +64,10 @@ function summarize(host, {database, disk, now}) {
     lastSuccess: timestamp(updated.lastSuccess), lastAttempt: timestamp(updated.lastAttempt)};
   if (updates.state === 'ok' && (!updates.lastSuccess || Date.parse(updates.lastSuccess) > now + 300000)) updates.state = 'unknown';
   const job = host?.manual || {};
-  const manual = {available: job.available === true, state: ['idle', 'running', 'ok', 'failed'].includes(job.state) ? job.state : 'idle',
+  const manual = {available: job.available === true, state: ['idle', 'running', 'ok', 'failed'].includes(job.state) ? job.state : 'unknown',
     startedAt: timestamp(job.startedAt), finishedAt: timestamp(job.finishedAt)};
+  if (manual.state === 'ok' && (!manual.startedAt || !manual.finishedAt || Date.parse(manual.finishedAt) < Date.parse(manual.startedAt) || Date.parse(manual.finishedAt) > now + 300000)) manual.state = 'unknown';
+  if (manual.state === 'running' && (!manual.startedAt || manual.finishedAt || Date.parse(manual.startedAt) > now + 300000)) manual.state = 'unknown';
   const warnings = [];
   if (database.state !== 'ok') warnings.push('DATABASE_UNAVAILABLE');
   if (disk.state === 'warning') warnings.push('DISK_SPACE_LOW');
@@ -69,25 +79,50 @@ function summarize(host, {database, disk, now}) {
   if (updates.state === 'failed') warnings.push('UPDATE_FAILED');
   if (updates.state === 'unknown') warnings.push('UPDATE_STATUS_UNKNOWN');
   if (manual.state === 'failed') warnings.push('MANUAL_BACKUP_FAILED');
-  const states = [database.state, disk.state, backups.state, secondary.state, updates.state, manual.state === 'failed' ? 'failed' : 'ok'];
+  if (!manual.available) warnings.push('MANUAL_BACKUP_UNAVAILABLE');
+  if (manual.state === 'unknown') warnings.push('MANUAL_BACKUP_STATUS_UNKNOWN');
+  const states = [database.state, disk.state, backups.state, secondary.state, updates.state,
+    manual.state === 'failed' ? 'failed' : !manual.available || manual.state === 'unknown' ? 'unknown' : 'ok'];
   const state = states.includes('failed') ? 'failed' : states.includes('warning') ? 'warning' : states.includes('unknown') ? 'unknown' : 'ok';
   return {state, checkedAt: new Date(now).toISOString(), database, disk, backups, secondary, updates, manual, warnings};
 }
 function createMaintenance({store, filename, socketPath, now = Date.now, request = hostRequest}) {
-  let pending;
-  async function status() {
+  let pending, generation = 0;
+  let identity;
+  if (filename !== ':memory:') {
+    try { const file = fs.lstatSync(filename, {bigint: true}); identity = {device: file.dev, inode: file.ino}; } catch { /* Report unavailable below. */ }
+  }
+  async function readStatus() {
+    const startedGeneration = generation;
     let host = null;
     if (socketPath) {
-      // Coalesce simultaneous page refreshes; a failed read never reuses old success.
-      pending ||= request(socketPath, '/status').catch(() => null).finally(() => { pending = null; });
-      host = await pending;
+      host = await request(socketPath, '/status').catch(() => null);
     }
+    // A manual action may have changed the host while this read was in flight.
+    // Discard its old snapshot rather than claiming a result from before it.
+    if (generation !== startedGeneration) host = null;
     let database;
     try {
-      const checks = store.db.prepare('PRAGMA quick_check(1)').all();
-      database = {state: checks.length === 1 && checks[0].quick_check === 'ok' ? 'ok' : 'failed'};
+      if (filename !== ':memory:') {
+        const file = fs.lstatSync(filename, {bigint: true});
+        if (!identity || !file.isFile() || file.nlink !== 1n || file.size === 0n || file.dev !== identity.device || file.ino !== identity.inode) throw new Error();
+        fs.accessSync(filename, fs.constants.R_OK | fs.constants.W_OK);
+      }
+      // Check access without scanning every data/BLOB page on each screen poll.
+      // Backup verification performs the complete database integrity checks.
+      const check = store.db.prepare('SELECT count(*) AS readable FROM sqlite_schema').get();
+      database = {state: Number.isSafeInteger(check?.readable) && check.readable > 0 ? 'ok' : 'failed'};
     } catch { database = {state: 'failed'}; }
     return summarize(host, {database, disk: capacity(filename), now: now()});
+  }
+  function status() {
+    // Share the whole check, including SQLite/disk reads, for concurrent callers.
+    // After settlement, the next request reads afresh and never reuses old green.
+    if (!pending) {
+      const operation = readStatus().finally(() => { if (pending === operation) pending = null; });
+      pending = operation;
+    }
+    return pending;
   }
   async function backup() {
     if (!socketPath) throw problem(503, 'MAINTENANCE_UNAVAILABLE');
@@ -96,6 +131,7 @@ function createMaintenance({store, filename, socketPath, now = Date.now, request
       if (result.state !== 'running') throw new Error();
       return {state: 'running'};
     } catch (error) { throw problem(error.status === 409 ? 409 : 503, error.status === 409 ? 'BACKUP_BUSY' : 'MAINTENANCE_UNAVAILABLE'); }
+    finally { generation++; pending = null; }
   }
   return {status, backup};
 }

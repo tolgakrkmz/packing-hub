@@ -466,11 +466,20 @@ The page uses the shared Package Hub theme and supports BG/EN and small screens.
 The Bulgarian [practical scenarios and test coverage](SYSTEM-STATUS-SCENARIOS.md)
 explain how this task complements backup and recovery.
 
-The page checks SQLite and the space available to the database's user. It warns
+The page checks database access with a small schema read and the space available
+to the database's user. Complete database integrity scans remain part of backup
+verification, rather than running on every screen poll. Concurrent status
+requests share the entire check.
+The check also verifies access to the same regular database file the server
+opened. A missing, replaced, empty or linked file cannot be hidden by SQLite's
+cached schema. It warns
 below 1 GiB or 10% free space. Backup timestamps, the second disk's mount/UUID and
 update results come from an optional local host adapter. Backups become overdue
 after their configured interval plus 15 minutes. Unknown, failed and overdue
 checks are distinct; a failed refresh hides the previous successful summary.
+Browser requests stop waiting after 20 seconds and allow a fresh check. Restoring
+the screen from the browser's back/forward cache hides the old summary until it
+has been checked again. A stale or aborted response cannot overwrite that check.
 There are no public archive links, host paths, revisions, account details or log
 contents in the status response. `/healthz` keeps its minimal public response.
 
@@ -492,14 +501,28 @@ application. It adds no network listener, timer, external notification or Docker
 socket inside the application. Its only operations are status reads and starting
 `package-hub-backup.service`; API request data cannot supply commands or paths.
 The application never mounts the backup disks or private host configuration.
+Install while the backup service is idle. Preflight rejects an active backup,
+unsafe or linked configuration/worker/unit files, and a missing service. Re-running
+the installer refreshes an already active adapter with `try-restart`; a failed
+copy, reload, enable or restart never reports a successful installation.
 For the socket activation contract, see the official
 [systemd socket documentation](https://github.com/systemd/systemd/blob/main/man/systemd.socket.xml).
 
 **Create backup** returns an asynchronous status, then the screen polls progress.
-Concurrent requests and an active scheduled backup are refused. Success requires
-a newly confirmed successful pair. Closing the browser does not cancel the host
+Concurrent requests and an active scheduled backup are refused. A manual request
+invalidates any older in-flight status snapshot; the screen
+reads again after the request rather than reusing an old idle result.
+Success requires a newly confirmed successful pair with canonical matching timestamps and no
+error code. A lost reply does not imply that the host action was cancelled: the
+screen checks status and never retries a POST automatically. A failed attempt
+to create the worker thread leaves a failed, retryable job. Closing the browser does not cancel the host
 service. Missing configuration leaves the relevant cards unknown and the action
 unavailable; the standalone/offline application offers no maintenance controls.
+An unavailable manual service or an unconfirmed manual result also prevents an
+entirely successful overall summary. The adapter limits simultaneous connections
+to eight and gives each status/preflight operation a shared ten-second command
+budget, with at most five seconds per command. A timed-out disk check remains
+unknown. The application bounds and validates the adapter's HTTP/JSON responses.
 
 The auto-update script now records a private fixed-state `last-attempt` marker,
 including failures before build/deployment, while `last-good` retains the actual

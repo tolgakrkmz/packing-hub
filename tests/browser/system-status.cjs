@@ -34,6 +34,12 @@ async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, 
   await expect(admin.locator('#databaseState')).toHaveText('Изправно');
   await expect(admin.locator('#backupState')).toHaveText('Изправно');
   await expect(admin.locator('.server-links a[href="/system-status.html"]')).toHaveAttribute('aria-current', 'page');
+  // A restored page must check again before showing an old successful summary.
+  await admin.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
+  fixture.set(value => { value.backups.secondaryAvailable = false; });
+  await admin.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
+  await expect(admin.locator('#secondaryState')).toHaveText('Проблем');
+  fixture.healthy(); await admin.locator('#refreshSystem').click();
   fixture.set(value => { value.backups.secondaryAvailable = false; value.updates.state = 'failed'; }); fixture.disk(0n);
   await admin.locator('#refreshSystem').click();
   await expect(admin.locator('#systemWarnings')).toContainText('Свободното място е малко');
@@ -57,11 +63,61 @@ async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, 
   fixture.reply(409); await admin.locator('#manualBackup').click();
   await expect(admin.locator('#manualMessage')).toContainText('Вече се изпълнява архив');
   fixture.reply(503); await admin.locator('#manualBackup').click();
-  await expect(admin.locator('#manualMessage')).toContainText('не може да се стартира');
+  await expect(admin.locator('#manualMessage')).toContainText('Не можем да потвърдим');
+  fixture.reply(202);
+  const beforeLostReply = fixture.calls();
+  await admin.route('**/api/admin/backup', async route => { await route.fetch(); await route.abort(); });
+  await admin.locator('#manualBackup').click();
+  await expect(admin.locator('#manualMessage')).toContainText('създава и проверява');
+  assert.equal(fixture.calls(), beforeLostReply + 1);
+  await expect(admin.locator('#manualBackup')).toBeDisabled();
+  await admin.unroute('**/api/admin/backup');
+  fixture.set(value => { value.manual.state = 'ok'; value.manual.finishedAt = new Date().toISOString(); });
+  await admin.locator('#refreshSystem').click();
+  await expect(admin.locator('#manualMessage')).toContainText('завършен');
   await admin.route('**/api/admin/status', route => route.abort()); await admin.locator('#refreshSystem').click();
   await expect(admin.locator('#systemContent')).toBeHidden(); await expect(admin.locator('#systemMessage')).toContainText('Опитай отново');
   await admin.unroute('**/api/admin/status'); await admin.locator('#refreshSystem').click();
   await expect(admin.locator('#systemContent')).toBeVisible();
+  console.log('RUN bounded browser requests and recovery after stalled status/manual replies');
+  const stalledStatus = [];
+  await admin.route('**/api/admin/status', route => { stalledStatus.push(route); });
+  await admin.locator('#refreshSystem').click();
+  await expect(admin.locator('#systemContent')).toBeHidden({timeout: 25000});
+  await expect(admin.locator('#refreshSystem')).toBeEnabled();
+  await expect(admin.locator('#systemMessage')).toContainText('Опитай отново');
+  await admin.unroute('**/api/admin/status');
+  for (const route of stalledStatus) await route.abort().catch(() => {});
+  await admin.locator('#refreshSystem').click(); await expect(admin.locator('#systemContent')).toBeVisible();
+  const beforeStalledBackup = fixture.calls(), stalledBackup = [];
+  await admin.route('**/api/admin/backup', route => { stalledBackup.push(route); });
+  await admin.locator('#manualBackup').click();
+  await expect(admin.locator('#manualBackup')).toBeDisabled();
+  await expect(admin.locator('#manualMessage')).toContainText('Не можем да потвърдим', {timeout: 25000});
+  await expect(admin.locator('#manualBackup')).toBeEnabled();
+  assert.equal(fixture.calls(), beforeStalledBackup);
+  await admin.unroute('**/api/admin/backup');
+  for (const route of stalledBackup) await route.abort().catch(() => {});
+  fixture.reply(202); await admin.locator('#manualBackup').focus(); await admin.keyboard.press('Enter');
+  await expect(admin.locator('#manualMessage')).toContainText('създава и проверява');
+  assert.equal(fixture.calls(), beforeStalledBackup + 1);
+  fixture.set(value => { value.manual.state = 'failed'; value.manual.finishedAt = new Date().toISOString(); });
+  await admin.locator('#refreshSystem').click(); await expect(admin.locator('#manualMessage')).toContainText('неуспешен');
+  console.log('PASS bounded requests, no automatic POST retry, keyboard action and manual failure');
+  fixture.healthy(); await admin.locator('#refreshSystem').click();
+  const beforeConcurrentBackup = fixture.calls(); let heldOldStatus, intercepted = 0, entered;
+  const oldStatusArrived = new Promise(resolve => { entered = resolve; });
+  await admin.route('**/api/admin/status', route => {
+    if (++intercepted === 1) { heldOldStatus = route; entered(); } else return route.continue();
+  });
+  await admin.locator('#refreshSystem').click(); await oldStatusArrived;
+  await admin.locator('#manualBackup').click();
+  await expect(admin.locator('#manualMessage')).toContainText('създава и проверява');
+  await expect(admin.locator('#manualBackup')).toBeDisabled();
+  await expect(admin.locator('#refreshSystem')).toBeEnabled();
+  assert.equal(fixture.calls(), beforeConcurrentBackup + 1); assert.ok(intercepted >= 2);
+  await heldOldStatus.abort().catch(() => {}); await admin.unroute('**/api/admin/status');
+  console.log('PASS manual backup during an older status request: fresh read and no stale idle result');
   for (const role of ['operator', 'observer']) {
     await hub.auth.create('demo-status-' + role, 'Fictional-password-123', role);
     const page = await device('demo-status-' + role, true);
@@ -87,4 +143,23 @@ async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, 
     }
   }
 }
-module.exports = {statusFixture, exerciseSystemStatus};
+async function exerciseOfflineSystemStatus(browser, base, expect) {
+  const context = await browser.newContext({viewport: {width: 390, height: 844}});
+  await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+  const page = await context.newPage(), errors = [], apiRequests = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.method()); });
+  try {
+    await page.goto(base + '/system-status.html');
+    await expect(page.locator('#systemContent')).toBeHidden();
+    await expect(page.locator('#refreshSystem')).toBeDisabled();
+    await expect(page.locator('#manualBackup')).toBeDisabled();
+    await expect(page.locator('#systemMessage')).toContainText('само за администратор в сървърната версия');
+    await page.locator('[data-hub-language=en]').click();
+    await expect(page.locator('#systemMessage')).toContainText('only to an administrator in server mode');
+    await assertResponsive(page, 'Standalone system status notice at 390px');
+    assert.deepEqual(apiRequests, []); assert.deepEqual(errors, []);
+    console.log('PASS standalone system status: server-only notice, disabled controls, BG/EN, no API requests');
+  } finally { await context.close(); }
+}
+module.exports = {statusFixture, exerciseSystemStatus, exerciseOfflineSystemStatus};

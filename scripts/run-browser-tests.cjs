@@ -8,7 +8,9 @@ const root = path.resolve(__dirname, '..');
 
 async function main() {
   const {chromium} = require('playwright');
+  const {expect} = require('playwright/test');
   const {run} = require('../tests/browser/workflows.cjs');
+  const {exerciseOfflineSystemStatus} = require('../tests/browser/system-status.cjs');
   const tokens = privateTokens(process.env.PACKAGE_HUB_PRIVATE_SOURCE || path.resolve(root, '../..'));
   // In-memory, exact-path allowlist: neither URL traversal nor new files can expose local data.
   const assets = new Map();
@@ -42,6 +44,7 @@ async function main() {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
     await run(browser, `http://127.0.0.1:${server.address().port}`, {headed});
+    await exerciseOfflineSystemStatus(browser, `http://127.0.0.1:${server.address().port}`, expect);
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

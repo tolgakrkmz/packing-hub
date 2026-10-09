@@ -1035,7 +1035,7 @@ Object.assign(HUB_EN_MESSAGES, {
   'Последна проверка:': 'Last checked:', 'Няма данни': 'No data', 'Изправно': 'Healthy', 'Внимание': 'Attention', 'Проблем': 'Issue',
   'Проверките са успешни': 'Checks passed', 'Има предупреждение': 'There is a warning', 'Необходима е проверка': 'Review required', 'Проверката е непълна': 'Checks are incomplete',
   'Работна база': 'Application database', 'Достъпна': 'Available', 'Няма потвърждение': 'Not confirmed',
-  'Проверка на достъпността и целостта на базата.': 'Database availability and integrity check.',
+  'Проверка на достъпността на базата.': 'Database availability check.',
   'Свободно място': 'Free space', 'Свободни от': 'Free of', 'Използвано място': 'Used space',
   'Архивиране': 'Backups', 'Последен успешен архив': 'Last successful backup', 'Последен опит': 'Last attempt', 'График': 'Schedule', 'На всеки': 'Every', 'часа': 'hours',
   'Второ копие': 'Second copy', 'Последно проверено копие': 'Last verified copy',
@@ -1054,11 +1054,13 @@ Object.assign(HUB_EN_MESSAGES, {
   'Няма потвърдени данни за защитата с два архива.': 'Two-copy backup protection is not confirmed.',
   'Последната проверка или обновяване е неуспешно.': 'The last update check or deployment failed.', 'Няма потвърдени данни за последното обновяване.': 'The last update is not confirmed.',
   'Ръчният архив е неуспешен. Провери местната настройка.': 'The manual backup failed. Check local configuration.',
+  'Ръчният архив не е достъпен. Провери местната настройка.': 'Manual backup is unavailable. Check local configuration.',
+  'Резултатът от ръчния архив не може да бъде потвърден.': 'The manual backup result cannot be confirmed.',
   'Архивът се създава и проверява. Можеш да оставиш екрана отворен.': 'The backup is being created and checked. You can leave this screen open.',
   'Ръчният архив е завършен. Провери статуса на двете копия.': 'The manual backup completed. Check both copy statuses.',
   'Статусът не може да се прочете. Опитай отново.': 'Status could not be read. Try again.',
   'Този екран е достъпен само за администратор в сървърната версия.': 'This screen is available only to an administrator in server mode.',
   'Заявката за архив е изпратена.': 'The backup request was sent.', 'Вече се изпълнява архив. Изчакай и опресни.': 'A backup is already running. Wait and refresh.',
-  'Архивът не може да се стартира. Провери местната настройка.': 'The backup could not be started. Check local configuration.'
+  'Не можем да потвърдим заявката за архив. Опресни статуса, преди нов опит.': 'We cannot confirm the backup request. Refresh the status before trying again.'
 });
 Object.assign(HUB_EN_MESSAGES, {'Второто копие е по-старо от зададения график.': 'The second copy is older than the configured schedule.'});

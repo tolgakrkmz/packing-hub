@@ -11,21 +11,23 @@ function fixture(t, mode = 'success') {
   t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
   const root = path.join(directory, 'root'), bin = path.join(directory, 'bin'), commands = path.join(directory, 'commands');
   for (const folder of [bin, path.join(root, 'etc/systemd/system'), path.join(root, 'usr/local/libexec')]) fs.mkdirSync(folder, {recursive: true});
-  for (const file of ['etc/package-hub-backup.conf', 'etc/systemd/system/package-hub-backup.service', 'usr/local/libexec/package-hub-backup.sh']) fs.writeFileSync(path.join(root, file), 'Fictional existing installation', {mode: 0o600});
+  for (const [file, mode] of [['etc/package-hub-backup.conf', 0o600], ['etc/systemd/system/package-hub-backup.service', 0o644], ['usr/local/libexec/package-hub-backup.sh', 0o755]]) fs.writeFileSync(path.join(root, file), 'Fictional existing installation', {mode});
   const boundary = path.join(bin, 'boundary.cjs');
   fs.writeFileSync(boundary, `#!/usr/bin/env node
 const fs=require('node:fs'),path=require('node:path'),name=path.basename(process.argv[1]),args=process.argv.slice(2),mode=process.env.FICTIONAL_INSTALL_MODE;
 const file=process.env.FICTIONAL_INSTALL_COMMANDS,list=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):[];
 list.push([name,...args]);fs.writeFileSync(file,JSON.stringify(list));let value='',status=0;
-if(name==='stat') value=(mode==='wrong-owner'?'1000':'0')+':'+(fs.statSync(args.at(-1)).mode&0o777).toString(8);
+if(name==='stat') {const info=fs.statSync(args.at(-1));value=(mode==='wrong-owner'?'1000':'0')+':'+(info.mode&0o777).toString(8)+':'+info.nlink;}
 else if(name==='systemctl') {
-  if(args[0]==='show') value=mode==='missing-service'?'not-found':'loaded';
-  if((mode==='reload-fails'&&args[0]==='daemon-reload')||(mode==='enable-fails'&&args[0]==='enable')) status=1;
+  if(args[0]==='show') value=args.includes('--property=ActiveState')?(mode==='active-backup'?'activating':'inactive'):(mode==='missing-service'?'not-found':'loaded');
+  if((mode==='reload-fails'&&args[0]==='daemon-reload')||(mode==='enable-fails'&&args[0]==='enable')||(mode==='restart-fails'&&args[0]==='try-restart')) status=1;
 } else if(name==='id') value='1000';
+else if(name==='install') status=1;
 if(status) process.stderr.write('Fictional private command detail');
 if(value) process.stdout.write(value+'\\n');process.exit(status);
 `, {mode: 0o755});
   for (const name of ['systemctl', 'stat', 'id', 'docker', 'mountpoint', 'findmnt']) fs.symlinkSync(boundary, path.join(bin, name));
+  if (mode === 'copy-fails') fs.symlinkSync(boundary, path.join(bin, 'install'));
   return {root, directory, config: path.join(root, 'etc/package-hub-backup.conf'), run(cliArgs) {
     const staged = 'set -Eeuo pipefail; umask 077; exec 2>/dev/null; source "$1"; trap abort ERR; check_host "$2"; install_service "$(dirname "$1")" "$2"';
     const result = spawnSync('bash', cliArgs ? [script, ...cliArgs] : ['-c', staged, 'fictional-install', script, root],
@@ -49,17 +51,25 @@ test('maintenance installer stages the exact protected source files and enables 
   }
   assert.deepEqual(result.commands.filter(args => args[0] === 'systemctl'), [
     ['systemctl', 'show', 'package-hub-backup.service', '--property=LoadState', '--value'],
-    ['systemctl', 'daemon-reload'], ['systemctl', 'enable', '--now', 'package-hub-maintenance.socket']
+    ['systemctl', 'show', 'package-hub-backup.service', '--property=ActiveState', '--value'],
+    ['systemctl', 'daemon-reload'], ['systemctl', 'enable', '--now', 'package-hub-maintenance.socket'],
+    ['systemctl', 'try-restart', 'package-hub-maintenance.service']
   ]);
   assert.equal(fs.readFileSync(demo.config, 'utf8'), 'Fictional existing installation');
 });
 
-for (const mode of ['public-config', 'symlink-config', 'missing-config', 'wrong-owner', 'missing-service']) {
+for (const mode of ['public-config', 'symlink-config', 'hardlink-config', 'missing-config', 'wrong-owner', 'missing-service', 'active-backup', 'missing-worker', 'writable-worker', 'symlink-worker', 'writable-unit']) {
   test('maintenance installer refuses ' + mode + ' before installing the adapter', t => {
     const demo = fixture(t, mode);
     if (mode === 'public-config') fs.chmodSync(demo.config, 0o644);
     if (mode === 'missing-config' || mode === 'symlink-config') fs.unlinkSync(demo.config);
     if (mode === 'symlink-config') fs.symlinkSync(path.join(demo.root, 'usr/local/libexec/package-hub-backup.sh'), demo.config);
+    if (mode === 'hardlink-config') fs.linkSync(demo.config, path.join(demo.directory, 'fictional-copy.conf'));
+    const worker = path.join(demo.root, 'usr/local/libexec/package-hub-backup.sh');
+    if (mode === 'missing-worker' || mode === 'symlink-worker') fs.unlinkSync(worker);
+    if (mode === 'symlink-worker') fs.symlinkSync(demo.config, worker);
+    if (mode === 'writable-worker') fs.chmodSync(worker, 0o777);
+    if (mode === 'writable-unit') fs.chmodSync(path.join(demo.root, 'etc/systemd/system/package-hub-backup.service'), 0o666);
     const result = demo.run();
     assert.notEqual(result.status, 0); assert.equal(result.stderr, '');
     assert.ok(!fs.existsSync(path.join(demo.root, 'usr/local/libexec/package-hub-maintenance-host.py')));
@@ -67,7 +77,7 @@ for (const mode of ['public-config', 'symlink-config', 'missing-config', 'wrong-
   });
 }
 
-for (const mode of ['reload-fails', 'enable-fails']) {
+for (const mode of ['copy-fails', 'reload-fails', 'enable-fails', 'restart-fails']) {
   test('maintenance installer ' + mode + ' reports failure without claiming a working endpoint', t => {
     const demo = fixture(t, mode), result = demo.run();
     assert.notEqual(result.status, 0); assert.equal(result.stderr, '');

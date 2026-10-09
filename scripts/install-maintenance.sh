@@ -6,9 +6,13 @@ check_host() {
   for command in python3 systemctl docker mountpoint findmnt install stat; do command -v "$command" >/dev/null; done
   [[ -x /usr/bin/python3 ]] || abort
   /usr/bin/python3 -c 'import sys; assert sys.version_info >= (3, 8)'
-  [[ -f "$install_root/etc/package-hub-backup.conf" && ! -L "$install_root/etc/package-hub-backup.conf" && $(stat -c '%u:%a' "$install_root/etc/package-hub-backup.conf") == 0:600 ]] || abort
-  [[ -f "$install_root/usr/local/libexec/package-hub-backup.sh" && -f "$install_root/etc/systemd/system/package-hub-backup.service" ]] || abort
+  [[ -f "$install_root/etc/package-hub-backup.conf" && ! -L "$install_root/etc/package-hub-backup.conf" && $(stat -c '%u:%a:%h' "$install_root/etc/package-hub-backup.conf") == 0:600:1 ]] || abort
+  [[ -f "$install_root/usr/local/libexec/package-hub-backup.sh" && ! -L "$install_root/usr/local/libexec/package-hub-backup.sh" && $(stat -c '%u:%a:%h' "$install_root/usr/local/libexec/package-hub-backup.sh") == 0:755:1 ]] || abort
+  [[ -f "$install_root/etc/systemd/system/package-hub-backup.service" && ! -L "$install_root/etc/systemd/system/package-hub-backup.service" && $(stat -c '%u:%a:%h' "$install_root/etc/systemd/system/package-hub-backup.service") == 0:644:1 ]] || abort
   [[ $(systemctl show package-hub-backup.service --property=LoadState --value) == loaded ]] || abort
+  local active
+  active=$(systemctl show package-hub-backup.service --property=ActiveState --value)
+  [[ $active == inactive || $active == failed ]] || abort
 }
 install_service() {
   # Tests stage these exact copies in a temporary root; the CLI always uses /.
@@ -19,6 +23,8 @@ install_service() {
   install -m 600 "$script_dir/../compose.maintenance.yaml" "$install_root/etc/package-hub-maintenance.compose.yaml"
   systemctl daemon-reload
   systemctl enable --now package-hub-maintenance.socket
+  # Existing socket-activated workers must load the newly reviewed source too.
+  systemctl try-restart package-hub-maintenance.service
   echo 'Local maintenance endpoint installed. Apply the reviewed Compose override during a planned deployment.'
 }
 main() {
