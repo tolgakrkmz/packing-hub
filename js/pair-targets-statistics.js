@@ -1,20 +1,19 @@
 /* Read-only monthly dashboard; it can render without production or personnel files. */
-function createPairTargetsStatistics({dbName, localStorageKey}) {
+function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onDataChange}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const fmt = value => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits: 2});
   const pct = value => value === null ? '—' : fmt(value) + '%';
   const monthLabel = month => new Date(Number(month.slice(0,4)), Number(month.slice(5,7)) - 1, 1).toLocaleDateString('bg-BG', {month:'long', year:'numeric'});
   const statusLabels = {pending:'Очаква отчет', achieved:'Постигнат', missed:'Непостигнат'};
-  let data = PairTargets.emptyData(), loaded = false, started = false, selectedMonth = '';
+  let data = PairTargets.emptyData(), loaded = false, started = false;
   const elements = Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key, $('pairStats' + key[0].toUpperCase() + key.slice(1))]));
   const accept = value => { data = PairTargets.validateData(value); loaded = true; };
   const sync = createFileSync({
     dbName, localStorageKey, suggestedFileName:'pair-targets.json', readOnly:true, strictJson:true,
-    defaultData:PairTargets.emptyData, getData:() => data, onConnect:accept, onRefresh:accept, render, elements
+    defaultData:PairTargets.emptyData, getData:() => data, onConnect:accept, onRefresh:accept, render:onDataChange, elements
   });
   $('pairStatsTeam').innerHTML = '<option value="">Всички екипи</option>' + PairTargets.TEAMS.map(team => `<option value="${escape(team)}">${escape(team)}</option>`).join('');
-  $('pairStatsMonth').addEventListener('change', () => { selectedMonth = $('pairStatsMonth').value; render(); });
   $('pairStatsTeam').addEventListener('change', render);
 
   function reportsTable(records) {
@@ -28,15 +27,12 @@ function createPairTargetsStatistics({dbName, localStorageKey}) {
 
   function render() {
     const openGroups = new Set(Array.from($('pairStatsBody').querySelectorAll('details[open]')).map(node => node.dataset.group));
-    const months = [...new Set(data.entries.map(entry => entry.date.slice(0,7)))].sort();
-    if (!months.includes(selectedMonth)) selectedMonth = months[months.length - 1] || '';
-    $('pairStatsMonth').innerHTML = months.length ? months.map(month => `<option value="${month}">${escape(monthLabel(month))}</option>`).join('') : '<option value="">Няма записи</option>';
-    $('pairStatsMonth').value = selectedMonth;
-    $('pairStatsMonth').disabled = !months.length;
+    const selectedMonth = getPeriod();
+    $('pairStatsPeriod').textContent = monthLabel(selectedMonth);
     $('pairStatsHint').textContent = !loaded ? 'Свържете pair-targets.json от панела за файловете. Статистиката само чете отчетите.' : 'Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Килограмите не се добавят към „Тонаж и брак“.';
     const result = PairTargetsStatistics.aggregate(data.entries, selectedMonth, $('pairStatsTeam').value);
     if (!result.planned) {
-      $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? 'Няма свързан файл за двойките.' : !months.length ? 'Все още няма планирани двойки.' : 'Няма двойки за избрания месец и екип.'}</div>`;
+      $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
       return;
     }
     const card = (label, value, sub) => `<div class="kpi-card"><div class="lab">${label}</div><div class="val">${value}</div><div class="sub">${sub}</div></div>`;
@@ -62,6 +58,7 @@ function createPairTargetsStatistics({dbName, localStorageKey}) {
   }
   return {
     init() { if (!started) { started = true; sync.init(); } render(); },
-    render
+    render,
+    getYears() { return data.entries.map(entry => entry.date.slice(0, 4)); }
   };
 }

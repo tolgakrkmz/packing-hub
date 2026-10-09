@@ -83,12 +83,12 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
   }
   const controls = new Map();
   let config, inits = 0;
-  const ui = vm.createContext({Date,
+  const ui = vm.createContext({Date, period:'2026-10',
     document:{getElementById(id) { if (!controls.has(id)) controls.set(id,new Control()); return controls.get(id); }},
     createFileSync(cfg) { config = cfg; return {init() { inits++; }}; }
   });
   for (const file of ['shift-schedule','pair-targets-model','pair-targets-statistics-model','pair-targets-statistics']) load(ui,file);
-  const dashboard = vm.runInContext("createPairTargetsStatistics({dbName:'demo-pairs',localStorageKey:'demo-pairs'})", ui);
+  const dashboard = vm.runInContext("createPairTargetsStatistics({dbName:'demo-pairs',localStorageKey:'demo-pairs',getPeriod:() => period,onDataChange:() => {}})", ui);
   assert.equal(config.readOnly, true);
   assert.equal(config.strictJson, true);
   dashboard.render();
@@ -99,13 +99,17 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
     entry('one', {result:output(0,0,'other','<img src=x onerror=alert(1)>')}),
     entry('old', {date:'2025-12-31'})]});
   dashboard.render();
-  assert.equal(controls.get('pairStatsMonth').value, '2026-10');
+  assert.match(controls.get('pairStatsPeriod').textContent, /октомври 2026/);
+  assert.deepEqual(plain(dashboard.getYears()), ['2026','2025']);
   assert.match(controls.get('pairStatsBody').innerHTML, /&lt;img/);
   assert.doesNotMatch(controls.get('pairStatsBody').innerHTML, /<img/);
-  controls.get('pairStatsMonth').value = '2025-12';
-  controls.get('pairStatsMonth').listeners.change();
+  ui.period = '2025-12';
   dashboard.render();
-  assert.equal(controls.get('pairStatsMonth').value, '2025-12');
+  assert.match(controls.get('pairStatsPeriod').textContent, /декември 2025/);
+  ui.period = '2026-09';
+  dashboard.render();
+  assert.match(controls.get('pairStatsBody').innerHTML, /Няма двойки за избрания/);
+  assert.match(controls.get('pairStatsPeriod').textContent, /септември 2026/);
   const accepted = config.getData();
   assert.throws(() => config.onRefresh({entries:[]}));
   assert.equal(config.getData(), accepted);

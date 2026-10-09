@@ -13,6 +13,7 @@ const {exerciseTasks} = require('../tests/browser/tasks.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
 const {statusFixture, exerciseSystemStatus} = require('../tests/browser/system-status.cjs');
+const {statisticsFixture, exerciseStatisticsPeriod, changedSources} = require('../tests/browser/statistics-period.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -23,6 +24,11 @@ async function main() {
   const errors = [];
   try {
     await hub.auth.create('demo-admin', demoPassword, 'admin');
+    if (process.argv.includes('--statistics-only')) {
+      // Seed historical reports for read-only statistics, independently of
+      // current pair-planning rules. This database is temporary and fictional.
+      for (const [kind, data] of Object.entries(statisticsFixture())) hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+    }
     await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
     const base = `http://127.0.0.1:${hub.server.address().port}`;
     browser = await chromium.launch({channel: 'chrome', headless: process.argv.includes('--headless'), slowMo: process.argv.includes('--headless') ? 0 : 250});
@@ -41,6 +47,20 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--statistics-only')) {
+      await admin.goto(base + '/statistics.html');
+      await expect(admin.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
+      await exerciseStatisticsPeriod({page:admin, expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
+        replaceSources:async () => {
+          for (const [kind, data] of Object.entries(changedSources())) hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+          await admin.locator('#statsFilesBtn').click();
+          await admin.locator('#refreshBtn').click();
+          await admin.locator('#pairStatsRefreshBtn').click();
+        }
+      });
+      assert.deepEqual(errors, []); return;
+    }
     if (status) {
       await exerciseSystemStatus({admin, hub, base, device, expect, fixture: status, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS administrator system status browser workflows'); return;

@@ -303,14 +303,14 @@
       <select id="yearSelect"></select>
     </div>
         <div class="dashboard-filter">
-          <label for="dashboardMonthSelect">Месец</label>
+          <label for="dashboardMonthSelect">Общ месец</label>
           <select class="dashboard-select" id="dashboardMonthSelect"></select>
         </div>
         </div>
       </div>
 
       <div class="stats-empty-month" id="monthlyResultEmpty" hidden>
-        Няма тонажни записи за избрания период. Свържете файла от „Тонаж и брак“, за да видите месечния резултат.<br>
+        Няма тонажни записи за избрания период.<br>
         <button class="conn-btn" id="monthlyConnectBtn">Свържи тонажен дневник</button>
       </div>
       <div id="monthlyResultBody">
@@ -510,10 +510,10 @@
       <div class="pair-stats-head">
         <div>
           <h2 id="pairStatsTitle">Двойки и таргети — месечен отчет</h2>
+          <p class="conn-note" id="pairStatsPeriod"></p>
           <a href="pair-targets.html">Отвори „Двойки и таргети“ →</a>
         </div>
         <div class="pair-stats-filters">
-          <label for="pairStatsMonth">Месец<select class="dashboard-select" id="pairStatsMonth"></select></label>
           <label for="pairStatsTeam">Екип<select class="dashboard-select" id="pairStatsTeam"></select></label>
         </div>
       </div>
@@ -523,7 +523,7 @@
 
     </div>
     <div class="stats-section" id="statsProduction" data-stats-panel="production" role="tabpanel" aria-labelledby="statsTabProduction" hidden>
-
+    <h2 id="productionScopeTitle"></h2>
 
     <div class="kpi-row" id="kpiRow"></div>
 
@@ -545,10 +545,6 @@
     <div class="panel">
       <div class="line-shift-head">
         <h2 id="lineShiftTitle">Ръчна / автоматична линия по смяна</h2>
-        <div class="line-month-filter">
-          <label for="lineShiftMonthSelect">Месец</label>
-          <select id="lineShiftMonthSelect"></select>
-        </div>
       </div>
       <div class="conn-note" id="lineShiftHint" style="margin:0 0 14px;"></div>
       <div id="lineShiftContainer" style="overflow-x:auto;"></div>
@@ -558,7 +554,7 @@
     </div>
     <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">
-      <h2>Престой на автоматична линия</h2>
+      <h2 id="downtimeScopeTitle">Престой на автоматична линия</h2>
       <div class="kpi-row" id="avKpiRow"></div>
       <div class="conn-note" id="avHint" style="margin-bottom:14px;"></div>
       <details class="stats-details">
