@@ -13,6 +13,7 @@ async function main() {
   const {exerciseOfflineSystemStatus} = require('../tests/browser/system-status.cjs');
   const {installStorage} = require('../tests/browser/storage.cjs');
   const {statisticsFixture, exerciseStatisticsPeriod, changedSources} = require('../tests/browser/statistics-period.cjs');
+  const {exerciseOfflineTransfer} = require('../tests/browser/data-transfer.cjs');
   const tokens = privateTokens(process.env.PACKAGE_HUB_PRIVATE_SOURCE || path.resolve(root, '../..'));
   // In-memory, exact-path allowlist: neither URL traversal nor new files can expose local data.
   const assets = new Map();
@@ -45,6 +46,9 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    if (process.argv.includes('--transfer-only')) {
+      await exerciseOfflineTransfer(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
+    }
     if (process.argv.includes('--statistics-only')) {
       const context = await browser.newContext({timezoneId:'Europe/Sofia'});
       const base = `http://127.0.0.1:${server.address().port}`;

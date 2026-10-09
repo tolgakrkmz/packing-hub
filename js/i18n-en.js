@@ -1080,3 +1080,34 @@ Object.assign(HUB_EN_MESSAGES, {
   'Всички години': 'All years',
   'Няма тонажни записи за избрания период.': 'No production records for the selected period.'
 });
+
+Object.assign(HUB_EN_MESSAGES, {
+  'Импорт и експорт': 'Import & export',
+  'Импорт / експорт': 'Import / export',
+  'Отчети и данни': 'Reports & data',
+  'Действия с данни': 'Data actions',
+  'Избери действие за отчетите и данните в общата база.': 'Choose an action for reports and data in the shared database.',
+  'Сваляй отчети или добавяй проверени данни към общата база.': 'Download reports or add verified data to the shared database.',
+  'Сваляй текущите отчети от общата база.': 'Download current reports from the shared database.',
+  'Сваляне на отчети': 'Download reports',
+  'Тонаж, престои и двойки': 'Production, downtime and pairs',
+  'Добавяне на история без промяна на целта': 'Add history while keeping the target',
+  'Модули и приложения': 'Modules & attachments',
+  'Общо добавяне на избрани файлове': 'Add selected files together',
+  'Свали отчет': 'Download a report',
+  'Избери модул и свали текущите му отчети като JSON файл. Записите в сайта се запазват.': 'Choose a module and download its current reports as a JSON file. Records in the site are kept.',
+  'Файлът съдържа отчетите от избрания модул. Той не е пълен архив на приложението.': 'The file contains reports from the selected module. It is not a full application backup.',
+  'Добави история на тонажа': 'Add production history',
+  'Подготовка на файла': 'Prepare the file',
+  'Добави данни от модули': 'Add module data',
+  'Избери JSON файлове и, ако прехвърляш инструкции, папката с приложенията. Прегледай новите записи, дубликатите и конфликтите преди потвърждение.': 'Select JSON files and, when importing instructions, the attachment folder. Review new records, duplicates and conflicts before confirming.',
+  'Тонаж и брак, престои, състав, двойки или инструкции.': 'Production and scrap, downtime, personnel, pairs or instructions.',
+  'Избери data, profiles или папката на старата програма.': 'Select data, profiles or the old application folder.',
+  'Преглед преди добавяне': 'Review before adding',
+  'Как работи импортът': 'How importing works',
+  'Избери актуалните файлове след последния запис в старата програма и запази копие на оригиналната папка.': 'Select current files after the last entry in the old application and keep a copy of the original folder.',
+  'Отделно избраните JSON файлове имат предимство пред копията в папката.': 'Separately selected JSON files take priority over copies in the folder.',
+  'Тази страница работи в сървърен режим. Отвори сайта и влез в акаунта си. За локални файлове използвай бутоните в съответния модул.': 'This page works in server mode. Open the site and sign in. For local files, use the controls in the corresponding module.',
+  'Импортът на тонаж е в общия екран за импорт и експорт.': 'Production import is on the shared import and export screen.',
+  'Отвори импорт и експорт': 'Open import and export'
+});

@@ -135,12 +135,21 @@ fields needed for selection. Workforce statistics receive aggregate counts,
 not personnel identities, notes, settings or movement history. Both read views
 refresh automatically after administrator changes to personnel.
 
-The server bar offers JSON exports of production, downtime and pair reports via
-authenticated `/api/export/<module>` endpoints. Exports use current server data
-and record only action metadata in the audit log. Denying export removes these
-controls and blocks the export API; it does not prevent copying information the
-account is allowed to view. Instruction attachments keep their separate viewing
-behavior. These permissions apply to shared server mode.
+The server bar links to the shared **Import & export** screen at
+`data-import.html`. Report downloads, production-history import and module/attachment
+import have separate tabs; switching tabs retains selected files and checked
+previews. The previous `production-import.html` address redirects to the
+production tab. Only permitted actions appear: export-only accounts can download
+reports, import-only administrators can import, and accounts with neither
+permission cannot open the screen. In file mode it shows guidance without sending
+data or enabling server controls.
+
+JSON downloads use the authenticated `/api/export/<module>` endpoints for
+production, downtime and pairs. Exports use current server data and record only
+action metadata in the audit log. Denying export removes these controls and blocks
+the export API; it does not prevent copying information the account is allowed to
+view. Instruction attachments keep their separate viewing behavior. These
+permissions apply to shared server mode.
 
 The server uses Node.js 24+ and SQLite without npm dependencies. All five module
 documents, accounts, sessions and packing attachments live in one local database.
@@ -280,7 +289,8 @@ cleared on later imports. Backup retention remains manual.
 
 Verify all modules and Reports, then enter new data only on the site. Old files
 remain an archive; the old application does not synchronize automatically.
-The earlier production-only importer remains available at `production-import.html`.
+The production-only importer is the **Production import** tab on the shared
+screen; `production-import.html` redirects there for authorized administrators.
 
 ### Backup and updates
 
@@ -686,9 +696,9 @@ is available by opening `data/personnel.json`.
 
 The shared package mark is a local, scalable SVG in the project amber/teal colors.
 Every screen uses it as its browser icon. File-mode pages link home through the
-wordmark; server-mode pages use the authenticated toolbar, with role-aware links,
-report export, connection status and language controls. Login keeps the same
-authentication flow and uses the shared palette. No remote fonts or images are
+wordmark; server-mode pages use the authenticated toolbar, with role-aware links
+to modules and Import & export, connection status and language controls. Login
+keeps the same authentication flow and uses the shared palette. No remote fonts or images are
 required. Deploy the `assets` directory with HTML/CSS/JS; retain live data files.
 
 The publication guard permits only the exact reviewed logo source fingerprint.
@@ -824,6 +834,17 @@ node scripts/run-server-browser-tests.cjs --headless --statistics-only
 
 These use fictional sources with different months and years, empty selections,
 source refreshes and annual scopes, in Bulgarian and English on phone and desktop.
+
+The shared import/export screen has focused browser checks in both modes:
+
+```sh
+node scripts/run-browser-tests.cjs --headless --transfer-only
+node scripts/run-server-browser-tests.cjs --headless --transfer-only
+```
+
+These check JSON downloads, retained file selections and previews, the legacy
+redirect, keyboard navigation, Bulgarian/English layouts from 320 to 1440 px,
+import/export permission combinations and the disabled offline controls.
 
 ### Visible browser tests
 

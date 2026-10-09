@@ -1,0 +1,47 @@
+/* Import/export follows the shared amber/teal palette and works on narrow phones. */
+.transfer-wrap{max-width:1060px;font-family:inherit}
+.transfer-header{margin-bottom:24px}
+.transfer-eyebrow{color:var(--teal);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:750;margin:0 0 10px}
+.transfer-header h1{font-size:clamp(26px,4vw,38px);margin:0 0 12px}
+.transfer-header>p:last-child{color:var(--text-muted);font-size:14px;margin:0;line-height:1.7}
+.transfer-navigation{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 24px}
+.transfer-navigation button{display:grid;gap:7px;text-align:left;padding:18px 20px;background:var(--panel);border:1px solid var(--border);color:var(--text);font:inherit;border-radius:14px;min-width:0}
+.transfer-navigation button strong{font-size:14px;line-height:1.5}
+.transfer-navigation button span{font-size:12px;font-weight:400;line-height:1.6;color:var(--text-muted)}
+.transfer-navigation button[aria-selected=true]{border-color:var(--teal);background:linear-gradient(135deg,#3fbfa018,var(--panel));box-shadow:inset 0 2px 0 var(--teal)}
+.transfer-card{padding:26px;border:1px solid var(--border);border-radius:18px;background:var(--panel);box-shadow:0 12px 36px #0002;min-width:0}
+.transfer-card h2{font-size:21px;line-height:1.4;margin:0 0 12px;letter-spacing:-.02em}
+.transfer-card p{font-size:13px;line-height:1.8;color:var(--text-muted)}
+.transfer-card .transfer-lead{font-size:14px;margin:0 0 20px;max-width:760px}
+.transfer-controls{border:0;padding:0;margin:0;min-width:0}
+.transfer-wrap .transfer-controls label{font-size:13px;font-weight:650;gap:9px}
+.transfer-export-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:16px;max-width:650px}
+.transfer-wrap .transfer-download{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 18px;box-sizing:border-box;border-radius:10px;background:var(--teal);color:#10251f;font-size:14px;font-weight:750;text-decoration:none}
+.transfer-wrap .transfer-controls select,.transfer-wrap .transfer-controls input[type=file]{background:var(--bg);border-radius:10px;font-size:14px;min-height:48px}
+.transfer-wrap .transfer-controls input[type=file]{display:block}
+.transfer-wrap .transfer-controls input[type=file]::file-selector-button{border:0;border-radius:6px;padding:8px 10px;background:var(--panel-2);color:var(--text);margin-right:10px;font:inherit;cursor:pointer}
+.transfer-upload-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.transfer-upload-grid label{padding:18px;background:var(--bg);border:1px dashed var(--border);border-radius:12px}
+.transfer-wrap #dataImportForm{margin:0 0 22px;padding:0;background:transparent;border:0;box-shadow:none;gap:20px}
+.transfer-wrap .transfer-controls small{font-size:12px;font-weight:400;line-height:1.7}
+.transfer-wrap .transfer-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.transfer-wrap button{font-family:inherit;font-size:13px}
+.transfer-wrap .transfer-secondary{background:var(--panel-2);color:var(--text-muted)}
+.transfer-guide{border:1px solid var(--border);border-radius:10px;background:var(--bg);padding:0 16px;margin:20px 0}
+.transfer-guide>summary{cursor:pointer;padding:14px 0;font-size:13px;font-weight:650;color:var(--text)}
+.transfer-guide ol{padding-left:20px;margin:0 0 16px;font-size:13px;color:var(--text-muted);line-height:1.8}
+.transfer-guide p{margin:0 0 16px}
+.transfer-preview{border-top:1px solid var(--border);padding-top:20px;margin-top:22px}
+.transfer-preview h3{font-size:15px;margin:0 0 14px}
+.transfer-wrap #importSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:20px 0}
+#importSummary>div{padding:13px;background:var(--bg);border:1px solid var(--border);border-radius:10px;min-width:0}
+#importSummary dt{font-size:11px;color:var(--text-muted);line-height:1.6}
+#importSummary dd{margin:6px 0 0;font-size:18px;font-weight:750;overflow-wrap:anywhere}
+.transfer-status{min-height:1.5em;font-size:13px!important;color:var(--text)!important;overflow-wrap:anywhere}
+.transfer-note{padding:12px 16px;border-left:3px solid var(--amber);background:#f5a62308;border-radius:0 8px 8px 0}
+.transfer-footer{display:flex;flex-wrap:wrap;gap:16px;margin-top:22px}
+.transfer-footer a{display:inline-flex;align-items:center;min-height:44px;color:var(--text-muted);font-size:13px;text-underline-offset:4px}
+.transfer-navigation:has(button[hidden]){grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+@media(hover:hover){.transfer-navigation button:hover{border-color:var(--teal)}.transfer-download:hover{filter:brightness(1.08)}}
+@media(max-width:700px){.transfer-navigation{gap:8px}.transfer-navigation button{padding:14px}.transfer-wrap #importSummary{grid-template-columns:repeat(2,minmax(0,1fr))}.transfer-upload-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.transfer-card{padding:18px 16px}.transfer-navigation{grid-template-columns:1fr}.transfer-navigation button{gap:4px}.transfer-export-row{grid-template-columns:1fr}.transfer-wrap .transfer-controls select,.transfer-wrap .transfer-controls input[type=file]{font-size:16px}.transfer-header{margin-bottom:20px}.transfer-upload-grid label{padding:14px}.transfer-actions button{flex:1 1 150px}}

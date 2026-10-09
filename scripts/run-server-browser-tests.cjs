@@ -14,6 +14,7 @@ const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs'
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
 const {statusFixture, exerciseSystemStatus} = require('../tests/browser/system-status.cjs');
 const {statisticsFixture, exerciseStatisticsPeriod, changedSources} = require('../tests/browser/statistics-period.cjs');
+const {exerciseDataTransfer} = require('../tests/browser/data-transfer.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
@@ -47,6 +48,11 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--transfer-only')) {
+      await exerciseDataTransfer({admin, hub, base, device, expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--statistics-only')) {
       await admin.goto(base + '/statistics.html');
       await expect(admin.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
@@ -230,8 +236,9 @@ async function main() {
     for (const [kind, data] of Object.entries(migration.payload.documents)) fs.writeFileSync(path.join(migrationDir, kind + '.json'), JSON.stringify(data));
     for (const [index, file] of migration.payload.files.entries()) { const filename = path.join(migrationDir, file.path); fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, migration.contents[index]); }
     fs.writeFileSync(path.join(migrationDir, 'unrelated-demo.txt'), 'Fictional unrelated file, must be skipped.');
-    await admin.getByRole('link', {name: 'Импорт на данни', exact: true}).click();
-    await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Data import'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
+    await admin.getByRole('link', {name: 'Импорт / експорт', exact: true}).click();
+    await admin.locator('[data-transfer-tab=modules]').click();
+    await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Import & export'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
     await admin.locator('[data-hub-language=bg]').click();
     console.log('RUN import JSON equality, conflicting folder copies and explicit-file priority');
     const duplicateDir = path.join(migrationDir, 'data'); fs.mkdirSync(duplicateDir, {recursive: true});
@@ -324,6 +331,7 @@ async function main() {
     await expect(limited).toHaveURL(base + '/index.html');
     await limited.goto(base + '/production-log.html'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
     await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
+    await limited.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
     const downloadPromise = limited.waitForEvent('download'); await limited.locator('#reportExport').click(); const download = await downloadPromise;
     assert.equal(download.suggestedFilename(), 'production-log.json'); const chunks = []; for await (const chunk of await download.createReadStream()) chunks.push(chunk);
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
@@ -336,8 +344,12 @@ async function main() {
     await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login.html');
     await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button').click();
     await expect(admin).toHaveURL(base + '/index.html');
-    await expect(admin.getByRole('link', {name: 'Импорт на данни', exact: true})).toHaveCount(0);
-    assert.equal(await admin.evaluate(async () => (await fetch('/data-import.html')).status), 403);
+    await admin.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+    await expect(admin.locator('[data-transfer-tab=production]')).toBeHidden();
+    await expect(admin.locator('[data-transfer-tab=modules]')).toBeHidden();
+    await expect(admin.locator('#reportExport')).toBeVisible();
+    assert.equal(await admin.evaluate(async () => (await fetch('/data-import.html')).status), 200);
+    assert.equal(await admin.evaluate(async () => (await fetch('/production-import.html')).status), 403);
     console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
     console.log('RUN shift and global tasks, approvals, missed reports and responsive task screens');
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);

@@ -1,26 +1,94 @@
 <!DOCTYPE html>
 <html lang="bg">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Импорт на данни · Package Hub</title><link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><script src="js/data-import.js" defer></script><link rel="stylesheet" href="css/layout.css">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Импорт и експорт · Package Hub</title>
 <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/server.css">
+<link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/brand.css">
 <link rel="stylesheet" href="css/brand-shell.css">
+<link rel="stylesheet" href="css/data-transfer.css">
+<link rel="stylesheet" href="css/i18n.css">
+<script src="js/i18n-en.js"></script>
+<script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
+<script src="js/data-transfer.js" defer></script>
+<script src="js/production-import.js" defer></script>
+<script src="js/data-import.js" defer></script>
 </head>
-<body><script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css"><main class="account-wrap import-wrap"><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><h1>Импорт на данни</h1>
-<p>Избери актуалните файлове от производствения компютър след последния запис в старата програма. Запази копие на оригиналната папка.</p>
-<ol><li>Избери JSON файловете за модулите. Можеш да ги избереш заедно.</li><li>За инструкциите избери и папката data, profiles или цялата папка на старата програма.</li><li>Провери прегледа и потвърди общото добавяне.</li></ol>
-<p>Прехвърлят се само избраните данни за модулите и посочените в инструкциите снимки, приложения и instruction.txt. Кодът и останалите файлове в папката се пропускат.</p>
-<p>Избраните отделно JSON файлове имат предимство пред копията в папката. Папката допълва само модулите, за които не си избрал файл.</p>
-<form id="dataImportForm"><label>JSON файлове за модулите<input id="moduleFiles" type="file" accept=".json,application/json" multiple></label>
-<label>Папка с данни и инструкции<input id="legacyFolder" type="file" webkitdirectory multiple></label>
+<body>
+<main class="account-wrap transfer-wrap">
+<a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
+<header class="transfer-header">
+<p class="transfer-eyebrow">Отчети и данни</p>
+<h1>Импорт и експорт</h1>
+<p id="transferIntro">Избери действие за отчетите и данните в общата база.</p>
+</header>
+<p class="transfer-note" id="transferOffline" hidden>Тази страница работи в сървърен режим. Отвори сайта и влез в акаунта си. За локални файлове използвай бутоните в съответния модул.</p>
+<nav class="transfer-navigation" id="transferNavigation" role="tablist" aria-label="Действия с данни" hidden>
+<button type="button" id="transferTabExport" role="tab" data-transfer-tab="export" aria-controls="transferExport" aria-selected="false" tabindex="-1" hidden><strong>Сваляне на отчети</strong><span>Тонаж, престои и двойки</span></button>
+<button type="button" id="transferTabProduction" role="tab" data-transfer-tab="production" aria-controls="transferProduction" aria-selected="false" tabindex="-1" hidden><strong>Импорт на тонаж</strong><span>Добавяне на история без промяна на целта</span></button>
+<button type="button" id="transferTabModules" role="tab" data-transfer-tab="modules" aria-controls="transferModules" aria-selected="false" tabindex="-1" hidden><strong>Модули и приложения</strong><span>Общо добавяне на избрани файлове</span></button>
+</nav>
+<section class="transfer-card" id="transferExport" data-transfer-panel="export" role="tabpanel" aria-labelledby="transferTabExport" hidden>
+<h2>Свали отчет</h2>
+<p class="transfer-lead">Избери модул и свали текущите му отчети като JSON файл. Записите в сайта се запазват.</p>
+<fieldset class="transfer-controls" data-transfer-controls="export" disabled>
+<div class="transfer-export-row">
+<label for="reportExportKind">Отчет за експорт<select id="reportExportKind">
+<option value="production-log">Тонаж и брак</option><option value="line-downtime">Престои</option><option value="pair-targets">Двойки и таргети</option>
+</select></label>
+<a class="transfer-download" id="reportExport" href="#">Свали отчет (.json)</a>
+</div>
+</fieldset>
+<p>Файлът съдържа отчетите от избрания модул. Той не е пълен архив на приложението.</p>
+</section>
+<section class="transfer-card" id="transferProduction" data-transfer-panel="production" role="tabpanel" aria-labelledby="transferTabProduction" hidden>
+<h2>Добави история на тонажа</h2>
+<p class="transfer-lead">Добавят се тонажът, бракът и разбивката по линии. Съществуващите записи и целта в сайта се запазват. Повторният импорт пропуска еднаквите записи. При конфликт нищо не се добавя.</p>
+<fieldset class="transfer-controls" data-transfer-controls="production" disabled>
+<label for="importFile">Файл с тонаж (JSON, до 2 MB)<input id="importFile" type="file" accept=".json,application/json"></label>
+<div class="transfer-actions"><button id="previewImport" type="button" disabled>Провери файла</button></div>
+<dl id="importSummary" aria-live="polite" hidden></dl>
+<p class="transfer-note">Преди добавяне сървърът създава частно резервно копие на базата.</p>
+<div class="transfer-actions"><button id="applyImport" type="button" disabled>Добави проверените записи</button></div>
+<p class="transfer-status" id="importMessage" role="status" aria-live="polite"></p>
+</fieldset>
+<details class="transfer-guide"><summary>Подготовка на файла</summary><p>Избери актуалния production-log.json от производствения компютър след последния запис в старата програма. Запази копие на оригиналния файл.</p><p>След прехвърлянето въвеждайте новия тонаж само в сайта, за да има една обща база.</p></details>
+</section>
+<section class="transfer-card" id="transferModules" data-transfer-panel="modules" role="tabpanel" aria-labelledby="transferTabModules" hidden>
+<h2>Добави данни от модули</h2>
+<p class="transfer-lead">Избери JSON файлове и, ако прехвърляш инструкции, папката с приложенията. Прегледай новите записи, дубликатите и конфликтите преди потвърждение.</p>
+<fieldset class="transfer-controls" data-transfer-controls="modules" disabled>
+<form id="dataImportForm">
+<div class="transfer-upload-grid">
+<label for="moduleFiles">JSON файлове за модулите<input id="moduleFiles" type="file" accept=".json,application/json" multiple><small>Тонаж и брак, престои, състав, двойки или инструкции.</small></label>
+<label for="legacyFolder">Папка с данни и инструкции<input id="legacyFolder" type="file" webkitdirectory multiple><small>Избери data, profiles или папката на старата програма.</small></label>
+</div>
 <label class="import-option"><input id="includeSettings" type="checkbox" checked>Прехвърли и настройките: цел за тонаж, причини за престои и настройки на Стикери.</label>
 <small>До 20 MB общо за JSON, до 20 MB за отделна снимка или приложение, до 1 GB и 5000 приложения общо.</small>
-<button id="checkDataImport" type="submit" disabled>Провери избраните данни</button></form>
+<div class="transfer-actions"><button id="checkDataImport" type="submit" disabled>Провери избраните данни</button></div>
+</form>
 <progress id="importProgress" max="1" value="0" aria-label="Качване на приложения" hidden></progress>
+<div class="transfer-preview" id="batchPreview" hidden>
+<h3>Преглед преди добавяне</h3>
 <div class="import-table-wrap"><table id="dataImportTable"><thead><tr><th>Модул</th><th>Файл</th><th>Нови</th><th>Вече добавени</th><th>Конфликти</th><th>Настройки</th><th>История</th></tr></thead><tbody id="dataImportRows"></tbody></table></div>
 <p id="missingAttachments" hidden>Липсващи приложения: <strong id="missingCount" translate="no">0</strong></p>
+</div>
+<p class="transfer-note">Преди потвърденото добавяне сървърът създава частно резервно копие. Избраните модули и приложения се добавят заедно.</p>
+<div class="transfer-actions"><button id="confirmDataImport" type="button" disabled>Добави проверените данни</button><button class="transfer-secondary" id="cancelDataImport" type="button" disabled>Откажи импорта</button></div>
+<p class="transfer-status" id="dataImportMessage" role="status" aria-live="polite"></p>
+</fieldset>
+<details class="transfer-guide"><summary>Как работи импортът</summary>
+<ol><li>Избери актуалните файлове след последния запис в старата програма и запази копие на оригиналната папка.</li><li>Отделно избраните JSON файлове имат предимство пред копията в папката.</li><li>Провери прегледа и потвърди общото добавяне.</li></ol>
+<p>Прехвърлят се само избраните данни за модулите и посочените в инструкциите снимки, приложения и instruction.txt. Кодът и останалите файлове в папката се пропускат.</p>
 <p>Съществуващите записи се запазват. Различни записи с еднакъв идентификатор или различни приложения със същия път спират целия импорт. Историческите двойки запазват състава и отчетите си.</p>
-<p>Преди потвърденото добавяне сървърът създава частно резервно копие. Избраните модули и приложения се добавят заедно.</p>
-<button id="confirmDataImport" disabled>Добави проверените данни</button> <button id="cancelDataImport" disabled>Откажи импорта</button>
-<p id="dataImportMessage" role="status" aria-live="polite"></p>
-<p>След прехвърлянето работете само в сайта. Старите файлове остават архив и не се синхронизират автоматично.</p><a href="statistics.html">Отчети</a></main></body>
+<p>След прехвърлянето работете само в сайта. Старите файлове остават архив и не се синхронизират автоматично.</p>
+</details>
+</section>
+<footer class="transfer-footer"><a href="index.html">Начална страница</a></footer>
+</main>
+</body>
 </html>

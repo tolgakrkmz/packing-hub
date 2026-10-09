@@ -113,7 +113,7 @@ test('operator can append reports but cannot change goals, delete reports, manag
   assert.equal((await request('/api/accounts', operator)).status, 403);
   assert.equal((await request('/accounts.html', observer)).status, 403);
   assert.equal((await request('/production-import.html', observer)).status, 403);
-  assert.equal((await request('/data-import.html', observer)).status, 403);
+  assert.equal((await request('/data-import.html', observer)).status, 200);
   assert.equal((await request('/api/data/personnel', operator)).status, 403);
   assert.equal((await request('/api/data/personnel', observer)).status, 403);
 });
