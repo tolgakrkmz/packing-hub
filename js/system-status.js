@@ -5,7 +5,7 @@
     DISK_STATUS_UNKNOWN: 'Няма данни за свободното място.', SECONDARY_UNAVAILABLE: 'Вторият носител е недостъпен или не съответства на настройката.',
     BACKUP_FAILED: 'Последният опит за архивиране е неуспешен.', BACKUP_OVERDUE: 'Архивът е по-стар от зададения график.',
     SECONDARY_COPY_OVERDUE: 'Второто копие е по-старо от зададения график.',
-    BACKUP_STATUS_UNKNOWN: 'Няма потвърдени данни за защитата с два архива.', UPDATE_FAILED: 'Последната проверка или обновяване е неуспешно.',
+    BACKUP_STATUS_UNKNOWN: 'Няма потвърдени данни за архивирането.', SINGLE_DISK_BACKUP: 'Архивите са на основния диск. При повреда на диска могат да се загубят заедно с работната база.', UPDATE_FAILED: 'Последната проверка или обновяване е неуспешно.',
     UPDATE_STATUS_UNKNOWN: 'Няма потвърдени данни за последното обновяване.', MANUAL_BACKUP_FAILED: 'Ръчният архив е неуспешен. Провери местната настройка.',
     MANUAL_BACKUP_UNAVAILABLE: 'Ръчният архив не е достъпен. Провери местната настройка.',
     MANUAL_BACKUP_STATUS_UNKNOWN: 'Резултатът от ръчния архив не може да бъде потвърден.'};
@@ -28,7 +28,9 @@
     if (data.disk.totalBytes) $('diskMeter').value = 100 * (1 - data.disk.freeBytes / data.disk.totalBytes);
     for (const [id, value] of [['backupTime', data.backups.lastSuccess], ['backupAttempt', data.backups.lastAttempt], ['secondaryTime', data.secondary.lastCopy], ['updateTime', data.updates.lastSuccess], ['updateAttempt', data.updates.lastAttempt]]) $(id).textContent = clock(value);
     $('backupSchedule').textContent = data.backups.intervalHours ? 'На всеки ' + data.backups.intervalHours + ' часа' : 'Няма данни';
-    $('secondaryDetail').textContent = {ok: 'Носителят е достъпен. Провери часа на копието.', warning: warnings.SECONDARY_COPY_OVERDUE,
+    $('backupMode').textContent = data.backups.mode === 'single' ? 'Основен диск' : data.backups.mode === 'dual' ? 'Два отделни диска' : 'Няма данни';
+    $('secondaryState').textContent = data.backups.mode === 'single' ? 'Няма независимо копие' : states[data.secondary.state] || states.unknown;
+    $('secondaryDetail').textContent = data.backups.mode === 'single' ? 'Второ независимо копие не е настроено.' : {ok: 'Носителят е достъпен. Провери часа на копието.', warning: warnings.SECONDARY_COPY_OVERDUE,
       failed: 'Провери втория носител на сървъра.', unknown: 'Няма потвърждение за втория носител.'}[data.secondary.state];
     $('systemWarnings').replaceChildren();
     for (const code of data.warnings) if (warnings[code]) { const item = document.createElement('li'); item.textContent = warnings[code]; $('systemWarnings').append(item); }
@@ -42,7 +44,7 @@
     if (manualPending) $('manualMessage').textContent = 'Заявката за архив е изпратена.';
     else if (manualError && data.manual.state !== 'running') $('manualMessage').textContent = manualError;
     else if (data.manual.state === 'running') $('manualMessage').textContent = 'Архивът се създава и проверява. Можеш да оставиш екрана отворен.';
-    else if (data.manual.state === 'ok') $('manualMessage').textContent = 'Ръчният архив е завършен. Провери статуса на двете копия.';
+    else if (data.manual.state === 'ok') $('manualMessage').textContent = data.backups.mode === 'single' ? 'Ръчният архив на основния диск е завършен и проверен.' : 'Ръчният архив е завършен. Провери статуса на двете копия.';
     else if (data.manual.state === 'failed') $('manualMessage').textContent = warnings.MANUAL_BACKUP_FAILED;
     else if (data.manual.state === 'unknown') $('manualMessage').textContent = warnings.MANUAL_BACKUP_STATUS_UNKNOWN;
     else $('manualMessage').textContent = '';

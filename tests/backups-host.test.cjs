@@ -5,13 +5,14 @@ const os = require('node:os');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const runner = path.resolve(__dirname, '../scripts/backup.sh');
-function environment(t, scenario = 'success') {
+function environment(t, scenario = 'success', mode = 'dual') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-backup-host-demo-'));
   t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
   const bin = path.join(dir, 'bin'), primary = path.join(dir, 'primary'), secondary = path.join(dir, 'secondary with spaces');
   for (const folder of [bin, primary, secondary]) fs.mkdirSync(folder, {mode: 0o700});
   const config = path.join(dir, 'config'), state = path.join(dir, 'commands');
   fs.writeFileSync(config, `DEPLOY_DIR='${dir}/demo-deploy'\nCOMPOSE_PROJECT=demo-hub\nPRIMARY_DIR='${primary}'\nSECONDARY_DIR='${secondary}'\nSECONDARY_MOUNT='${dir}/demo-mount'\nSECONDARY_UUID=fictional-disk-uuid\n`, {mode: 0o600});
+  if (mode !== 'dual') fs.writeFileSync(config, `DEPLOY_DIR='${dir}/demo-deploy'\nCOMPOSE_PROJECT=demo-hub\nPRIMARY_DIR='${primary}'\nBACKUP_MODE=${mode}\n`, {mode: 0o600});
   const mock = path.join(bin, 'boundary.cjs');
   fs.writeFileSync(mock, `#!/usr/bin/env node
 const fs=require('node:fs'),path=require('node:path');
@@ -21,7 +22,8 @@ const commands=fs.existsSync(state)?JSON.parse(fs.readFileSync(state)):[];
 commands.push([name,...a]);fs.writeFileSync(state,JSON.stringify(commands));
 let out='',status=0;
 if(name==='stat') {
-  if(a[1]==='%u:%a') out=a[2]===process.env.DEMO_CONFIG?'0:600':'1000:700';
+  if(a[1]==='%u:%a:%h') out='0:600:1';
+  else if(a[1]==='%u:%a') out='1000:700';
   else if(a[1]==='%d') out=a[2]===process.env.DEMO_PRIMARY||mode==='same-disk'?'1':'2';
 } else if(name==='flock'&&mode==='locked') status=1;
 else if(name==='mountpoint'&&mode==='missing-disk') status=1;
@@ -106,4 +108,31 @@ test('status is read-only and remains available with a missing secondary disk', 
   const run = result.commands.find(a => a[0] === 'docker' && a[1] === 'run');
   assert.ok(run.includes('type=bind,src=' + demo.primary + ',dst=/backup-primary,readonly'));
   assert.equal(run.at(-1), 'status');
+});
+
+test('single-disk host worker mounts only the primary directory and reports the missing independent copy', t => {
+  const demo = environment(t, 'missing-disk', 'single'), result = demo.run();
+  assert.equal(result.status, 0, result.stdout);
+  const create = result.commands.find(a => a[0] === 'docker' && a[1] === 'create');
+  assert.ok(create.includes('HUB_BACKUP_MODE=single'));
+  assert.ok(create.includes('type=volume,src=demo-hub-data,dst=/var/lib/package-hub,readonly'));
+  assert.ok(!create.some(a => a.includes('backup-secondary')));
+  assert.ok(!result.commands.some(a => ['mountpoint', 'findmnt'].includes(a[0])));
+  assert.ok(result.stdout.includes('No independent second copy'));
+  assert.ok(!result.stdout.includes('both local copies verified'));
+});
+for (const scenario of ['worker-fails', 'bad-exit', 'cleanup-fails', 'interrupted']) {
+  test('single-disk ' + scenario + ' preserves existing archives and reports failure', t => {
+    const demo = environment(t, scenario, 'single');
+    fs.writeFileSync(path.join(demo.primary, 'previous.sqlite'), 'Fictional previous archive');
+    const result = demo.run(); assert.notEqual(result.status, 0);
+    assert.equal(fs.readFileSync(path.join(demo.primary, 'previous.sqlite'), 'utf8'), 'Fictional previous archive');
+    assert.ok(fs.existsSync(path.join(demo.primary, 'host-failure')));
+    assert.ok(!result.stdout.includes('Scheduled backup completed'));
+  });
+}
+test('unknown host backup mode fails before starting a worker', t => {
+  const result = environment(t, 'success', 'unknown').run();
+  assert.notEqual(result.status, 0);
+  assert.ok(!result.commands.some(a => a[0] === 'docker'));
 });

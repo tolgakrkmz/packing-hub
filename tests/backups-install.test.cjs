@@ -37,15 +37,15 @@ if(out) process.stdout.write(out+'\\n');process.exit(status);
   for (const name of tools) fs.symlinkSync(boundary, path.join(bin, name));
   const env = {...process.env, PATH: bin + path.delimiter + process.env.PATH, DEMO_SCENARIO: scenario, DEMO_COMMANDS: commands,
     DEMO_DEPLOY: deploy, DEMO_PRIMARY: primary, DEMO_MOUNT: path.join(directory, 'fictional-mount')};
-  return {root, deploy, primary, secondary, run(hours = '4') {
+  return {root, deploy, primary, secondary, run(hours = '4', mode = 'dual') {
     // Source the same installation function with a temporary root, leaving the
     // CLI's root-only preflight and hardcoded system root unchanged.
     const staged = `set -Eeuo pipefail; umask 077; exec 2>/dev/null
 source "$1"
 deploy_dir=$3; primary_dir=$4; secondary_dir=$5; secondary_mount=$6
-secondary_uuid=fictional-disk-uuid; project=demo-hub; hours=$7
+secondary_uuid=fictional-disk-uuid; project=demo-hub; hours=$7; backup_mode=$8
 install_service "$(dirname "$1")" "$2"`;
-    const args = preflight ? [script, deploy, primary, secondary, hours] : ['-c', staged, 'demo-install', script, root, deploy, primary, secondary, env.DEMO_MOUNT, hours];
+    const args = preflight ? mode === 'single' ? [script, '--single', deploy, primary, hours] : [script, deploy, primary, secondary, hours] : ['-c', staged, 'demo-install', script, root, deploy, primary, secondary, env.DEMO_MOUNT, hours, mode];
     const result = spawnSync('bash', args, {env, encoding: 'utf8'});
     return {...result, commands: fs.existsSync(commands) ? JSON.parse(fs.readFileSync(commands)) : []};
   }};
@@ -86,4 +86,37 @@ test('installer refuses an unsupported interval before installing or contacting 
   const result = environment(t, 'success', true).run('5');
   assert.notEqual(result.status, 0);
   assert.ok(!result.commands.some(a => ['install', 'systemctl', 'docker'].includes(a[0])));
+});
+
+test('single-disk installer writes an explicit private mode without secondary paths', t => {
+  const demo = environment(t), result = demo.run('4', 'single');
+  assert.equal(result.status, 0, result.stdout);
+  const config = path.join(demo.root, 'etc/package-hub-backup.conf');
+  const parsed = spawnSync('bash', ['-c', 'source "$1"; printf "%s\\0" "$BACKUP_MODE" "$PRIMARY_DIR" "${SECONDARY_DIR:-}" "${SECONDARY_UUID:-}"', 'demo-read', config], {encoding: 'utf8'});
+  assert.deepEqual(parsed.stdout.split('\0').slice(0, -1), ['single', demo.primary, '', '']);
+  assert.equal(fs.statSync(config).mode & 0o777, 0o600);
+  assert.ok(result.stdout.includes('no independent second copy'));
+});
+for (const scenario of ['same-disk', 'missing-uuid', 'root-mount', 'missing-mount']) {
+  test('explicit single-disk preflight does not require a second filesystem: ' + scenario, t => {
+    const result = environment(t, scenario, true).run('4', 'single');
+    assert.notEqual(result.status, 0); // Mock install refuses /etc writes after successful preflight.
+    assert.ok(result.commands.some(a => a[0] === 'install'));
+    assert.ok(!result.commands.some(a => ['findmnt', 'mountpoint'].includes(a[0])));
+  });
+}
+for (const scenario of ['non-root', 'public-directory', 'missing-app', 'wrong-project', 'root-app', 'unsupported-image']) {
+  test('single-disk preflight still refuses unsafe application/configuration: ' + scenario, t => {
+    const result = environment(t, scenario, true).run('4', 'single');
+    assert.notEqual(result.status, 0);
+    assert.ok(!result.commands.some(a => a[0] === 'install' || a[0] === 'systemctl'));
+  });
+}
+
+test('single-disk installer refuses a symlink primary path before installation', t => {
+  const demo = environment(t, 'success', true);
+  fs.rmdirSync(demo.primary); fs.symlinkSync(demo.secondary, demo.primary);
+  const result = demo.run('4', 'single');
+  assert.notEqual(result.status, 0);
+  assert.ok(!result.commands.some(a => a[0] === 'install' || a[0] === 'systemctl'));
 });

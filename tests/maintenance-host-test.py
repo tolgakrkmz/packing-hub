@@ -42,7 +42,7 @@ class HostTests(unittest.TestCase):
             elif args[-1] == str(self.update_config):
                 out = str(self.state) + "\0"
             else:
-                out = "/fictional/primary\0/fictional/secondary\0/fictional/mount\0"
+                out = "/fictional/primary\0/fictional/secondary\0/fictional/mount\0\0"
         elif args[0] == "mountpoint":
             code = 1 if self.mode == "missing-disk" else 0
         elif args[0] == "findmnt":
@@ -61,6 +61,65 @@ class HostTests(unittest.TestCase):
             at = "2020-01-01T00:00:00.000Z" if self.mode == "stale-result" else module.utc_now()
             out = "Fictional invalid status" if self.mode == "invalid-status" else json.dumps(dict(state="ok", lastSuccess=at, lastAttempt=at, lastPrimary=at, lastSecondary=at, code=None))
         return subprocess.CompletedProcess(args, code, out, "")
+
+    def single_mode(self):
+        original = self.run_command
+        def run(args, timeout=15):
+            result = original(args, timeout)
+            if args[0] == "/bin/bash" and args[1] == "-c" and args[-1] == str(self.backup_config):
+                result.stdout = "/fictional/primary\0\0\0single\0"
+            elif args[0] == "/bin/bash" and args[1] != "-c" and result.returncode == 0:
+                value = json.loads(result.stdout)
+                value.update(mode="single", lastSecondary=None)
+                result.stdout = json.dumps(value)
+            return result
+        self.host.run = run
+
+    def test_explicit_single_mode_reports_local_success_without_probing_a_second_disk(self):
+        self.single_mode()
+        result = self.host.status()
+        self.assertEqual(result["backups"]["mode"], "single")
+        self.assertEqual(result["backups"]["state"], "ok")
+        self.assertIsNone(result["backups"]["lastSecondary"])
+        self.assertFalse(result["backups"]["secondaryAvailable"])
+        self.assertTrue(result["manual"]["available"])
+        self.assertFalse(any(args[0] in ["mountpoint", "findmnt"] for args in self.commands))
+
+    def test_single_mode_manual_backup_confirms_a_fresh_local_archive(self):
+        self.single_mode()
+        self.assertEqual(self.host.backup()[0], 202)
+        self.wait_finished()
+        self.assertEqual(self.host.job["state"], "ok")
+        self.mode = "backup-fails"
+        self.assertEqual(self.host.backup()[0], 202)
+        self.wait_finished()
+        self.assertEqual(self.host.job["state"], "failed")
+
+    def test_configured_mode_cannot_be_downgraded_by_a_status_response(self):
+        self.single_mode()
+        original = self.host.run
+        def wrong_mode(args, timeout=15):
+            result = original(args, timeout)
+            if args[0] == "/bin/bash" and args[1] != "-c":
+                value = json.loads(result.stdout)
+                value["mode"] = "dual"
+                result.stdout = json.dumps(value)
+            return result
+        self.host.run = wrong_mode
+        self.assertEqual(self.host.status()["backups"]["state"], "unknown")
+        self.assertEqual(self.host.backup()[0], 202)
+        self.wait_finished()
+        self.assertEqual(self.host.job["state"], "failed")
+
+    def test_single_mode_requires_explicit_configuration_and_rejects_secondary_paths(self):
+        self.host.run = module.command
+        self.backup_config.write_text("PRIMARY_DIR=/fictional/primary\nBACKUP_MODE=single\n")
+        self.assertEqual(self.host.backup_config_values()["BACKUP_MODE"], "single")
+        for extra in ["SECONDARY_DIR=/fictional/secondary", "SECONDARY_MOUNT=/fictional/mount", "BACKUP_MODE=unknown"]:
+            self.backup_config.write_text("PRIMARY_DIR=/fictional/primary\nBACKUP_MODE=single\n" + extra + "\n")
+            with self.assertRaises(ValueError):
+                self.host.backup_config_values()
+
 
     def info(self, device):
         return type("Info", (), {"st_mode": 0o40700, "st_dev": device, "st_uid": 1000})()

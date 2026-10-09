@@ -16,7 +16,7 @@ test('backup CLI reports failed two-disk protection with a nonzero exit and sani
   assert.ok(failed.stdout.includes('SECONDARY_NOT_SEPARATE'));
   const status = run(backup, ['status'], env); assert.equal(status.status, 0); privateOutput(status, demo);
   const value = JSON.parse(status.stdout); assert.equal(value.state, 'failed'); assert.equal(value.lastSuccess, null);
-  assert.deepEqual(Object.keys(value).sort(), ['state', 'code', 'lastAttempt', 'lastSuccess', 'lastPrimary', 'lastSecondary'].sort());
+  assert.deepEqual(Object.keys(value).sort(), ['mode', 'state', 'code', 'lastAttempt', 'lastSuccess', 'lastPrimary', 'lastSecondary'].sort());
 });
 test('status CLI handles a truncated summary without reporting success or revealing its content', t => {
   const demo = backupFixture(t); fs.writeFileSync(path.join(demo.primary, 'status.json'), '{"fictional-private-field":');
@@ -42,4 +42,16 @@ test('invalid maintenance commands and failed recovery exit nonzero with generic
     const result = run(script, args, env); assert.equal(result.status, 1); privateOutput(result, demo);
     assert.ok(result.stderr.includes('failed')); assert.ok(!result.stderr.includes('Error:'));
   }
+});
+
+test('explicit single-disk CLI succeeds with a clear limitation and sanitized status', t => {
+  const demo = backupFixture(t), env = {HUB_DATABASE: demo.database, HUB_BACKUP_PRIMARY: demo.primary, HUB_BACKUP_SECONDARY: '', HUB_BACKUP_MODE: 'single'};
+  const result = run(backup, ['run'], env); assert.equal(result.status, 0, result.stderr); privateOutput(result, demo);
+  assert.ok(result.stdout.includes('No independent second copy')); assert.ok(!result.stdout.includes('Both local'));
+  const status = JSON.parse(run(backup, ['status'], env).stdout);
+  assert.equal(status.state, 'ok'); assert.equal(status.mode, 'single'); assert.equal(status.lastSecondary, null);
+  const archive = fs.readdirSync(demo.primary).find(file => file.endsWith('.sqlite'));
+  const restored = run(restore, ['drill', path.join(demo.primary, archive), path.join(demo.directory, 'single-disk-drill')]);
+  assert.equal(restored.status, 0, restored.stderr); privateOutput(restored, demo);
+  assert.equal(JSON.parse(restored.stdout).ok, true);
 });

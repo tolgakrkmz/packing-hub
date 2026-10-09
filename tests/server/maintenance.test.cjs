@@ -307,3 +307,33 @@ test('revoking the session while the backup body arrives prevents starting the h
   demo.hub.auth.logout(admin.token); request.end('}');
   assert.equal(await response, 401); assert.equal(demo.count(), 0);
 });
+
+test('single-disk success remains a warning with no independent copy and an available manual action', () => {
+  const host = healthy(); Object.assign(host.backups, {mode: 'single', lastSecondary: null, secondaryAvailable: false});
+  const value = checked(host);
+  assert.equal(value.state, 'warning'); assert.equal(value.backups.state, 'ok'); assert.equal(value.backups.mode, 'single');
+  assert.equal(value.secondary.state, 'warning'); assert.equal(value.secondary.lastCopy, null);
+  assert.equal(value.manual.available, true); assert.deepEqual(value.warnings, ['SINGLE_DISK_BACKUP']);
+});
+test('single-disk overdue, failed and malformed results do not become successful two-copy protection', () => {
+  const host = healthy(); Object.assign(host.backups, {mode: 'single', lastSecondary: null, secondaryAvailable: false});
+  for (const key of ['lastSuccess', 'lastAttempt', 'lastPrimary']) host.backups[key] = new Date(now - 6 * 3600000).toISOString();
+  assert.ok(checked(host).warnings.includes('BACKUP_OVERDUE'));
+  host.backups.state = 'failed'; host.backups.code = 'SNAPSHOT_FAILED';
+  assert.equal(checked(host).state, 'failed'); assert.ok(checked(host).warnings.includes('BACKUP_FAILED'));
+  for (const change of [{mode: 'unknown'}, {mode: null}, {lastPrimary: null}, {lastSecondary: at}]) {
+    const input = healthy(); Object.assign(input.backups, {mode: 'single', lastSecondary: null, secondaryAvailable: false}, change);
+    const value = checked(input); assert.notEqual(value.backups.state, 'ok'); assert.notEqual(value.state, 'ok');
+  }
+});
+test('configured two-disk backups never fall back to a successful single-disk summary', () => {
+  const host = healthy(); host.backups.secondaryAvailable = false;
+  const value = checked(host); assert.equal(value.backups.mode, 'dual'); assert.equal(value.state, 'failed');
+  assert.ok(!value.warnings.includes('SINGLE_DISK_BACKUP'));
+});
+
+test('an unconfigured or unreachable adapter cannot claim that either backup mode is configured', () => {
+  for (const host of [null, {backups: {}}, {backups: {state: 'unknown', mode: null}}]) {
+    const value = checked(host); assert.equal(value.backups.mode, null); assert.equal(value.backups.state, 'unknown');
+  }
+});

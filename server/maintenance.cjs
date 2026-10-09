@@ -45,14 +45,17 @@ function capacity(filename) {
 }
 function summarize(host, {database, disk, now}) {
   const value = host?.backups || {}, intervalHours = [1, 2, 3, 4, 6, 8, 12, 24].includes(value.intervalHours) ? value.intervalHours : null;
-  const backups = {state: ['ok', 'failed'].includes(value.state) ? value.state : 'unknown',
+  const mode = value.mode === undefined && ['ok', 'failed'].includes(value.state) ? 'dual' :
+    ['single', 'dual'].includes(value.mode) ? value.mode : null;
+  const backups = {mode, state: ['ok', 'failed'].includes(value.state) ? value.state : 'unknown',
     lastAttempt: timestamp(value.lastAttempt), lastSuccess: timestamp(value.lastSuccess), lastPrimary: timestamp(value.lastPrimary),
     lastSecondary: timestamp(value.lastSecondary), intervalHours, code: CODES.has(value.code) ? value.code : null};
-  if (backups.state === 'ok' && (!backups.lastSuccess || !intervalHours || value.code !== null ||
-    [backups.lastAttempt, backups.lastPrimary, backups.lastSecondary].some(at => at !== backups.lastSuccess) || Date.parse(backups.lastSuccess) > now + 300000)) {
+  if (!mode || backups.state === 'ok' && (!backups.lastSuccess || !intervalHours || value.code !== null ||
+    [backups.lastAttempt, backups.lastPrimary].some(at => at !== backups.lastSuccess) ||
+    (mode === 'dual' ? backups.lastSecondary !== backups.lastSuccess : value.lastSecondary !== null) || Date.parse(backups.lastSuccess) > now + 300000)) {
     backups.state = 'unknown'; backups.code = 'STATUS_UNREADABLE';
   }
-  const secondary = {state: value.secondaryAvailable === false ? 'failed' : value.secondaryAvailable === true && backups.lastSecondary ? 'ok' : 'unknown', lastCopy: backups.lastSecondary};
+  const secondary = {state: mode === 'single' ? 'warning' : value.secondaryAvailable === false ? 'failed' : value.secondaryAvailable === true && backups.lastSecondary ? 'ok' : 'unknown', lastCopy: mode === 'single' ? null : backups.lastSecondary};
   if (secondary.state === 'ok' && (!intervalHours || Date.parse(secondary.lastCopy) > now + 300000)) secondary.state = 'unknown';
   else if (secondary.state === 'ok' && Date.parse(secondary.lastCopy) + intervalHours * 3600000 + 900000 < now) secondary.state = 'warning';
   if (secondary.state === 'failed') { backups.state = 'failed'; backups.code = 'SECONDARY_UNAVAILABLE'; }
@@ -69,12 +72,13 @@ function summarize(host, {database, disk, now}) {
   if (manual.state === 'ok' && (!manual.startedAt || !manual.finishedAt || Date.parse(manual.finishedAt) < Date.parse(manual.startedAt) || Date.parse(manual.finishedAt) > now + 300000)) manual.state = 'unknown';
   if (manual.state === 'running' && (!manual.startedAt || manual.finishedAt || Date.parse(manual.startedAt) > now + 300000)) manual.state = 'unknown';
   const warnings = [];
+  if (mode === 'single') warnings.push('SINGLE_DISK_BACKUP');
   if (database.state !== 'ok') warnings.push('DATABASE_UNAVAILABLE');
   if (disk.state === 'warning') warnings.push('DISK_SPACE_LOW');
   if (disk.state === 'unknown') warnings.push('DISK_STATUS_UNKNOWN');
   if (backups.state === 'failed') warnings.push(secondary.state === 'failed' ? 'SECONDARY_UNAVAILABLE' : 'BACKUP_FAILED');
-  if (backups.state === 'warning') warnings.push('BACKUP_OVERDUE');
-  if (secondary.state === 'warning') warnings.push('SECONDARY_COPY_OVERDUE');
+  if (backups.code === 'BACKUP_OVERDUE') warnings.push('BACKUP_OVERDUE');
+  if (secondary.state === 'warning' && mode !== 'single') warnings.push('SECONDARY_COPY_OVERDUE');
   if (backups.state === 'unknown' || secondary.state === 'unknown') warnings.push('BACKUP_STATUS_UNKNOWN');
   if (updates.state === 'failed') warnings.push('UPDATE_FAILED');
   if (updates.state === 'unknown') warnings.push('UPDATE_STATUS_UNKNOWN');

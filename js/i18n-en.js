@@ -1064,3 +1064,12 @@ Object.assign(HUB_EN_MESSAGES, {
   'Не можем да потвърдим заявката за архив. Опресни статуса, преди нов опит.': 'We cannot confirm the backup request. Refresh the status before trying again.'
 });
 Object.assign(HUB_EN_MESSAGES, {'Второто копие е по-старо от зададения график.': 'The second copy is older than the configured schedule.'});
+
+Object.assign(HUB_EN_MESSAGES, {
+  'Режим': 'Mode', 'Основен диск': 'Primary disk', 'Два отделни диска': 'Two separate disks',
+  'Няма независимо копие': 'No independent copy', 'Второ независимо копие не е настроено.': 'An independent second copy is not configured.',
+  'Няма потвърдени данни за архивирането.': 'Backup status is not confirmed.',
+  'Архивите са на основния диск. При повреда на диска могат да се загубят заедно с работната база.': 'Backups are on the primary disk. A disk failure can lose them together with the live database.',
+  'Създай и провери архив според настроения режим.': 'Create and verify a backup using the configured mode.',
+  'Ръчният архив на основния диск е завършен и проверен.': 'The manual backup on the primary disk completed and was verified.'
+});

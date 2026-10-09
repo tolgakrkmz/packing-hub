@@ -51,6 +51,7 @@ class MaintenanceHost:
         self.owner_uid, self.run, self.clock = owner_uid, run, clock
         self.lock = threading.Lock()
         self.job = {"state": "idle", "startedAt": None, "finishedAt": None}
+        self.job_mode = "dual"
 
     def limited_commands(self):
         # Finish before the application's 15-second deadline. Several slow host
@@ -63,7 +64,7 @@ class MaintenanceHost:
             return self.run(args, timeout=min(timeout, remaining, 5))
         return run
 
-    def config(self, filename, fields, run=None):
+    def config(self, filename, fields, run=None, path_fields=None):
         run = run or self.run
         info = os.lstat(filename)
         if not stat.S_ISREG(info.st_mode) or info.st_uid != self.owner_uid or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1:
@@ -73,12 +74,28 @@ class MaintenanceHost:
         code = 'source "$1"; printf "%s\\0" ' + " ".join('"${' + field + ':-}"' for field in fields)
         result = run(["/bin/bash", "-c", code, "maintenance", filename])
         values = result.stdout.split("\0")[:-1]
-        if result.returncode or len(values) != len(fields) or any(not value.startswith("/") or any(char in value for char in "\n\r,") for value in values):
+        if result.returncode or len(values) != len(fields):
             raise ValueError("CONFIGURATION_FAILED")
-        return dict(zip(fields, values))
+        config = dict(zip(fields, values))
+        for field in (fields if path_fields is None else path_fields):
+            value = config[field]
+            if not value.startswith("/") or any(char in value for char in "\n\r,"):
+                raise ValueError("CONFIGURATION_FAILED")
+        return config
 
     def backup_config_values(self, run=None):
-        return self.config(self.backup_config, ["PRIMARY_DIR", "SECONDARY_DIR", "SECONDARY_MOUNT"], run)
+        config = self.config(self.backup_config, ["PRIMARY_DIR", "SECONDARY_DIR", "SECONDARY_MOUNT", "BACKUP_MODE"], run, ["PRIMARY_DIR"])
+        config["BACKUP_MODE"] = config["BACKUP_MODE"] or "dual"
+        if config["BACKUP_MODE"] not in ["single", "dual"]:
+            raise ValueError("CONFIGURATION_FAILED")
+        for field in ["SECONDARY_DIR", "SECONDARY_MOUNT"]:
+            value = config[field]
+            if config["BACKUP_MODE"] == "single":
+                if value:
+                    raise ValueError("CONFIGURATION_FAILED")
+            elif not value.startswith("/") or any(char in value for char in "\n\r,"):
+                raise ValueError("CONFIGURATION_FAILED")
+        return config
 
     def service_loaded(self, run=None):
         result = (run or self.run)(["systemctl", "show", "package-hub-backup.service", "--property=LoadState", "--value"], timeout=5)
@@ -155,16 +172,20 @@ class MaintenanceHost:
         return value
 
     def status(self):
-        backups = {"state": "unknown", "secondaryAvailable": None, "intervalHours": None}
+        backups = {"mode": None, "state": "unknown", "secondaryAvailable": None, "intervalHours": None}
         available = False
         run = self.limited_commands()
         try:
             config = self.backup_config_values(run)
+            backups["mode"] = config["BACKUP_MODE"]
             available = self.service_loaded(run)
-            try:
-                backups["secondaryAvailable"] = self.second_disk(config, run)
-            except Exception:
-                pass  # A timed-out check is unknown, not proof of a missing disk.
+            if config["BACKUP_MODE"] == "dual":
+                try:
+                    backups["secondaryAvailable"] = self.second_disk(config, run)
+                except Exception:
+                    pass  # A timed-out check is unknown, not proof of a missing disk.
+            else:
+                backups["secondaryAvailable"] = False
             try:
                 backups["intervalHours"] = self.interval()
             except Exception:
@@ -175,6 +196,8 @@ class MaintenanceHost:
                 if isinstance(value, dict):
                     for field in ["state", "lastAttempt", "lastSuccess", "lastPrimary", "lastSecondary", "code"]:
                         backups[field] = value.get(field)
+                    if value.get("mode", "dual") != config["BACKUP_MODE"]:
+                        backups.update(state="unknown", code="STATUS_UNREADABLE")
         except Exception:
             pass
         with self.lock:
@@ -184,7 +207,7 @@ class MaintenanceHost:
     def backup(self):
         run = self.limited_commands()
         try:
-            self.backup_config_values(run)
+            config = self.backup_config_values(run)
             if not self.service_loaded(run):
                 return 503, {"error": "MAINTENANCE_UNAVAILABLE"}
         except Exception:
@@ -202,6 +225,7 @@ class MaintenanceHost:
             except Exception:
                 return 503, {"error": "MAINTENANCE_UNAVAILABLE"}
             self.job = {"state": "running", "startedAt": utc_now(), "finishedAt": None}
+            self.job_mode = config["BACKUP_MODE"]
             try:
                 threading.Thread(target=self.perform_backup, daemon=True).start()
             except Exception:
@@ -214,14 +238,20 @@ class MaintenanceHost:
         try:
             result = self.run(["systemctl", "start", "package-hub-backup.service"], timeout=7210)
             if result.returncode == 0:
-                # Confirm a new successful pair, including when another scheduler
-                # acquired the service immediately before this request.
+                # Confirm a fresh result for the configured mode, including when
+                # the scheduler acquired the service immediately before us.
                 result = self.run(["/bin/bash", "/usr/local/libexec/package-hub-backup.sh", "status"], timeout=12)
                 value = json.loads(result.stdout) if result.returncode == 0 and len(result.stdout) <= 4096 else {}
                 with self.lock:
                     started = self.job["startedAt"]
+                    mode = self.job_mode
                 success = value.get("lastSuccess")
-                if value.get("state") == "ok" and "code" in value and value["code"] is None and valid_timestamp(success) and started <= success <= utc_now() and all(value.get(field) == success for field in ["lastAttempt", "lastPrimary", "lastSecondary"]):
+                secondary_ok = (value.get("lastSecondary") == success if mode == "dual" else
+                                "lastSecondary" in value and value["lastSecondary"] is None)
+                complete = (value.get("state") == "ok" and value.get("mode", "dual") == mode and
+                            "code" in value and value["code"] is None and secondary_ok and
+                            all(value.get(field) == success for field in ["lastAttempt", "lastPrimary"]))
+                if complete and valid_timestamp(success) and started <= success <= utc_now():
                     state = "ok"
         except Exception:
             pass

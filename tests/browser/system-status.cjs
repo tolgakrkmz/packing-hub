@@ -126,6 +126,31 @@ async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, 
     assert.equal(await page.evaluate(async () => (await fetch('/system-status.html')).status), 403);
     assert.equal(await page.evaluate(async () => (await fetch('/api/admin/backup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.HUB_SERVER_BOOT.csrf}, body: '{}'})).status), 403);
   }
+  fixture.healthy(); fixture.set(value => { Object.assign(value.backups, {mode: 'single', lastSecondary: null, secondaryAvailable: false}); });
+  await admin.locator('#refreshSystem').click();
+  await expect(admin.locator('#summaryLabel')).toHaveText('Има предупреждение');
+  await expect(admin.locator('#backupMode')).toHaveText('Основен диск');
+  await expect(admin.locator('#backupState')).toHaveText('Изправно');
+  await expect(admin.locator('#secondaryState')).toHaveText('Няма независимо копие');
+  await expect(admin.locator('#systemWarnings')).toContainText('Архивите са на основния диск');
+  const beforeSingle = fixture.calls();
+  await admin.locator('#manualBackup').click();
+  await expect(admin.locator('#manualBackup')).toBeDisabled();
+  assert.equal(fixture.calls(), beforeSingle + 1);
+  fixture.set(value => { value.manual.state = 'ok'; value.manual.finishedAt = new Date().toISOString(); });
+  await admin.locator('#refreshSystem').click();
+  await expect(admin.locator('#manualMessage')).toContainText('на основния диск е завършен и проверен');
+  await expect(admin.locator('#manualBackup')).toBeEnabled();
+  for (const language of ['bg', 'en']) {
+    await admin.locator(`[data-hub-language=${language}]`).click();
+    await expect(admin.locator('#backupMode')).toHaveText(language === 'bg' ? 'Основен диск' : 'Primary disk');
+    await expect(admin.locator('#secondaryState')).toHaveText(language === 'bg' ? 'Няма независимо копие' : 'No independent copy');
+    await expect(admin.locator('#manualMessage')).toContainText(language === 'bg' ? 'завършен и проверен' : 'completed and was verified');
+    await expect(admin.locator('#systemWarnings')).toContainText(language === 'bg' ? 'работната база' : 'live database');
+    for (const width of [320, 390, 768, 1440]) { await admin.setViewportSize({width, height: 1000}); await assertResponsive(admin, `Single-disk status ${language} at ${width}px`); }
+  }
+  console.log('PASS single-disk manual backup, explicit warning, BG/EN and responsive layouts');
+  await admin.locator('[data-hub-language=bg]').click();
   fixture.healthy(); await admin.locator('#refreshSystem').click();
   for (const language of ['bg', 'en']) {
     await admin.locator(`[data-hub-language=${language}]`).click();
