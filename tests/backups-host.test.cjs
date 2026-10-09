@@ -29,13 +29,17 @@ if(name==='stat') {
 else if(name==='mountpoint'&&mode==='missing-disk') status=1;
 else if(name==='findmnt') out=a[1]==='UUID'?(mode==='replaced-disk'?'fictional-other-uuid':'fictional-disk-uuid'):process.env.DEMO_MOUNT;
 else if(name==='docker') {
-  if(a[0]==='compose') out=mode==='missing-app'?'':'c'.repeat(64);
+  if(a[0]==='compose'||a[0]==='ps') {
+    out=mode==='missing-app'?'':mode==='multiple-apps'?'c'.repeat(64)+'\\n'+'e'.repeat(64):'c'.repeat(64);
+    if(a[0]==='compose'&&mode==='home-compose-hidden') status=1;
+  }
   else if(a[0]==='inspect') {
     const f=a[2];
     if(mode==='inspect-fails') status=1;
     if(f.includes('.State.Running')) out=mode==='stopped-app'?'false':'true';
     else if(f.includes('.State.ExitCode')) out=['worker-fails','bad-exit'].includes(mode)?'1':'0';
     else if(f.includes('.Image')) out=mode==='mutable-image'?'fictional:latest':'sha256:'+'a'.repeat(64);
+    else if(f.includes('com.docker.compose.service')) out=mode==='wrong-service'?'fictional-other-service':'package-hub';
     else if(f.includes('.Config.Labels')) out=mode==='wrong-project'?'fictional-other-project':'demo-hub';
     else if(f.includes('.Mounts')) out=mode==='missing-volume'?'':'demo-hub-data';
     else if(f.includes('.Config.Env')) out=mode==='different-database'?'/fictional/unsupported.sqlite':'/var/lib/package-hub/hub.sqlite';
@@ -109,6 +113,29 @@ test('status is read-only and remains available with a missing secondary disk', 
   assert.ok(run.includes('type=bind,src=' + demo.primary + ',dst=/backup-primary,readonly'));
   assert.equal(run.at(-1), 'status');
 });
+
+test('status finds the exact running project without reading the deployment home directory', t => {
+  const result = environment(t, 'home-compose-hidden').run(['status']);
+  assert.equal(result.status, 0, result.stdout);
+  const listing = result.commands.find(a => a[0] === 'docker' && a[1] === 'ps');
+  assert.ok(listing.includes('label=com.docker.compose.project=demo-hub'));
+  assert.ok(listing.includes('label=com.docker.compose.service=package-hub'));
+  assert.ok(listing.includes('status=running'));
+  assert.ok(listing.includes('--no-trunc'));
+  assert.ok(!result.commands.some(a => a[0] === 'docker' && a[1] === 'compose'));
+  assert.ok(!result.commands.some(a => a[0] === 'docker' && ['create', 'start', 'stop', 'rm'].includes(a[1])));
+  assert.ok(result.commands.some(a => a[0] === 'docker' && a[1] === 'run'));
+});
+
+for (const scenario of ['missing-app', 'multiple-apps', 'wrong-project', 'wrong-service', 'stopped-app', 'mutable-image', 'inspect-fails']) {
+  test('status refuses ' + scenario + ' without inspecting an archive using an unverified image', t => {
+    const result = environment(t, scenario).run(['status']);
+    assert.notEqual(result.status, 0);
+    assert.ok(!result.commands.some(a => a[0] === 'docker' && a[1] === 'run'));
+    assert.ok(!result.stderr.includes('fictional-sensitive-configuration'));
+    assert.equal(result.stderr, '');
+  });
+}
 
 test('single-disk host worker mounts only the primary directory and reports the missing independent copy', t => {
   const demo = environment(t, 'missing-disk', 'single'), result = demo.run();
