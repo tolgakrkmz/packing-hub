@@ -1029,3 +1029,38 @@ Object.assign(HUB_EN_MESSAGES, {
   'Задачите са достъпни в сървърната версия след вход с личен акаунт.': 'Tasks are available in server mode after signing in with a personal account.',
   'Възлагане на сменни и глобални задачи, отчитане и проследяване на изпълнението.': 'Assign shift and global tasks, report results and track completion.'
 });
+Object.assign(HUB_EN_MESSAGES, {
+  'Статус на системата': 'System status', 'Състояние на системата': 'System state',
+  'База, свободно място и защита на данните.': 'Database, free space and data protection.',
+  'Последна проверка:': 'Last checked:', 'Няма данни': 'No data', 'Изправно': 'Healthy', 'Внимание': 'Attention', 'Проблем': 'Issue',
+  'Проверките са успешни': 'Checks passed', 'Има предупреждение': 'There is a warning', 'Необходима е проверка': 'Review required', 'Проверката е непълна': 'Checks are incomplete',
+  'Работна база': 'Application database', 'Достъпна': 'Available', 'Няма потвърждение': 'Not confirmed',
+  'Проверка на достъпността на базата.': 'Database availability check.',
+  'Свободно място': 'Free space', 'Свободни от': 'Free of', 'Използвано място': 'Used space',
+  'Архивиране': 'Backups', 'Последен успешен архив': 'Last successful backup', 'Последен опит': 'Last attempt', 'График': 'Schedule', 'На всеки': 'Every', 'часа': 'hours',
+  'Второ копие': 'Second copy', 'Последно проверено копие': 'Last verified copy',
+  'Носителят е достъпен. Провери часа на копието.': 'The disk is available. Check the copy timestamp.',
+  'Носителят е достъпен. Няма проверено копие.': 'The disk is available. There is no verified copy.',
+  'Провери втория носител на сървъра.': 'Check the second disk on the server.', 'Няма потвърждение за втория носител.': 'The second disk is not confirmed.',
+  'Обновяване': 'Updates', 'Последно успешно обновяване': 'Last successful update', 'Последна проверка за обновяване': 'Last update check',
+  'Архив сега': 'Back up now', 'Създай архив': 'Create backup', 'Архивиране…': 'Backing up…',
+  'Създай и провери копия на двата локални диска.': 'Create and verify copies on both local disks.',
+  'Контролът на архивите не е настроен.': 'Backup controls are not configured.', 'Резултатът се показва тук. Архивите остават на сървъра.': 'Results appear here. Archives stay on the server.',
+  'Статусът показва последната проверка. При проблем прегледай местната настройка, преди да разчиташ на архивите.': 'Status reflects the last check. Review local configuration if there is an issue before relying on backups.',
+  'Предупреждения': 'Warnings', 'Базата не може да бъде проверена.': 'The database cannot be checked.',
+  'Свободното място е малко. Освободи място на диска.': 'Free space is low. Free up disk space.', 'Няма данни за свободното място.': 'Free space information is unavailable.',
+  'Вторият носител е недостъпен или не съответства на настройката.': 'The second disk is unavailable or does not match the configuration.',
+  'Последният опит за архивиране е неуспешен.': 'The last backup attempt failed.', 'Архивът е по-стар от зададения график.': 'The backup is older than the configured schedule.',
+  'Няма потвърдени данни за защитата с два архива.': 'Two-copy backup protection is not confirmed.',
+  'Последната проверка или обновяване е неуспешно.': 'The last update check or deployment failed.', 'Няма потвърдени данни за последното обновяване.': 'The last update is not confirmed.',
+  'Ръчният архив е неуспешен. Провери местната настройка.': 'The manual backup failed. Check local configuration.',
+  'Ръчният архив не е достъпен. Провери местната настройка.': 'Manual backup is unavailable. Check local configuration.',
+  'Резултатът от ръчния архив не може да бъде потвърден.': 'The manual backup result cannot be confirmed.',
+  'Архивът се създава и проверява. Можеш да оставиш екрана отворен.': 'The backup is being created and checked. You can leave this screen open.',
+  'Ръчният архив е завършен. Провери статуса на двете копия.': 'The manual backup completed. Check both copy statuses.',
+  'Статусът не може да се прочете. Опитай отново.': 'Status could not be read. Try again.',
+  'Този екран е достъпен само за администратор в сървърната версия.': 'This screen is available only to an administrator in server mode.',
+  'Заявката за архив е изпратена.': 'The backup request was sent.', 'Вече се изпълнява архив. Изчакай и опресни.': 'A backup is already running. Wait and refresh.',
+  'Не можем да потвърдим заявката за архив. Опресни статуса, преди нов опит.': 'We cannot confirm the backup request. Refresh the status before trying again.'
+});
+Object.assign(HUB_EN_MESSAGES, {'Второто копие е по-старо от зададения график.': 'The second copy is older than the configured schedule.'});

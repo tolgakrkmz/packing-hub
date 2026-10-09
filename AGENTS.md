@@ -13,6 +13,9 @@ Never upload company or employee data, including to private repositories.
   in public test fixtures or manifests.
 - Feature branches are used for substantial changes. Merge into `main` only
   after review and successful checks. The privacy rule applies to all branches.
+- For all PACKAGE-HUB work, never use the `codex/` branch prefix. Use standard
+  purpose-based prefixes: `feature/`, `fix/`, `hotfix/`, `chore/`, `refactor/`,
+  `docs/`, `test/` or `release/`. Shared feature batches use `feature/`.
 - After cloning, run `node scripts/install-hooks.cjs` to enable the local hooks.
 - This repository is a separate demo copy; do not copy production data into it.
 - Deployment to the production computer is manual. That computer has no Git.

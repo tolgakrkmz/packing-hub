@@ -1,0 +1,13 @@
+[Unit]
+Description=Local Package Hub status and manual backup adapter
+Requires=package-hub-maintenance.socket
+After=docker.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/libexec/package-hub-maintenance-host.py
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX

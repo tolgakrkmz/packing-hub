@@ -12,11 +12,13 @@ const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
+const {statusFixture, exerciseSystemStatus} = require('../tests/browser/system-status.cjs');
 const demoPassword = 'Fictional-password-123';
 async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
+  const status = process.argv.includes('--status-only') ? await statusFixture(dir) : null;
   let taskTime = Date.now();
-  const hub = createHubServer({filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime});
+  const hub = createHubServer({filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, maintenanceSocket: status?.socketPath});
   let browser;
   const errors = [];
   try {
@@ -39,6 +41,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (status) {
+      await exerciseSystemStatus({admin, hub, base, device, expect, fixture: status, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); console.log('PASS administrator system status browser workflows'); return;
+    }
     if (process.argv.includes('--branding-only')) {
       await exerciseBranding({admin, hub, base, device, expect, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS branding browser workflows'); return;
@@ -331,6 +337,6 @@ async function main() {
       if (page) { await page.screenshot({path: path.join(screenshotDir, 'browser-failure.png'), fullPage: true}); console.log(await page.evaluate(() => ({width: innerWidth, scrollWidth: document.documentElement.scrollWidth, bodyWidth: document.body.scrollWidth, wide: [...document.querySelectorAll('body *')].filter(el => el.checkVisibility() && el.scrollWidth > el.clientWidth + 3).map(el => ({tag: el.tagName, id: el.id, cls: el.className, width: el.clientWidth, scroll: el.scrollWidth, rect: {left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right}})).slice(0, 12)}))); }
     }
     if (errors.length) console.error('Browser errors:', errors); throw error;
-  } finally { if (browser) await browser.close(); await hub.close(); fs.rmSync(dir, {recursive: true, force: true}); }
+  } finally { if (browser) await browser.close(); await hub.close(); if (status) await status.close(); fs.rmSync(dir, {recursive: true, force: true}); }
 }
 main().catch(error => { console.error(error.stack); process.exitCode = 1; });

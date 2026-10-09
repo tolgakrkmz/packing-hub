@@ -294,8 +294,9 @@ docker compose cp package-hub:/var/lib/package-hub/backup-before-update.sqlite /
 ```
 
 Create `/srv/hub-backups` with restricted host permissions first. Keep a protected
-copy on a separate local disk. Backup scheduling and retention are manual in this
-version. Use the snapshot command instead of copying an actively written database.
+copy on a separate local disk. This command creates an additional manual snapshot;
+scheduled, verified two-copy backups are described below. Use the snapshot command
+instead of copying an actively written database.
 
 Deploy reviewed code with `docker compose up -d --build` from the same Compose
 project/directory. The named volume survives container recreation. Keep the
@@ -304,6 +305,241 @@ run `docker compose down -v`.** To restore, stop the service, replace its databa
 with a verified snapshot under the container user's ownership, remove obsolete
 WAL/SHM sidecars only while stopped, then restart. Test restore with fictional data
 before relying on backups.
+
+### Scheduled backups to two local disks
+
+For plain-language Bulgarian scenarios and the automated/manual coverage matrix,
+see [Backup and recovery scenarios](BACKUP-RECOVERY-SCENARIOS.md).
+
+After deploying the reviewed backup-capable image, install the host-side systemd
+service from the source checkout. It runs independently of the update timer, every
+four hours in UTC; a missed scheduled run executes after the host returns. No
+backup, database content, storage path or credential is sent to an external service.
+
+First mount a **separate physical local disk**, with a stable filesystem UUID.
+The administrator must confirm that it is physically separate; software checks
+different filesystem devices, the mountpoint and the configured UUID on every run.
+Two partitions on the same physical disk are not sufficient protection.
+Create application-specific private directories on each disk, owned by the image's
+Node user (UID/GID 1000), with mode 700. The example paths are placeholders; keep
+the real paths and configuration on the host, outside this repository:
+
+```sh
+sudo install -d -o 1000 -g 1000 -m 700 /srv/hub-backups /mnt/backup-disk/hub-backups
+sudo bash scripts/install-backups.sh /absolute/existing/compose/project /srv/hub-backups /mnt/backup-disk/hub-backups 4
+```
+
+The installer requires an existing mounted secondary directory and a successful
+first backup before enabling the timer. It records protected local configuration
+in `/etc/package-hub-backup.conf` (root-owned, mode 600). Supported intervals are
+1, 2, 3, 4, 6, 8, 12 or 24 hours; rerun the installer to change the interval or
+intentionally replace the disk. It does not alter the application's Compose file,
+existing volume, update service, accounts or live data.
+
+The worker uses the **currently running image** and mounts only its verified named
+data volume read-only. It creates a consistent `VACUUM INTO` snapshot, checks SQLite
+integrity, foreign keys, the supported schema and required module/task tables,
+then flushes it and publishes the completed archive without overwriting a previous
+file. The secondary copy passes the same checks and an internal byte digest
+comparison; digests and data never enter logs or manifests. Files are mode 600.
+Only after both copies verify does rotation retain the newest backup from each of
+7 most recent UTC days, 4 ISO weeks and 3 months (the union, at most 14 files per
+disk). Unmanaged files and incomplete work are preserved for local review. A
+damaged historical managed archive stops rotation until administrator review.
+
+Missing/replaced disks, copy errors and failed verification make the service fail;
+previous archives and the last successful timestamp remain. A failed secondary
+copy retains the newly verified primary snapshot too. Host preflight failures
+create a generic private failure marker; they never masquerade as verified copies.
+Overlapping jobs are locked. A timed-out worker is stopped and removed; a worker
+left behind by an abrupt host failure blocks the next run until local review.
+
+```sh
+sudo systemctl start package-hub-backup.service
+sudo systemctl status package-hub-backup.service package-hub-backup.timer
+sudo bash /usr/local/libexec/package-hub-backup.sh status
+```
+
+Status reports only state, fixed error codes and timestamps. `unknown` means no
+verified run; `ok` describes the last completed run, not perpetual protection.
+Check the timestamp and timer/service state: failures can make the recovery point
+older than four hours. At a healthy four-hour cadence, up to four hours of newer
+records may need to be re-entered after loss of the live disk. No automatic UI
+notification is added by this maintenance service; the administrator status screen
+is a separate task.
+
+Validate physical mounts, permissions, a scheduled run, missing-disk behavior and
+actual Docker read-only WAL access locally on the target Linux host before relying
+on the service. Development tests use fictional SQLite data and isolated host-tool
+boundaries; they do not claim to test real hardware. Keep a protected local copy
+of the private Compose `.env`, backup/update configuration and recovery access
+instructions on the second disk as well; database archives do not include host
+configuration. Do not upload those files or archives to GitHub, Trello or chat.
+
+### Isolated recovery rehearsal and emergency procedure
+
+Use the matching reviewed application image already present on the **local host**.
+The rehearsal script accepts an absolute local archive path and an immutable local
+`sha256:` image ID. It allocates a uniquely labelled disposable Docker volume,
+mounts the archive read-only, restores the database, revokes copied sessions and
+starts an isolated loopback server inside the container. No network, host port,
+live application volume or private host configuration is mounted. It checks module
+reads, accounts/permissions, schedules, database integrity, process health and
+unauthenticated API denial. It prints only fixed messages and recovery/startup
+durations, then removes its own container and labelled test volume.
+
+```sh
+bash scripts/restore-rehearsal.sh /absolute/local/verified-archive.sqlite sha256:LOCAL_IMAGE_ID
+```
+
+The archived file must be readable by UID 1000 and have no WAL/SHM/journal sidecars:
+use a completed snapshot, never an actively written database. The real archive
+stays on the protected host. Rehearsal is repeatable; the image must support archive
+schema version 4. Unsupported schemas, invalid data, partial copies, existing
+destination files and missing recovery administration fail instead of being
+silently migrated or overwritten. A failed recovery destination is retained by
+the core command for local review, without a ready marker; the disposable Docker
+drill removes its private test copy on exit.
+
+For a persistent recovery copy, Node.js 24+ provides the same local-only core:
+
+```sh
+node server/restore-cli.cjs restore /absolute/local/verified-archive.sqlite /absolute/new/private/recovery-directory
+```
+
+The parent must exist; the destination must be new or completely empty, owned by
+the executing user and mode 700. Output database files are mode 600. The command
+never accepts a populated destination. `recovery-ready.json` is a private technical
+marker, not a published report. Old sessions are revoked in the **copy**; usernames,
+password hashes, permissions, module records, task history and documents are kept.
+An authenticated acceptance check still requires the administrator's locally held
+credentials; do not put passwords in command arguments, logs or external services.
+
+During an actual incident:
+
+1. Stop new input and inform local users. Disable the backup and automatic update
+   timers during controlled recovery. Stop the live service only in the agreed
+   maintenance window. Preserve the existing data volume and original archive;
+   never run `docker compose down -v` or copy over an active SQLite database.
+2. On the protected host, select a completed verified archive and note its time
+   against the last confirmed entry. Rehearse it with the matching local image.
+   The gap after the snapshot is the potential loss window; do not infer zero loss
+   from successful integrity checks. Keep older copies available for comparison.
+3. Restore into a **new empty private directory or newly allocated volume** using
+   `restore-cli.cjs restore`. Do not reuse the live volume. Preserve UID 1000 and
+   mode 700/600 when preparing Docker storage. Never move old WAL/SHM files into
+   the restored storage. Keep the recovered database path at `hub.sqlite` in the
+   application's `/var/lib/package-hub` volume for backup compatibility.
+4. Start the recovered copy in isolation. Sign in with a known recovery
+   administrator and check every module, the last confirmed entry, individual
+   rights, tasks/recurring schedules and an attachment. Confirm old sessions are
+   rejected. Record only technical timings/validation locally. If account access
+   is unavailable, use `server/manage.cjs create-admin` interactively **on the
+   isolated restored copy**, then validate before exposing it.
+5. Switch the controlled deployment to the accepted new storage and matching
+   image, then verify user access before reopening input. If the copy is wrong,
+   stop the recovered service and return to the preserved previous volume/image
+   when healthy, or repeat recovery from an older archive into another new volume.
+   Avoid independent parallel writing; reconcile records entered after reopening
+   before any subsequent switch or rollback.
+6. Restore the protected private Compose `.env`, public-origin/proxy settings,
+   backup/update configuration and local recovery access if the old host is lost.
+   Keep these separately on the second disk; the database cannot reconstruct host
+   configuration. Check the disk UUID and mount, perform a fresh two-copy backup,
+   and re-enable the timers only after acceptance. Keep the preserved old storage
+   until the recovery has been reviewed.
+
+Automated fictional tests cover authenticated APIs, preserved account rights and
+documents, recurring task materialization, old-session revocation and the exact
+snapshot boundary. The measured timings are for tiny fictional databases and do
+not predict production recovery time. Actual Docker mounts, host replacement,
+private configuration recovery and a real archive rehearsal require a local
+target-host exercise; no real archive is needed in development or GitHub.
+
+### Administrator system status
+
+The authenticated header replaces its Tasks shortcut with **System status** for
+administrators. Tasks remain available from the home module tile, with their
+pending counter also shown in the Tasks heading. Operators and observers cannot
+open the status page or use either administration API, including direct requests.
+The page uses the shared Package Hub theme and supports BG/EN and small screens.
+The Bulgarian [practical scenarios and test coverage](SYSTEM-STATUS-SCENARIOS.md)
+explain how this task complements backup and recovery.
+
+The page checks database access with a small schema read and the space available
+to the database's user. Complete database integrity scans remain part of backup
+verification, rather than running on every screen poll. Concurrent status
+requests share the entire check.
+The check also verifies access to the same regular database file the server
+opened. A missing, replaced, empty or linked file cannot be hidden by SQLite's
+cached schema. It warns
+below 1 GiB or 10% free space. Backup timestamps, the second disk's mount/UUID and
+update results come from an optional local host adapter. Backups become overdue
+after their configured interval plus 15 minutes. Unknown, failed and overdue
+checks are distinct; a failed refresh hides the previous successful summary.
+Browser requests stop waiting after 20 seconds and allow a fresh check. Restoring
+the screen from the browser's back/forward cache hides the old summary until it
+has been checked again. A stale or aborted response cannot overwrite that check.
+There are no public archive links, host paths, revisions, account details or log
+contents in the status response. `/healthz` keeps its minimal public response.
+
+After installing and accepting the two-disk backup service, install the adapter
+on the Linux host during a planned deployment. It needs `/usr/bin/python3` 3.8+
+and uses only the Python standard library, existing host tools and the installed
+backup service:
+
+```sh
+sudo bash scripts/install-maintenance.sh
+sudo docker compose --project-directory /absolute/existing/compose/project -f /absolute/existing/compose/project/compose.yaml -f /etc/package-hub-maintenance.compose.yaml up -d --no-build --no-deps package-hub
+```
+
+Use the existing project's exact name and any existing local build overrides
+when applying that command. Deploy the reviewed status-capable image first.
+Preserve the existing named data volume. The adapter installs a protected Unix
+socket, activated by systemd, and an optional read-only directory mount for the
+application. It adds no network listener, timer, external notification or Docker
+socket inside the application. Its only operations are status reads and starting
+`package-hub-backup.service`; API request data cannot supply commands or paths.
+The application never mounts the backup disks or private host configuration.
+Install while the backup service is idle. Preflight rejects an active backup,
+unsafe or linked configuration/worker/unit files, and a missing service. Re-running
+the installer refreshes an already active adapter with `try-restart`; a failed
+copy, reload, enable or restart never reports a successful installation.
+For the socket activation contract, see the official
+[systemd socket documentation](https://github.com/systemd/systemd/blob/main/man/systemd.socket.xml).
+
+**Create backup** returns an asynchronous status, then the screen polls progress.
+Concurrent requests and an active scheduled backup are refused. A manual request
+invalidates any older in-flight status snapshot; the screen
+reads again after the request rather than reusing an old idle result.
+Success requires a newly confirmed successful pair with canonical matching timestamps and no
+error code. A lost reply does not imply that the host action was cancelled: the
+screen checks status and never retries a POST automatically. A failed attempt
+to create the worker thread leaves a failed, retryable job. Closing the browser does not cancel the host
+service. Missing configuration leaves the relevant cards unknown and the action
+unavailable; the standalone/offline application offers no maintenance controls.
+An unavailable manual service or an unconfirmed manual result also prevents an
+entirely successful overall summary. The adapter limits simultaneous connections
+to eight and gives each status/preflight operation a shared ten-second command
+budget, with at most five seconds per command. A timed-out disk check remains
+unknown. The application bounds and validates the adapter's HTTP/JSON responses.
+
+The auto-update script now records a private fixed-state `last-attempt` marker,
+including failures before build/deployment, while `last-good` retains the actual
+successful deployment time. No-op update checks do not claim a new deployment.
+Older installed updater scripts must be replaced with the reviewed version using
+the existing installer. The updater preserves the installed maintenance Compose
+override. Changes to either Compose source require a reviewed manual deployment.
+
+Validate socket ownership/access, actual Docker reads, manual and scheduled
+overlap, disk removal, update failure and reboot locally before acceptance. The
+automated tests use fictional state and local command boundaries; the Chrome
+workflow checks rendering, roles, warnings, manual requests, reconnect, BG/EN and
+320/390/768/1440 px layouts:
+
+```sh
+node scripts/run-server-browser-tests.cjs --status-only --headless
+```
 
 ### Automatic updates after merging into main
 

@@ -10,12 +10,27 @@ source "$config"
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/update.lock"
 flock -n 9 || exit 0
+record_attempt() {
+  local result=$? temporary state=failed
+  trap - EXIT
+  [[ $result != 0 ]] || state=ok
+  temporary=$(mktemp "$STATE_DIR/.update-attempt.XXXXXX") || exit 1
+  printf '%s\n%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$state" >"$temporary"
+  mv -f -- "$temporary" "$STATE_DIR/last-attempt"
+  exit "$result"
+}
+trap record_attempt EXIT
 log="$STATE_DIR/last-run.log"
 : >"$log"
 fail() { echo "$1"; exit 1; }
 run() { "$@" >>"$log" 2>&1; }
 git_source() { git -c "safe.directory=$SOURCE_DIR" -C "$SOURCE_DIR" "$@"; }
-compose() { docker compose --project-directory "$DEPLOY_DIR" -f "$DEPLOY_DIR/compose.yaml" -f "$BUILD_OVERRIDE" -p "$COMPOSE_PROJECT" "$@"; }
+compose() {
+  local files=(-f "$DEPLOY_DIR/compose.yaml" -f "$BUILD_OVERRIDE")
+  local maintenance_override=${MAINTENANCE_OVERRIDE:-/etc/package-hub-maintenance.compose.yaml}
+  if [[ -f $maintenance_override ]]; then files+=(-f "$maintenance_override"); fi
+  docker compose --project-directory "$DEPLOY_DIR" "${files[@]}" -p "$COMPOSE_PROJECT" "$@"
+}
 [[ $(git_source branch --show-current) == main ]] || fail 'Deployment requires the main branch.'
 [[ -z $(git_source status --porcelain --untracked-files=normal) ]] || fail 'Local source changes require administrator review.'
 case "$(git_source remote get-url origin)" in
@@ -33,7 +48,7 @@ fi
 git_source merge-base --is-ancestor HEAD origin/main || fail 'Diverged source history requires administrator review.'
 baseline=$current
 [[ ! -f "$STATE_DIR/last-good" ]] || baseline=$(cat "$STATE_DIR/last-good")
-git_source diff --quiet "$baseline" "$candidate" -- compose.yaml || fail 'Compose configuration changes require a manual deployment.'
+git_source diff --quiet "$baseline" "$candidate" -- compose.yaml compose.maintenance.yaml || fail 'Compose configuration changes require a manual deployment.'
 container=$(compose ps -q package-hub)
 [[ $container =~ ^[0-9a-f]{12,64}$ ]] || fail 'Exactly one existing application container is required.'
 [[ $(docker inspect --format '{{.State.Running}}' "$container") == true ]] || fail 'The application is not running.'

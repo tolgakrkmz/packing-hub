@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Статус на системата · Package Hub</title>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css">
+  <link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/system-status.css">
+  <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+  <script src="js/system-status.js" defer></script>
+</head>
+<body>
+  <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
+  <main class="account-wrap system-page">
+    <a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
+    <header class="system-heading">
+      <div><p class="system-eyebrow">Администраторски панел</p><h1>Статус на системата</h1><p>База, свободно място и защита на данните.</p></div>
+      <button id="refreshSystem" class="system-secondary" type="button">Опресни</button>
+    </header>
+    <p id="systemMessage" class="system-message" role="status" aria-live="polite"></p>
+    <section id="systemContent" hidden aria-label="Състояние на системата">
+      <div id="systemSummary" class="system-summary" data-state="unknown"><span class="system-dot" aria-hidden="true"></span><div><strong id="summaryLabel">Няма данни</strong><p>Последна проверка: <time id="checkedAt" translate="no">—</time></p></div><span id="summaryBadge" class="system-badge">Няма данни</span></div>
+      <ul id="systemWarnings" class="system-warnings" aria-label="Предупреждения" hidden></ul>
+      <div class="system-grid">
+        <section class="system-card" id="databaseCard" aria-labelledby="databaseTitle"><div class="system-card-heading"><h2 id="databaseTitle">Работна база</h2><span class="system-badge" data-state="unknown" id="databaseState">Няма данни</span></div><strong id="databaseValue" class="system-value">—</strong><p>Проверка на достъпността на базата.</p></section>
+        <section class="system-card" id="diskCard" aria-labelledby="diskTitle"><div class="system-card-heading"><h2 id="diskTitle">Свободно място</h2><span class="system-badge" data-state="unknown" id="diskState">Няма данни</span></div><strong id="diskValue" class="system-value" translate="no">—</strong><p id="diskDetail">Няма данни</p><meter id="diskMeter" min="0" max="100" value="0" aria-label="Използвано място" hidden></meter></section>
+        <section class="system-card" id="backupCard" aria-labelledby="backupTitle"><div class="system-card-heading"><h2 id="backupTitle">Архивиране</h2><span class="system-badge" data-state="unknown" id="backupState">Няма данни</span></div><p class="system-label">Последен успешен архив</p><time id="backupTime" class="system-time" translate="no">—</time><dl><div><dt>Последен опит</dt><dd><time id="backupAttempt" translate="no">—</time></dd></div><div><dt>График</dt><dd id="backupSchedule">Няма данни</dd></div></dl></section>
+        <section class="system-card" id="secondaryCard" aria-labelledby="secondaryTitle"><div class="system-card-heading"><h2 id="secondaryTitle">Второ копие</h2><span class="system-badge" data-state="unknown" id="secondaryState">Няма данни</span></div><p class="system-label">Последно проверено копие</p><time id="secondaryTime" class="system-time" translate="no">—</time><p id="secondaryDetail">Няма данни</p></section>
+        <section class="system-card system-update" id="updateCard" aria-labelledby="updateTitle"><div class="system-card-heading"><h2 id="updateTitle">Обновяване</h2><span class="system-badge" data-state="unknown" id="updateState">Няма данни</span></div><dl><div><dt>Последно успешно обновяване</dt><dd><time id="updateTime" translate="no">—</time></dd></div><div><dt>Последна проверка за обновяване</dt><dd><time id="updateAttempt" translate="no">—</time></dd></div></dl></section>
+      </div>
+      <section class="system-backup-action" aria-labelledby="manualTitle"><div><h2 id="manualTitle">Архив сега</h2><p>Създай и провери копия на двата локални диска.</p><p id="manualHint" class="system-label">Контролът на архивите не е настроен.</p></div><button id="manualBackup" type="button" disabled>Създай архив</button><p id="manualMessage" role="status" aria-live="polite"></p></section>
+      <p class="system-footnote">Статусът показва последната проверка. При проблем прегледай местната настройка, преди да разчиташ на архивите.</p>
+    </section>
+  </main>
+</body>
+</html>
