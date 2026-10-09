@@ -277,3 +277,64 @@ copyVerified(process.argv[2],process.argv[3]);`;
   copyVerified(source, destination); verifyDatabase(destination);
   assert.deepEqual(fs.readFileSync(destination), before); assert.ok(fs.existsSync(path.join(demo.secondary, incomplete[0])));
 });
+
+test('explicit single-disk mode verifies a complete local archive without claiming a second copy', t => {
+  const demo = backupFixture(t);
+  const status = runBackup({...demo, secondary: undefined, mode: 'single', now});
+  assert.equal(status.state, 'ok'); assert.equal(status.mode, 'single');
+  assert.equal(status.lastSuccess, now.toISOString()); assert.equal(status.lastPrimary, status.lastSuccess);
+  assert.equal(status.lastSecondary, null); assert.equal(status.code, null);
+  assert.deepEqual(readStatus(demo.primary), status); assert.equal(archives(demo.secondary).length, 0);
+  const db = new DatabaseSync(path.join(demo.primary, archives(demo.primary)[0]), {readOnly: true});
+  try {
+    for (const table of ['documents', 'users', 'sessions', 'files', 'audit', 'task_items', 'task_schedules', 'task_requests']) {
+      assert.deepEqual(db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all(), demo.store.db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
+    }
+  } finally { db.close(); }
+});
+test('single-disk history retains the same daily, weekly and monthly recovery points', t => {
+  const demo = backupFixture(t), names = [];
+  for (let days = 24; days >= 0; days--) {
+    const at = new Date(now.getTime() - days * 86400000);
+    const status = runBackup({...demo, secondary: undefined, mode: 'single', now: at});
+    assert.equal(status.state, 'ok');
+    names.push(archives(demo.primary).find(name => !names.includes(name)));
+  }
+  assert.deepEqual(archives(demo.primary).sort(), [...retainedArchives(names)].sort());
+  assert.ok(archives(demo.primary).length <= 14);
+});
+test('single-disk snapshot failure keeps the previous verified recovery point', t => {
+  const demo = backupFixture(t);
+  assert.equal(runBackup({...demo, secondary: undefined, mode: 'single', now}).state, 'ok');
+  const before = archives(demo.primary);
+  t.mock.method(fs, 'linkSync', () => { throw Object.assign(new Error('Fictional full disk'), {code: 'ENOSPC'}); });
+  const status = runBackup({...demo, secondary: undefined, mode: 'single', now: new Date(now.getTime() + 14400000)});
+  assert.equal(status.state, 'failed'); assert.equal(status.code, 'SNAPSHOT_FAILED');
+  assert.equal(status.lastSuccess, now.toISOString()); assert.deepEqual(archives(demo.primary), before);
+  assert.ok(!fs.readdirSync(demo.primary).some(name => name.startsWith('.incomplete')));
+});
+test('a damaged single-disk historical archive stops rotation without deleting recovery points', t => {
+  const demo = backupFixture(t);
+  assert.equal(runBackup({...demo, secondary: undefined, mode: 'single', now}).state, 'ok');
+  const corrupt = 'hub-2026-09-01T00-00-00-000Z-00000000-0000-4000-8000-000000000000.sqlite';
+  fs.writeFileSync(path.join(demo.primary, corrupt), 'Fictional damaged archive');
+  const status = runBackup({...demo, secondary: undefined, mode: 'single', now: new Date(now.getTime() + 14400000)});
+  assert.equal(status.state, 'failed'); assert.equal(status.code, 'RETENTION_FAILED');
+  assert.equal(status.lastSuccess, now.toISOString()); assert.equal(archives(demo.primary).length, 3);
+});
+test('single-disk mode is explicit and never silently substitutes for failed two-disk protection', t => {
+  const demo = backupFixture(t);
+  for (const mode of ['unknown', null, true]) assert.throws(() => runBackup({...demo, mode}), {code: 'CONFIGURATION_FAILED'});
+  assert.throws(() => runBackup({...demo, mode: 'single'}), {code: 'CONFIGURATION_FAILED'});
+  assert.deepEqual(fs.readdirSync(demo.primary), []);
+  const status = runBackup({...demo, secondary: undefined, now});
+  assert.equal(status.mode, 'dual'); assert.equal(status.state, 'failed');
+});
+test('single-disk success metadata cannot fabricate a second copy or accept an unknown mode', t => {
+  const demo = backupFixture(t);
+  const good = runBackup({...demo, secondary: undefined, mode: 'single', now});
+  for (const change of [{lastSecondary: now.toISOString()}, {lastPrimary: null}, {mode: 'unknown'}, {mode: null}]) {
+    fs.writeFileSync(path.join(demo.primary, 'status.json'), JSON.stringify({...good, ...change}));
+    assert.equal(readStatus(demo.primary).state, 'unknown');
+  }
+});

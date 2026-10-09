@@ -30,18 +30,30 @@ finish() {
   local result=$?
   trap - EXIT ERR TERM INT
   if ! cleanup; then code=BACKUP_WORKER_FAILED; failed; result=1; fi
-  if [[ $result == 0 && $locked == true ]]; then echo 'Scheduled backup completed; both local copies verified.'; fi
+  if [[ $result == 0 && $locked == true ]]; then
+    if [[ $BACKUP_MODE == single ]]; then echo 'Scheduled backup completed; local copy verified. No independent second copy.';
+    else echo 'Scheduled backup completed; both local copies verified.'; fi
+  fi
   exit "$result"
 }
 trap failed ERR
 trap finish EXIT
 trap 'code=BACKUP_INTERRUPTED; failed; exit 1' TERM INT
 config=${HUB_BACKUP_CONFIG:-/etc/package-hub-backup.conf}
-[[ -f $config && ! -L $config && $(stat -c '%u:%a' "$config") == 0:600 ]] || abort
+[[ -f $config && ! -L $config && $(stat -c '%u:%a:%h' "$config") == 0:600:1 ]] || abort
 # shellcheck source=/dev/null
 source "$config"
-: "${DEPLOY_DIR:?}" "${COMPOSE_PROJECT:?}" "${PRIMARY_DIR:?}" "${SECONDARY_DIR:?}" "${SECONDARY_MOUNT:?}" "${SECONDARY_UUID:?}"
-for directory in "$DEPLOY_DIR" "$PRIMARY_DIR" "$SECONDARY_DIR" "$SECONDARY_MOUNT"; do
+: "${DEPLOY_DIR:?}" "${COMPOSE_PROJECT:?}" "${PRIMARY_DIR:?}"
+BACKUP_MODE=${BACKUP_MODE:-dual}
+[[ $BACKUP_MODE == single || $BACKUP_MODE == dual ]] || abort
+directories=("$DEPLOY_DIR" "$PRIMARY_DIR")
+if [[ $BACKUP_MODE == dual ]]; then
+  : "${SECONDARY_DIR:?}" "${SECONDARY_MOUNT:?}" "${SECONDARY_UUID:?}"
+  directories+=("$SECONDARY_DIR" "$SECONDARY_MOUNT")
+else
+  [[ -z ${SECONDARY_DIR:-}${SECONDARY_MOUNT:-}${SECONDARY_UUID:-} ]] || abort
+fi
+for directory in "${directories[@]}"; do
   [[ $directory == /* && $directory != *','* && $directory != *$'\n'* && $directory != *$'\r'* ]] || abort
 done
 [[ -d $PRIMARY_DIR && ! -L $PRIMARY_DIR && $(stat -c '%u:%a' "$PRIMARY_DIR") == 1000:700 ]] || abort
@@ -62,12 +74,14 @@ fi
 exec 9>"$PRIMARY_DIR/backup.lock"
 flock -n 9 || { echo 'A backup is already running.'; exit 0; }
 locked=true
-code=SECONDARY_UNAVAILABLE
-mountpoint -q "$SECONDARY_MOUNT"
-[[ $(findmnt -nro TARGET --target "$SECONDARY_DIR") == "$SECONDARY_MOUNT" ]] || abort
-[[ $(findmnt -nro UUID --target "$SECONDARY_DIR") == "$SECONDARY_UUID" ]] || abort
-[[ -d $SECONDARY_DIR && ! -L $SECONDARY_DIR && $(stat -c '%u:%a' "$SECONDARY_DIR") == 1000:700 ]] || abort
-[[ $(stat -c '%d' "$PRIMARY_DIR") != "$(stat -c '%d' "$SECONDARY_DIR")" ]] || abort
+if [[ $BACKUP_MODE == dual ]]; then
+  code=SECONDARY_UNAVAILABLE
+  mountpoint -q "$SECONDARY_MOUNT"
+  [[ $(findmnt -nro TARGET --target "$SECONDARY_DIR") == "$SECONDARY_MOUNT" ]] || abort
+  [[ $(findmnt -nro UUID --target "$SECONDARY_DIR") == "$SECONDARY_UUID" ]] || abort
+  [[ -d $SECONDARY_DIR && ! -L $SECONDARY_DIR && $(stat -c '%u:%a' "$SECONDARY_DIR") == 1000:700 ]] || abort
+  [[ $(stat -c '%d' "$PRIMARY_DIR") != "$(stat -c '%d' "$SECONDARY_DIR")" ]] || abort
+fi
 code=APPLICATION_UNAVAILABLE
 container=$(docker compose --project-directory "$DEPLOY_DIR" -f "$DEPLOY_DIR/compose.yaml" -p "$COMPOSE_PROJECT" ps -q package-hub)
 [[ $container =~ ^[0-9a-f]{12,64}$ ]] || abort
@@ -81,14 +95,19 @@ code=DATABASE_CONFIGURATION_UNSUPPORTED
 database=$(docker inspect --format '{{range .Config.Env}}{{if eq (index (split . "=") 0) "HUB_DATABASE"}}{{index (split . "=") 1}}{{end}}{{end}}' "$container")
 [[ $database == /var/lib/package-hub/hub.sqlite ]] || abort
 code=BACKUP_WORKER_FAILED
+backup_mounts=(--mount "type=bind,src=$PRIMARY_DIR,dst=/backup-primary")
+backup_environment=(-e HUB_BACKUP_PRIMARY=/backup-primary -e "HUB_BACKUP_MODE=$BACKUP_MODE")
+if [[ $BACKUP_MODE == dual ]]; then
+  backup_mounts+=(--mount "type=bind,src=$SECONDARY_DIR,dst=/backup-secondary")
+  backup_environment+=(-e HUB_BACKUP_SECONDARY=/backup-secondary)
+fi
 # A fixed name also blocks an orphaned worker after a host/client interruption.
 worker=$(docker create --pull never --name "package-hub-backup-$COMPOSE_PROJECT" --network none --read-only --tmpfs /tmp \
   --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges:true \
   --mount "type=volume,src=$volume,dst=/var/lib/package-hub,readonly" \
-  --mount "type=bind,src=$PRIMARY_DIR,dst=/backup-primary" \
-  --mount "type=bind,src=$SECONDARY_DIR,dst=/backup-secondary" \
+  "${backup_mounts[@]}" \
   -e HUB_DATABASE=/var/lib/package-hub/hub.sqlite \
-  -e HUB_BACKUP_PRIMARY=/backup-primary -e HUB_BACKUP_SECONDARY=/backup-secondary \
+  "${backup_environment[@]}" \
   --entrypoint node "$image" --disable-warning=ExperimentalWarning server/backup-cli.cjs run)
 [[ $worker =~ ^[0-9a-f]{12,64}$ ]] || abort
 docker start -a "$worker"

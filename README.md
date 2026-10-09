@@ -306,6 +306,38 @@ with a verified snapshot under the container user's ownership, remove obsolete
 WAL/SHM sidecars only while stopped, then restart. Test restore with fictional data
 before relying on backups.
 
+### Scheduled backups on the primary disk
+
+An explicit single-disk mode is available when a second physical disk cannot be
+provided. It creates and verifies consistent SQLite archives independently of
+code updates, with the same 7 daily / 4 weekly / 3 monthly retention policy.
+The archive contains accounts, module data, tasks and uploaded documents.
+**These archives can be lost together with the live database if the disk fails.**
+The administrator screen always shows this limitation as a warning; it never
+claims an independent second copy or an entirely successful protection summary.
+
+After deploying the reviewed image, create an application-specific private host
+directory and install the service on the existing Compose project:
+
+```sh
+sudo install -d -o 1000 -g 1000 -m 700 /srv/hub-backups
+sudo bash scripts/install-backups.sh --single /absolute/existing/compose/project /srv/hub-backups 4
+```
+
+The installer writes `BACKUP_MODE=single` in the protected local configuration,
+without secondary disk fields. It verifies the first archive before enabling the
+schedule. The worker mounts only the existing database volume read-only and the
+primary archive directory. A failed snapshot or rotation preserves earlier
+recovery points and the last successful timestamp. Manual backups use the same
+service after installing the maintenance adapter described below. The UI shows
+**Primary disk**, the local archive time, and **No independent copy**.
+
+Two-disk mode remains the default for existing configurations and CLI callers.
+A missing or failed second disk never switches an existing two-disk setup into
+single-disk mode automatically. Run the installer explicitly to change modes.
+Restoration uses the same isolated rehearsal and emergency procedure for both
+modes; the rehearsal does not overwrite the live database.
+
 ### Scheduled backups to two local disks
 
 For plain-language Bulgarian scenarios and the automated/manual coverage matrix,
@@ -483,7 +515,7 @@ has been checked again. A stale or aborted response cannot overwrite that check.
 There are no public archive links, host paths, revisions, account details or log
 contents in the status response. `/healthz` keeps its minimal public response.
 
-After installing and accepting the two-disk backup service, install the adapter
+After installing and accepting the configured backup service, install the adapter
 on the Linux host during a planned deployment. It needs `/usr/bin/python3` 3.8+
 and uses only the Python standard library, existing host tools and the installed
 backup service:
@@ -512,8 +544,9 @@ For the socket activation contract, see the official
 Concurrent requests and an active scheduled backup are refused. A manual request
 invalidates any older in-flight status snapshot; the screen
 reads again after the request rather than reusing an old idle result.
-Success requires a newly confirmed successful pair with canonical matching timestamps and no
-error code. A lost reply does not imply that the host action was cancelled: the
+Success requires a newly confirmed archive for the configured mode, with canonical
+matching timestamps and no error code. Two-disk mode also requires a matching
+verified secondary copy; single-disk mode requires no secondary timestamp. A lost reply does not imply that the host action was cancelled: the
 screen checks status and never retries a POST automatically. A failed attempt
 to create the worker thread leaves a failed, retryable job. Closing the browser does not cancel the host
 service. Missing configuration leaves the relevant cards unknown and the action

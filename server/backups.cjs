@@ -138,14 +138,16 @@ function readStatus(directory) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) { value = {}; unreadable = true; }
   }
   const timestamp = item => typeof item === 'string' && Number.isFinite(Date.parse(item)) && new Date(item).toISOString() === item ? item : null;
-  const status = {state: ['ok', 'failed'].includes(value.state) ? value.state : 'unknown',
+  const mode = value.mode === undefined ? 'dual' : ['single', 'dual'].includes(value.mode) ? value.mode : null;
+  const status = {mode, state: ['ok', 'failed'].includes(value.state) ? value.state : 'unknown',
     lastAttempt: timestamp(value.lastAttempt), lastSuccess: timestamp(value.lastSuccess),
     lastPrimary: timestamp(value.lastPrimary), lastSecondary: timestamp(value.lastSecondary),
     code: CODES.has(value.code) ? value.code : null};
   // Status is a replaceable summary, never a prerequisite for creating a backup.
   // A truncated summary must neither stop the next run nor claim a verified pair.
-  if (status.state === 'ok' && (!status.lastAttempt || value.code !== null ||
-      [status.lastSuccess, status.lastPrimary, status.lastSecondary].some(at => at !== status.lastAttempt))) unreadable = true;
+  if (!mode || status.state === 'ok' && (!status.lastAttempt || value.code !== null ||
+      [status.lastSuccess, status.lastPrimary].some(at => at !== status.lastAttempt) ||
+      (mode === 'dual' ? status.lastSecondary !== status.lastAttempt : value.lastSecondary !== null))) unreadable = true;
   if (unreadable) { status.state = 'unknown'; status.code = 'STATUS_UNREADABLE'; }
   const hostFailure = path.join(directory, 'host-failure');
   if (fs.existsSync(hostFailure)) {
@@ -165,21 +167,26 @@ function writeStatus(directory, status) {
     syncDirectory(directory);
   } finally { fs.rmSync(temporary, {force: true}); }
 }
-function runBackup({database, primary, secondary, now = new Date()}) {
+function runBackup({database, primary, secondary, mode = 'dual', now = new Date()}) {
+  if (!['single', 'dual'].includes(mode) || mode === 'single' && secondary) throw failure('CONFIGURATION_FAILED');
   privateDirectory(primary);
   const at = now.toISOString(), name = 'hub-' + at.replace(/:/g, '-').replace('.', '-') + '-' + randomUUID() + '.sqlite';
-  const status = {...readStatus(primary), state: 'failed', lastAttempt: at, code: 'SNAPSHOT_FAILED'};
+  const status = {...readStatus(primary), mode, state: 'failed', lastAttempt: at, code: 'SNAPSHOT_FAILED'};
+  if (mode === 'single') status.lastSecondary = null;
   try {
     snapshot(database, path.join(primary, name));
     status.lastPrimary = at;
-    status.code = 'SECONDARY_UNAVAILABLE';
-    const other = privateDirectory(secondary);
-    if (other.dev === fs.statSync(primary).dev || other.dev === fs.statSync(database).dev) throw failure('SECONDARY_NOT_SEPARATE');
-    status.code = 'SECONDARY_COPY_FAILED';
-    copyVerified(path.join(primary, name), path.join(secondary, name));
-    status.lastSecondary = at;
+    if (mode === 'dual') {
+      status.code = 'SECONDARY_UNAVAILABLE';
+      const other = privateDirectory(secondary);
+      if (other.dev === fs.statSync(primary).dev || other.dev === fs.statSync(database).dev) throw failure('SECONDARY_NOT_SEPARATE');
+      status.code = 'SECONDARY_COPY_FAILED';
+      copyVerified(path.join(primary, name), path.join(secondary, name));
+      status.lastSecondary = at;
+    }
     status.code = 'RETENTION_FAILED';
-    prune(primary, name); prune(secondary, name);
+    prune(primary, name);
+    if (mode === 'dual') prune(secondary, name);
     status.state = 'ok'; status.code = null; status.lastSuccess = at;
   } catch (error) {
     if (error.code === 'SECONDARY_NOT_SEPARATE') status.code = error.code;

@@ -1,5 +1,5 @@
 [Unit]
-Description=Verify two local Package Hub database backups
+Description=Create and verify local Package Hub database backups
 After=docker.service
 Requires=docker.service
 
