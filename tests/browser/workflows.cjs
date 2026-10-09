@@ -280,7 +280,7 @@ async function run(browser, base, {headed = false} = {}) {
     await expect(page.locator('#stickersStage2')).toHaveValue('5');
   });
 
-  await scenario('Stickers pair planning, editing, deletion, reporting, correction and history', async t => {
+  await scenario('Stickers pair planning, editing, cancellation, reporting, correction and history', async t => {
     const {page, go, connect, read, saved} = t;
     await go('personnel');
     await connect('#openFileBtn', 'personnel.json');
@@ -293,7 +293,7 @@ async function run(browser, base, {headed = false} = {}) {
     await page.locator('#stickersShiftBtn').click();
     await expect(page.locator('#contextTeam')).toHaveValue('СТИКЕРИ');
     await expect(page.locator('#contextDate')).toHaveValue('2026-10-05');
-    async function plan() {
+    async function plan(count) {
       await page.locator('#addPairBtn').click();
       await expect(page.locator('#memberOne')).not.toContainText('Chief');
       await page.locator('#memberOne').selectOption(employees[0].id);
@@ -302,31 +302,33 @@ async function run(browser, base, {headed = false} = {}) {
       await page.locator('#targetCrates').fill('40');
       await page.locator('#areaManual').check();
       await page.locator('#savePairBtn').click();
-      await saved('pair-targets.json', data => data.entries.length === 1);
+      await saved('pair-targets.json', data => data.entries.length === count);
     }
-    await plan();
+    await plan(1);
     await expect(page.locator('#addPairBtn')).toBeDisabled();
     await page.locator('#pairsList [data-action=edit]').click();
     await page.locator('#targetKg').fill('1200');
     await page.locator('#savePairBtn').click();
     await saved('pair-targets.json', data => data.entries[0].targetKg === 1200);
-    await page.locator('#pairsList [data-action=delete]').click();
-    await saved('pair-targets.json', data => data.entries.length === 0);
-    await plan();
+    await page.locator('#pairsList [data-action=cancel]').click();
+    await page.locator('#cancellationReason').selectOption('cleaning');
+    await page.locator('#savePairBtn').click();
+    await saved('pair-targets.json', data => data.entries[0].cancellation?.reasonKey === 'cleaning');
+    await plan(2);
     await page.locator('#pairsList [data-action=report]').click();
     await page.locator('#actualKg').fill('1100');
     await page.locator('#actualCrates').fill('44');
     await page.locator('#savePairBtn').click();
-    await saved('pair-targets.json', data => data.entries[0].result?.kg === 1100);
+    await saved('pair-targets.json', data => data.entries[1].result?.kg === 1100);
     await expect(page.locator('#pairsList')).toContainText('Постигнат');
     await page.locator('#pairsList [data-action=report]').click();
     await page.locator('#actualCrates').fill('39');
     await page.locator('#reasonKey').selectOption('other');
     await page.locator('#reasonText').fill('Fictional missing crate');
     await page.locator('#savePairBtn').click();
-    await saved('pair-targets.json', data => data.entries[0].result?.crates === 39);
+    await saved('pair-targets.json', data => data.entries[1].result?.crates === 39);
     await expect(page.locator('#pairsList')).toContainText('Непостигнат');
-    await expect(page.locator('#pairsList [data-action=delete]')).toHaveCount(0);
+    await expect(page.locator('#pairsList [data-action=cancel]')).toHaveCount(0);
     await page.locator('#currentShiftBtn').click();
     await page.locator('#historyList summary').click();
     await page.locator('#historyList [data-action=view]').click();
@@ -573,9 +575,14 @@ async function run(browser, base, {headed = false} = {}) {
       await page.setViewportSize({width, height: 900});
       for (const module of ['index', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics']) {
         await go(module);
-        if (['production-log', 'line-downtime', 'personnel'].includes(module) && !/\bon\b/.test(await page.locator('#connDot').getAttribute('class'))) await connect('#openFileBtn', module + '.json');
+        // Later visits restore the remembered handles asynchronously.
+        if (['production-log', 'line-downtime', 'personnel'].includes(module)) {
+          if (width === 320) await connect('#openFileBtn', module + '.json');
+          else await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);
+        }
         if (module === 'pair-targets') {
-          if (!/\bon\b/.test(await page.locator('#pairsConnDot').getAttribute('class'))) await connect('#pairsOpenFileBtn', 'pair-targets.json', '#pairsConnDot');
+          if (width === 320) await connect('#pairsOpenFileBtn', 'pair-targets.json', '#pairsConnDot');
+          else await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
           await expect(page.locator('#rosterConnDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
         }
         if (module === 'statistics') {

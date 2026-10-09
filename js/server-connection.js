@@ -171,7 +171,7 @@ const HubServer = (() => {
       }
     }
     if (module === 'pair-targets.html') {
-      if (!can('canCreateReports')) selector += ',#addPairBtn,[data-action=edit],[data-action=delete]';
+      if (!can('canCreateReports')) selector += ',#addPairBtn,[data-action=edit],[data-action=cancel]';
       document.querySelectorAll('[data-action=report]').forEach(control => {
         if (!(control.dataset.reported === 'true' ? can('canEditReports') : can('canCreateReports')) && !control.hidden) control.hidden = true;
       });

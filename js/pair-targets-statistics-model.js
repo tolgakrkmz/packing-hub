@@ -3,11 +3,13 @@ const PairTargetsStatistics = (() => {
   const ratio = (actual, target) => target > 0 ? actual / target * 100 : null;
   function summarize(entries) {
     const totals = {
-      planned: entries.length, reported: 0, pending: 0, achieved: 0, missed: 0,
+      planned: 0, cancelled: 0, reported: 0, pending: 0, achieved: 0, missed: 0,
       plannedKg: 0, plannedCrates: 0, reportedTargetKg: 0, reportedTargetCrates: 0,
       actualKg: 0, actualCrates: 0, deficitKg: 0, deficitCrates: 0
     };
     for (const entry of entries) {
+      if(entry.cancellation) { totals.cancelled++; continue; }
+      totals.planned++;
       totals.plannedKg += entry.targetKg;
       totals.plannedCrates += entry.targetCrates;
       const state = PairTargets.status(entry);
@@ -33,7 +35,7 @@ const PairTargetsStatistics = (() => {
     const teams = PairTargets.TEAMS.map(name => {
       const records = selected.filter(entry => entry.team === name);
       return {team: name, entries: records, ...summarize(records)};
-    }).filter(group => group.planned);
+    }).filter(group => group.planned || group.cancelled);
     const reasons = PairTargets.REASONS.map(reason => {
       const records = selected.filter(entry => PairTargets.status(entry) === 'missed' &&
         (PairTargets.REASONS.some(item => item.key === entry.result.reasonKey) ? entry.result.reasonKey : 'other') === reason.key);

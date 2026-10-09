@@ -15,6 +15,22 @@ function entry(id, overrides = {}) {
     areas:['auto','manual'], targetKg:100, targetCrates:10, result:null, ...overrides};
 }
 const output = (kg, crates, reasonKey = '', reasonText = '') => ({kg, crates, reasonKey, reasonText});
+test('cancellations stay visible but do not affect plans, pending counts, ratios or deficits', () => {
+  const cancelled = entry('cancelled',{targetKg:1000,targetCrates:100,cancellation:{reasonKey:'cleaning',reasonText:'',cancelledAt:'2026-10-04T07:00:00Z'}});
+  const only = model.aggregate([cancelled],'2026-10');
+  assert.equal(only.cancelled,1);
+  for(const key of ['planned','pending','reported','plannedKg','plannedCrates','deficitKg','deficitCrates']) assert.equal(only[key],0);
+  for(const key of ['successPct','kgPct','cratesPct','averageKg']) assert.equal(only[key],null);
+  assert.equal(only.teams.length,1);
+  assert.equal(only.entries.length,1);
+  assert.equal(only.reasons.length,0);
+  const active = [entry('pending'),entry('reported',{result:output(100,10)})];
+  const result = model.aggregate([...active,cancelled],'2026-10');
+  const prior = model.aggregate(active,'2026-10');
+  for(const key of Object.keys(prior).filter(key => typeof prior[key] === 'number' && key !== 'cancelled')) assert.equal(result[key],prior[key],key);
+  assert.equal(result.cancelled,1);
+  assert.equal(model.aggregate([cancelled],'2026-09').cancelled,0);
+});
 test('pending plans are separate and both targets determine success', () => {
   const entries = [entry('pending', {targetKg:1000, targetCrates:100}),
     entry('ok', {result:output(100,10)}), entry('missed', {result:output(200,9,'materials')})];

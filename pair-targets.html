@@ -94,7 +94,12 @@
         <p class="muted">Изберете причина, напишете обяснение или използвайте и двете.</p>
       </div>
     </div>
-    <fieldset><legend>Къде е работила двойката</legend>
+    <div id="cancellationFields" hidden>
+      <label>Причина за отмяната<select id="cancellationReason"></select></label>
+      <label>Обяснение<textarea id="cancellationText" rows="3" maxlength="1000"></textarea></label>
+      <p class="muted">При друга причина обяснението е задължително. Двойката остава в историята, а хората могат да се разпределят отново.</p>
+    </div>
+    <fieldset id="areaFields"><legend>Къде е работила двойката</legend>
       <label class="checkbox"><input id="areaAuto" type="checkbox" value="auto">Автоматична опаковка</label>
       <label class="checkbox"><input id="areaManual" type="checkbox" value="manual">Ръчна опаковка</label>
       <p class="muted">Може да изберете и двете при преместване през смяната.</p>

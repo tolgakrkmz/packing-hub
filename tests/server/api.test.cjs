@@ -273,6 +273,44 @@ test('pair writes enforce the active packer roster and preserve reported plans w
   const corrector = await login('demo-operator');
   assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, kg: 1200, crates: 48}}]}, 3, corrector)).status, 200);
 });
+test('pair cancellation enforces reasons, history, permissions, revision and unchanged plans', async t => {
+  const {hub, request, login} = await setup(t);
+  const admin = await login(), operator = await login('demo-operator'), observer = await login('demo-observer');
+  const roster = hub.store.get('personnel').data;
+  roster.employees = [1,2].map(id => ({id:'demo-cancel-person-'+id,name:'Demo Cancellation Person '+id,category:'stickers',team:'1 смяна',role:'Опаковчик',active:true}));
+  hub.store.put('personnel',roster,1,admin.user);
+  const now = '2026-10-05T05:30:00.000Z';
+  const entry = {id:'demo-cancel-pair',date:'2026-10-05',shiftCode:1,team:'СТИКЕРИ',members:roster.employees.map(({id,name,category,role}) => ({id,name,category,role})),areas:['manual'],targetKg:1000,targetCrates:40,result:null,createdAt:now,updatedAt:now};
+  const data = {module:'pair-targets',schemaVersion:1,entries:[entry]};
+  const put = (entries,revision=2,user=operator,headers={}) => request('/api/data/pair-targets',user,{method:'PUT',data:{...data,entries},headers:{'If-Match':'"'+revision+'"',...headers}});
+  assert.equal((await put([entry],1)).status,200);
+  const cancelledAt = '2026-10-05T06:00:00.000Z';
+  const cancelled = {...entry,cancellation:{reasonKey:'cleaning',reasonText:'',cancelledAt},updatedAt:cancelledAt};
+  for(const reasonKey of ['', 'unknown', 'other']) assert.equal((await put([{...cancelled,cancellation:{...cancelled.cancellation,reasonKey}}])).status,400);
+  assert.equal((await put([])).status,400);
+  assert.equal((await put([],2,admin)).status,400);
+  assert.equal((await put([{...cancelled,targetKg:2000}])).status,400);
+  assert.equal((await put([cancelled],2,observer)).status,403);
+  await hub.auth.update(operator.user.id,{permissions:{canCreateReports:false,canEditReports:true}},admin.user);
+  const corrector = await login('demo-operator');
+  assert.equal((await put([cancelled],2,corrector)).status,403);
+  await hub.auth.update(operator.user.id,{permissions:{canCreateReports:true,canEditReports:false}},admin.user);
+  const reporter = await login('demo-operator');
+  assert.equal((await put([cancelled],1,reporter)).status,409);
+  assert.equal((await put([cancelled],2,reporter,{'X-CSRF-Token':''})).status,403);
+  assert.equal((await put([cancelled],2,reporter,{Origin:'https://example.invalid'})).status,403);
+  assert.equal(hub.store.get('pair-targets').revision,2);
+  assert.equal((await put([cancelled],2,reporter)).status,200);
+  for(const entries of [[],[entry],[{...cancelled,cancellation:{...cancelled.cancellation,reasonKey:'left'}}],[{...cancelled,result:{kg:1000,crates:40,reasonKey:'',reasonText:'',reportedAt:now}}]]) {
+    assert.equal((await put(entries,3,admin)).status,400);
+  }
+  const replacement = {...entry,id:'demo-replacement-pair'};
+  assert.equal((await put([cancelled,replacement],3,reporter)).status,200);
+  assert.deepEqual(hub.store.get('pair-targets').data.entries[0],cancelled);
+  const reported = {...replacement,result:{kg:1000,crates:40,reasonKey:'',reasonText:'',reportedAt:now}};
+  assert.equal((await put([cancelled,reported],4,reporter)).status,200);
+  assert.equal((await put([cancelled,{...reported,cancellation:cancelled.cancellation,updatedAt:cancelledAt}],5,admin)).status,400);
+});
 test('simultaneous saves accept one revision and a refreshed retry preserves both reports', async t => {
   const {request, login} = await setup(t); const operator = await login('demo-operator');
   const initial = await (await request('/api/data/production-log', operator)).json();

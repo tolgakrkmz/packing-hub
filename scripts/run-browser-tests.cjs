@@ -46,6 +46,33 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    if (process.argv.includes('--pair-cancellation-only')) {
+      const {employees,exercisePairCancellation} = require('../tests/browser/pair-cancellation.cjs');
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*',route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+      await context.addInitScript(installStorage,{});
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror',error => errors.push(error.message));
+      await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
+      await page.goto(base+'/pair-targets.html');
+      await page.evaluate(() => window.__browserTest.ready);
+      await page.evaluate(employees => window.__browserTest.write('personnel.json',{schemaVersion:3,employees,settings:{stickersStage1:1,stickersStage2:2},moveLog:[]}),employees);
+      for(const [button,file,dot] of [['pairsOpenFileBtn','pair-targets.json','pairsConnDot'],['rosterOpenFileBtn','personnel.json','rosterConnDot']]) {
+        await page.evaluate(file => { window.__browserTest.nextFile=file; },file);
+        await page.locator('#'+button).click();
+        await expect(page.locator('#'+dot)).toHaveClass(/\bon\b/);
+      }
+      await exercisePairCancellation({page,base,expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
+        read:() => page.evaluate(() => window.__browserTest.read('pair-targets.json')),
+        replace:data => page.evaluate(data => window.__browserTest.write('pair-targets.json',data),data),
+        failNextWrite:() => page.evaluate(() => { window.__browserTest.fault={file:'pair-targets.json',stage:'open'}; })
+      });
+      require('node:assert/strict').deepEqual(errors,[]);
+      console.log('PASS offline pair cancellation, history, drafts, conflict, statistics and BG/EN layouts');
+      await context.close(); return;
+    }
     if (process.argv.includes('--transfer-only')) {
       await exerciseOfflineTransfer(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
     }
