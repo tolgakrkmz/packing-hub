@@ -11,6 +11,8 @@ async function main() {
   const {expect} = require('playwright/test');
   const {run} = require('../tests/browser/workflows.cjs');
   const {exerciseOfflineSystemStatus} = require('../tests/browser/system-status.cjs');
+  const {installStorage} = require('../tests/browser/storage.cjs');
+  const {statisticsFixture, exerciseStatisticsPeriod, changedSources} = require('../tests/browser/statistics-period.cjs');
   const tokens = privateTokens(process.env.PACKAGE_HUB_PRIVATE_SOURCE || path.resolve(root, '../..'));
   // In-memory, exact-path allowlist: neither URL traversal nor new files can expose local data.
   const assets = new Map();
@@ -43,6 +45,47 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    if (process.argv.includes('--statistics-only')) {
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+      await context.addInitScript(installStorage, {});
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
+      await page.goto(base + '/statistics.html');
+      await page.evaluate(() => window.__browserTest.ready);
+      const write = documents => page.evaluate(async documents => {
+        for (const [kind, data] of Object.entries(documents)) await window.__browserTest.write(kind + '.json', data);
+      }, documents);
+      await write(statisticsFixture());
+      await page.locator('#statsFilesBtn').click();
+      for (const [button, kind, dot] of [
+        ['pairStatsOpenFileBtn','pair-targets','pairStatsConnDot'], ['openFileBtn','production-log','connDot'],
+        ['avOpenFileBtn','line-downtime','avConnDot'], ['personnelOpenFileBtn','personnel','personnelConnDot']
+      ]) {
+        await page.evaluate(kind => { window.__browserTest.nextFile = kind + '.json'; }, kind);
+        await page.locator('#' + button).click();
+        await expect(page.locator('#' + dot)).toHaveClass(/\bon\b/);
+        if (kind === 'pair-targets') {
+          await expect(page.locator('#yearSelect option[value="2025"]')).toHaveCount(1);
+          await expect(page.locator('#dashboardMonthSelect')).toHaveValue('10');
+          await expect(page.locator('#monthlyResultEmpty')).toBeVisible();
+        }
+      }
+      await page.locator('#statsFilesBtn').click();
+      await exerciseStatisticsPeriod({page, expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
+        replaceSources:async () => {
+          await write(changedSources());
+          await page.locator('#statsFilesBtn').click();
+          await page.locator('#refreshBtn').click();
+          await page.locator('#pairStatsRefreshBtn').click();
+        }
+      });
+      require('node:assert/strict').deepEqual(errors, []);
+      await context.close(); return;
+    }
     await run(browser, `http://127.0.0.1:${server.address().port}`, {headed});
     await exerciseOfflineSystemStatus(browser, `http://127.0.0.1:${server.address().port}`, expect);
   } finally {

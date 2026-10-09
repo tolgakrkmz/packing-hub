@@ -1073,3 +1073,10 @@ Object.assign(HUB_EN_MESSAGES, {
   'Създай и провери архив според настроения режим.': 'Create and verify a backup using the configured mode.',
   'Ръчният архив на основния диск е завършен и проверен.': 'The manual backup on the primary disk completed and was verified.'
 });
+
+Object.assign(HUB_EN_MESSAGES, {
+  'Общ месец': 'Shared month',
+  'Годишен преглед': 'Annual overview',
+  'Всички години': 'All years',
+  'Няма тонажни записи за избрания период.': 'No production records for the selected period.'
+});

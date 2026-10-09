@@ -755,10 +755,17 @@ clear the old retry action; changed records are refused before deletion.
 The monthly result stays above every statistics section. Switch between Overview,
 Production, Pair Targets, Downtime, and Workforce Capacity; only one section is
 shown at a time. The last section is remembered separately in demo browser storage.
-Choose the monthly year and month at the top. Production and downtime support
-monthly/yearly breakdowns. Detailed tables, the daily trend, and pair comparisons
+Choose the shared year and month at the top. The monthly result, pair reports,
+line breakdown and workforce capacity use that same period across sections and
+data refreshes. The initial selection is the current month; all twelve months
+are selectable, including empty ones. Connecting an older source or removing
+its last report never switches the chosen period. Years include available
+production, downtime and pair reports, the current year and the selected year.
+Production and downtime retain their annual breakdowns by month and their
+all-years views, with the scope stated in each heading. Pair output stays separate
+from production totals. Detailed tables, the daily trend, and pair comparisons
 expand on demand. The Files button shows connections and keeps the file panel
-closed until requested. Without production records, the monthly result offers a
+closed until requested. Without a connected production source, the monthly result offers a
 connection button while the other sections remain available.
 
 ## Pair target statistics
@@ -807,6 +814,16 @@ database and fictional inputs, then removes it. Server tests also check API
 permissions, CSRF/origin rejection, stale and simultaneous writes, roster rules,
 live events, persistence, backups and login throttling. Docker, Funnel and the
 actual CasaOS reboot/restore still require target-host checks.
+
+The shared statistics period has focused browser checks in both modes:
+
+```sh
+node scripts/run-browser-tests.cjs --headless --statistics-only
+node scripts/run-server-browser-tests.cjs --headless --statistics-only
+```
+
+These use fictional sources with different months and years, empty selections,
+source refreshes and annual scopes, in Bulgarian and English on phone and desktop.
 
 ### Visible browser tests
 

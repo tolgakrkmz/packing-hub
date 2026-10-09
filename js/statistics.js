@@ -21,9 +21,9 @@ let personnelCounts = null;
 let personnelLoaded = false;
 
 let currentView = 'month';
-let selectedYear = null;
-let selectedDashboardMonth = null;
-let selectedLineMonth = null;
+const initialPeriod = new Date();
+let selectedYear = String(initialPeriod.getFullYear());
+let selectedDashboardMonth = pad2(initialPeriod.getMonth() + 1);
 
 const el = {
   connPanel: document.getElementById('connPanel'),
@@ -101,7 +101,6 @@ const el = {
   monthlyChartTooltip: document.getElementById('monthlyChartTooltip'),
 
   lineShiftTitle: document.getElementById('lineShiftTitle'),
-  lineShiftMonthSelect: document.getElementById('lineShiftMonthSelect'),
   lineShiftHint: document.getElementById('lineShiftHint'),
   lineShiftContainer: document.getElementById('lineShiftContainer'),
 
@@ -330,7 +329,9 @@ const personnelSync = createFileSync({
 
 const pairStatistics = createPairTargetsStatistics({
   dbName: 'portfolio-pair-targets-fs-db',
-  localStorageKey: 'portfolio-pair-targets-fallback'
+  localStorageKey: 'portfolio-pair-targets-fallback',
+  getPeriod: () => `${selectedYear}-${selectedDashboardMonth}`,
+  onDataChange: renderAll
 });
 
 createStatisticsNavigation({
@@ -367,116 +368,32 @@ document
     );
   });
 
-el.yearSelect.addEventListener(
-  'change',
-  () => {
-    selectedYear =
-      el.yearSelect.value;
+el.yearSelect.addEventListener('change', () => {
+  selectedYear = el.yearSelect.value;
+  renderAll();
+});
 
-    selectedDashboardMonth =
-      null;
-
-    selectedLineMonth =
-      null;
-
-    renderAll();
-  }
-);
-
-el.dashboardMonthSelect.addEventListener(
-  'change',
-  () => {
-    selectedDashboardMonth =
-      el.dashboardMonthSelect.value;
-
-    renderMonthlyDashboard();
-    renderWorkforceDashboard();
-  }
-);
-
-el.lineShiftMonthSelect.addEventListener(
-  'change',
-  () => {
-    selectedLineMonth =
-      el.lineShiftMonthSelect.value;
-
-    renderLineShiftForSelectedMonth();
-  }
-);
+el.dashboardMonthSelect.addEventListener('change', () => {
+  selectedDashboardMonth = el.dashboardMonthSelect.value;
+  renderAll();
+});
 
 
 /* Production aggregation */
 
 function getAvailableYears() {
-  return Array.from(
-    new Set(
-      entries.concat(avEntries)
-        .map(e =>
-          e.date
-            ? e.date.slice(0, 4)
-            : null
-        )
-        .filter(Boolean)
-    )
-  ).sort();
+  // Optional sources may arrive in any order. Keep the chosen period even when
+  // its records disappear or a newly connected module has only older reports.
+  return [...new Set([
+    String(initialPeriod.getFullYear()), selectedYear,
+    ...getReportYears(),
+    ...pairStatistics.getYears()
+  ].filter(Boolean))].sort();
 }
 
-function getAvailableMonthsForYear(
-  year
-) {
-  const set =
-    new Set();
-
-  entries.forEach(e => {
-    if (
-      e.date &&
-      e.date.startsWith(
-        year + '-'
-      )
-    ) {
-      set.add(
-        e.date.slice(5, 7)
-      );
-    }
-  });
-
-  return Array.from(
-    set
-  ).sort();
-}
-
-function getBreakdownMonthsForYear(
-  year
-) {
-  const set =
-    new Set();
-
-  entries.forEach(e => {
-    if (
-      !e.date ||
-      !e.date.startsWith(
-        year + '-'
-      )
-    ) {
-      return;
-    }
-
-    if (
-      !e.breakdown ||
-      typeof e.breakdown !==
-        'object'
-    ) {
-      return;
-    }
-
-    set.add(
-      e.date.slice(5, 7)
-    );
-  });
-
-  return Array.from(
-    set
-  ).sort();
+function getReportYears() {
+  return [...new Set(entries.concat(avEntries)
+    .map(entry => entry.date?.slice(0, 4)).filter(Boolean))].sort();
 }
 
 function emptyShiftMap() {
@@ -559,7 +476,7 @@ function aggregateByMonth(
 }
 
 function aggregateByYear() {
-  return getAvailableYears()
+  return getReportYears()
     .map(year => {
       const row = {
         key: year,
@@ -616,124 +533,16 @@ function aggregateByYear() {
 /* Month selection */
 
 function populateMonthSelectors() {
-  if (!selectedYear) {
-    return;
-  }
+  el.yearSelect.innerHTML = getAvailableYears()
+    .map(year => `<option value="${year}">${year}</option>`).join('');
+  el.yearSelect.value = selectedYear;
+  el.dashboardMonthSelect.innerHTML = MONTH_FULL_LABELS
+    .map((name, index) => `<option value="${pad2(index + 1)}">${name}</option>`).join('');
+  el.dashboardMonthSelect.value = selectedDashboardMonth;
+}
 
-  const months =
-    getAvailableMonthsForYear(
-      selectedYear
-    );
-
-  if (!months.length) {
-    el.dashboardMonthSelect.innerHTML =
-      '<option value="">Няма записи</option>';
-
-    el.lineShiftMonthSelect.innerHTML =
-      '<option value="">Няма записи</option>';
-
-    selectedDashboardMonth = null;
-    selectedLineMonth = null;
-    el.dashboardMonthSelect.disabled = true;
-
-    return;
-  }
-
-  el.dashboardMonthSelect.disabled = false;
-
-  const current =
-    new Date();
-
-  const currentMonth =
-    String(
-      current.getFullYear()
-    ) === selectedYear
-      ? pad2(
-          current.getMonth() + 1
-        )
-      : null;
-
-  if (
-    !selectedDashboardMonth ||
-    !months.includes(
-      selectedDashboardMonth
-    )
-  ) {
-    selectedDashboardMonth =
-      currentMonth &&
-      months.includes(
-        currentMonth
-      )
-        ? currentMonth
-        : months[
-            months.length - 1
-          ];
-  }
-
-  const dashboardHtml =
-    months
-      .map(
-        m =>
-          `<option value="${m}">${
-            MONTH_FULL_LABELS[
-              Number(m) - 1
-            ]
-          }</option>`
-      )
-      .join('');
-
-  el.dashboardMonthSelect.innerHTML =
-    dashboardHtml;
-
-  el.dashboardMonthSelect.value =
-    selectedDashboardMonth;
-
-  const breakdownMonths =
-    getBreakdownMonthsForYear(
-      selectedYear
-    );
-
-  if (
-    !breakdownMonths.length
-  ) {
-    el.lineShiftMonthSelect.innerHTML =
-      '<option value="">Няма breakdown записи</option>';
-
-    selectedLineMonth =
-      null;
-  } else {
-    if (
-      !selectedLineMonth ||
-      !breakdownMonths.includes(
-        selectedLineMonth
-      )
-    ) {
-      selectedLineMonth =
-        breakdownMonths.includes(
-          selectedDashboardMonth
-        )
-          ? selectedDashboardMonth
-          : breakdownMonths[
-              breakdownMonths.length -
-              1
-            ];
-    }
-
-    el.lineShiftMonthSelect.innerHTML =
-      breakdownMonths
-        .map(
-          m =>
-            `<option value="${m}">${
-              MONTH_FULL_LABELS[
-                Number(m) - 1
-              ]
-            }</option>`
-        )
-        .join('');
-
-    el.lineShiftMonthSelect.value =
-      selectedLineMonth;
-  }
+function selectedPeriodLabel() {
+  return `${MONTH_FULL_LABELS[Number(selectedDashboardMonth) - 1]} ${selectedYear}`;
 }
 
 /* Monthly production result */
@@ -765,6 +574,8 @@ function getMonthlyDashboardData() {
           prefix
         )
     );
+
+  if (!rows.length) return null;
 
   const daysTotal =
     new Date(
@@ -1127,11 +938,10 @@ function renderMonthlyDashboard() {
 
   document.getElementById('monthlyResultBody').hidden = !d;
   document.getElementById('monthlyResultEmpty').hidden = !!d;
+  document.getElementById('monthlyConnectBtn').hidden = el.connDot.classList.contains('on');
+  el.dashboardTitle.textContent = selectedPeriodLabel();
 
   if (!d) {
-    el.dashboardTitle.textContent =
-      'Няма данни';
-
     el.dashboardStatus.className =
       'status-chip neutral';
 
@@ -3168,6 +2978,7 @@ function setWfKpiClass(node, cls) {
 function renderWorkforceDashboard() {
   if (!el.workforceDashboard) return;
 
+  el.wfSubtitle.textContent = selectedPeriodLabel();
   const counts = getPersonnelSnapshot();
   if (!counts) {
     el.wfNoData.style.display = 'block';
@@ -3337,38 +3148,10 @@ function aggregateLineByShift(
 }
 
 function renderLineShiftForSelectedMonth() {
-  if (
-    !selectedYear ||
-    !selectedLineMonth
-  ) {
-    el.lineShiftTitle.textContent =
-      'Ръчна / автоматична линия по смяна';
-
-    el.lineShiftContainer.innerHTML =
-      '<div class="empty">Няма записи с breakdown за тази година.</div>';
-
-    return;
-  }
-
-  const prefix =
-    `${selectedYear}-${selectedLineMonth}-`;
-
-  const monthName =
-    MONTH_FULL_LABELS[
-      Number(
-        selectedLineMonth
-      ) - 1
-    ];
-
+  const prefix = `${selectedYear}-${selectedDashboardMonth}-`;
   renderLineShiftTable(
-    entries.filter(
-      e =>
-        e.date &&
-        e.date.startsWith(
-          prefix
-        )
-    ),
-    `${monthName} ${selectedYear}`
+    entries.filter(entry => entry.date?.startsWith(prefix)),
+    selectedPeriodLabel()
   );
 }
 
@@ -3542,132 +3325,20 @@ function renderLineShiftTable(
 /* Dashboard rendering */
 
 function renderAll() {
+  populateMonthSelectors();
   pairStatistics.render();
+  renderMonthlyDashboard();
+  renderLineShiftForSelectedMonth();
 
-  const years =
-    getAvailableYears();
-
-  if (
-    !years.length
-  ) {
-    el.monthDashboard.style.display = 'block';
-    selectedYear = null;
-    selectedDashboardMonth = null;
-    selectedLineMonth = null;
-    el.yearSelect.innerHTML = '<option value="">Няма записи</option>';
-    el.yearSelect.disabled = true;
-    el.dashboardMonthSelect.innerHTML = '<option value="">Няма записи</option>';
-    el.dashboardMonthSelect.disabled = true;
-    renderMonthlyDashboard();
-
-    el.kpiRow.innerHTML =
-      '';
-
-    el.chartContainer.innerHTML =
-      '<div class="empty">Все още няма записи в тонажния дневник.</div>';
-
-    el.chartLegend.innerHTML =
-      '';
-
-    el.tableContainer.innerHTML =
-      '';
-
-    el.lineShiftContainer.innerHTML =
-      '';
-  } else {
-    el.monthDashboard.style.display = 'block';
-    el.yearSelect.disabled = false;
-    el.dashboardMonthSelect.disabled = false;
-
-    const previous =
-      el.yearSelect.value;
-
-    el.yearSelect.innerHTML =
-      years
-        .map(
-          y =>
-            `<option value="${y}">${y}</option>`
-        )
-        .join('');
-
-    if (
-      selectedYear &&
-      years.includes(
-        selectedYear
-      )
-    ) {
-      el.yearSelect.value =
-        selectedYear;
-    } else if (
-      years.includes(
-        previous
-      )
-    ) {
-      el.yearSelect.value =
-        previous;
-    } else {
-      el.yearSelect.value =
-        years[
-          years.length -
-          1
-        ];
-    }
-
-    selectedYear =
-      el.yearSelect.value;
-
-    populateMonthSelectors();
-
-    renderMonthlyDashboard();
-
-    renderLineShiftForSelectedMonth();
-
-    if (
-      currentView === 'month'
-    ) {
-      const rows =
-        aggregateByMonth(
-          selectedYear
-        );
-
-      renderKpis(
-        rows,
-        'месец'
-      );
-
-      renderStackedBarChart(
-        el.chartContainer,
-        rows
-      );
-
-      renderLegend();
-
-      renderTable(
-        rows,
-        `месец (${selectedYear})`
-      );
-    } else {
-      const rows =
-        aggregateByYear();
-
-      renderKpis(
-        rows,
-        'година'
-      );
-
-      renderStackedBarChart(
-        el.chartContainer,
-        rows
-      );
-
-      renderLegend();
-
-      renderTable(
-        rows,
-        'година'
-      );
-    }
-  }
+  const annual = currentView === 'month';
+  const scopeLabel = annual ? `Годишен преглед ${selectedYear}` : 'Всички години';
+  document.getElementById('productionScopeTitle').textContent = `Тонаж и брак — ${scopeLabel}`;
+  document.getElementById('downtimeScopeTitle').textContent = `Престой на автоматична линия — ${scopeLabel}`;
+  const rows = annual ? aggregateByMonth(selectedYear) : aggregateByYear();
+  renderKpis(rows, annual ? 'месец' : 'година');
+  renderStackedBarChart(el.chartContainer, rows);
+  renderLegend();
+  renderTable(rows, annual ? `месец (${selectedYear})` : 'година');
 
   renderWorkforceDashboard();
 
