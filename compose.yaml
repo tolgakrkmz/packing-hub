@@ -6,6 +6,8 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       HUB_PUBLIC_ORIGIN: ${HUB_PUBLIC_ORIGIN:?Set the provided HTTPS site address}
+      HUB_TASK_PHOTO_RETENTION_MONTHS: ${HUB_TASK_PHOTO_RETENTION_MONTHS:-6}
+      HUB_TASK_PHOTO_LIMIT_MB: ${HUB_TASK_PHOTO_LIMIT_MB:-512}
     volumes:
       - hub-data:/var/lib/package-hub
     read_only: true

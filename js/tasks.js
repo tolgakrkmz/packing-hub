@@ -4,11 +4,16 @@
   if (typeof HubServer === 'undefined') { $('taskMessage').textContent = 'Задачите са достъпни в сървърната версия след вход с личен акаунт.'; $('taskContent').hidden = true; return; }
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
-  let state, view = 'shift', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, previewSequence = 0;
+  let state, view = 'shift', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
-  const dialogs = ['taskEditor', 'taskAction', 'taskHistory'];
+  const dialogs = ['taskEditor', 'taskAction', 'taskHistory', 'taskPhotoViewer'];
   const draftOpen = () => busy || dialogs.some(id => $(id).open);
+  function renderPhotoPolicy() {
+    if (!state) return;
+    $('photoPolicy').setAttribute('translate', 'no');
+    $('photoPolicy').textContent = HubI18n.language === 'en' ? `Photos: up to 1280 px and 300 KB each. Deleted ${state.photoPolicy.retentionMonths} months after closing; active tasks retain their photos. Storage: ${Math.ceil(state.photoPolicy.usedBytes / 1048576)} / ${Math.round(state.photoPolicy.limitBytes / 1048576)} MB.` : `Снимки: до 1280 px и 300 KB всяка. Изтриват се ${state.photoPolicy.retentionMonths} месеца след приключване; активните задачи пазят снимките си. Място: ${Math.ceil(state.photoPolicy.usedBytes / 1048576)} / ${Math.round(state.photoPolicy.limitBytes / 1048576)} MB.`;
+  }
   function el(tag, text = '', cls = '', custom = false) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; if (custom) node.setAttribute('translate', 'no'); return node; }
   function date(at) { return new Intl.DateTimeFormat('en-CA', {timeZone: state.timezone, year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(at)); }
   function clock(at) { return new Intl.DateTimeFormat('bg-BG', {timeZone: state.timezone, dateStyle: 'short', timeStyle: 'short'}).format(new Date(at)); }
@@ -17,6 +22,72 @@
   function selectedOwner(item) { return !$('ownerFilter').value || String(item.owner.id) === $('ownerFilter').value; }
   function selected(item) { return selectedOwner(item) && (item.title + ' ' + item.description).toLowerCase().includes($('taskSearch').value.trim().toLowerCase()); }
   function empty(text) { return el('p', text, 'task-empty'); }
+  function withoutMetadata(dataURL) {
+    // Some browsers add an ICC profile to canvas JPEGs. Strip optional metadata
+    // segments as well as camera tags; compressed pixels stay unchanged.
+    const binary = atob(dataURL.split(',')[1]), parts = [binary.slice(0, 2)];
+    let offset = 2;
+    while (offset + 4 <= binary.length) {
+      const marker = binary.charCodeAt(offset + 1);
+      if (marker === 0xda || marker === 0xd9) { parts.push(binary.slice(offset)); break; }
+      const length = (binary.charCodeAt(offset + 2) << 8) + binary.charCodeAt(offset + 3), end = offset + 2 + length;
+      if (binary.charCodeAt(offset) !== 0xff || length < 2 || end > binary.length) throw new Error('Снимката не може да се отвори. Избери JPEG, PNG или WebP.');
+      if (!(marker >= 0xe1 && marker <= 0xef || marker === 0xfe)) parts.push(binary.slice(offset, end));
+      offset = end;
+    }
+    return 'data:image/jpeg;base64,' + btoa(parts.join(''));
+  }
+  function photoView(item, photo, label, recurring = false) {
+    const figure = el('figure', '', 'task-photo'); figure.append(el('figcaption', label));
+    if (!photo?.available) { figure.append(el('p', photo ? 'Снимката е изтрита след срока за съхранение.' : 'Няма снимка от предишната версия.', 'task-muted')); return figure; }
+    const url = '/api/tasks/' + (recurring ? 'schedules/' : 'items/') + item.id + '/photos/' + photo.id;
+    const control = button('Отвори снимката', () => {
+      $('photoViewerTitle').textContent = label; $('photoViewerFeedback').textContent = '';
+      $('photoViewerImage').alt = label; $('photoViewerImage').src = url; $('taskPhotoViewer').showModal();
+    }, 'secondary task-photo-button');
+    const img = el('img'); img.alt = label; img.loading = 'lazy'; img.src = url;
+    img.addEventListener('error', () => { control.replaceChildren(el('span', 'Снимката не е достъпна. Опресни задачите.')); });
+    control.replaceChildren(img, el('span', 'Отвори снимката')); figure.append(control); return figure;
+  }
+  function photoPicker(prefix) {
+    let value = null, pending = false, failed = false, original = null, sequence = 0;
+    const input = $(prefix + 'Photo'), camera = $(prefix + 'Camera'), preview = $(prefix + 'PhotoPreview'), info = $(prefix + 'PhotoInfo'), clear = $(prefix + 'PhotoClear');
+    function reset(existing = null, item = null, recurring = false) {
+      ++sequence; value = null; pending = false; failed = false; original = {existing, item, recurring}; input.value = ''; camera.value = ''; preview.replaceChildren(); info.textContent = ''; clear.hidden = true;
+      if (existing && item) preview.append(photoView(item, existing, 'Проблем', recurring));
+    }
+    async function choose(event) {
+      if (busy) return;
+      const file = event.target.files[0]; if (!file) return;
+      const current = ++sequence; pending = true; failed = false; value = null; clear.hidden = false; preview.replaceChildren(); info.textContent = 'Подготвяне на снимката…';
+      let bitmap;
+      try {
+        if (!file.type.startsWith('image/') || file.size > 20 * 1024 * 1024) throw new Error('Избери снимка до 20 MB, която браузърът може да отвори (JPEG, PNG или WebP).');
+        bitmap = await createImageBitmap(file);
+        if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 40000000) throw new Error('Снимката е прекалено голяма. Избери по-малка снимка.');
+        let edge = state.photoPolicy.maxEdge, result;
+        while (edge >= 320) {
+          const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+          const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          for (const quality of [.82, .7, .58]) {
+            result = canvas.toDataURL('image/jpeg', quality);
+            if ((result.length - result.indexOf(',') - 1) * 3 / 4 <= state.photoPolicy.maxBytes) break;
+          }
+          if ((result.length - result.indexOf(',') - 1) * 3 / 4 <= state.photoPolicy.maxBytes) break;
+          result = null; edge = Math.floor(edge * .75);
+        }
+        if (!result) throw new Error('Снимката е прекалено голяма. Избери по-малка снимка.');
+        if (sequence !== current) return;
+        result = withoutMetadata(result); value = result.split(',')[1]; const img = el('img', '', 'task-photo-preview'); img.alt = 'Избрана снимка'; img.src = result; preview.append(img);
+        info.textContent = 'Снимката е готова за запис.';
+      } catch (error) { if (sequence === current) { failed = true; info.textContent = error.message.startsWith('Избери') || error.message.startsWith('Снимката') ? error.message : 'Снимката не може да се отвори. Избери JPEG, PNG или WebP.'; } }
+      finally { bitmap?.close(); if (sequence === current) pending = false; }
+    }
+    input.addEventListener('change', choose); camera.addEventListener('change', choose); clear.addEventListener('click', () => { if (!busy) reset(original?.existing, original?.item, original?.recurring); });
+    return {reset, get value() { return value; }, get pending() { return pending; }, get failed() { return failed; }};
+  }
+  const problemPicker = photoPicker('problem'), solutionPicker = photoPicker('solution');
   function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
   function summarize(items) {
     const shifts = items.filter(item => item.kind === 'shift' && item.due + state.graceMinutes * 60000 < state.now && !['cancelled', 'not-applicable'].includes(item.status));
@@ -49,7 +120,7 @@
   }
   function history(item) {
     const content = $('historyContent'); content.replaceChildren(el('h3', item.title, '', true));
-    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true)); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } content.append(row); }
+    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true)); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot?.problemPhoto) row.append(photoView(item, entry.snapshot.problemPhoto, 'Проблем', !item.kind)); if (entry.photo) row.append(photoView(item, entry.photo, 'Решение')); content.append(row); }
     $('taskHistory').showModal();
   }
   function card(item, recurring = false) {
@@ -62,6 +133,8 @@
     if (item.priority === 'high') badges.append(el('span', 'Висок приоритет', 'task-badge alert'));
     if (item.overdue) badges.append(el('span', 'Просрочена', 'task-badge alert')); if (item.late) badges.append(el('span', 'Закъснял отчет', 'task-badge alert'));
     node.append(badges, el('p', item.description, 'task-description', true));
+    const evidence = el('div', '', 'task-photos'); evidence.append(photoView(item, item.problemPhoto, 'Проблем', recurring));
+    if (item.report) evidence.append(photoView(item, item.report.photo, 'Решение')); node.append(evidence);
     node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
     if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
     const lastNote = [...item.events].reverse().find(entry => entry.note); if (lastNote) node.append(el('p', lastNote.note, 'task-description', true));
@@ -98,6 +171,7 @@
     try {
       const result = await HubServer.json('/api/tasks'); if (current !== sequence) return;
       state = result; $('taskMessage').textContent = '';
+      renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
       if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
@@ -124,6 +198,7 @@
   }
   function openEditor(item = null, recurring = false) {
     editing = item ? {item, recurring} : null; creationKey = null; $('taskForm').reset(); $('editorFeedback').textContent = state.supervisors.length ? '' : 'Няма активни началници смяна с право за преглед. Настрой ги в „Акаунти“ с право за отчитане и избран екип.';
+    problemPicker.reset(item?.problemPhoto, item, recurring); $('problemPhotoHelp').textContent = item ? 'Избери нова снимка, за да замениш проблема. Предишната остава в историята.' : 'Добави снимка на проблема. При повторение тя се използва за всички смени.';
     $('editorTitle').textContent = item ? recurring ? 'Промени бъдещите задачи' : 'Промени задача' : 'Възложи задача'; $('saveTask').textContent = item ? 'Запази' : 'Възложи';
     $('taskKind').value = item?.kind || 'shift'; $('taskKind').disabled = !!item; $('taskRepeat').value = recurring ? 'every-shift' : 'once'; $('taskRepeat').disabled = !!item;
     $('taskFrom').disabled = !!item; $('taskUntil').disabled = !!item; $('editReasonLabel').hidden = !item; $('editReason').required = !!item;
@@ -140,33 +215,51 @@
     $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); $('taskEditor').showModal(); $('taskTitle').focus();
   }
   function openAction(item, action, recurring = false) {
-    acting = {item, action, recurring}; $('actionForm').reset(); $('actionFeedback').textContent = '';
+    acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); $('solutionPhotoFields').hidden = action !== 'report';
     $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
     $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
     for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
     $('actionNote').required = action !== 'approve' && (action !== 'report' || $('reportStatus').value !== 'completed'); $('taskAction').showModal();
   }
   async function mutate(form, feedback, fn) {
+    if (busy) return;
     busy = true; const submit = form.querySelector('button[type=submit]'); submit.disabled = true; feedback.textContent = '';
+    const controls = [...form.querySelectorAll('input,select,textarea,button')].filter(control => !control.disabled); for (const control of controls) control.disabled = true;
     try { await fn(); form.closest('dialog').close(); busy = false; await refresh(); $('taskMessage').textContent = 'Промяната е записана.'; }
     catch (error) { feedback.textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; if (error.status === 409) feedback.textContent += ' Затвори прозореца и натисни „Опресни“. Въведеното е запазено до затваряне.'; }
-    finally { busy = false; submit.disabled = false; }
+    finally { busy = false; for (const control of controls) control.disabled = false; submit.disabled = false; }
   }
   $('taskForm').addEventListener('submit', event => {
     event.preventDefault();
+    if (problemPicker.pending) { $('editorFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
+    if (problemPicker.failed) { $('editorFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
+    if (!editing && !problemPicker.value) { $('editorFeedback').textContent = 'Добави снимка преди запис.'; return; }
     const payload = {title: $('taskTitle').value, description: $('taskDescription').value, priority: $('taskPriority').value, assigneeId: Number($('taskOwner').value), participantIds: $('taskKind').value === 'global' ? [...$('participantOptions').querySelectorAll('input:checked')].map(input => Number(input.value)) : [], kind: $('taskKind').value, repeat: $('taskRepeat').value, from: $('taskFrom').value, until: $('taskUntil').value, dueDate: $('taskDueDate').value, dueTime: $('taskDueTime').value, note: $('editReason').value};
+    if (problemPicker.value) payload.problemPhoto = problemPicker.value;
     if (!editing) { const signature = JSON.stringify(payload); if (!creationKey || creationKey.signature !== signature) creationKey = {signature, id: crypto.randomUUID()}; payload.requestId = creationKey.id; }
     mutate($('taskForm'), $('editorFeedback'), () => editing ? HubServer.send('/api/tasks/' + (editing.recurring ? 'schedules/' : 'items/') + editing.item.id, 'PATCH', {...payload, action: 'edit'}, {'If-Match': '"' + editing.item.revision + '"'}) : HubServer.send('/api/tasks', 'POST', payload));
   });
-  $('actionForm').addEventListener('submit', event => { event.preventDefault(); mutate($('actionForm'), $('actionFeedback'), () => HubServer.send('/api/tasks/' + (acting.recurring ? 'schedules/' : 'items/') + acting.item.id, 'PATCH', {action: acting.action, status: $('reportStatus').value, note: $('actionNote').value}, {'If-Match': '"' + acting.item.revision + '"'})); });
+  $('actionForm').addEventListener('submit', event => {
+    event.preventDefault();
+    if (solutionPicker.pending) { $('actionFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
+    if (acting.action === 'report' && !solutionPicker.value) { $('actionFeedback').textContent = 'Добави снимка преди запис.'; return; }
+    const payload = {action: acting.action, status: $('reportStatus').value, note: $('actionNote').value};
+    if (acting.action === 'report') payload.solutionPhoto = solutionPicker.value;
+    const signature = JSON.stringify(payload); if (!actionKey || actionKey.signature !== signature) actionKey = {signature, id: crypto.randomUUID()}; payload.requestId = actionKey.id;
+    mutate($('actionForm'), $('actionFeedback'), () => HubServer.send('/api/tasks/' + (acting.recurring ? 'schedules/' : 'items/') + acting.item.id, 'PATCH', payload, {'If-Match': '"' + acting.item.revision + '"'}));
+  });
   $('reportStatus').addEventListener('change', () => { $('actionNote').required = $('reportStatus').value !== 'completed'; });
   for (const control of document.querySelectorAll('[data-close]')) control.addEventListener('click', () => { if (!busy) $(control.dataset.close).close(); });
   for (const id of dialogs) $(id).addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+  $('taskEditor').addEventListener('close', () => problemPicker.reset()); $('taskAction').addEventListener('close', () => solutionPicker.reset());
+  $('taskPhotoViewer').addEventListener('close', () => $('photoViewerImage').removeAttribute('src'));
+  $('photoViewerImage').addEventListener('error', () => { if ($('taskPhotoViewer').open) $('photoViewerFeedback').textContent = 'Снимката не е достъпна. Опресни задачите.'; });
   for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom']) $(id).addEventListener('change', editorFields);
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
   for (const id of ['ownerFilter', 'taskSearch', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', render);
   $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });
+  document.addEventListener('click', event => { if (event.target.closest('[data-hub-language]')) renderPhotoPolicy(); });
   HubServer.watch('tasks', refresh, draftOpen); HubServer.watch('accounts', refresh, draftOpen);
   setInterval(() => { if (!draftOpen()) refresh(); }, 30000); refresh();
 })();

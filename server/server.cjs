@@ -12,13 +12,14 @@ const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, maintenanceSocket}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, taskPhotos, maintenanceSocket}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
   const activity = createActivity(store);
-  const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
+  const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  tasks.maintain();
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
   const assets = new Map();
@@ -164,6 +165,13 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           return json(response, 200, tasks.preview(url.searchParams.get('date'), Number(url.searchParams.get('assigneeId')), currentUser()));
         }
+        const taskPhoto = pathname.match(/^\/api\/tasks\/(items|schedules)\/([0-9a-f:-]+)\/photos\/([0-9a-f-]{36})$/);
+        if (taskPhoto) {
+          if (!['GET', 'HEAD'].includes(request.method)) throw problem(405, 'METHOD_REJECTED');
+          const content = tasks.photo(taskPhoto[1], taskPhoto[2], taskPhoto[3], currentUser());
+          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
+          return response.end(request.method === 'HEAD' ? undefined : content);
+        }
         const taskRoute = pathname.match(/^\/api\/tasks(?:\/(items|schedules)\/([0-9a-f:-]+))?$/);
         if (taskRoute) {
           if (!taskRoute[1] && request.method === 'GET') return json(response, 200, tasks.list(currentUser()));
@@ -276,13 +284,16 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const close = async () => { clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
+  const photoCleanup = setInterval(() => { try { tasks.maintain(); } catch { /* Retry next hour; do not log private task data. */ } }, 3600000);
+  photoCleanup.unref();
+  const close = async () => { clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
   return {server, store, auth, imports, tasks, maintenance, close};
 }
 if (require.main === module) {
   process.umask(0o077);
   try {
-    const hub = createHubServer({filename: process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite', publicOrigin: process.env.HUB_PUBLIC_ORIGIN || '', allowHttp: process.env.HUB_ALLOW_HTTP === 'true', maintenanceSocket: process.env.HUB_MAINTENANCE_SOCKET});
+    const hub = createHubServer({filename: process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite', publicOrigin: process.env.HUB_PUBLIC_ORIGIN || '', allowHttp: process.env.HUB_ALLOW_HTTP === 'true', maintenanceSocket: process.env.HUB_MAINTENANCE_SOCKET,
+      taskPhotos: {retentionMonths: Number(process.env.HUB_TASK_PHOTO_RETENTION_MONTHS || 6), limitBytes: Number(process.env.HUB_TASK_PHOTO_LIMIT_MB || 512) * 1024 * 1024}});
     hub.server.listen(Number(process.env.PORT || 3000), '0.0.0.0', () => console.log('Package Hub server started.'));
     for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => hub.close().then(() => process.exit(0)));
   } catch { console.error('Server startup failed. Check Node.js 24+, database permissions and HUB_PUBLIC_ORIGIN.'); process.exitCode = 1; }

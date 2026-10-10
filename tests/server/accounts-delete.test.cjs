@@ -1,3 +1,4 @@
+const {photo} = require('./task-photo-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,7 +18,7 @@ test('deleted identities and historical assignments survive reopen; an in-flight
   const chief = await auth.create('demo-chief', password, 'operator', admin, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   const session = await auth.login(chief.username, password);
   let tasks = createTasks(store, {now: () => Date.parse('2026-12-01T07:00:00+02:00')});
-  tasks.create({requestId: randomUUID(), title: 'Fictional historical task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'global', repeat: 'once', dueDate: '2026-12-02', dueTime: '17:00'}, admin);
+  tasks.create({problemPhoto: photo, requestId: randomUUID(), title: 'Fictional historical task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'global', repeat: 'once', dueDate: '2026-12-02', dueTime: '17:00'}, admin);
   const history = tasks.list(admin).items;
   const update = auth.update(chief.id, {password: 'Fictional-replacement-123', active: true}, admin);
   auth.remove(chief.id, admin);

@@ -46,6 +46,8 @@ function verifyDatabase(filename) {
     if (TABLES.some(table => !tables.has(table))) throw failure('INVALID_ARCHIVE');
     // Read every table, including attachment BLOBs, without returning their contents.
     for (const table of TABLES) db.prepare(`SELECT count(*) FROM ${table}`).get();
+    // Photos are additive: older archives can still be restored and migrated.
+    if (tables.has('task_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM task_photos').get();
     const modules = db.prepare('SELECT kind,data FROM documents').all();
     for (const kind of ['production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions']) {
       const row = modules.find(item => item.kind === kind);
