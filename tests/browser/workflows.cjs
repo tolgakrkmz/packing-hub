@@ -171,23 +171,23 @@ async function run(browser, base, {headed = false} = {}) {
     await go('index');
     await page.locator('a[href="statistics.html"]').click();
     await expect(page.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
-    await expect(page.locator('#dashboardActual')).toHaveText('5,500 т');
-    await expect(page.locator('#dashboardGoal')).toContainText('12,000 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('5,5 т');
+    await expect(page.locator('#dashboardGoal')).toContainText('12 т');
     await page.locator('#monthlyTrendDetails summary').click();
     await expect(page.locator('#monthlyTrendChart svg')).toBeVisible();
     await page.locator('[data-stats-tab=production]').click();
-    await expect(page.locator('#kpiRow .val').first()).toHaveText('6,500 т');
-    await expect(page.locator('#tableContainer')).toContainText('5,500 т');
+    await expect(page.locator('#kpiRow .val').first()).toHaveText('6,5 т');
+    await expect(page.locator('#tableContainer')).toContainText('5,5 т');
     await expect(page.locator('#tableContainer')).toContainText('0,055 т');
-    await expect(page.locator('#lineShiftContainer')).toContainText('2,400 т');
-    await expect(page.locator('#lineShiftContainer')).toContainText('0,600 т');
+    await expect(page.locator('#lineShiftContainer')).toContainText('2,4 т');
+    await expect(page.locator('#lineShiftContainer')).toContainText('0,6 т');
     await page.locator('#dashboardMonthSelect').selectOption('09');
-    await expect(page.locator('#dashboardActual')).toHaveText('1,000 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('1 т');
     await page.locator('#yearSelect').selectOption('2025');
     await page.locator('#dashboardMonthSelect').selectOption('12');
-    await expect(page.locator('#dashboardActual')).toHaveText('4,000 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('4 т');
     await page.locator('[data-view=year]').click();
-    await expect(page.locator('#kpiRow .val').first()).toHaveText('10,500 т');
+    await expect(page.locator('#kpiRow .val').first()).toHaveText('10,5 т');
     await expect(page.locator('#tableContainer')).toContainText('2025');
     await expect(page.locator('#tableContainer')).toContainText('2026');
     await page.locator('#yearSelect').selectOption('2026');
@@ -199,19 +199,19 @@ async function run(browser, base, {headed = false} = {}) {
     await page.locator('[data-stats-tab=workforce]').click();
     await expect(page.locator('#wfCurrentStaff')).toHaveText('5');
     await expect(page.locator('#wfStaffSource')).toHaveText('5 производствени + 0 допълнителни');
-    await expect(page.locator('#wfMeasuredProductivity')).toHaveText('0,200 т');
+    await expect(page.locator('#wfMeasuredProductivity')).toHaveText('0,2 т');
     await page.locator('[data-stats-tab=pairs]').click();
     await page.locator('#pairStatsTeam').selectOption(team);
-    await expect(page.locator('#pairStatsBody')).toContainText('0,800 / 1,000');
+    await expect(page.locator('#pairStatsBody')).toContainText('0,8 / 1');
     await expect(page.locator('#pairStatsBody')).toContainText('35 / 40');
-    await expect(page.locator('#pairStatsBody')).toContainText('0,200 т');
+    await expect(page.locator('#pairStatsBody')).toContainText('0,2 т');
     await page.locator('#pairStatsBody details').first().locator(':scope > summary').click();
     await expect(page.locator('#pairStatsBody')).toContainText('Fictional material delay');
     // Pair results must not add their quantities to the tonnage dashboard.
-    await expect(page.locator('#dashboardActual')).toHaveText('5,500 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('5,5 т');
     await page.reload();
     await expect(page.locator('[data-stats-tab=pairs]')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#dashboardActual')).toHaveText('5,500 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('5,5 т');
   });
 
   await scenario('Failed write and lost close acknowledgement → retained draft → retry exactly once', async t => {
@@ -550,7 +550,7 @@ async function run(browser, base, {headed = false} = {}) {
     await page.reload();
     await expect(page.locator('#goalCur')).toHaveText('2,5 т');
     await go('statistics');
-    await expect(page.locator('#dashboardActual')).toHaveText('2,500 т');
+    await expect(page.locator('#dashboardActual')).toHaveText('2,5 т');
     const before = await page.evaluate(() => localStorage.getItem('portfolio-tonnage-fallback'));
     await page.locator('[data-stats-tab=production]').click();
     await page.locator('[data-view=year]').click();

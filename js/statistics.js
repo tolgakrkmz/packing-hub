@@ -1075,7 +1075,7 @@ function renderMonthlyDashboard() {
     d.goalKg
   ) {
     el.dashboardRequired.textContent =
-      '0,000 т';
+      '0 т';
 
     el.dashboardRequiredSub.textContent =
       'целта вече е постигната';

@@ -27,19 +27,19 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(month).toHaveValue('10');
   await expect(month.locator('option')).toHaveCount(12);
   for (const value of ['2024','2025','2026']) await expect(year.locator(`option[value="${value}"]`)).toHaveCount(1);
-  await expect(page.locator('#dashboardActual')).toHaveText('3,000 т');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,150 т');
+  await expect(page.locator('#dashboardActual')).toHaveText('3 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,15 т');
   const refreshed = statisticsFixture();
   refreshed['production-log'].entries[0].brak = 170;
   await replaceSources(refreshed);
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,250 т');
-  await expect(page.locator('#dashboardActual')).toHaveText('3,000 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,25 т');
+  await expect(page.locator('#dashboardActual')).toHaveText('3 т');
   await page.locator('[data-stats-tab=pairs]').click();
   await expect(page.locator('#pairStatsPeriod')).toContainText('2026');
-  await expect(page.locator('#pairStatsBody')).toContainText(/1,100\s*\/\s*1,000/);
+  await expect(page.locator('#pairStatsBody')).toContainText(/1,1\s*\/\s*1/);
   await month.selectOption('09');
-  await expect(page.locator('#dashboardActual')).toHaveText('1,000 т');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,000 т');
+  await expect(page.locator('#dashboardActual')).toHaveText('1 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0 т');
   await expect(page.locator('#pairStatsBody')).toContainText('Няма двойки за избрания месец и екип.');
   for (const tab of ['overview','production','downtime','workforce','pairs']) {
     await page.locator(`[data-stats-tab=${tab}]`).click();
@@ -56,13 +56,13 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await year.selectOption('2025');
   await expect(month).toHaveValue('09');
   await month.selectOption('10');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,900 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,9 т');
   await month.selectOption('12');
   await expect(page.locator('#monthlyResultEmpty')).toBeVisible();
   await expect(page.locator('#dashboardBrak')).toBeHidden();
   await expect(page.locator('#wfSubtitle')).toHaveText('Декември 2025');
   await page.locator('[data-stats-tab=pairs]').click();
-  await expect(page.locator('#pairStatsBody')).toContainText('0,800 / 1,000');
+  await expect(page.locator('#pairStatsBody')).toContainText('0,8 / 1');
   await expect(page.locator('#pairStatsPeriod')).toContainText('декември 2025');
   await year.selectOption('2024');
   await month.selectOption('02');
@@ -75,7 +75,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(year).toHaveValue('2024');
   await page.locator('[data-stats-tab=production]').click();
   await expect(page.locator('#productionScopeTitle')).toContainText('Всички години');
-  await expect(page.locator('#kpiRow .val').first()).toHaveText('9,000 т');
+  await expect(page.locator('#kpiRow .val').first()).toHaveText('9 т');
   await page.locator('[data-view=month]').click();
   await year.selectOption('2026');
   await month.selectOption('11');
@@ -88,7 +88,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   for (const language of ['bg','en']) {
     await page.locator(`[data-hub-language=${language}]`).click();
     await month.selectOption('10');
-    await expect(page.locator('#dashboardBrak')).toHaveText(language === 'bg' ? '0,250 т' : '0,250 t');
+    await expect(page.locator('#dashboardBrak')).toHaveText(language === 'bg' ? '0,25 т' : '0,25 t');
     await expect(page.locator('.goal-scrap .goal-label')).toHaveText(language === 'bg' ? 'Общо брак' : 'Total scrap');
     for (const width of [390,1440]) {
       await page.setViewportSize({width, height:900});
@@ -154,7 +154,7 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
     await page.locator(`[data-hub-language=${language}]`).click();
     await expect(page.locator('#dashboardActual')).toHaveText('1,251 ' + unit);
     await expect(page.locator('#dashboardBrak')).toHaveText('0,001 ' + unit);
-    await expect(page.locator('#dashboardGoal')).toContainText('10,000 ' + unit);
+    await expect(page.locator('#dashboardGoal')).toContainText('10 ' + unit);
     await expect(page.locator('#dashboardRemaining')).toContainText('8,749 ' + unit);
     await expect(page.locator('#dashboardBrakKg')).toHaveCount(0);
 
@@ -163,15 +163,15 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
     const october = page.locator('#tableContainer tbody tr').filter({hasText:language === 'bg' ? 'Окт' : 'Oct'});
     await expect(october.locator('td').nth(1)).toHaveText('1,251 ' + unit);
     await expect(october.locator('td').nth(2)).toHaveText('0,001 ' + unit);
-    await expect(october.locator('td').nth(4)).toHaveText('1,250');
+    await expect(october.locator('td').nth(4)).toHaveText('1,25');
     await expect(october.locator('td').nth(5)).toHaveText('0,001');
     await expect(page.locator('#tableContainer thead')).toContainText('(' + unit + ')');
     await expect(page.locator('#kpiRow .val').nth(1)).toHaveText('0,001 ' + unit);
     await expect(page.locator('#lineShiftContainer .total-row td').nth(1)).toHaveText('1,001 ' + unit);
-    await expect(page.locator('#lineShiftContainer .total-row td').nth(2)).toHaveText('0,250 ' + unit);
+    await expect(page.locator('#lineShiftContainer .total-row td').nth(2)).toHaveText('0,25 ' + unit);
     await expect(page.locator('#lineShiftContainer .total-row td').nth(3)).toHaveText('41');
     await expect(page.locator('#lineShiftContainer .total-row td').nth(4)).toHaveText('10');
-    await expect(page.locator('#chartContainer')).toContainText('2,000' + unit);
+    await expect(page.locator('#chartContainer')).toContainText('2' + unit);
     await page.locator('[data-view=year]').click();
     await expect(page.locator('#kpiRow .val').first()).toHaveText('7,251 ' + unit);
     await expect(page.locator('#tableContainer .total-row td').nth(1)).toHaveText('7,251 ' + unit);
@@ -179,12 +179,12 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
 
     await page.locator('[data-stats-tab=pairs]').click();
     const cards = page.locator('.pair-stats-kpis .kpi-card');
-    await expect(cards.nth(2).locator('.sub')).toContainText('1,249 / 1,250 ' + unit);
+    await expect(cards.nth(2).locator('.sub')).toContainText('1,249 / 1,25 ' + unit);
     await expect(cards.nth(2).locator('.val')).toHaveText('99,92%');
     await expect(cards.nth(3).locator('.sub')).toContainText('44 / 40');
     await expect(cards.nth(4).locator('.val')).toHaveText('0,001 ' + unit);
     await expect(cards.nth(5).locator('.val')).toHaveText('1,249 ' + unit);
-    await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(2)).toHaveText('1,249 / 1,250');
+    await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(2)).toHaveText('1,249 / 1,25');
     await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(3)).toHaveText('44 / 40');
     await expect(page.locator('#pairStatsBody details[data-group=analysis] > .pair-stats-scroll td').nth(4)).toHaveText('1,249');
     await expect(page.locator('#pairStatsHint')).not.toContainText(/килограм|kilogram/i);
@@ -192,8 +192,8 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
     await page.locator('[data-stats-tab=workforce]').click();
     await expect(page.locator('#wfMeasuredProductivity')).toHaveText('0,125 ' + unit);
     await expect(page.locator('#wfMeasuredProductivitySub')).toContainText('1,251 ' + unit);
-    await expect(page.locator('#wfCalcTarget')).toHaveText('10,000 ' + unit);
-    await expect(page.locator('#wfCapacityChart')).toContainText('10,000 ' + unit);
+    await expect(page.locator('#wfCalcTarget')).toHaveText('10 ' + unit);
+    await expect(page.locator('#wfCapacityChart')).toContainText('10 ' + unit);
 
     for (const width of [390,1440]) {
       await page.setViewportSize({width, height:900});

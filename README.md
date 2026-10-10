@@ -950,8 +950,9 @@ clear the old retry action; changed records are refused before deletion.
 
 ## Statistics navigation
 
-All mass quantities in Statistics are displayed in tonnes (`t`) with three decimal
-places: 1250 kg is shown as 1.250 t and 1 kg of scrap as 0.001 t. This includes
+All mass quantities in Statistics are displayed in tonnes (`t`) with up to three
+decimal places and no trailing zeroes: 1250 kg is shown as 1.25 t and 1 kg of scrap
+as 0.001 t. This includes
 production and pair tables, charts, totals, targets, deficits and workforce
 productivity. Counts, percentages and durations retain their units. All report
 entry fields remain in kilograms; stored reports and JSON import/export formats
