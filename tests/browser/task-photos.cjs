@@ -63,6 +63,7 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
     fs.mkdirSync(screenshotDir, {recursive: true}); await chief.setViewportSize({width: 390, height: 900});
     await chief.locator('[data-hub-language=bg]').click(); await chief.screenshot({path: path.join(screenshotDir, 'task-photos-mobile.png'), fullPage: true});
   }
+  await chief.locator('[data-hub-language=bg]').click();
   setTime('2027-06-02T15:00:00+02:00'); hub.tasks.maintain();
   await chief.locator('#refreshTasks').click(); await chief.locator('#statsFrom').fill('2026-12-01'); await chief.locator('#statsUntil').fill('2026-12-03');
   await expect(card).toContainText('Снимката е изтрита след срока за съхранение.'); await expect(card).toContainText('Изпълнена');
