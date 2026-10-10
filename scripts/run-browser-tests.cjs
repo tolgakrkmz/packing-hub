@@ -107,11 +107,12 @@ async function main() {
       await page.locator('#statsFilesBtn').click();
       await exerciseStatisticsPeriod({page, expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
-        replaceSources:async () => {
-          await write(changedSources());
+        replaceSources:async (documents = changedSources()) => {
+          await write(documents);
           await page.locator('#statsFilesBtn').click();
           await page.locator('#refreshBtn').click();
           await page.locator('#pairStatsRefreshBtn').click();
+          await page.locator('#statsFilesBtn').click();
         }
       });
       require('node:assert/strict').deepEqual(errors, []);

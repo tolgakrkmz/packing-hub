@@ -9,8 +9,10 @@ function statisticsFixture() {
     createdAt:date + 'T06:00:00Z', updatedAt:date + 'T12:00:00Z'});
   return {
     'production-log': {goalTons:10, entries:[
-      {id:'demo-period-october', date:'2026-10-04', shift:'А', tonnage:3000, brak:30, breakdown:{autoKg:2400, autoCrates:96, manKg:600, manCrates:24}},
-      {id:'demo-period-september', date:'2026-09-30', shift:'А', tonnage:1000, brak:10, breakdown:null}
+      {id:'demo-period-october', date:'2026-10-04', shift:'А', tonnage:2000, brak:70, breakdown:{autoKg:1400, autoCrates:56, manKg:600, manCrates:24}},
+      {id:'demo-period-october-second-shift', date:'2026-10-05', shift:'Б', tonnage:1000, brak:80, breakdown:null},
+      {id:'demo-period-september', date:'2026-09-30', shift:'А', tonnage:1000, brak:0, breakdown:null},
+      {id:'demo-period-previous-october', date:'2025-10-04', shift:'А', tonnage:5000, brak:900, breakdown:null}
     ]},
     'line-downtime': {entries:[{id:'demo-period-downtime', date:'2024-02-20', shift:'А', start:'08:00', end:'08:30', durationMin:30, reason:'Fictional period downtime'}], reasons:['Fictional period downtime']},
     'pair-targets': {module:'pair-targets', schemaVersion:1, entries:[pair('demo-period-current', '2026-10-04', 1100), pair('demo-period-old', '2025-12-31', 800)]},
@@ -26,11 +28,21 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(month.locator('option')).toHaveCount(12);
   for (const value of ['2024','2025','2026']) await expect(year.locator(`option[value="${value}"]`)).toHaveCount(1);
   await expect(page.locator('#dashboardActual')).toHaveText('3,0 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,2 т');
+  await expect(page.locator('#dashboardBrakKg')).toHaveText('150 кг');
+  const refreshed = statisticsFixture();
+  refreshed['production-log'].entries[0].brak = 170;
+  await replaceSources(refreshed);
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,3 т');
+  await expect(page.locator('#dashboardBrakKg')).toHaveText('250 кг');
+  await expect(page.locator('#dashboardActual')).toHaveText('3,0 т');
   await page.locator('[data-stats-tab=pairs]').click();
   await expect(page.locator('#pairStatsPeriod')).toContainText('2026');
   await expect(page.locator('#pairStatsBody')).toContainText(/1\s?100\s*\/\s*1\s?000/);
   await month.selectOption('09');
   await expect(page.locator('#dashboardActual')).toHaveText('1,0 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,0 т');
+  await expect(page.locator('#dashboardBrakKg')).toHaveText('0 кг');
   await expect(page.locator('#pairStatsBody')).toContainText('Няма двойки за избрания месец и екип.');
   for (const tab of ['overview','production','downtime','workforce','pairs']) {
     await page.locator(`[data-stats-tab=${tab}]`).click();
@@ -46,8 +58,12 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(page.locator('#wfSubtitle')).toContainText('Септември 2026');
   await year.selectOption('2025');
   await expect(month).toHaveValue('09');
+  await month.selectOption('10');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,9 т');
+  await expect(page.locator('#dashboardBrakKg')).toHaveText('900 кг');
   await month.selectOption('12');
   await expect(page.locator('#monthlyResultEmpty')).toBeVisible();
+  await expect(page.locator('#dashboardBrak')).toBeHidden();
   await expect(page.locator('#wfSubtitle')).toHaveText('Декември 2025');
   await page.locator('[data-stats-tab=pairs]').click();
   await expect(page.locator('#pairStatsBody')).toContainText('800 / 1');
@@ -63,7 +79,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(year).toHaveValue('2024');
   await page.locator('[data-stats-tab=production]').click();
   await expect(page.locator('#productionScopeTitle')).toContainText('Всички години');
-  await expect(page.locator('#kpiRow .val').first()).toHaveText('4,0 т');
+  await expect(page.locator('#kpiRow .val').first()).toHaveText('9,0 т');
   await page.locator('[data-view=month]').click();
   await year.selectOption('2026');
   await month.selectOption('11');
@@ -75,6 +91,18 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
 
   for (const language of ['bg','en']) {
     await page.locator(`[data-hub-language=${language}]`).click();
+    await month.selectOption('10');
+    await expect(page.locator('#dashboardBrak')).toHaveText(language === 'bg' ? '0,3 т' : '0,3 t');
+    await expect(page.locator('#dashboardBrakKg')).toHaveText(language === 'bg' ? '250 кг' : '250 kg');
+    await expect(page.locator('.goal-scrap .goal-label')).toHaveText(language === 'bg' ? 'Общо брак' : 'Total scrap');
+    for (const width of [390,1440]) {
+      await page.setViewportSize({width, height:900});
+      await page.locator('[data-stats-tab=overview]').click();
+      await assertResponsive(page, `Monthly scrap ${language} ${width}`);
+      await expect(page.locator('#dashboardBrak')).toBeVisible();
+      if (screenshotDir) await page.locator('#monthDashboard').screenshot({path:screenshotDir + `/monthly-scrap-${language}-${width}.png`});
+    }
+    await month.selectOption('11');
     for (const width of [390,1440]) {
       await page.setViewportSize({width, height:900});
       for (const tab of ['overview','production','pairs','downtime','workforce']) {
@@ -104,9 +132,11 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(month).toHaveValue('12');
   await expect(year).toHaveValue('2025');
   await expect(page.locator('#dashboardTitle')).toHaveText('Декември 2025');
+  await expect(page.locator('#monthlyResultEmpty')).toBeVisible();
+  await expect(page.locator('#dashboardBrak')).toBeHidden();
   await expect(page.locator('#pairStatsPeriod')).toContainText('декември 2025');
   assert.equal(await page.locator('#pairStatsMonth, #lineShiftMonthSelect').count(), 0);
-  console.log('PASS shared statistics period, BG/EN phone/desktop and refresh without fallback');
+  console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
 }
 
 function changedSources() {

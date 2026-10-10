@@ -77,6 +77,8 @@ const el = {
   goalRingPct: document.getElementById('goalRingPct'),
 
   dashboardActual: document.getElementById('dashboardActual'),
+  dashboardBrak: document.getElementById('dashboardBrak'),
+  dashboardBrakKg: document.getElementById('dashboardBrakKg'),
   dashboardGoal: document.getElementById('dashboardGoal'),
   dashboardRemaining: document.getElementById('dashboardRemaining'),
 
@@ -708,6 +710,11 @@ function getMonthlyDashboardData() {
       0
     );
 
+  const totalBrakKg = rows.reduce(
+    (sum, entry) => sum + (Number(entry.brak) || 0),
+    0
+  );
+
   const goalKg =
     Math.max(
       0,
@@ -815,6 +822,7 @@ function getMonthlyDashboardData() {
     elapsedDays,
     actualThroughDay,
     totalKg,
+    totalBrakKg,
     goalKg,
     avgKg,
     remainingKg,
@@ -1007,6 +1015,9 @@ function renderMonthlyDashboard() {
     `${fmtTons(
       d.totalKg
     )} т`;
+
+  el.dashboardBrak.textContent = `${fmtTons(d.totalBrakKg)} т`;
+  el.dashboardBrakKg.textContent = `${fmt(d.totalBrakKg)} кг`;
 
   el.dashboardGoal.textContent =
     d.goalKg > 0
