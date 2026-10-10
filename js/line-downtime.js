@@ -309,9 +309,10 @@ function renderHistory(){
     wrap.innerHTML = '<div class="empty">Няма аварии за избрания месец.</div>';
     return;
   }
-  const sorted = [...monthEntries].sort((a,b)=>{
+  // Reports are appended to entries; reverse them before the stable date sort.
+  const sorted = monthEntries.reverse().sort((a,b)=>{
     if(a.date !== b.date) return a.date < b.date ? 1 : -1;
-    return b.id.localeCompare(a.id);
+    return 0;
   });
   let html = '<table><thead><tr>'
     + '<th>Дата</th><th>Смяна</th><th>Час</th><th style="text-align:right">Продълж.</th><th>Причина</th><th></th>'
