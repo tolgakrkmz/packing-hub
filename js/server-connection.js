@@ -202,6 +202,7 @@ const HubServer = (() => {
     };
     if (boot.user.role === 'admin') addLink('/system-status.html', 'Статус на системата');
     if (boot.user.role === 'admin') addLink('/accounts.html', 'Акаунти');
+    if (boot.user.role === 'admin') addLink('/activity-log.html', 'Потребителска активност');
     if (can('canImportData') || can('canExportReports')) {
       const current = location.pathname.split('/').pop().replace(/\.html$/, '');
       const query = ['production-log', 'line-downtime', 'pair-targets'].includes(current) ? '?module=' + current : '';

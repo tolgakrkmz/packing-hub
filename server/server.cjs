@@ -9,6 +9,7 @@ const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cj
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
+const {createActivity} = require('./activity.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
 function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, maintenanceSocket}) {
@@ -16,6 +17,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
+  const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
@@ -109,6 +111,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if (pathname === '/api/admin/activity') {
+          const user = currentAdmin();
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, activity.list(url.searchParams, user));
+        }
         if (pathname === '/api/admin/status' || pathname === '/api/admin/backup') {
           currentAdmin();
           if (pathname === '/api/admin/status' && request.method === 'GET') {
@@ -235,7 +242,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (['/accounts.html', '/system-status.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+      if (['/accounts.html', '/system-status.html', '/activity-log.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
       if (assetName === '/tasks.html' && !canViewModule(session?.user, 'tasks')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
       if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
@@ -247,6 +254,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
+      if (session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
       return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/server-connection.js"></script>\n<link rel="stylesheet" href="/css/server.css">') : asset);
     } catch (error) {
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});

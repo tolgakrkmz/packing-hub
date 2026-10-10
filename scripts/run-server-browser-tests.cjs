@@ -48,6 +48,11 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--activity-only')) {
+      await require('../tests/browser/activity.cjs').exerciseActivity({admin,hub,base,device,expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors,[]); return;
+    }
     if(process.argv.includes('--pair-cancellation-only')) {
       const {employees,exercisePairCancellation} = require('../tests/browser/pair-cancellation.cjs');
       const user = hub.auth.list()[0];
