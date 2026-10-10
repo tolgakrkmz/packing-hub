@@ -1,5 +1,6 @@
 /* Assignment checks use only fictional accounts and tasks in a temporary server. */
 const assert = require('node:assert/strict');
+const {photo, uploadPhoto} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
 const password = 'Fictional-password-123';
 async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime, screenshotDir}) {
@@ -47,7 +48,7 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
       if (kind === 'recurring') { await page.locator('#taskRepeat').selectOption('every-shift'); await page.locator('#taskUntil').fill('2026-12-05'); }
     }
     await assertResponsive(page, 'Delegated task editor ' + kind + '/' + language);
-    await page.locator('#saveTask').click(); await expect(page.locator('#taskEditor')).not.toBeVisible();
+    await uploadPhoto(page, 'problem', expect); await page.locator('#saveTask').click(); await expect(page.locator('#taskEditor')).not.toBeVisible();
     await page.locator('[data-hub-language=bg]').click();
     await page.locator('[data-view=' + (kind === 'recurring' ? 'schedules' : kind) + ']').click();
     await expect(page.locator('#taskContent')).toContainText(title);
@@ -57,7 +58,7 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   await assigner.locator('[data-view=global]').click();
   const global = hub.tasks.list(user).items.find(item => item.title === 'Fictional delegated global task');
   assert.equal(global.events[0].actor.id, user.id);
-  hub.tasks.change(global.id, {action: 'report', status: 'review', note: 'Fictional solution for review'}, 1, owner);
+  hub.tasks.change(global.id, {solutionPhoto: photo, action: 'report', status: 'review', note: 'Fictional solution for review'}, 1, owner);
   await assigner.locator('#refreshTasks').click(); await expect(assigner.locator('#taskContent')).toContainText('Готова за проверка');
   for (const name of ['Промени', 'Отмени', 'Отчети', 'Добави напредък', 'Потвърди приключване', 'Върни за работа']) await expect(assigner.getByRole('button', {name, exact: true})).toHaveCount(0);
   const chief = await hub.auth.create('demo-assignment-chief', password, 'operator', null, {canAssignTasks: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});

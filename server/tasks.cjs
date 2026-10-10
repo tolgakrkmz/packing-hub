@@ -5,6 +5,7 @@ const vm = require('node:vm');
 const {randomUUID, createHash} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
+const {createTaskPhotos} = require('./task-photos.cjs');
 const sandbox = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/shift-schedule.js'), 'utf8'), sandbox);
 const schedule = vm.runInContext('ShiftSchedule', sandbox);
@@ -12,7 +13,7 @@ const TEAMS = ['А', 'Б', 'В', 'Г', 'СТИКЕРИ'];
 const GRACE = 30 * 60000;
 const dateKey = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 function nextDate(value, days = 1) { return new Date(Date.parse(value) + days * 86400000).toISOString().slice(0, 10); }
-function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
+function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: photoOptions} = {}) {
   const formatter = new Intl.DateTimeFormat('en-CA', {timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
   function parts(at) { return Object.fromEntries(formatter.formatToParts(new Date(at)).map(part => [part.type, part.value])); }
   function localDate(at) { const p = parts(at); return `${p.year}-${p.month}-${p.day}`; }
@@ -39,6 +40,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS task_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
+  const photos = createTaskPhotos(store, photoOptions);
   const access = user => { if (!can(user, 'canViewTasks')) throw problem(403, 'FORBIDDEN'); };
   const supervisor = user => user.taskSupervisor === true;
   const manager = user => { access(user); if (!can(user, 'canManageTasks')) throw problem(403, 'FORBIDDEN'); };
@@ -83,7 +85,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     const events = source.events.map(entry => entry.action === 'created' ? {...entry, snapshot: {...entry.snapshot, due: period.due}} : entry);
     return {...fieldsSnapshot(source), kind: 'shift', scheduleId: source.id || null, shift: period, due: period.due, createdAt: at, status: 'pending', report: null, events};
   }
-  function fieldsSnapshot(source) { return {title: source.title, description: source.description, priority: source.priority, owner: source.owner, participants: source.participants}; }
+  function fieldsSnapshot(source) { return {title: source.title, description: source.description, priority: source.priority, owner: source.owner, participants: source.participants, problemPhoto: source.problemPhoto || null}; }
   // Materialize missed shifts on the server, including after an outage. No browser needs to be open.
   function materialize(at = now()) {
     const today = localDate(at);
@@ -106,11 +108,20 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     const code = Number(p.hour) < 6 || Number(p.hour) >= 22 ? 3 : Number(p.hour) < 14 ? 1 : 2;
     return {date, code};
   }
+  function clean(at) { photos.cleanup(all('task_items'), all('task_schedules'), at, date => instant(nextDate(date), '12:00')); }
+  function maintain() { store.transaction(() => { const at = now(); materialize(at); clean(at); }); }
+  function photo(table, id, photoId, user) {
+    access(user); maintain();
+    const item = row(table === 'schedules' ? 'task_schedules' : 'task_items', id);
+    if (!visible(item, user)) throw problem(403, 'FORBIDDEN');
+    return photos.get(item, photoId);
+  }
   function list(user) {
     access(user); const at = now();
-    store.transaction(() => materialize(at));
-    return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), supervisors: can(user, 'canManageTasks') || can(user, 'canAssignTasks') ? roster() : [],
-      items: all('task_items').filter(item => visible(item, user)).map(item => derived(item, at)), schedules: all('task_schedules').filter(item => visible(item, user))};
+    maintain();
+    const available = new Set(db.prepare('SELECT id FROM task_photos').all().map(row => row.id));
+    return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), photoPolicy: photos.policy(), supervisors: can(user, 'canManageTasks') || can(user, 'canAssignTasks') ? roster() : [],
+      items: all('task_items').filter(item => visible(item, user)).map(item => photos.decorate(derived(item, at), available)), schedules: all('task_schedules').filter(item => visible(item, user)).map(item => photos.decorate(item, available))};
   }
   function summary(user) {
     access(user); const at = now();
@@ -140,7 +151,9 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     if (!['shift', 'global'].includes(input.kind)) throw problem(400, 'INVALID_TASK');
     if (input.kind === 'shift' && values.participants.length) throw problem(400, 'INVALID_TASK');
     return idempotent(input, user, () => {
-      const id = randomUUID(), base = {...values, createdAt: at, events: [{...event(user, 'created', '', at), snapshot: values}]};
+      materialize(at); clean(at);
+      const problemPhoto = photos.add(input.problemPhoto, at);
+      const id = randomUUID(), base = {...values, problemPhoto, createdAt: at, events: [{...event(user, 'created', '', at), snapshot: {...values, problemPhoto}}]};
       if (input.kind === 'global') {
         const due = instant(input.dueDate, input.dueTime);
         if (due <= at) throw problem(400, 'INVALID_TASK_DATE');
@@ -164,12 +177,13 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     access(user); const at = now();
     const required = ['approve', 'return'].includes(input.action) ? 'canReviewTasks' : ['report', 'progress'].includes(input.action) ? 'canReportTasks' : 'canManageTasks';
     if (!can(user, required)) throw problem(403, 'FORBIDDEN');
-    return store.transaction(() => {
+    const work = () => {
       materialize(at);
       const table = isSchedule ? 'task_schedules' : 'task_items', item = row(table, id);
       if (!visible(item, user)) throw problem(403, 'FORBIDDEN');
       revision(item, expected);
       let note = text(input.note ?? '', 4000);
+      clean(at);
       if (isSchedule) {
         manager(user);
         if (item.stoppedAt) throw problem(409, 'TASK_STATE');
@@ -179,6 +193,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
           const value = fields(input);
           if (value.participants.length || value.owner.team !== item.team) throw problem(400, 'INVALID_TASK_ASSIGNEE');
           Object.assign(item, value);
+          if (input.problemPhoto) item.problemPhoto = photos.add(input.problemPhoto, at);
         } else throw problem(400, 'INVALID_TASK');
       } else {
         if (['completed', 'cancelled'].includes(item.status) && input.action !== 'reopen') throw problem(409, 'TASK_STATE');
@@ -194,13 +209,15 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
             if (item.status === 'review' || item.owner.id !== value.owner.id) { item.status = 'pending'; item.report = null; }
           }
           Object.assign(item, value);
+          if (input.problemPhoto) item.problemPhoto = photos.add(input.problemPhoto, at);
         } else if (input.action === 'report') {
           if (!can(user, 'canReportTasks') || item.owner.id !== user.id) throw problem(403, 'FORBIDDEN');
           if (item.kind === 'shift' && at < item.shift.start) throw problem(409, 'TASK_NOT_STARTED');
           const allowed = item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review'];
           if (!allowed.includes(input.status)) throw problem(400, 'INVALID_TASK');
           if (input.status !== 'completed' && !note) throw problem(400, 'TASK_REASON');
-          item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
+          const photo = photos.add(input.solutionPhoto, at);
+          item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, photo, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
         } else if (input.action === 'progress') {
           if (!assignedTo(item, user)) throw problem(403, 'FORBIDDEN');
           if (item.kind !== 'global' || !can(user, 'canReportTasks') || !note) throw problem(400, 'INVALID_TASK');
@@ -208,6 +225,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
           if (['approve', 'return'].includes(input.action)) { if (!can(user, 'canReviewTasks')) throw problem(403, 'FORBIDDEN'); }
           else manager(user);
           if (input.action === 'approve' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
+          if (input.action === 'approve' && !photos.exists(item.report?.photo?.id || '')) throw problem(400, 'TASK_PHOTO_REQUIRED');
           if (input.action === 'return' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
           if (input.action === 'reopen' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)) throw problem(409, 'TASK_STATE');
           if (input.action !== 'approve' && !note) throw problem(400, 'TASK_REASON');
@@ -215,10 +233,17 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
           if (input.action === 'reopen' || input.action === 'return') item.report = null;
         } else throw problem(400, 'INVALID_TASK');
       }
-      item.events.push({...event(user, input.action, note, at), status: item.status || null, late: input.action === 'report' ? at > item.due + (item.kind === 'shift' ? GRACE : 0) : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
+      if (!isSchedule) item.closedAt = ['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) ? at : null;
+      item.events.push({...event(user, input.action, note, at), status: item.status || null, photo: input.action === 'report' ? item.report.photo : undefined, late: input.action === 'report' ? at > item.due + (item.kind === 'shift' ? GRACE : 0) : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
       store.audit(user, 'task-' + input.action, 'tasks');
       return {item: save(table, item)};
-    });
+    };
+    if (input.requestId) {
+      const item = row(isSchedule ? 'task_schedules' : 'task_items', id);
+      if (!visible(item, user) || input.action === 'report' && item.owner.id !== user.id) throw problem(403, 'FORBIDDEN');
+      return idempotent({...input, taskId: id, expected, isSchedule}, user, work);
+    }
+    return store.transaction(work);
   }
   function preview(date, assigneeId, user) {
     assigner(user);
@@ -226,6 +251,6 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     if (!owner) throw problem(400, 'INVALID_TASK_ASSIGNEE');
     return {shift: shift(date, owner.team), timezone};
   }
-  return {list, summary, create, change, shift, instant, localDate, currentShift, preview};
+  return {list, summary, create, change, shift, instant, localDate, currentShift, preview, photo, maintain};
 }
 module.exports = {createTasks};

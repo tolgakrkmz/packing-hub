@@ -9,6 +9,7 @@ const {createHubServer} = require('../../server/server.cjs');
 const {openStore} = require('../../server/store.cjs');
 const {accounts} = require('../../server/accounts.cjs');
 const {createTasks} = require('../../server/tasks.cjs');
+const {photo} = require('./task-photo-fixture.cjs');
 const password = 'Fictional-tasks-password-123';
 async function setup(t, filename = ':memory:') {
   let time = Date.parse('2026-12-01T07:00:00+02:00');
@@ -22,10 +23,10 @@ async function setup(t, filename = ':memory:') {
   }
   const request = (route, user, method = 'GET', data, headers = {}) => fetch(base + route, {method, redirect: 'manual', headers: {Origin: base, Cookie: user.cookie, 'X-CSRF-Token': user.csrf, 'Content-Type': 'application/json', ...headers}, ...(data === undefined ? {} : {body: JSON.stringify(data)})});
   const admin = await login(), chief = await login('demo-chief-a'), other = await login('demo-chief-b');
-  const payload = (extra = {}) => ({requestId: randomUUID(), title: 'Fictional shift check', description: 'Fictional task content', priority: 'normal', assigneeId: chief.user.id, participantIds: [], kind: 'shift', repeat: 'once', from: '2026-12-01', ...extra});
+  const payload = (extra = {}) => ({requestId: randomUUID(), problemPhoto: photo, title: 'Fictional shift check', description: 'Fictional task content', priority: 'normal', assigneeId: chief.user.id, participantIds: [], kind: 'shift', repeat: 'once', from: '2026-12-01', ...extra});
   async function create(data = payload()) { const response = await request('/api/tasks', admin, 'POST', data); assert.equal(response.status, 201); return (await response.json()).id; }
   const list = async (user = admin) => (await request('/api/tasks', user)).json();
-  const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', data, {'If-Match': '"' + revision + '"'});
+  const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', {...(data.action === 'report' ? {solutionPhoto: photo} : {}), ...data}, {'If-Match': '"' + revision + '"'});
   return {hub, admin, chief, other, request, login, payload, create, list, change, time: value => { time = Date.parse(value); }};
 }
 test('task badges count only work awaiting the account, and expose no task content', async t => {
@@ -324,7 +325,7 @@ test('global deadline and assignment amendments retain original snapshots and re
   s.time('2026-12-03T10:00:00+02:00');
   assert.equal((await s.change(id, s.chief, {action: 'report', status: 'review', note: 'Fictional late solution'})).status, 200);
   assert.equal((await s.list()).items[0].late, true);
-  const amended = {...payload, action: 'edit', assigneeId: s.other.user.id, dueDate: '2026-12-05', dueTime: '17:00', note: 'Fictional changed responsibility'};
+  const amended = {...payload, requestId: randomUUID(), action: 'edit', assigneeId: s.other.user.id, dueDate: '2026-12-05', dueTime: '17:00', note: 'Fictional changed responsibility'};
   assert.equal((await s.change(id, s.admin, amended, 2)).status, 200);
   const item = (await s.list()).items[0]; assert.equal(item.status, 'pending'); assert.equal(item.report, null);
   assert.equal(item.events[0].snapshot.due, Date.parse('2026-12-02T17:00:00+02:00')); assert.equal(item.events[0].snapshot.owner.id, s.chief.user.id);
@@ -370,7 +371,7 @@ test('tasks, supervisor profiles, event history and recurring catch-up survive a
   const filename = path.join(directory, 'demo.sqlite'); let store = openStore(filename), auth = accounts(store);
   const admin = await auth.create('demo-admin', password, 'admin'), chief = await auth.create('demo-chief', password, 'operator', admin, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   let tasks = createTasks(store, {now: () => Date.parse('2026-12-01T07:00:00+02:00')});
-  tasks.create({requestId: randomUUID(), title: 'Fictional persistent task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'shift', repeat: 'every-shift', from: '2026-12-01', until: '2026-12-03'}, admin); store.close();
+  tasks.create({problemPhoto: photo, requestId: randomUUID(), title: 'Fictional persistent task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'shift', repeat: 'every-shift', from: '2026-12-01', until: '2026-12-03'}, admin); store.close();
   store = openStore(filename); t.after(() => store.close()); tasks = createTasks(store, {now: () => Date.parse('2026-12-04T07:00:00+02:00')});
   const view = tasks.list(admin); assert.equal(view.items.length, 2); assert.ok(view.items.every(item => item.displayStatus === 'unreported')); assert.equal(view.items[0].events[0].snapshot.owner.username, 'demo-chief');
   assert.equal(accounts(store).list().find(user => user.id === chief.id).taskSupervisor, true);

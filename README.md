@@ -116,6 +116,63 @@ part of legacy imports, generic module replacement, report exports or offline
 file mode. Deploy the reviewed server code/container to enable them; the legacy
 production folder and its live files remain independent.
 
+### Task photos: Problem / Solution
+
+New assignments require one **Problem** photo. Each owner report requires a new
+**Solution / current state** photo, including not-done, not-applicable, blocked
+and in-progress reports. Participant progress notes remain text notes. Global
+completion requires the owner's photographed report and reviewer approval.
+Older tasks remain readable; old review reports without a photo must be returned
+for a new report before approval. Existing history and statistics are preserved.
+
+Choose a local image or use **Take photo** on a phone. The browser re-encodes it
+as JPEG, removes camera metadata and limits it to 1280 pixels on the longest edge
+and 300 KB. Inputs are limited to 20 MB and 40 megapixels; formats must be decodable
+by that browser (JPEG, PNG and WebP are supported by the tested Chrome). Review the
+preview before saving. The server also checks JPEG structure, dimensions and size.
+This establishes attached evidence; it cannot establish when the original photo
+was taken or whether the photographed work was actually performed.
+
+Cards show Problem and the latest Solution; event history retains earlier photos,
+including replaced problem images. Recurring shifts share their problem image
+without copying its bytes. Photos use authenticated task-scoped URLs, the same
+viewing rules as their task and `Cache-Control: no-store`. Draft images remain in
+memory until saved or the dialog closes. Task creation and report retries use
+idempotency keys: a lost response can be retried without duplicate photos/events.
+Images and the task change commit in one SQLite transaction; a failed upload,
+stale revision, revoked session or storage refusal cannot mark work reported.
+
+Photos are removed **six calendar months after a final outcome**: completed,
+cancelled, not-done or not-applicable. Reopening before expiration keeps prior
+evidence and restarts retention on the next final outcome. Active, unreported,
+blocked, in-progress and ready-for-review tasks retain their photos. An expired
+or stopped recurring plan retains its photos while any associated unfinished
+shift still references them. Cleanup runs at startup, hourly and on task reads
+and writes; an outage is caught up on restart. Text history remains after cleanup
+and shows that its photos expired. Reopening after expiration requires new
+evidence; deleted image bytes cannot be recovered through the task screen.
+
+`HUB_TASK_PHOTO_RETENTION_MONTHS` defaults to **6** (1–24 allowed), and
+`HUB_TASK_PHOTO_LIMIT_MB` to **512** (1–4096 allowed). Compose passes these settings
+through; recreate the container after changing them. The task screen shows
+usage and policy. Saving refuses a photo if its storage cap would be exceeded or
+the database filesystem has less than 128 MB reserve plus space for the new
+write. Active evidence is never deleted merely to fit the cap. Deleted SQLite
+pages are reused for future writes; the database file may retain its allocated
+size. Backups include photos and consume additional disk space. Older backup
+copies retain images until normal backup retention removes those copies;
+restoring a copy applies the task-photo cleanup policy on startup. No production
+images belong in this source repository, test fixtures, screenshots or Trello.
+
+Deploy the server and client together. Photo storage is an additive local table;
+no live file replacement, legacy import or employee-data migration is needed.
+Test using generated images and fictional accounts:
+
+```sh
+node --test tests/server/task-photos.test.cjs tests/server/tasks.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --tasks-only
+```
+
 Account managers configure permissions as module cards in **Admin panel → Accounts**.
 Roles supply defaults; every flag can be explicitly allowed or denied for every
 role, including operator and observer. Resetting restores inheritance. Existing

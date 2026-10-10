@@ -1243,3 +1243,16 @@ Object.assign(HUB_EN_MESSAGES, {
 });
 
 Object.assign(HUB_EN_MESSAGES, {"Двойки": "Pairs", "Инструкции": "Instructions", "Статистика": "Statistics", "Редактирай задачи и проследявай изпълнението им.": "Edit tasks and track their progress."});
+Object.assign(HUB_EN_MESSAGES, {
+  "Проблем — снимка": "Problem — photo", "Решение — снимка": "Solution — photo", "Проблем": "Problem", "Решение": "Solution",
+  "Избери снимка": "Choose photo", "Снимай": "Take photo", "Избрана снимка": "Selected photo", "Отвори снимката": "Open photo", "Премахни избора": "Clear selection",
+  "Добави снимка на проблема. При повторение тя се използва за всички смени.": "Add a photo of the problem. Recurring shifts share this photo.",
+  "Избери нова снимка, за да замениш проблема. Предишната остава в историята.": "Choose a new problem photo. The previous photo stays in history.",
+  "Всеки отчет изисква нова снимка на решението или текущото състояние, включително при неизпълнена задача.": "Every report requires a new photo of the solution or current state, including unfinished work.",
+  "Няма снимка от предишната версия.": "No photo from the previous version.", "Снимката е изтрита след срока за съхранение.": "The photo was deleted after its retention period.",
+  "Подготвяне на снимката…": "Preparing photo…", "Снимката е готова за запис.": "The photo is ready to save.", "Изчакай снимката да е готова.": "Wait for the photo to be ready.", "Добави снимка преди запис.": "Add a photo before saving.",
+  "Избери снимка до 20 MB, която браузърът може да отвори (JPEG, PNG или WebP).": "Choose a photo up to 20 MB that the browser can open (JPEG, PNG or WebP).",
+  "Снимката е прекалено голяма. Избери по-малка снимка.": "The photo is too large. Choose a smaller photo.", "Снимката не може да се отвори. Избери JPEG, PNG или WebP.": "Cannot open the photo. Choose JPEG, PNG or WebP.",
+  "Снимката не е достъпна. Опресни задачите.": "The photo is unavailable. Refresh tasks.", "Снимката не е валидна. Избери я отново.": "The photo is invalid. Select it again.",
+  "Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.": "There is not enough photo storage. Contact an administrator; the report was not saved."
+});

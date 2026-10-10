@@ -1,3 +1,4 @@
+const {photo} = require('./task-photo-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -84,7 +85,7 @@ test('restored application starts, authenticates, enforces permissions, material
   const oldSession = await auth.login('demo-restore-admin', password);
   const at = Date.parse('2026-12-01T07:00:00+02:00');
   const tasks = createTasks(demo.store, {now: () => at});
-  const plan = tasks.create({requestId: randomUUID(), title: 'Fictional recurring recovery task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'shift', repeat: 'every-shift', from: '2026-12-01', until: '2026-12-03'}, admin);
+  const plan = tasks.create({problemPhoto: photo, requestId: randomUUID(), title: 'Fictional recurring recovery task', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'shift', repeat: 'every-shift', from: '2026-12-01', until: '2026-12-03'}, admin);
   const archive = path.join(demo.primary, 'snapshot.sqlite'); snapshot(demo.database, archive);
   const expected = demo.store.get('production-log');
   demo.store.db.prepare("UPDATE documents SET data=? WHERE kind='production-log'").run(JSON.stringify({...expected.data, entries: [...expected.data.entries, {...expected.data.entries[0], id: 'demo-after-snapshot'}]}));
