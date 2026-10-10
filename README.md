@@ -119,24 +119,31 @@ production folder and its live files remain independent.
 ### Task photos: Problem / Solution
 
 New assignments have **Requires photos** checked by default. Leave it checked to
-require one **Problem** photo at assignment and a new **Solution / current state**
-photo with each owner report. Uncheck it for tasks that can be assigned, reported
-and completed without photos. The task card and history show this requirement.
+require one or more **Problem** photos at assignment and exactly the same number
+of new **Solution / current state** photos with each owner report. Uncheck it for
+tasks that can be assigned, reported and completed without photos. The task card
+and history show this requirement.
 The server enforces the stored setting; reporting cannot disable it.
 
-For tasks requiring photos, each owner report requires a new
-**Solution / current state** photo, including not-done, not-applicable, blocked
+For tasks requiring photos, each owner report requires matching new
+**Solution / current state** photos, including not-done, not-applicable, blocked
 and in-progress reports. Participant progress notes remain text notes. Global
 completion requires reviewer approval and, when selected, the owner's photographed
 report. Managers can change the setting when editing; enabling it requires an
-available Problem photo. The change is recorded in history. Recurring plans pass
-the setting to future shifts; already created shifts keep their own setting.
+available set of Problem photos. Changes to the photo set and requirement are
+recorded in history. Recurring plans pass the setting to future shifts; already
+created shifts keep their own setting.
 Older tasks without this setting retain the previous photo requirement. Old
 review reports requiring a photo must be returned for a new report before approval.
 Existing history and statistics are preserved.
 
-Choose a local image or use **Take photo** on a phone. The browser re-encodes it
-as JPEG, removes camera metadata and limits it to 1280 pixels on the longest edge
+Choose multiple local images or use **Take photo** repeatedly on a phone. Add or
+remove individual selections before saving, up to 10 photos per set. Reports show
+the selected and required count. Existing single-photo tasks require one solution;
+legacy tasks with no Problem photo require one fresh solution. All photos remain
+subject to task-scoped access, snapshots, storage limits and retention.
+The browser re-encodes each image as JPEG, removes camera metadata and limits it
+to 1280 pixels on the longest edge
 and 300 KB. Inputs are limited to 20 MB and 40 megapixels; formats must be decodable
 by that browser (JPEG, PNG and WebP are supported by the tested Chrome). Review the
 preview before saving. The server also checks JPEG structure, dimensions and size.

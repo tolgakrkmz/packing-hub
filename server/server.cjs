@@ -8,6 +8,7 @@ const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createTasks} = require('./tasks.cjs');
+const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
@@ -176,11 +177,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (taskRoute) {
           if (!taskRoute[1] && request.method === 'GET') return json(response, 200, tasks.list(currentUser()));
           if (!taskRoute[1] && request.method === 'POST') {
-            const input = await jsonBody(request), result = tasks.create(input, currentUser());
+            const input = await jsonBody(request, taskPhotoRequestBytes), result = tasks.create(input, currentUser());
             broadcast('tasks', 0); return json(response, 201, result);
           }
           if (taskRoute[1] && request.method === 'PATCH') {
-            const input = await jsonBody(request), result = tasks.change(taskRoute[2], input, revisionFor(request), currentUser(), taskRoute[1] === 'schedules');
+            const input = await jsonBody(request, taskPhotoRequestBytes), result = tasks.change(taskRoute[2], input, revisionFor(request), currentUser(), taskRoute[1] === 'schedules');
             broadcast('tasks', 0); return json(response, 200, result);
           }
           throw problem(405, 'METHOD_REJECTED');

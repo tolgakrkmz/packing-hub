@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const {randomUUID, createHash} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
-const {createTaskPhotos} = require('./task-photos.cjs');
+const {createTaskPhotos, photoList, photoInputs} = require('./task-photos.cjs');
 const sandbox = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/shift-schedule.js'), 'utf8'), sandbox);
 const schedule = vm.runInContext('ShiftSchedule', sandbox);
@@ -68,8 +68,18 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     return {title: text(input.title, 180, true), description: text(input.description, 4000), priority: input.priority, requiresPhotos: input.requiresPhotos ?? photoDefault, ...assignments(input)};
   }
   function updateProblemPhoto(item, input, at) {
-    if (input.problemPhoto != null) item.problemPhoto = photos.add(input.problemPhoto, at);
-    if (requiresPhotos(item) && !photos.exists(item.problemPhoto?.id || '')) throw problem(400, 'TASK_PHOTO_REQUIRED');
+    if (input.problemPhotos !== undefined || input.problemPhoto != null) {
+      item.problemPhotos = photos.addMany(photoInputs(input, 'problemPhotos', 'problemPhoto'), at, photoList(item, 'problemPhotos', 'problemPhoto'));
+      delete item.problemPhoto;
+    }
+    const evidence = photoList(item, 'problemPhotos', 'problemPhoto');
+    if (requiresPhotos(item) && (!evidence.length || evidence.some(photo => !photos.exists(photo.id)))) throw problem(400, 'TASK_PHOTO_REQUIRED');
+  }
+  const requiredCount = item => Math.max(1, photoList(item, 'problemPhotos', 'problemPhoto').length);
+  function checkSolutionCount(item, evidence) {
+    if (!requiresPhotos(item)) return;
+    if (!evidence.length) throw problem(400, 'TASK_PHOTO_REQUIRED');
+    if (evidence.length !== requiredCount(item)) throw problem(400, 'TASK_PHOTO_COUNT');
   }
   function row(table, id) {
     const found = db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
@@ -91,7 +101,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     const events = source.events.map(entry => entry.action === 'created' ? {...entry, snapshot: {...entry.snapshot, due: period.due}} : entry);
     return {...fieldsSnapshot(source), kind: 'shift', scheduleId: source.id || null, shift: period, due: period.due, createdAt: at, status: 'pending', report: null, events};
   }
-  function fieldsSnapshot(source) { return {title: source.title, description: source.description, priority: source.priority, requiresPhotos: requiresPhotos(source), owner: source.owner, participants: source.participants, problemPhoto: source.problemPhoto || null}; }
+  function fieldsSnapshot(source) { return {title: source.title, description: source.description, priority: source.priority, requiresPhotos: requiresPhotos(source), owner: source.owner, participants: source.participants, problemPhotos: photoList(source, 'problemPhotos', 'problemPhoto')}; }
   // Materialize missed shifts on the server, including after an outage. No browser needs to be open.
   function materialize(at = now()) {
     const today = localDate(at);
@@ -158,8 +168,10 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     if (input.kind === 'shift' && values.participants.length) throw problem(400, 'INVALID_TASK');
     return idempotent(input, user, () => {
       materialize(at); clean(at);
-      const problemPhoto = values.requiresPhotos || input.problemPhoto != null ? photos.add(input.problemPhoto, at) : null;
-      const id = randomUUID(), base = {...values, problemPhoto, createdAt: at, events: [{...event(user, 'created', '', at), snapshot: {...values, problemPhoto}}]};
+      const inputs = photoInputs(input, 'problemPhotos', 'problemPhoto');
+      if (values.requiresPhotos && !inputs.length) throw problem(400, 'TASK_PHOTO_REQUIRED');
+      const problemPhotos = photos.addMany(inputs, at);
+      const id = randomUUID(), base = {...values, problemPhotos, createdAt: at, events: [{...event(user, 'created', '', at), snapshot: {...values, problemPhotos}}]};
       if (input.kind === 'global') {
         const due = instant(input.dueDate, input.dueTime);
         if (due <= at) throw problem(400, 'INVALID_TASK_DATE');
@@ -222,8 +234,9 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
           const allowed = item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review'];
           if (!allowed.includes(input.status)) throw problem(400, 'INVALID_TASK');
           if (input.status !== 'completed' && !note) throw problem(400, 'TASK_REASON');
-          const photo = requiresPhotos(item) || input.solutionPhoto != null ? photos.add(input.solutionPhoto, at) : null;
-          item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, photo, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
+          const inputs = photoInputs(input, 'solutionPhotos', 'solutionPhoto'); checkSolutionCount(item, inputs);
+          const evidence = photos.addMany(inputs, at);
+          item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, photos: evidence, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
         } else if (input.action === 'progress') {
           if (!assignedTo(item, user)) throw problem(403, 'FORBIDDEN');
           if (item.kind !== 'global' || !can(user, 'canReportTasks') || !note) throw problem(400, 'INVALID_TASK');
@@ -231,7 +244,10 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
           if (['approve', 'return'].includes(input.action)) { if (!can(user, 'canReviewTasks')) throw problem(403, 'FORBIDDEN'); }
           else manager(user);
           if (input.action === 'approve' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
-          if (input.action === 'approve' && requiresPhotos(item) && !photos.exists(item.report?.photo?.id || '')) throw problem(400, 'TASK_PHOTO_REQUIRED');
+          if (input.action === 'approve' && requiresPhotos(item)) {
+            const evidence = photoList(item.report, 'photos', 'photo'); checkSolutionCount(item, evidence);
+            if (evidence.some(photo => !photos.exists(photo.id))) throw problem(400, 'TASK_PHOTO_REQUIRED');
+          }
           if (input.action === 'return' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
           if (input.action === 'reopen' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)) throw problem(409, 'TASK_STATE');
           if (input.action !== 'approve' && !note) throw problem(400, 'TASK_REASON');
@@ -240,7 +256,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
         } else throw problem(400, 'INVALID_TASK');
       }
       if (!isSchedule) item.closedAt = ['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) ? at : null;
-      item.events.push({...event(user, input.action, note, at), status: item.status || null, photo: input.action === 'report' ? item.report.photo : undefined, late: input.action === 'report' ? at > item.due + (item.kind === 'shift' ? GRACE : 0) : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
+      item.events.push({...event(user, input.action, note, at), status: item.status || null, photos: input.action === 'report' ? item.report.photos : undefined, late: input.action === 'report' ? at > item.due + (item.kind === 'shift' ? GRACE : 0) : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
       store.audit(user, 'task-' + input.action, 'tasks');
       return {item: save(table, item)};
     };
