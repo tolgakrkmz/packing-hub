@@ -5,7 +5,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   const fmt = value => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits: 2});
   const pct = value => value === null ? '—' : fmt(value) + '%';
   const monthLabel = month => new Date(Number(month.slice(0,4)), Number(month.slice(5,7)) - 1, 1).toLocaleDateString('bg-BG', {month:'long', year:'numeric'});
-  const statusLabels = {pending:'Очаква отчет', achieved:'Постигнат', missed:'Непостигнат'};
+  const statusLabels = {pending:'Очаква отчет', achieved:'Постигнат', missed:'Непостигнат', cancelled:'Отменена'};
   let data = PairTargets.emptyData(), loaded = false, started = false;
   const elements = Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key, $('pairStats' + key[0].toUpperCase() + key.slice(1))]));
   const accept = value => { data = PairTargets.validateData(value); loaded = true; };
@@ -20,8 +20,9 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     return `<div class="pair-stats-scroll"><table class="stats-table"><thead><tr><th>Дата / смяна</th><th>Двойка / опаковка</th><th>Кг реално / цел</th><th>Каси реално / цел</th><th>Статус</th><th>Причина / бележка</th></tr></thead><tbody>${records.slice().sort((a,b) => a.date.localeCompare(b.date) || a.shiftCode - b.shiftCode || a.id.localeCompare(b.id)).map(entry => {
       const state = PairTargets.status(entry);
       const area = entry.areas.length === 2 ? 'Смесена опаковка' : entry.areas[0] === 'auto' ? 'Автоматична опаковка' : 'Ръчна опаковка';
-      const reason = state === 'missed' ? PairTargets.REASONS.find(item => item.key === entry.result.reasonKey) || PairTargets.REASONS.find(item => item.key === 'other') : null;
-      return `<tr><td>${escape(entry.date.split('-').reverse().join('.'))}<br>${entry.shiftCode} смяна · ${escape(entry.team)}</td><td><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span><br><span class="conn-note">${area}</span></td><td class="num">${entry.result ? fmt(entry.result.kg) : '—'} / ${fmt(entry.targetKg)}</td><td class="num">${entry.result ? fmt(entry.result.crates) : '—'} / ${fmt(entry.targetCrates)}</td><td class="pair-state-${state}">${statusLabels[state]}</td><td class="pair-report-note">${reason ? escape(reason.label) : ''}${entry.result?.reasonText ? ' · <span translate="no">' + escape(entry.result.reasonText) + '</span>' : reason ? '' : '—'}</td></tr>`;
+      const explanation = entry.cancellation || entry.result;
+      const reason = state === 'cancelled' ? PairTargets.CANCELLATION_REASONS.find(item => item.key === explanation.reasonKey) : state === 'missed' ? PairTargets.REASONS.find(item => item.key === explanation.reasonKey) || PairTargets.REASONS.find(item => item.key === 'other') : null;
+      return `<tr><td>${escape(entry.date.split('-').reverse().join('.'))}<br>${entry.shiftCode} смяна · ${escape(entry.team)}</td><td><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span><br><span class="conn-note">${area}</span></td><td class="num">${entry.result ? fmt(entry.result.kg) : '—'} / ${fmt(entry.targetKg)}</td><td class="num">${entry.result ? fmt(entry.result.crates) : '—'} / ${fmt(entry.targetCrates)}</td><td class="pair-state-${state}">${statusLabels[state]}</td><td class="pair-report-note">${reason ? escape(reason.label) : ''}${explanation?.reasonText ? ' · <span translate="no">' + escape(explanation.reasonText) + '</span>' : reason ? '' : '—'}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 
@@ -31,7 +32,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     $('pairStatsPeriod').textContent = monthLabel(selectedMonth);
     $('pairStatsHint').textContent = !loaded ? 'Свържете pair-targets.json от панела за файловете. Статистиката само чете отчетите.' : 'Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Килограмите не се добавят към „Тонаж и брак“.';
     const result = PairTargetsStatistics.aggregate(data.entries, selectedMonth, $('pairStatsTeam').value);
-    if (!result.planned) {
+    if (!result.planned && !result.cancelled) {
       $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
       return;
     }
@@ -39,6 +40,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     const details = (key, summary, body) => `<details data-group="${escape(key)}"${openGroups.has(key) ? ' open' : ''}><summary>${summary}</summary>${body}</details>`;
     $('pairStatsBody').innerHTML = `<div class="pair-stats-kpis">
       ${card('Планирани двойки', fmt(result.planned), `Отчетени: ${result.reported} · Очакват отчет: ${result.pending}`)}
+      ${result.cancelled ? card('Отменени двойки', fmt(result.cancelled), 'Отменените таргети не участват в плана и изпълнението.') : ''}
       ${card('Постигнати таргети', pct(result.successPct), `Постигнати: ${result.achieved} · Непостигнати: ${result.missed}<br>И двете цели трябва да са изпълнени.`)}
       ${card('Изпълнение · килограми', pct(result.kgPct), `${fmt(result.actualKg)} / ${fmt(result.reportedTargetKg)} кг по отчетените двойки<br>Общ план: ${fmt(result.plannedKg)} кг`)}
       ${card('Изпълнение · каси', pct(result.cratesPct), `${fmt(result.actualCrates)} / ${fmt(result.reportedTargetCrates)} каси по отчетените двойки<br>Общ план: ${fmt(result.plannedCrates)} каси`)}
@@ -54,7 +56,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     ${result.reasons.length ? result.reasons.map(reason => details('reason-' + reason.key, `<div class="pair-reason-title"><span>${escape(reason.label)}</span><strong>${reason.count} · ${pct(reason.count / result.missed * 100)}</strong></div><div class="pair-reason-bar" aria-hidden="true"><span style="width:${reason.count / result.missed * 100}%"></span></div>`, reportsTable(reason.entries))).join('') : '<div class="conn-note">Няма отчетени непостигнати таргети.</div>'}
     </details>
     <h3>Двойки и отчети</h3>
-    ${result.teams.map(group => details('team-' + group.team, `Екип ${escape(group.team)} · ${group.planned} двойки · ${group.pending} очакват отчет`, reportsTable(group.entries))).join('')}`;
+    ${result.teams.map(group => details('team-' + group.team, `Екип ${escape(group.team)} · ${group.planned} двойки · ${group.pending} очакват отчет${group.cancelled ? ' · '+group.cancelled+' отменени' : ''}`, reportsTable(group.entries))).join('')}`;
   }
   return {
     init() { if (!started) { started = true; sync.init(); } render(); },

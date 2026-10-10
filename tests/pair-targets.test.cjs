@@ -153,3 +153,33 @@ test('stickers use their active roster in first shift',() => {
   assert.equal(plan({context:{...context,team:'СТИКЕРИ'},employees:people}).team,'СТИКЕРИ');
   assert.throws(() => plan({context:{...context,team:'СТИКЕРИ',shiftCode:2},employees:people}),/ротацията/);
 });
+test('cancellation requires a preset or explained Other and preserves the original plan',() => {
+  const entry = plan(), before = JSON.stringify(entry), now = '2026-10-04T07:00:00Z';
+  const cancel = values => model.cancel(entry,{context,reasonKey:'cleaning',reasonText:'',now,...values});
+  for(const reasonKey of ['left','cleaning','other-work','other']) {
+    const cancelled = cancel({reasonKey,reasonText:'  Fictional explanation  '});
+    assert.equal(model.status(cancelled),'cancelled');
+    assert.equal(cancelled.cancellation.reasonText,'Fictional explanation');
+    assert.equal(cancelled.updatedAt,now);
+    for(const key of ['id','members','areas','targetKg','targetCrates','createdAt','result']) assert.deepEqual(plain(cancelled[key]),plain(entry[key]));
+    assert.equal(model.validateData({...model.emptyData(),entries:[cancelled]}).entries.length,1);
+  }
+  for(const values of [{reasonKey:''},{reasonKey:'unknown'},{reasonKey:'other',reasonText:'  '},{reasonText:123},{reasonText:'x'.repeat(1001)},{now:'bad'},{now:'2026-02-30T07:00:00Z'},{context:{...context,shiftCode:2}}]) assert.throws(() => cancel(values));
+  assert.equal(JSON.stringify(entry),before);
+  assert.throws(() => model.cancel(report(),{context,reasonKey:'left',now}),/неотчетена/);
+});
+test('cancelled pairs release members for reassignment but cannot be edited or reported',() => {
+  const entry = model.cancel(plan(),{context,reasonKey:'left',now:'2026-10-04T07:00:00Z'});
+  const data = {...model.emptyData(),entries:[entry]};
+  const replacement = plan({data,id:'pair-2'});
+  assert.equal(model.validateData({...data,entries:[entry,replacement]}).entries.length,2);
+  assert.equal(model.validateData({...data,entries:[replacement,entry]}).entries.length,2);
+  assert.throws(() => plan({data,existingId:entry.id}),/Отменена/);
+  assert.throws(() => report({},entry),/Отменена/);
+  assert.throws(() => model.cancel(entry,{context,reasonKey:'cleaning',now:'2026-10-04T08:00:00Z'}));
+  for(const cancellation of [false,'',0,[],{}, {...entry.cancellation,reasonKey:'unknown'}, {...entry.cancellation,reasonText:'  '}, {...entry.cancellation,extra:true}]) {
+    assert.throws(() => model.validateData({...data,entries:[{...entry,cancellation}]}));
+  }
+  assert.throws(() => model.validateData({...data,entries:[{...entry,members:[entry.members[0],entry.members[0]]}]}));
+  assert.throws(() => model.validateData({...data,entries:[{...entry,result:report().result}]}));
+});

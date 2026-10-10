@@ -48,6 +48,44 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if(process.argv.includes('--pair-cancellation-only')) {
+      const {employees,exercisePairCancellation} = require('../tests/browser/pair-cancellation.cjs');
+      const user = hub.auth.list()[0];
+      const personnel = hub.store.get('personnel');
+      hub.store.put('personnel',{...personnel.data,employees},personnel.revision,user);
+      await hub.auth.create('demo-cancel-operator',demoPassword,'operator',user);
+      const page = await device('demo-cancel-operator');
+      await page.goto(base+'/pair-targets.html');
+      await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
+      await exercisePairCancellation({page,base,expect,statisticsPage:admin,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
+        read:async () => hub.store.get('pair-targets').data,
+        replace:async data => hub.store.put('pair-targets',data,hub.store.get('pair-targets').revision,user),
+        checkReadOnly:async () => {
+          for(const [username,permissions] of [['demo-cancel-reader',{canCreateReports:false,canEditReports:true}],['demo-cancel-observer',{}]]) {
+            await hub.auth.create(username,demoPassword,username.endsWith('observer') ? 'observer' : 'operator',user,permissions);
+            const reader = await device(username);
+            await reader.goto(base+'/pair-targets.html');
+            await reader.locator('#stickersShiftBtn').click();
+            await expect(reader.locator('#pairsList [data-action=cancel]')).toHaveCount(1);
+            await expect(reader.locator('#addPairBtn')).toBeHidden();
+            await expect(reader.locator('#pairsList [data-action=cancel]')).toBeHidden();
+            await reader.context().close();
+          }
+        },
+        failNextWrite:async () => {
+          const handler = async route => {
+            if(route.request().method() !== 'PUT') return route.fallback();
+            await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'DEMO_WRITE_FAILURE'})});
+            await page.unroute('**/api/data/pair-targets',handler);
+          };
+          await page.route('**/api/data/pair-targets',handler);
+        }
+      });
+      assert.deepEqual(errors,[]);
+      console.log('PASS server pair cancellation, history, drafts, conflict, statistics, permissions and BG/EN layouts');
+      return;
+    }
     if (process.argv.includes('--transfer-only')) {
       await exerciseDataTransfer({admin, hub, base, device, expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});

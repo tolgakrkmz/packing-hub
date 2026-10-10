@@ -95,10 +95,19 @@ function openStore(filename) {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
           const planFields = ['id', 'date', 'shiftCode', 'team', 'members', 'targetKg', 'targetCrates', 'createdAt'];
           const remaining = new Set(data.entries.map(entry => entry.id));
-          if (current.data.entries.some(entry => entry.result && !remaining.has(entry.id))) throw new Error();
+          // Every saved pair stays in history. Unreported plans are cancelled
+          // with a reason, and the resulting snapshot cannot be rewritten.
+          if (current.data.entries.some(entry => !remaining.has(entry.id))) throw new Error();
           for (const entry of data.entries) {
             const previous = current.data.entries.find(item => item.id === entry.id);
-            if (previous && same(previous, entry)) continue;
+            if (previous && isDeepStrictEqual(previous, entry)) continue;
+            if (previous?.cancellation) throw new Error();
+            if (entry.cancellation) {
+              if (!previous) throw new Error();
+              const cancelled = pairModel.cancel(previous, {context: entry, ...entry.cancellation, now: entry.cancellation.cancelledAt});
+              if (!isDeepStrictEqual(JSON.parse(JSON.stringify(cancelled)), entry)) throw new Error();
+              continue;
+            }
             if (!previous || planFields.some(field => !same(previous[field], entry[field]))) {
               const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt});
               if (planFields.some(field => !same(planned[field], entry[field]))) throw new Error();

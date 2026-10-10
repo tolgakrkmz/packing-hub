@@ -784,6 +784,29 @@ connection button while the other sections remain available.
 
 ## Pair target statistics
 
+Cancel an unreported pair with a required reason: **Left the shift**, **Cleaning**,
+**Doing other work**, or **Other** with an explanation. Cancellation preserves
+the pair, its original targets, reason and time in shift/monthly history, and
+releases its members for a new pair in the same shift. Cancelled pairs cannot be
+edited, reported or removed; reported pairs retain their correction workflow.
+Server cancellation requires report-creation permission and the current revision.
+Existing pair files remain compatible. Deploy the updated client and server
+together; older clients' pair deletion requests are rejected by the updated server.
+Cancelled targets are excluded from active totals, pending counts, completion
+rates and deficits. Monthly statistics show cancellations separately, including
+months containing only cancelled pairs.
+
+Focused browser checks in both modes:
+
+```sh
+node scripts/run-browser-tests.cjs --headless --pair-cancellation-only
+node scripts/run-server-browser-tests.cjs --headless --pair-cancellation-only
+```
+
+These cover required reasons, retained drafts after failed writes or conflicts,
+reassignment, saved history, cancelled-only statistics, server permission limits
+and Bulgarian/English dialogs at 320, 390 and 1440 px using fictional data.
+
 New pairs use only active people with the personnel role `Опаковчик` (packer)
 from the selected team, including Stickers. Other roles and people without an
 assigned role are excluded from the roster, counts and new pair selection.

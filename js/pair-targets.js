@@ -4,7 +4,7 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const fmt = value => Number(value).toLocaleString('bg-BG',{maximumFractionDigits:2});
   const fmtDate = value => value.split('-').reverse().join('.');
-  const statusLabels = {pending:'Очаква отчет',achieved:'Постигнат',missed:'Непостигнат'};
+  const statusLabels = {pending:'Очаква отчет',achieved:'Постигнат',missed:'Непостигнат',cancelled:'Отменена'};
   const areaLabels = {auto:'Автоматична',manual:'Ръчна'};
   let data = PairTargets.emptyData();
   let personnel = {employees:[]};
@@ -49,14 +49,16 @@
   function pairCard(entry, actions = false) {
     const state = PairTargets.status(entry);
     const metric = (target, actual, unit) => `<div class="metric"><span>${actual === undefined ? 'Цел' : 'Реално / цел'} · ${unit}</span><strong>${actual === undefined ? fmt(target) : fmt(actual)+' / '+fmt(target)}</strong></div>${actual === undefined ? '' : `<progress max="${target}" value="${Math.min(actual,target)}" aria-label="Изпълнение в ${unit}"></progress>`}`;
-    const reason = PairTargets.REASONS.find(item => item.key === entry.result?.reasonKey);
-    const cause = [reason ? escape(reason.label) : '', entry.result?.reasonText ? `<span translate="no">${escape(entry.result.reasonText)}</span>` : ''].filter(Boolean).join(' · ');
+    const explanation = entry.cancellation || entry.result;
+    const reason = (entry.cancellation ? PairTargets.CANCELLATION_REASONS : PairTargets.REASONS).find(item => item.key === explanation?.reasonKey);
+    const cause = [reason ? escape(reason.label) : '', explanation?.reasonText ? `<span translate="no">${escape(explanation.reasonText)}</span>` : ''].filter(Boolean).join(' · ');
     return `<article class="pair-card">
       <div class="card-top"><h3 translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</h3><span class="badge ${state}">${statusLabels[state]}</span></div>
       <div class="area-tags">${entry.areas.map(area => `<span class="badge">${areaLabels[area]} опаковка</span>`).join('')}</div>
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
-      ${state === 'missed' ? `<p class="cause"><strong>Причина:</strong> ${cause}</p>` : ''}
-      ${actions ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="delete" data-id="${escape(entry.id)}">Премахни</button>`}</div>` : ''}
+      ${state === 'missed' || state === 'cancelled' ? `<p class="cause"><strong>${state === 'cancelled' ? 'Причина за отмяната:' : 'Причина:'}</strong> ${cause}</p>` : ''}
+      ${entry.cancellation ? `<p class="muted">Отменена на: <time datetime="${escape(entry.cancellation.cancelledAt)}">${escape(new Date(entry.cancellation.cancelledAt).toLocaleString('bg-BG'))}</time></p>` : ''}
+      ${actions && !entry.cancellation ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="cancel" data-id="${escape(entry.id)}">Отмени</button>`}</div>` : ''}
     </article>`;
   }
   function render() {
@@ -71,7 +73,8 @@
     $('contextBadge').className = 'badge '+(isCurrent ? 'achieved' : 'pending');
     $('contextNote').classList.toggle('historical',!isCurrent);
     const scheduled = validScope();
-    const entries = selectedEntries();
+    const selected = selectedEntries();
+    const entries = selected.filter(entry => !entry.cancellation);
     const people = PairTargets.roster(personnel.employees,context.team);
     const used = new Set(entries.flatMap(entry => entry.members.map(person => person.id)));
     const available = people.filter(person => !used.has(person.id));
@@ -89,7 +92,7 @@
     $('rosterSummary').textContent = `Състав · ${rosterLoaded ? people.length+' човека' : 'изберете Personnel'}${rosterLoaded ? ' · '+available.length+' неразпределени' : ''}`;
     $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2;
-    $('pairsList').innerHTML = entries.map(entry => pairCard(entry,true)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
+    $('pairsList').innerHTML = selected.map(entry => pairCard(entry,true)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
   }
   function renderHistory() {
@@ -103,7 +106,7 @@
     $('historyList').innerHTML = Array.from(groups,([key,entries]) => {
       const first = entries[0];
       const count = state => entries.filter(entry => PairTargets.status(entry) === state).length;
-      return `<details class="history-group" data-scope="${escape(key)}" ${open.has(key) ? 'open' : ''}><summary>${fmtDate(first.date)} · Екип ${escape(first.team)} · ${ShiftSchedule.HOURS[first.shiftCode]}<span class="history-counts">${entries.length} двойки · ${count('achieved')} постигнати · ${count('missed')} непостигнати · ${count('pending')} без отчет</span></summary><button class="jump" data-action="view" data-id="${escape(first.id)}">Отвори смяната</button><div class="pair-grid">${entries.map(entry => pairCard(entry)).join('')}</div></details>`;
+      return `<details class="history-group" data-scope="${escape(key)}" ${open.has(key) ? 'open' : ''}><summary>${fmtDate(first.date)} · Екип ${escape(first.team)} · ${ShiftSchedule.HOURS[first.shiftCode]}<span class="history-counts">${entries.length} двойки · ${count('achieved')} постигнати · ${count('missed')} непостигнати · ${count('pending')} без отчет · ${count('cancelled')} отменени</span></summary><button class="jump" data-action="view" data-id="${escape(first.id)}">Отвори смяната</button><div class="pair-grid">${entries.map(entry => pairCard(entry)).join('')}</div></details>`;
     }).join('') || '<p class="empty">Няма записи за този месец.</p>';
   }
   function closeDialog() {
@@ -119,17 +122,26 @@
   }
   function openDialog(mode, entry = null) {
     if(busy || !pairsLoaded || !rosterLoaded) return;
+    if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
     const scope = entry || context;
     editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null};
     $('pairForm').reset();
     $('dialogError').textContent = '';
-    $('dialogTitle').textContent = mode === 'report' ? 'Отчет на двойката' : entry ? 'Промяна на двойката' : 'Нова двойка';
-    $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode === 'report' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
-    $('planFields').hidden = mode === 'report';
+    $('dialogTitle').textContent = mode === 'cancel' ? 'Отмяна на двойката' : mode === 'report' ? 'Отчет на двойката' : entry ? 'Промяна на двойката' : 'Нова двойка';
+    $('savePairBtn').textContent = mode === 'cancel' ? 'Отмени двойката' : 'Запази';
+    $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode !== 'plan' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
+    $('planFields').hidden = mode !== 'plan';
     $('reportFields').hidden = mode !== 'report';
-    ['memberOne','memberTwo','targetKg','targetCrates'].forEach(id => { $(id).disabled = mode === 'report'; $(id).required = mode !== 'report'; });
+    $('cancellationFields').hidden = mode !== 'cancel';
+    $('areaFields').hidden = mode === 'cancel';
+    ['areaAuto','areaManual'].forEach(id => { $(id).disabled = mode === 'cancel'; });
+    ['memberOne','memberTwo','targetKg','targetCrates'].forEach(id => { $(id).disabled = mode !== 'plan'; $(id).required = mode === 'plan'; });
     ['actualKg','actualCrates','reasonKey','reasonText'].forEach(id => { $(id).disabled = mode !== 'report'; $(id).required = ['actualKg','actualCrates'].includes(id) && mode === 'report'; });
-    const occupied = new Set(selectedEntries().filter(item => item.id !== entry?.id).flatMap(item => item.members.map(person => person.id)));
+    ['cancellationReason','cancellationText'].forEach(id => { $(id).disabled = mode !== 'cancel'; });
+    $('cancellationReason').required = mode === 'cancel';
+    $('cancellationText').required = false;
+    $('cancellationReason').innerHTML = '<option value="">Изберете причина</option>'+PairTargets.CANCELLATION_REASONS.map(reason => `<option value="${reason.key}">${reason.label}</option>`).join('');
+    const occupied = new Set(selectedEntries().filter(item => !item.cancellation && item.id !== entry?.id).flatMap(item => item.members.map(person => person.id)));
     const people = PairTargets.roster(personnel.employees,scope.team).filter(person => !occupied.has(person.id));
     (entry?.members || []).forEach(person => { if(!people.some(item => item.id === person.id)) people.push(person); });
     const options = '<option value="">Изберете човек</option>'+people.map(person => `<option translate="no" value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
@@ -200,30 +212,23 @@
     const edit = {...editing};
     const inputs = {memberIds:[$('memberOne').value,$('memberTwo').value],targetKg:$('targetKg').value,targetCrates:$('targetCrates').value,
       kg:$('actualKg').value,crates:$('actualCrates').value,reasonKey:$('reasonKey').value,reasonText:$('reasonText').value,
+      cancellationReason:$('cancellationReason').value,cancellationText:$('cancellationText').value,
       workAreas:[$('areaAuto').checked ? 'auto' : null,$('areaManual').checked ? 'manual' : null].filter(Boolean),now:new Date().toISOString()};
     const saved = await mutate(() => {
       if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
       const entry = data.entries.find(item => item.id === edit.id);
       if(edit.id && (!entry || JSON.stringify(entry) !== edit.original)) throw new Error('Двойката е променена след отваряне на формата. Отворете я отново.');
-      const next = edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+      const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
       return {...data,entries:edit.id ? data.entries.map(item => item.id === edit.id ? next : item) : [...data.entries,next]};
     },$('dialogError'));
     if(saved) closeDialog();
   });
-  $('pairsList').addEventListener('click', async event => {
+  $('pairsList').addEventListener('click', event => {
     const button = event.target.closest('button[data-action]');
     if(!button || busy) return;
     const entry = data.entries.find(item => item.id === button.dataset.id);
     if(!entry) return;
-    if(button.dataset.action !== 'delete') { openDialog(button.dataset.action === 'report' ? 'report' : 'plan',entry); return; }
-    if(!confirm('Да премахна ли тази неотчетена двойка? Хората ще могат да се разпределят отново.')) return;
-    const original = JSON.stringify(entry);
-    await mutate(() => {
-      const current = data.entries.find(item => item.id === entry.id);
-      if(!PairTargets.inScope(entry,context)) throw new Error('Двойката не е от избраната смяна.');
-      if(!current || current.result || JSON.stringify(current) !== original) throw new Error('Двойката вече е променена или отчетена.');
-      return {...data,entries:data.entries.filter(item => item.id !== entry.id)};
-    },$('pageError'));
+    openDialog(button.dataset.action === 'cancel' ? 'cancel' : button.dataset.action === 'report' ? 'report' : 'plan',entry);
   });
   $('historyList').addEventListener('click', event => {
     const button = event.target.closest('button[data-action="view"]');
@@ -259,6 +264,7 @@
   $('historyMonth').addEventListener('change',renderHistory);
   ['memberOne','memberTwo'].forEach(id => $(id).addEventListener('change',updateMemberOptions));
   ['actualKg','actualCrates'].forEach(id => $(id).addEventListener('input',updateResultPreview));
+  $('cancellationReason').addEventListener('change',() => { $('cancellationText').required = $('cancellationReason').value === 'other'; });
   $('closeDialogBtn').addEventListener('click',closeDialog);
   $('cancelDialogBtn').addEventListener('click',closeDialog);
   $('pairDialog').addEventListener('cancel',event => { event.preventDefault(); closeDialog(); });
