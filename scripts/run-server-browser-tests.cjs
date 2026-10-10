@@ -113,11 +113,12 @@ async function main() {
       await expect(admin.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
       await exerciseStatisticsPeriod({page:admin, expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
-        replaceSources:async () => {
-          for (const [kind, data] of Object.entries(changedSources())) hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+        replaceSources:async (documents = changedSources()) => {
+          for (const [kind, data] of Object.entries(documents)) hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
           await admin.locator('#statsFilesBtn').click();
           await admin.locator('#refreshBtn').click();
           await admin.locator('#pairStatsRefreshBtn').click();
+          await admin.locator('#statsFilesBtn').click();
         }
       });
       assert.deepEqual(errors, []); return;
