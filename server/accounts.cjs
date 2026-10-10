@@ -94,6 +94,14 @@ function accounts(store) {
       return {id};
     });
   }
-  return {create, login, session, update, remove, logout: token => db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(token)), list: () => db.prepare('SELECT id,username,role,active,permissions,task_supervisor,task_team FROM users WHERE deleted_at IS NULL ORDER BY username').all().map(publicUser)};
+  function logout(token) {
+    const current = session(token);
+    return store.transaction(() => {
+      const result = db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(token));
+      if (current) store.audit(current.user, 'logout', 'accounts');
+      return result;
+    });
+  }
+  return {create, login, session, update, remove, logout, list: () => db.prepare('SELECT id,username,role,active,permissions,task_supervisor,task_team FROM users WHERE deleted_at IS NULL ORDER BY username').all().map(publicUser)};
 }
 module.exports = {accounts};

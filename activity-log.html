@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Потребителска активност · Package Hub</title>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css">
+  <link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/activity-log.css">
+  <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+  <script src="js/activity-log.js" defer></script>
+</head>
+<body>
+  <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
+  <main class="account-wrap activity-page">
+    <a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
+    <header class="activity-heading"><div><p class="activity-eyebrow">Администраторски панел</p><h1>Потребителска активност</h1><p>Последни посещения и история на действията.</p></div><button id="refreshActivity" type="button">Опресни</button></header>
+    <p id="activityMessage" role="status" aria-live="polite"></p>
+    <section id="activityContent" hidden>
+      <form id="activityFilters" class="activity-filters">
+        <label>Потребител<select id="activityUser"><option value="">Всички потребители</option></select></label>
+        <label>Период<select id="activityPeriod"><option value="7">Последни 7 дни</option><option value="30">Последни 30 дни</option><option value="90">Последни 90 дни</option><option value="all">Цялата история</option></select></label>
+        <label>Действие<select id="activityAction"><option value="all">Всички действия</option><option value="visit">Посещения на страници</option><option value="login">Входове</option><option value="logout">Изходи</option><option value="changes">Промени и експорти</option></select></label>
+        <button type="submit">Покажи</button>
+      </form>
+      <details class="activity-visits" open><summary>Последно посещение по потребител</summary><p class="activity-hint">Последно отваряне на страница или вход, независимо от избрания период. Това не показва кой е онлайн.</p><div id="activityUsers" class="activity-users"></div></details>
+      <div class="activity-list-heading"><h2>История на действията</h2><span id="activityCount" role="status" aria-live="polite"></span></div>
+      <ol id="activityEvents" class="activity-events" aria-label="История на действията"></ol>
+      <p id="activityEmpty" class="activity-empty" hidden>Няма действия по тези критерии.</p>
+      <button id="moreActivity" type="button" hidden>Покажи по-стари</button>
+      <p class="activity-hint">Посещенията се записват от тази версия нататък. По-старите входове и промени са запазени. Автоматичното опресняване не е посещение. Журналът съдържа време, акаунт, действие и модул.</p>
+    </section>
+  </main>
+</body>
+</html>

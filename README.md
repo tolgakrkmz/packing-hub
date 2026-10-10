@@ -821,6 +821,36 @@ targets must be met for success. Pair output is never added to production totals
 Mixed packaging remains one report; actual hours and per-line quantities are not
 available. Reasons count reports, not downtime minutes.
 
+## Administrator activity log
+
+In server mode, **User activity** in the administrator navigation opens the
+account journal. Only administrators can access the page and its API. It shows
+the last successful sign-in or page visit for each account, including inactive
+and deleted accounts, and a newest-first history filtered by account, period
+and action. Load older records in pages of 50. Times use the viewing device's
+local timezone. Last visits are independent of the history period; they are
+not online status or time spent in the application.
+
+Successful page requests and explicit sign-outs are recorded from this version
+onwards. Existing sign-ins, saved changes, task actions, imports and exports
+remain visible. Background polling, event streams, static assets, HEAD requests
+and refused actions do not create visits. The log stores only timestamp,
+account identifier, action and module, with account names resolved from the
+existing account database. It does not store report bodies, attachment contents,
+passwords, tokens or IP addresses. The existing journal remains in the private
+SQLite database and its local backups; it is never a source fixture.
+
+No database format change or data import is needed. Older history cannot
+reconstruct past page visits. The offline file-based application does not
+collect account activity. Deploy the server and client together.
+
+Focused verification with fictional accounts and an isolated database:
+
+```sh
+node --test tests/server/activity.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --activity-only
+```
+
 ## Tests
 
 With Node.js 20 or newer:
