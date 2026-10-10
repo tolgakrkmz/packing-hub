@@ -74,9 +74,9 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
       await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/index.html');
       await assertMark();
       await expect(admin.locator('.server-bar .hub-language')).toHaveCount(1);
-      await expect(admin.locator('.server-links a')).toHaveCount(1);
+      await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveCount(1);
       if (['admin-panel','system-status','accounts','activity-log','data-import','production-import'].includes(name)) {
-        await expect(admin.locator('.server-links a')).toHaveAttribute('aria-current',name === 'admin-panel' ? 'page' : 'location');
+        await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('aria-current',name === 'admin-panel' ? 'page' : 'location');
       } else await expect(admin.locator('.server-links [aria-current]')).toHaveCount(0);
       for (const language of ['en', 'bg']) {
         await admin.locator(`[data-hub-language=${language}]`).click();
@@ -125,10 +125,11 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     await hub.auth.create(username, password, role);
     const page = await device(username, true);
     await expect(page.locator('.server-links a[href="/accounts.html"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/data-import.html"]')).toBeVisible();
+    await expect(page.locator('.server-links a[href="/data-import.html"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/admin-panel.html"]')).toBeVisible();
     await expect(page.locator('.server-links a[href="/tasks.html"]')).toHaveCount(0);
     await expect(page.locator('.server-bar #reportExportKind')).toHaveCount(0);
-    await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+    await openAdminModule(page,'data-import');
     await expect(page.locator('#reportExportKind')).toBeVisible();
     await expect(page.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(page.locator('.server-user')).toHaveText(username);

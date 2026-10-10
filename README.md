@@ -89,7 +89,93 @@ task changes, reconnection, returning to a tab and every 30 seconds while visibl
 The authenticated summary API returns only a count, without task details. A
 failed refresh hides the badge until the connection succeeds again.
 
-System browser notifications and Web Push subscriptions are not implemented.
+### Notifications on Android and iPhone
+
+Accounts have separate receiving flags for task assignment, changes/returns,
+reports/progress, review, approval/cancellation, upcoming deadlines and overdue
+work; new production and downtime reports and their corrections; pair changes;
+instructions; database/disk/backup/update warnings and recovery. Configure these
+in **Accounts → Notifications** for any role. Flags never grant module viewing
+or task action permissions. Admins inherit all receiving flags; operators and
+observers inherit task flags, with eligibility still constrained by task rights
+and assignment. Other categories require an explicit receiving flag. A user can
+turn off any permitted type in **Notifications → Settings**. Current rights are
+rechecked when listing the inbox and before push delivery.
+
+The toolbar bell opens a local inbox with unread count, read/all-read actions,
+links to authorized modules and paginated history. Rows retain 90 days, up to
+1,000 per account. Events committed before notification installation are not
+replayed; cursors and deadline markers survive restart. New reports, corrections
+and unchanged saves are distinguished. Task notices go to the responsible account
+and participants, report/progress to the assigner, and ready-for-review to
+reviewers. The action's author is excluded from task notices. Reminders run on the
+server every 30 seconds, 30 minutes before the deadline and once overdue; shifts
+keep their existing 30-minute reporting grace. Recurring instances are materialized
+without a browser. System component checks run every five minutes, notify on state
+changes including unknown state, and report recovery when all checks are OK.
+
+**Web Push is optional.** Android uses a supported browser. iPhone requires
+**iOS 16.4+**, **Add to Home Screen**, and opening from that icon. The app includes
+a standalone manifest and a notification-only service worker with no private
+page, data or photo caching. Device settings show unsupported, blocked,
+unconfigured, off and on states. Native permission is requested only after a
+button click. An already granted browser permission still needs explicit device
+opt-in after account revocation or a key change.
+
+The shared-design invitation appears after 30 visible seconds on a page, only
+when a permitted type is enabled, push is configured, no current subscription
+exists, and the device supports push or the iPhone installation instructions.
+It waits while editing a form or another dialog is open. **Later**, close and
+Escape postpone it seven days; **Do not remind me** stops invitations for that
+account on this browser. Settings can re-enable reminders, also after seven days.
+At most one invitation appears per browser-tab session. The deferral is shared
+across tabs and survives navigation/reload. A blocked browser permission leads
+to instructions, with no repeated native permission request. Browser storage
+restrictions still limit invitations in the loaded page, but cannot preserve a
+choice across reloads when both storage mechanisms are unavailable.
+
+Push requests have **zero message payload**. The service worker always displays
+only a generic Bulgarian/English notice and opens the authenticated inbox. No
+employee names, quantities, notes, photos, account IDs or task content are sent to
+push providers or displayed on the lock screen. Device endpoints and generated
+keys remain in private local storage. The queue combines pending notices per
+device, retries transient failures up to eight attempts with increasing delay,
+and removes 404/410 subscriptions. This is best-effort delivery; the local inbox
+remains the durable channel. Browser push providers necessarily process the device
+endpoint and the public application identification.
+
+Signing keys must remain stable and private. Generate a fresh local file without
+printing its key (the command refuses to overwrite an existing file):
+
+```sh
+node scripts/configure-push.cjs .env.push
+docker compose --env-file .env --env-file .env.push up -d --build
+```
+
+The file supplies `HUB_PUSH_PRIVATE_JWK` and a public project URI for
+`HUB_PUSH_SUBJECT`; it belongs only on the local deployment host and never in
+Git/Trello. Retain it across updates, with the private deployment settings. The
+HTTPS address must have a certificate trusted by the phone. The server needs
+outbound HTTPS to supported browser push hosts; opening the inbox also requires
+access to the application. Requests accept only known browser push domains,
+reject redirects, and time out after ten seconds. No inbound public port or
+cloud copy of the database is required. Session expiration alone does not remove
+a device subscription; explicit logout removes devices registered to that
+session, and account changes/deactivation/deletion remove all its subscriptions.
+An already queued provider notice can still arrive after logout; its text is
+always generic and access to the inbox remains authenticated.
+
+Deploy the server, HTML/CSS/JS and manifest together, preserving the local SQLite
+volume, live files and signing configuration. No employee or production-data
+migration is needed. Verify actual Android and iPhone delivery on the local HTTPS
+deployment; automated tests use fictional accounts and simulated providers and
+do not establish physical-device delivery.
+
+```sh
+node --test tests/notification-prompt.test.cjs tests/server/notifications.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --notifications-only
+```
+
 
 Task clocks use **Europe/Sofia** on the server, including daylight-saving changes.
 Night shifts retain their start date. An unreported shift task becomes

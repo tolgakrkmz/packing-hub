@@ -220,7 +220,7 @@ const HubServer = (() => {
     }
     tools.append(links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
-    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await send('/api/logout', 'POST', {}); location.assign('/login.html'); };
+    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login.html'); };
     session.append(identity, state, logout); bar.append(top, tools);
     document.body.prepend(bar);
     // The language switch is initialized by i18n after the injected server script.
@@ -229,7 +229,7 @@ const HubServer = (() => {
     eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
     eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
-    eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login.html'); });
+    eventSource.addEventListener('logout', () => { window.HubNotifications?.stopDevice(true).catch(() => {}); eventSource.close(); location.assign('/login.html'); });
     eventSource.addEventListener('version', event => {
       if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
         const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);

@@ -4,6 +4,7 @@
   if (typeof module === 'object' && module.exports) module.exports = model;
   else root.HubPermissions = model;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
+  const notifications = typeof module === 'object' && module.exports ? require('./notification-model.js') : globalThis.HubNotificationModel;
   const groups = [
     {title: 'Производство', module: 'production-log', view: 'canViewProduction', flags: {canViewProduction: 'Преглед на производството', canCreateProduction: 'Добавяне на производствени отчети', canEditProduction: 'Корекции и изтриване в производството', canManageProductionSettings: 'Промяна на производствената цел'}},
     {title: 'Престои', module: 'line-downtime', view: 'canViewDowntime', flags: {canViewDowntime: 'Преглед на престоите', canCreateDowntime: 'Добавяне на престои', canEditDowntime: 'Корекции и изтриване на престои', canManageDowntimeSettings: 'Управление на причините за престой'}},
@@ -16,6 +17,7 @@
     {title: 'Потребителска активност', module: 'activity-log', view: 'canViewActivity', flags: {canViewActivity: 'Преглед на потребителската активност'}},
     {title: 'Статус на системата', module: 'system-status', view: 'canViewSystemStatus', flags: {canViewSystemStatus: 'Преглед на статуса на системата', canBackupSystem: 'Създаване на архив'}},
     {title: 'Импорт / експорт', module: 'data-import', flags: {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети'}},
+    {title: 'Известия', module: 'notifications', view: 'canViewNotifications', flags: {canViewNotifications: 'Център за известия', ...Object.fromEntries(Object.values(notifications.types).map(type => [type.flag, type.label]))}},
     {title: 'Общи права за отчетите', flags: {canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети'}}
   ];
   const keys = groups.flatMap(group => Object.keys(group.flags));
@@ -24,7 +26,7 @@
     'line-downtime': {view: 'canViewDowntime', create: 'canCreateDowntime', edit: 'canEditDowntime', settings: 'canManageDowntimeSettings'},
     'pair-targets': {view: 'canViewPairs', create: 'canCreatePairs', edit: 'canEditPairs'}
   };
-  const shared = new Set(['canExportReports', 'canViewProduction', 'canViewDowntime', 'canViewPairs', 'canViewInstructions']);
+  const shared = new Set(['canViewNotifications', ...Object.entries(notifications.types).filter(([key]) => key.startsWith('task')).map(([, type]) => type.flag), 'canExportReports', 'canViewProduction', 'canViewDowntime', 'canViewPairs', 'canViewInstructions']);
   const creation = new Set(['canCreateReports', ...Object.values(reports).map(report => report.create)]);
   function initialRight(role, key) {
     if (key === 'canReportTasks') return false; // Inherited from the task profile below.

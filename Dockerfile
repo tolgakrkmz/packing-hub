@@ -1,7 +1,7 @@
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production HUB_DATABASE=/var/lib/package-hub/hub.sqlite
 WORKDIR /app
-COPY --chown=node:node *.html ./
+COPY --chown=node:node *.html manifest.webmanifest ./
 COPY --chown=node:node css ./css
 COPY --chown=node:node js ./js
 COPY --chown=node:node assets/package-hub-mark.svg ./assets/package-hub-mark.svg

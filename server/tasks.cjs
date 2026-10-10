@@ -273,6 +273,6 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     if (!owner) throw problem(400, 'INVALID_TASK_ASSIGNEE');
     return {shift: shift(date, owner.team), timezone};
   }
-  return {list, summary, create, change, shift, instant, localDate, currentShift, preview, photo, maintain};
+  return {tick: () => store.transaction(() => materialize(now())), list, summary, create, change, shift, instant, localDate, currentShift, preview, photo, maintain};
 }
 module.exports = {createTasks};

@@ -26,7 +26,9 @@ async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
   const status = process.argv.includes('--status-only') ? await statusFixture(dir) : null;
   let taskTime = Date.now();
-  const hub = createHubServer({filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, maintenanceSocket: status?.socketPath});
+  const notificationMode = process.argv.includes('--notifications-only');
+  const notificationKey = notificationMode ? require('node:crypto').generateKeyPairSync('ec', {namedCurve: 'prime256v1'}).privateKey.export({format: 'jwk'}) : null;
+  const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, maintenanceSocket: status?.socketPath});
   let browser;
   const errors = [];
   try {
@@ -56,6 +58,10 @@ async function main() {
     const admin = await device('demo-admin');
     if (process.argv.includes('--permissions-only')) {
       await exerciseModulePermissions({admin, hub, base, device, expect, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
+    if (notificationMode) {
+      await require('../tests/browser/notifications.cjs').exerciseNotifications({admin,hub,base,device,expect,screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); return;
     }
     if (process.argv.includes('--admin-panel-only')) {

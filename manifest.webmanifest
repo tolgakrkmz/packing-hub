@@ -1,0 +1,11 @@
+{
+  "id": "/",
+  "name": "Package Hub",
+  "short_name": "Package Hub",
+  "start_url": "/notifications.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#15171b",
+  "theme_color": "#15171b",
+  "icons": [{"src": "/assets/package-hub-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

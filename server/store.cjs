@@ -30,6 +30,11 @@ function validateData(kind, data) {
     if (kind === 'package-instructions' && Object.keys(data).some(key => ['__proto__', 'constructor', 'prototype'].includes(key))) throw new Error();
   } catch { throw problem(400, 'INVALID_DATA'); }
 }
+function reportChanges(before, after) {
+  const prior = new Map((before.entries || []).map(entry => [entry.id, entry]));
+  const next = new Map((after.entries || []).map(entry => [entry.id, entry]));
+  return {added: [...next.keys()].some(id => !prior.has(id)), changed: [...prior].some(([id, entry]) => !isDeepStrictEqual(entry, next.get(id))), content: !isDeepStrictEqual(before, after)};
+}
 function openStore(filename) {
   if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), {recursive: true, mode: 0o700});
   const db = new DatabaseSync(filename, {timeout: 5000});
@@ -49,6 +54,7 @@ function openStore(filename) {
   if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'deleted_at')) {
     db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER');
   }
+  if (!db.prepare('PRAGMA table_info(audit)').all().some(column => column.name === 'detail')) db.exec("ALTER TABLE audit ADD COLUMN detail TEXT NOT NULL DEFAULT '{}'");
   db.exec('PRAGMA user_version=4');
   for (const [kind, data] of Object.entries(defaults)) db.prepare('INSERT OR IGNORE INTO documents(kind,data) VALUES(?,?)').run(kind, JSON.stringify(data));
   db.prepare("INSERT OR IGNORE INTO files(path,kind) VALUES('data','directory'),('data/profiles','directory')").run();
@@ -57,7 +63,7 @@ function openStore(filename) {
     if (!row) throw problem(404, 'NOT_FOUND');
     return {data: JSON.parse(row.data), revision: row.revision};
   };
-  const audit = (user, action, module) => db.prepare('INSERT INTO audit(at,user_id,action,module) VALUES(?,?,?,?)').run(Date.now(), user?.id || null, action, module);
+  const audit = (user, action, module, detail = {}) => db.prepare('INSERT INTO audit(at,user_id,action,module,detail) VALUES(?,?,?,?,?)').run(Date.now(), user?.id || null, action, module, JSON.stringify(detail));
   const transaction = work => {
     db.exec('BEGIN IMMEDIATE');
     try { const result = work(); db.exec('COMMIT'); return result; }
@@ -116,7 +122,7 @@ function openStore(filename) {
         } catch { throw problem(400, 'INVALID_PAIR_CHANGE'); }
       }
       db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
-      audit(user, 'write', kind);
+      audit(user, 'write', kind, reportChanges(current.data, data));
       return get(kind);
     });
   }
@@ -207,4 +213,4 @@ function openStore(filename) {
   }
   return {db, get, put, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
-module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel};
+module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges};
