@@ -7,6 +7,7 @@
     return;
   }
   const modules = {index:'Начален екран', accounts:'Акаунти', 'activity-log':'Потребителска активност', 'system-status':'Статус на системата', 'production-log':'Тонаж и брак', 'line-downtime':'Престои', personnel:'Смени и хора', 'pair-targets':'Двойки и таргети', 'package-instructions':'Инструкции за опаковка', statistics:'Статистики', tasks:'Задачи', 'data-import':'Импорт / експорт', system:'Система'};
+  modules['admin-panel'] = 'Админ панел';
   const actions = {visit:'Отваряне на страница', login:'Вход в акаунта', logout:'Изход от акаунта', write:'Запазване на данни', export:'Експорт на отчет', import:'Импорт на данни', 'attachment-write':'Запазване на приложение', 'attachments-import':'Импорт на приложения', 'account-create':'Създаване на акаунт', 'account-update':'Промяна на акаунт', 'account-delete':'Изтриване на акаунт', 'task-create':'Създаване на задача', 'task-report':'Отчитане на задача', 'task-approve':'Одобряване на задача', 'task-return':'Връщане на задача', 'task-cancel':'Отмяна на задача', restore:'Възстановяване на архив'};
   Object.assign(actions, {'task-edit':'Промяна на задача', 'task-stop':'Спиране на повторение', 'task-reopen':'Повторно отваряне на задача', 'task-progress':'Напредък по задача'});
   const node = (tag, text, raw = false) => {

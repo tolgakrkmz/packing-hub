@@ -60,7 +60,7 @@
   font-size: 12px;
   font-weight: 650;
 }
-.server-links a[aria-current=page] { color: var(--amber); background: #f5a62312; border-color: #f5a62333; }
+.server-links a[aria-current] { color: var(--amber); background: #f5a62312; border-color: #f5a62333; }
 .server-bar .hub-language { margin: 0 0 0 auto; gap: 4px; }
 .server-bar .hub-language button { padding: 8px; background: var(--bg); color: var(--text-muted); }
 .server-bar .hub-language button[aria-pressed=true] { color: var(--amber); background: #f5a62312; border-color: #f5a62355; }

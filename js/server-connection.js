@@ -199,13 +199,16 @@ const HubServer = (() => {
       const link = document.createElement('a'); link.href = href; link.textContent = label;
       if (location.pathname === href.split('?')[0]) link.setAttribute('aria-current', 'page');
       links.append(link);
+      return link;
     };
-    if (boot.user.role === 'admin') addLink('/system-status.html', 'Статус на системата');
-    if (boot.user.role === 'admin') addLink('/accounts.html', 'Акаунти');
-    if (boot.user.role === 'admin') addLink('/activity-log.html', 'Потребителска активност');
-    if (can('canImportData') || can('canExportReports')) {
-      const current = location.pathname.split('/').pop().replace(/\.html$/, '');
-      const query = ['production-log', 'line-downtime', 'pair-targets'].includes(current) ? '?module=' + current : '';
+    const current = location.pathname.split('/').pop().replace(/\.html$/, '');
+    const reports = ['production-log', 'line-downtime', 'pair-targets'];
+    const module = reports.includes(current) ? current : new URLSearchParams(location.search).get('module');
+    const query = reports.includes(module) ? '?module=' + module : '';
+    if (boot.user.role === 'admin') {
+      const link = addLink('/admin-panel.html' + query, 'Админ панел');
+      if (['system-status','accounts','activity-log','data-import','production-import'].includes(current)) link.setAttribute('aria-current', 'location');
+    } else if (can('canImportData') || can('canExportReports')) {
       addLink('/data-import.html' + query, 'Импорт / експорт');
     }
     tools.append(links);

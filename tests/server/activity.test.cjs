@@ -23,16 +23,17 @@ async function setup(t) {
 }
 test('activity page and API are administrator-only, including direct access, revoked sessions and spoofed filters',async t => {
   const {hub,request,login} = await setup(t);
-  assert.equal((await request('/activity-log.html')).status,302);
+  for (const method of ['GET','HEAD']) for (const page of ['admin-panel','activity-log']) assert.equal((await request('/'+page+'.html',null,method)).status,302);
   assert.equal((await request('/api/admin/activity')).status,401);
   const admin = await login('admin');
   for (const role of ['operator','observer']) {
     const user = await login(role);
-    assert.equal((await request('/activity-log.html',user)).status,403);
+    for (const method of ['GET','HEAD']) for (const page of ['admin-panel','activity-log']) assert.equal((await request('/'+page+'.html',user,method)).status,403);
     assert.equal((await request('/api/admin/activity?userId='+user.user.id,user)).status,403);
     assert.equal((await request('/api/admin/activity',user,'POST',{})).status,403);
   }
   assert.equal((await request('/activity-log.html',admin)).status,200);
+  for (const method of ['GET','HEAD']) assert.equal((await request('/admin-panel.html',admin,method)).status,200);
   assert.equal((await request('/api/admin/activity',admin,'POST',{})).status,405);
   for (const query of ['userId=0','userId=1%20OR%201=1','limit=101','limit=-1','from=2&to=1','before=0','action=made-up','userId=1&userId=2','token=fictional']) assert.equal((await request('/api/admin/activity?'+query,admin)).status,400);
   await hub.auth.create('demo-second-admin',password,'admin');

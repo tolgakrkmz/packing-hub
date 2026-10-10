@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Админ панел · Package Hub</title>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css">
+  <link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/admin-panel.css">
+  <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+  <script src="js/admin-panel.js" defer></script>
+</head>
+<body>
+  <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
+  <main class="account-wrap admin-panel-page">
+    <a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
+    <header class="admin-panel-heading"><p class="admin-panel-eyebrow">Администраторски панел</p><h1>Админ панел</h1><p>Управление, проследяване и поддръжка на едно място.</p></header>
+    <p id="adminPanelMessage" role="status"></p>
+    <nav id="adminModules" class="admin-modules" aria-label="Администраторски модули" hidden>
+      <a class="admin-card admin-accounts" data-module="accounts" href="accounts.html" aria-labelledby="adminAccountsTitle"><span class="admin-card-icon" aria-hidden="true">◎</span><span class="admin-card-category">Управление</span><h2 id="adminAccountsTitle">Акаунти</h2><p>Потребители, роли и индивидуални права.</p><span class="admin-card-open" aria-hidden="true">Отвори <span>↗</span></span></a>
+      <a class="admin-card admin-activity" data-module="activity-log" href="activity-log.html" aria-labelledby="adminActivityTitle"><span class="admin-card-icon" aria-hidden="true">↺</span><span class="admin-card-category">Проследяване</span><h2 id="adminActivityTitle">Потребителска активност</h2><p>Последни посещения и история на действията.</p><span class="admin-card-open" aria-hidden="true">Отвори <span>↗</span></span></a>
+      <a class="admin-card admin-status" data-module="system-status" href="system-status.html" aria-labelledby="adminStatusTitle"><span class="admin-card-icon" aria-hidden="true">◷</span><span class="admin-card-category">Поддръжка</span><h2 id="adminStatusTitle">Статус на системата</h2><p>База, свободно място, архиви и обновяване.</p><span class="admin-card-open" aria-hidden="true">Отвори <span>↗</span></span></a>
+      <a id="adminTransfer" class="admin-card admin-transfer" data-module="data-import" href="data-import.html" aria-labelledby="adminTransferTitle" hidden><span class="admin-card-icon" aria-hidden="true">⇄</span><span class="admin-card-category">Прехвърляне</span><h2 id="adminTransferTitle">Импорт / експорт</h2><p id="adminTransferDescription">Сваляне на отчети и добавяне на проверени данни.</p><span class="admin-card-open" aria-hidden="true">Отвори <span>↗</span></span></a>
+    </nav>
+    <a class="admin-panel-back" href="index.html">← Към работните модули</a>
+  </main>
+</body>
+</html>

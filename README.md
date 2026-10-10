@@ -823,7 +823,7 @@ available. Reasons count reports, not downtime minutes.
 
 ## Administrator activity log
 
-In server mode, **User activity** in the administrator navigation opens the
+In server mode, **Admin panel → User activity** opens the
 account journal. Only administrators can access the page and its API. It shows
 the last successful sign-in or page visit for each account, including inactive
 and deleted accounts, and a newest-first history filtered by account, period
@@ -849,6 +849,26 @@ Focused verification with fictional accounts and an isolated database:
 ```sh
 node --test tests/server/activity.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --activity-only
+```
+
+## Administrator panel
+
+Administrators have one **Admin panel** link in the shared header. The panel
+contains cards for Accounts, User activity, System status, and Import / export.
+Additional administration modules belong here. Only administrators can open
+the panel, including through direct GET and HEAD requests. The existing module
+URLs remain available with their existing permissions. The header highlights
+the panel while visiting one of its modules.
+
+The transfer card appears only when the administrator has import or export
+permission. Its description reflects those permissions. Opening it from a
+report module via the panel keeps that module selected for export. Operators
+and observers retain their direct transfer link when permitted.
+
+Focused browser verification:
+
+```sh
+node scripts/run-server-browser-tests.cjs --headless --admin-panel-only
 ```
 
 ## Tests

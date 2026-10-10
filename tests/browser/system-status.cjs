@@ -29,11 +29,11 @@ async function statusFixture(directory) {
 async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, screenshotDir}) {
   await expect(admin.locator('.server-links a[href="/tasks.html"]')).toHaveCount(0);
   await expect(admin.locator('a[href="tasks.html"]')).toBeVisible();
-  await admin.getByRole('link', {name: 'Статус на системата', exact: true}).click();
+  await require('./admin-panel.cjs').openAdminModule(admin,'system-status');
   await expect(admin.locator('#summaryLabel')).toHaveText('Проверките са успешни');
   await expect(admin.locator('#databaseState')).toHaveText('Изправно');
   await expect(admin.locator('#backupState')).toHaveText('Изправно');
-  await expect(admin.locator('.server-links a[href="/system-status.html"]')).toHaveAttribute('aria-current', 'page');
+  await expect(admin.locator('.server-links a[href="/admin-panel.html"]')).toHaveAttribute('aria-current', 'location');
   // A restored page must check again before showing an old successful summary.
   await admin.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
   fixture.set(value => { value.backups.secondaryAvailable = false; });
