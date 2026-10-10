@@ -118,12 +118,22 @@ production folder and its live files remain independent.
 
 ### Task photos: Problem / Solution
 
-New assignments require one **Problem** photo. Each owner report requires a new
+New assignments have **Requires photos** checked by default. Leave it checked to
+require one **Problem** photo at assignment and a new **Solution / current state**
+photo with each owner report. Uncheck it for tasks that can be assigned, reported
+and completed without photos. The task card and history show this requirement.
+The server enforces the stored setting; reporting cannot disable it.
+
+For tasks requiring photos, each owner report requires a new
 **Solution / current state** photo, including not-done, not-applicable, blocked
 and in-progress reports. Participant progress notes remain text notes. Global
-completion requires the owner's photographed report and reviewer approval.
-Older tasks remain readable; old review reports without a photo must be returned
-for a new report before approval. Existing history and statistics are preserved.
+completion requires reviewer approval and, when selected, the owner's photographed
+report. Managers can change the setting when editing; enabling it requires an
+available Problem photo. The change is recorded in history. Recurring plans pass
+the setting to future shifts; already created shifts keep their own setting.
+Older tasks without this setting retain the previous photo requirement. Old
+review reports requiring a photo must be returned for a new report before approval.
+Existing history and statistics are preserved.
 
 Choose a local image or use **Take photo** on a phone. The browser re-encodes it
 as JPEG, removes camera metadata and limits it to 1280 pixels on the longest edge

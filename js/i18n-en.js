@@ -1245,6 +1245,8 @@ Object.assign(HUB_EN_MESSAGES, {
 Object.assign(HUB_EN_MESSAGES, {"Двойки": "Pairs", "Инструкции": "Instructions", "Статистика": "Statistics", "Редактирай задачи и проследявай изпълнението им.": "Edit tasks and track their progress."});
 Object.assign(HUB_EN_MESSAGES, {
   "Проблем — снимка": "Problem — photo", "Решение — снимка": "Solution — photo", "Проблем": "Problem", "Решение": "Solution",
+  "Изисква снимки": "Requires photos", "Снимки не се изискват": "Photos are not required",
+  "При включена отметка снимките „Проблем“ и „Решение“ са задължителни.": "When checked, Problem and Solution photos are required.",
   "Избери снимка": "Choose photo", "Снимай": "Take photo", "Избрана снимка": "Selected photo", "Отвори снимката": "Open photo", "Премахни избора": "Clear selection",
   "Добави снимка на проблема. При повторение тя се използва за всички смени.": "Add a photo of the problem. Recurring shifts share this photo.",
   "Избери нова снимка, за да замениш проблема. Предишната остава в историята.": "Choose a new problem photo. The previous photo stays in history.",

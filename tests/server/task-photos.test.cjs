@@ -40,6 +40,62 @@ test('creation and every report require an image; rejection rolls back task, his
   assert.throws(() => f.tasks.create(f.input({dueDate: '2020-01-01'}), f.admin), {code: 'INVALID_TASK_DATE'});
   assert.equal(f.count(), 2);
 });
+test('an explicit opt-out permits creation, owner reports and reviewed completion without images', async t => {
+  const f = await fixture(t, {freeBytes: () => 0});
+  const request = f.input({requiresPhotos: false, problemPhoto: null}), {id} = f.tasks.create(request, f.admin);
+  assert.deepEqual(f.tasks.create(request, f.admin), {id});
+  assert.equal(f.item(id).requiresPhotos, false); assert.equal(f.item(id).problemPhoto, null);
+  assert.throws(() => f.tasks.create({...request, requiresPhotos: true}, f.admin), {code: 'CONFLICT'});
+  const report = {requestId: randomUUID(), action: 'report', status: 'review', note: 'Fictional text-only result'};
+  const result = f.tasks.change(id, report, 1, f.owner);
+  assert.deepEqual(f.tasks.change(id, report, 1, f.owner), result);
+  f.tasks.change(id, {action: 'approve'}, 2, f.admin);
+  assert.equal(f.item(id).status, 'completed'); assert.equal(f.item(id).report.photo, null);
+  const shift = f.tasks.create(f.input({requiresPhotos: false, problemPhoto: null, kind: 'shift', repeat: 'once', from: '2026-12-01'}), f.admin).id;
+  f.report(shift, 'completed', {solutionPhoto: null});
+  assert.equal(f.item(shift).status, 'completed'); assert.equal(f.count(), 0);
+  const copy = path.join(f.dir, 'optional-snapshot.sqlite'); snapshot(f.filename, copy);
+  const restored = openStore(copy); t.after(() => restored.close());
+  assert.equal(createTasks(restored, {now: () => Date.parse('2026-12-02T23:00:00+02:00')}).list(f.admin).items.find(item => item.id === id).requiresPhotos, false);
+});
+test('only boolean assignment settings are accepted and reports cannot bypass the stored photo rule', async t => {
+  const f = await fixture(t);
+  for (const value of ['false', 0, null, {}, []]) assert.throws(() => f.tasks.create(f.input({requiresPhotos: value}), f.admin), {code: 'INVALID_TASK'});
+  assert.equal(f.tasks.list(f.admin).items.length, 0); assert.equal(f.count(), 0);
+  const {id} = f.tasks.create(f.input(), f.admin), before = f.item(id);
+  assert.equal(before.requiresPhotos, true);
+  assert.throws(() => f.report(id, 'review', {solutionPhoto: null, requiresPhotos: false}), {code: 'TASK_PHOTO_REQUIRED'});
+  assert.deepEqual(f.item(id), before);
+});
+test('manager edits preserve omitted settings, require evidence when enabling and record policy history', async t => {
+  const f = await fixture(t), {id} = f.tasks.create(f.input({requiresPhotos: false, problemPhoto: null}), f.admin);
+  const edit = extra => ({...f.input({problemPhoto: null}), action: 'edit', note: 'Fictional changed photo policy', ...extra});
+  f.tasks.change(id, edit({}), 1, f.admin);
+  assert.equal(f.item(id).requiresPhotos, false);
+  const before = f.item(id);
+  assert.throws(() => f.tasks.change(id, edit({requiresPhotos: true}), 2, f.admin), {code: 'TASK_PHOTO_REQUIRED'});
+  assert.deepEqual(f.item(id), before); assert.equal(f.count(), 0);
+  assert.throws(() => f.tasks.change(id, edit({requiresPhotos: true, problemPhoto: photo}), 2, f.owner), {code: 'FORBIDDEN'});
+  f.tasks.change(id, edit({requiresPhotos: true, problemPhoto: photo}), 2, f.admin);
+  assert.equal(f.item(id).requiresPhotos, true); assert.equal(f.item(id).events.at(-1).snapshot.requiresPhotos, true);
+  assert.throws(() => f.report(id, 'review', {solutionPhoto: null}), {code: 'TASK_PHOTO_REQUIRED'});
+  f.tasks.change(id, edit({requiresPhotos: false}), 3, f.admin);
+  f.report(id, 'review', {solutionPhoto: null}); f.tasks.change(id, {action: 'approve'}, 5, f.admin);
+  assert.equal(f.item(id).status, 'completed'); assert.equal(f.item(id).events[0].snapshot.requiresPhotos, false);
+  assert.equal(f.item(id).events[2].snapshot.requiresPhotos, true); assert.equal(f.item(id).events[3].snapshot.requiresPhotos, false);
+  assert.equal(f.item(id).problemPhoto.available, true);
+});
+test('recurring policy changes affect future shifts while created shifts keep their requirement', async t => {
+  const f = await fixture(t), {id} = f.tasks.create(f.input({kind: 'shift', repeat: 'every-shift', from: '2026-12-01', until: '2026-12-05'}), f.admin);
+  const first = f.tasks.list(f.admin).items[0]; assert.equal(first.requiresPhotos, true);
+  f.tasks.change(id, {...f.input({problemPhoto: null, requiresPhotos: false}), action: 'edit', note: 'Fictional future text-only shifts'}, 1, f.admin, true);
+  assert.equal(f.tasks.list(f.admin).schedules[0].requiresPhotos, false);
+  f.time('2026-12-02T23:00:00+02:00');
+  const future = f.tasks.list(f.admin).items.find(item => item.id !== first.id);
+  assert.equal(f.item(first.id).requiresPhotos, true); assert.equal(future.requiresPhotos, false);
+  assert.throws(() => f.report(first.id, 'completed', {solutionPhoto: null, requiresPhotos: false}), {code: 'TASK_PHOTO_REQUIRED'});
+  f.report(future.id, 'completed', {solutionPhoto: null}); assert.equal(f.item(future.id).status, 'completed');
+});
 test('JPEG validation rejects text, SVG, metadata, oversized dimensions, trailing bytes and truncated scans', () => {
   assert.deepEqual({width: jpeg(photo).width, height: jpeg(photo).height}, {width: 8, height: 8});
   const content = Buffer.from(photo, 'base64'), frame = content.indexOf(Buffer.from([0xff, 0xc0]));
@@ -117,9 +173,9 @@ test('recurring shifts share problem storage, retain earlier edited snapshots, a
 test('legacy tasks remain readable; review approval requires fresh evidence, and additive photo storage survives snapshots', async t => {
   const f = await fixture(t), {id} = f.tasks.create(f.input(), f.admin);
   const legacy = JSON.parse(f.store.db.prepare('SELECT data FROM task_items WHERE id=?').get(id).data);
-  delete legacy.problemPhoto; delete legacy.events[0].snapshot.problemPhoto; legacy.status = 'review'; legacy.report = {at: 1, status: 'review'};
+  delete legacy.requiresPhotos; delete legacy.problemPhoto; delete legacy.events[0].snapshot.problemPhoto; legacy.status = 'review'; legacy.report = {at: 1, status: 'review'};
   f.store.db.prepare('UPDATE task_items SET data=? WHERE id=?').run(JSON.stringify(legacy), id);
-  assert.equal(f.item(id).problemPhoto, null); assert.throws(() => f.tasks.change(id, {action: 'approve'}, 1, f.admin), {code: 'TASK_PHOTO_REQUIRED'});
+  assert.equal(f.item(id).requiresPhotos, true); assert.equal(f.item(id).problemPhoto, null); assert.throws(() => f.tasks.change(id, {action: 'approve', requiresPhotos: false}, 1, f.admin), {code: 'TASK_PHOTO_REQUIRED'});
   f.tasks.change(id, {action: 'return', note: 'Fictional request for photo'}, 1, f.admin); f.report(id);
   const copy = path.join(f.dir, 'snapshot.sqlite'); snapshot(f.filename, copy);
   const restored = openStore(copy); t.after(() => restored.close());
