@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
+const {openAdminModule} = require('./admin-panel.cjs');
 async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
   const operator = await hub.auth.create('demo-activity-operator','Fictional-password-123','operator');
   const inactive = await hub.auth.create('demo-activity-inactive','Fictional-password-123','observer');
@@ -18,7 +19,7 @@ async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
   const old = Date.now()-100*86400000;
   hub.store.db.prepare("INSERT INTO audit(at,user_id,action,module) VALUES(?,?,'visit','statistics')").run(old,inactive.id);
   await hub.auth.remove(inactive.id,user);
-  await admin.locator('.server-links a[href="/activity-log.html"]').click();
+  await openAdminModule(admin,'activity-log');
   await expect(admin.locator('h1')).toHaveText('Потребителска активност');
   await expect(admin.locator('#activityEvents .activity-event')).toHaveCount(50);
   await admin.locator('#activityUser').selectOption(String(operator.id));
@@ -54,7 +55,7 @@ async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
   await expect(admin.locator('#activityMessage')).toBeEmpty();
   await admin.locator('#activityUser').selectOption('');
   await admin.locator('#activityAction').selectOption('visit');
-  await expect(admin.locator('#activityEvents .activity-event')).toHaveCount(6);
+  await expect(admin.locator('#activityEvents .activity-event')).toHaveCount(7);
   for (const language of ['bg','en']) {
     await admin.locator('[data-hub-language='+language+']').click();
     await expect(admin.locator('h1')).toHaveText(language === 'en' ? 'User activity' : 'Потребителска активност');

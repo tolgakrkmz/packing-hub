@@ -1181,5 +1181,20 @@ Object.assign(HUB_EN_MESSAGES, {
   'Спиране на повторение': 'Recurrence stopped',
   'Повторно отваряне на задача': 'Task reopened',
   'Напредък по задача': 'Task progress',
-  'Възстановяване на архив': 'Backup restored'
+  'Възстановяване на архив': 'Backup restored',
+  'Админ панел': 'Admin panel',
+  'Отвори': 'Open',
+  'Управление, проследяване и поддръжка на едно място.': 'Management, activity and maintenance in one place.',
+  'Администраторски модули': 'Administrator modules',
+  'Управление': 'Management',
+  'Проследяване': 'Activity',
+  'Поддръжка': 'Maintenance',
+  'Прехвърляне': 'Transfer',
+  'Потребители, роли и индивидуални права.': 'Users, roles and individual permissions.',
+  'База, свободно място, архиви и обновяване.': 'Database, free space, backups and updates.',
+  'Сваляне на отчети и добавяне на проверени данни.': 'Download reports and add verified data.',
+  'Добавяне и проверка на данни.': 'Add and validate data.',
+  'Сваляне на текущите отчети.': 'Download current reports.',
+  'Към работните модули': 'Back to work modules',
+  'Админ панелът е достъпен само за администратори в сървърен режим.': 'The admin panel is available only to administrators in server mode.'
 });

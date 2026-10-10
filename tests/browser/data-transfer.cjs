@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {assertResponsive} = require('./responsive.cjs');
+const {openAdminModule} = require('./admin-panel.cjs');
 const password = 'Fictional-password-123';
 
 async function exerciseDataTransfer({admin, hub, base, device, expect, screenshotDir}) {
@@ -11,7 +12,7 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
   const before = kinds.map(kind => hub.store.get(kind).data);
   await admin.goto(base + '/production-log.html');
   await expect(admin.locator('.server-bar #reportExport, .server-bar #reportExportKind')).toHaveCount(0);
-  await admin.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+  await openAdminModule(admin,'data-import');
   await expect(admin.locator('[data-transfer-tab=export]')).toHaveAttribute('aria-selected', 'true');
   await expect(admin.locator('#reportExportKind')).toHaveValue('production-log');
   await admin.goto(base + '/data-import.html#constructor');
@@ -101,7 +102,8 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
       await expect(page.getByRole('link', {name:'Импорт / експорт', exact:true})).toHaveCount(0);
       assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 403);
     } else {
-      await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+      if (role === 'admin') await openAdminModule(page,'data-import');
+      else await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
       await page.goto(base + '/data-import.html#' + (canImport ? 'export' : 'modules'));
       await expect(page.locator(`[data-transfer-tab=${canExport ? 'export' : 'production'}]`)).toHaveAttribute('aria-selected', 'true');
       assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 200);

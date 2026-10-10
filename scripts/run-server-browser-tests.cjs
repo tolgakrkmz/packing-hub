@@ -11,6 +11,7 @@ const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs'
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
+const {openAdminModule,exerciseAdminPanel} = require('../tests/browser/admin-panel.cjs');
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
 const {statusFixture, exerciseSystemStatus} = require('../tests/browser/system-status.cjs');
 const {statisticsFixture, exerciseStatisticsPeriod, changedSources} = require('../tests/browser/statistics-period.cjs');
@@ -48,6 +49,11 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--admin-panel-only')) {
+      await exerciseAdminPanel({admin,hub,base,device,expect,
+        screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--activity-only')) {
       await require('../tests/browser/activity.cjs').exerciseActivity({admin,hub,base,device,expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
@@ -279,7 +285,7 @@ async function main() {
     for (const [kind, data] of Object.entries(migration.payload.documents)) fs.writeFileSync(path.join(migrationDir, kind + '.json'), JSON.stringify(data));
     for (const [index, file] of migration.payload.files.entries()) { const filename = path.join(migrationDir, file.path); fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, migration.contents[index]); }
     fs.writeFileSync(path.join(migrationDir, 'unrelated-demo.txt'), 'Fictional unrelated file, must be skipped.');
-    await admin.getByRole('link', {name: 'Импорт / експорт', exact: true}).click();
+    await openAdminModule(admin,'data-import');
     await admin.locator('[data-transfer-tab=modules]').click();
     await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Import & export'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
     await admin.locator('[data-hub-language=bg]').click();
@@ -387,7 +393,7 @@ async function main() {
     await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login.html');
     await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button').click();
     await expect(admin).toHaveURL(base + '/index.html');
-    await admin.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+    await openAdminModule(admin,'data-import');
     await expect(admin.locator('[data-transfer-tab=production]')).toBeHidden();
     await expect(admin.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(admin.locator('#reportExport')).toBeVisible();

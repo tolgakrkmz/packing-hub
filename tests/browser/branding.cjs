@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {assertResponsive} = require('./responsive.cjs');
+const {openAdminModule} = require('./admin-panel.cjs');
 const password = 'Fictional-password-123';
-const pages = ['index', 'tasks', 'accounts', 'data-import', 'production-import', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics'];
+const pages = ['index', 'tasks', 'admin-panel', 'accounts', 'activity-log', 'system-status', 'data-import', 'production-import', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics'];
 
 async function exerciseBranding({admin, hub, base, device, expect, screenshotDir}) {
   console.log('RUN branded login, error feedback and logout');
@@ -73,10 +74,10 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
       await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/index.html');
       await assertMark();
       await expect(admin.locator('.server-bar .hub-language')).toHaveCount(1);
-      if (['system-status', 'accounts', 'data-import', 'production-import'].includes(name)) {
-        const active = name === 'production-import' ? 'data-import' : name;
-        await expect(admin.locator(`.server-links a[href="/${active}.html"]`)).toHaveAttribute('aria-current', 'page');
-      } else await expect(admin.locator('.server-links [aria-current=page]')).toHaveCount(0);
+      await expect(admin.locator('.server-links a')).toHaveCount(1);
+      if (['admin-panel','system-status','accounts','activity-log','data-import','production-import'].includes(name)) {
+        await expect(admin.locator('.server-links a')).toHaveAttribute('aria-current',name === 'admin-panel' ? 'page' : 'location');
+      } else await expect(admin.locator('.server-links [aria-current]')).toHaveCount(0);
       for (const language of ['en', 'bg']) {
         await admin.locator(`[data-hub-language=${language}]`).click();
         await expect(admin.locator('.server-bar .hub-brand')).toHaveText('Package Hub');
@@ -104,7 +105,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   for (const kind of ['production-log', 'line-downtime', 'pair-targets']) {
     await admin.goto(`${base}/${kind}.html`);
     await expect(admin.locator('.server-bar #reportExport')).toHaveCount(0);
-    await admin.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+    await openAdminModule(admin,'data-import');
     await expect(admin.locator('#reportExportKind')).toHaveValue(kind);
     await expect(admin.locator('#reportExport')).toHaveAttribute('href', '/api/export/' + kind);
     await expect(admin.locator('#reportExport')).toHaveAttribute('download', kind + '.json');

@@ -1,0 +1,14 @@
+.admin-panel-page{max-width:1080px;font-family:inherit;font-size:14px;line-height:1.6}
+.admin-panel-heading{margin:10px 0 30px}.admin-panel-heading h1{margin:4px 0 10px;font-size:36px;letter-spacing:-.035em}.admin-panel-heading>p{margin:0;color:var(--text-muted)}
+.admin-panel-heading .admin-panel-eyebrow{color:var(--amber);font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+#adminPanelMessage:empty{display:none}
+.admin-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.admin-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:26px;border:1px solid var(--border);border-radius:16px;background:var(--panel);text-decoration:none;color:var(--text);transition:border-color .15s,background .15s}
+.admin-card-icon{display:grid;place-items:center;width:44px;height:44px;margin-bottom:22px;border-radius:11px;color:var(--admin-accent);background:var(--admin-shade);font-size:26px;font-weight:650}
+.admin-card-category{color:var(--admin-accent);font-size:11px;font-weight:650;letter-spacing:.04em}.admin-card h2{font-size:20px;line-height:1.3;letter-spacing:-.02em;margin:6px 0 9px}.admin-card p{font-size:13px;line-height:1.7;color:var(--text-muted);margin:0 0 24px}
+.admin-card-open{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:auto;padding-top:14px;border-top:1px solid var(--border);color:var(--admin-accent);font-size:12px;font-weight:650}.admin-card-open>span{font-size:20px;line-height:1}
+.admin-accounts{--admin-accent:var(--blue);--admin-shade:var(--blue-dark)}.admin-activity{--admin-accent:var(--teal);--admin-shade:var(--teal-dark)}.admin-status{--admin-accent:var(--amber);--admin-shade:var(--amber-dark)}.admin-transfer{--admin-accent:var(--purple);--admin-shade:var(--purple-dark)}
+.admin-panel-page .admin-panel-back{display:inline-flex;align-items:center;min-height:44px;margin-top:24px;font-size:13px;text-decoration:none;color:var(--text-muted)}
+.admin-panel-page a:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
+@media(hover:hover){.admin-card:hover{border-color:var(--admin-accent);background:var(--panel-2)}.admin-panel-back:hover{color:var(--text)}}
+@media(max-width:600px){.admin-modules{grid-template-columns:minmax(0,1fr);gap:14px}.admin-card{padding:22px}.admin-panel-heading{margin-bottom:24px}.admin-panel-heading h1{font-size:28px}.admin-card h2{font-size:19px}.admin-card-icon{margin-bottom:18px}}
