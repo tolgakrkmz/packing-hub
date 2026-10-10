@@ -1,5 +1,16 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Тонаж (т)": "Output (t)",
+  "Брак (т)": "Scrap (t)",
+  "Автоматична (т)": "Automatic (t)",
+  "Ръчна (т)": "Manual (t)",
+  "Тонове реално / цел": "Tonnes actual / target",
+  "Изпълнение · тонове": "Completion · tonnes",
+  "Реално (т)": "Actual (t)",
+  "Изпълнение по тонаж": "Output completion",
+  "т по отчетените двойки": "t for reported pairs",
+  "Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Количествата на двойките не се добавят към „Тонаж и брак“.": "Completion is based on the targets of reported pairs. Pending plans are shown separately. Pair quantities are not added to Production & Scrap.",
+
   "Администраторски панел": "Administration",
   "Потребители": "Users",
   "Профили, роли и права на едно място.": "Accounts, roles and permissions in one place.",

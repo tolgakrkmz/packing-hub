@@ -27,22 +27,19 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(month).toHaveValue('10');
   await expect(month.locator('option')).toHaveCount(12);
   for (const value of ['2024','2025','2026']) await expect(year.locator(`option[value="${value}"]`)).toHaveCount(1);
-  await expect(page.locator('#dashboardActual')).toHaveText('3,0 т');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,2 т');
-  await expect(page.locator('#dashboardBrakKg')).toHaveText('150 кг');
+  await expect(page.locator('#dashboardActual')).toHaveText('3,000 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,150 т');
   const refreshed = statisticsFixture();
   refreshed['production-log'].entries[0].brak = 170;
   await replaceSources(refreshed);
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,3 т');
-  await expect(page.locator('#dashboardBrakKg')).toHaveText('250 кг');
-  await expect(page.locator('#dashboardActual')).toHaveText('3,0 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,250 т');
+  await expect(page.locator('#dashboardActual')).toHaveText('3,000 т');
   await page.locator('[data-stats-tab=pairs]').click();
   await expect(page.locator('#pairStatsPeriod')).toContainText('2026');
-  await expect(page.locator('#pairStatsBody')).toContainText(/1\s?100\s*\/\s*1\s?000/);
+  await expect(page.locator('#pairStatsBody')).toContainText(/1,100\s*\/\s*1,000/);
   await month.selectOption('09');
-  await expect(page.locator('#dashboardActual')).toHaveText('1,0 т');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,0 т');
-  await expect(page.locator('#dashboardBrakKg')).toHaveText('0 кг');
+  await expect(page.locator('#dashboardActual')).toHaveText('1,000 т');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,000 т');
   await expect(page.locator('#pairStatsBody')).toContainText('Няма двойки за избрания месец и екип.');
   for (const tab of ['overview','production','downtime','workforce','pairs']) {
     await page.locator(`[data-stats-tab=${tab}]`).click();
@@ -59,14 +56,13 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await year.selectOption('2025');
   await expect(month).toHaveValue('09');
   await month.selectOption('10');
-  await expect(page.locator('#dashboardBrak')).toHaveText('0,9 т');
-  await expect(page.locator('#dashboardBrakKg')).toHaveText('900 кг');
+  await expect(page.locator('#dashboardBrak')).toHaveText('0,900 т');
   await month.selectOption('12');
   await expect(page.locator('#monthlyResultEmpty')).toBeVisible();
   await expect(page.locator('#dashboardBrak')).toBeHidden();
   await expect(page.locator('#wfSubtitle')).toHaveText('Декември 2025');
   await page.locator('[data-stats-tab=pairs]').click();
-  await expect(page.locator('#pairStatsBody')).toContainText('800 / 1');
+  await expect(page.locator('#pairStatsBody')).toContainText('0,800 / 1,000');
   await expect(page.locator('#pairStatsPeriod')).toContainText('декември 2025');
   await year.selectOption('2024');
   await month.selectOption('02');
@@ -79,7 +75,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(year).toHaveValue('2024');
   await page.locator('[data-stats-tab=production]').click();
   await expect(page.locator('#productionScopeTitle')).toContainText('Всички години');
-  await expect(page.locator('#kpiRow .val').first()).toHaveText('9,0 т');
+  await expect(page.locator('#kpiRow .val').first()).toHaveText('9,000 т');
   await page.locator('[data-view=month]').click();
   await year.selectOption('2026');
   await month.selectOption('11');
@@ -92,8 +88,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   for (const language of ['bg','en']) {
     await page.locator(`[data-hub-language=${language}]`).click();
     await month.selectOption('10');
-    await expect(page.locator('#dashboardBrak')).toHaveText(language === 'bg' ? '0,3 т' : '0,3 t');
-    await expect(page.locator('#dashboardBrakKg')).toHaveText(language === 'bg' ? '250 кг' : '250 kg');
+    await expect(page.locator('#dashboardBrak')).toHaveText(language === 'bg' ? '0,250 т' : '0,250 t');
     await expect(page.locator('.goal-scrap .goal-label')).toHaveText(language === 'bg' ? 'Общо брак' : 'Total scrap');
     for (const width of [390,1440]) {
       await page.setViewportSize({width, height:900});
@@ -136,7 +131,85 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(page.locator('#dashboardBrak')).toBeHidden();
   await expect(page.locator('#pairStatsPeriod')).toContainText('декември 2025');
   assert.equal(await page.locator('#pairStatsMonth, #lineShiftMonthSelect').count(), 0);
+  await exerciseStatisticsUnits({page, expect, replaceSources, screenshotDir});
   console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
+}
+
+async function exerciseStatisticsUnits({page, expect, replaceSources, screenshotDir}) {
+  console.log('RUN legacy kg reports displayed as tonnes, including 1 kg scrap and pair deficit');
+  const documents = statisticsFixture();
+  documents['production-log'].entries[0] = {...documents['production-log'].entries[0],
+    tonnage:1250, brak:1, breakdown:{autoKg:1000, autoCrates:40, manKg:250, manCrates:10}};
+  documents['production-log'].entries[1] = {...documents['production-log'].entries[1],
+    tonnage:1, brak:0, breakdown:{autoKg:1, autoCrates:1, manKg:0, manCrates:0}};
+  const pair = documents['pair-targets'].entries[0];
+  pair.targetKg = 1250;
+  pair.result = {...pair.result, kg:1249, reasonKey:'materials'};
+  await replaceSources(documents);
+  await page.locator('#yearSelect').selectOption('2026');
+  await page.locator('#dashboardMonthSelect').selectOption('10');
+
+  for (const language of ['bg','en']) {
+    const unit = language === 'bg' ? 'т' : 't';
+    await page.locator(`[data-hub-language=${language}]`).click();
+    await expect(page.locator('#dashboardActual')).toHaveText('1,251 ' + unit);
+    await expect(page.locator('#dashboardBrak')).toHaveText('0,001 ' + unit);
+    await expect(page.locator('#dashboardGoal')).toContainText('10,000 ' + unit);
+    await expect(page.locator('#dashboardRemaining')).toContainText('8,749 ' + unit);
+    await expect(page.locator('#dashboardBrakKg')).toHaveCount(0);
+
+    await page.locator('[data-stats-tab=production]').click();
+    await page.locator('[data-view=month]').click();
+    const october = page.locator('#tableContainer tbody tr').filter({hasText:language === 'bg' ? 'Окт' : 'Oct'});
+    await expect(october.locator('td').nth(1)).toHaveText('1,251 ' + unit);
+    await expect(october.locator('td').nth(2)).toHaveText('0,001 ' + unit);
+    await expect(october.locator('td').nth(4)).toHaveText('1,250');
+    await expect(october.locator('td').nth(5)).toHaveText('0,001');
+    await expect(page.locator('#tableContainer thead')).toContainText('(' + unit + ')');
+    await expect(page.locator('#kpiRow .val').nth(1)).toHaveText('0,001 ' + unit);
+    await expect(page.locator('#lineShiftContainer .total-row td').nth(1)).toHaveText('1,001 ' + unit);
+    await expect(page.locator('#lineShiftContainer .total-row td').nth(2)).toHaveText('0,250 ' + unit);
+    await expect(page.locator('#lineShiftContainer .total-row td').nth(3)).toHaveText('41');
+    await expect(page.locator('#lineShiftContainer .total-row td').nth(4)).toHaveText('10');
+    await expect(page.locator('#chartContainer')).toContainText('2,000' + unit);
+    await page.locator('[data-view=year]').click();
+    await expect(page.locator('#kpiRow .val').first()).toHaveText('7,251 ' + unit);
+    await expect(page.locator('#tableContainer .total-row td').nth(1)).toHaveText('7,251 ' + unit);
+    await page.locator('[data-view=month]').click();
+
+    await page.locator('[data-stats-tab=pairs]').click();
+    const cards = page.locator('.pair-stats-kpis .kpi-card');
+    await expect(cards.nth(2).locator('.sub')).toContainText('1,249 / 1,250 ' + unit);
+    await expect(cards.nth(2).locator('.val')).toHaveText('99,92%');
+    await expect(cards.nth(3).locator('.sub')).toContainText('44 / 40');
+    await expect(cards.nth(4).locator('.val')).toHaveText('0,001 ' + unit);
+    await expect(cards.nth(5).locator('.val')).toHaveText('1,249 ' + unit);
+    await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(2)).toHaveText('1,249 / 1,250');
+    await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(3)).toHaveText('44 / 40');
+    await expect(page.locator('#pairStatsBody details[data-group=analysis] > .pair-stats-scroll td').nth(4)).toHaveText('1,249');
+    await expect(page.locator('#pairStatsHint')).not.toContainText(/килограм|kilogram/i);
+
+    await page.locator('[data-stats-tab=workforce]').click();
+    await expect(page.locator('#wfMeasuredProductivity')).toHaveText('0,125 ' + unit);
+    await expect(page.locator('#wfMeasuredProductivitySub')).toContainText('1,251 ' + unit);
+    await expect(page.locator('#wfCalcTarget')).toHaveText('10,000 ' + unit);
+    await expect(page.locator('#wfCapacityChart')).toContainText('10,000 ' + unit);
+
+    for (const width of [390,1440]) {
+      await page.setViewportSize({width, height:900});
+      for (const tab of ['overview','production','pairs','downtime','workforce']) {
+        await page.locator(`[data-stats-tab=${tab}]`).click();
+        assert.doesNotMatch(await page.locator('.wrap').innerText(), /\bkg\b|(?:^|\s)кг(?:\s|$)|килограм/iu);
+        await assertResponsive(page, `Statistics tonnes ${language} ${width} ${tab}`);
+        if (screenshotDir && ['production','pairs','workforce'].includes(tab)) {
+          await page.screenshot({path:screenshotDir + `/statistics-tonnes-${tab}-${language}-${width}.png`, fullPage:true});
+        }
+      }
+      if (screenshotDir) await page.screenshot({path:screenshotDir + `/statistics-tonnes-${language}-${width}.png`, fullPage:true});
+    }
+  }
+  await page.locator('[data-hub-language=bg]').click();
+  console.log('PASS statistics tonnes, small amounts, unchanged crate counts/percentages and BG/EN layouts');
 }
 
 function changedSources() {
