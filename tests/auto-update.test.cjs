@@ -8,13 +8,19 @@ const updater = path.resolve(__dirname, '../scripts/auto-update.sh');
 const candidate = 'b'.repeat(40);
 
 // Execute the real shell workflow with isolated command boundaries and fictional IDs.
-function environment(t, scenario = 'success') {
+function environment(t, scenario = 'success', {push = false} = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-update-demo-'));
   t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
   const bin = path.join(dir, 'bin'), source = path.join(dir, 'source'), state = path.join(dir, 'state');
   for (const name of [bin, source, state]) fs.mkdirSync(name);
   const config = path.join(dir, 'config');
   fs.writeFileSync(config, `SOURCE_DIR='${source}'\nDEPLOY_DIR='${dir}/existing-project'\nBUILD_OVERRIDE='${dir}/build-override'\nCOMPOSE_PROJECT=demo-hub\nSTATE_DIR='${state}'\n`);
+  const deploy = path.join(dir, 'existing-project');
+  if (push) {
+    fs.mkdirSync(deploy);
+    fs.writeFileSync(path.join(deploy, '.env'), 'HUB_PUBLIC_ORIGIN=https://demo.example.test\n');
+    fs.writeFileSync(path.join(deploy, '.env.push'), 'HUB_PUSH_SUBJECT=https://example.test\n', {mode: 0o600});
+  }
   const maintenance = path.join(dir, 'maintenance-override');
   if (scenario === 'maintenance-enabled') {
     fs.writeFileSync(maintenance, 'Fictional Compose boundary');
@@ -69,7 +75,7 @@ process.exit(status);
   for (const command of ['git', 'docker', 'curl', 'flock', 'date']) fs.symlinkSync(mock, path.join(bin, command));
   const boundary = path.join(dir, 'boundary-state');
   return {
-    state, maintenance,
+    state, maintenance, deploy,
     run() {
       const result = spawnSync('bash', [updater], {encoding: 'utf8', env: {...process.env, PATH: bin + path.delimiter + process.env.PATH, HUB_UPDATE_CONFIG: config, DEMO_SCENARIO: scenario, DEMO_BOUNDARY_STATE: boundary}});
       return {...result, commands: JSON.parse(fs.readFileSync(boundary)).commands};
@@ -121,6 +127,20 @@ test('automatic deployment preserves the explicitly configured local maintenance
   assert.equal(result.status, 0, result.stderr);
   for (const args of result.commands.filter(args => args[0] === 'docker' && args[1] === 'compose')) assert.ok(args.includes(demo.maintenance));
 });
+
+for (const scenario of ['success', 'unhealthy']) {
+  test('local push configuration persists through automatic ' + (scenario === 'success' ? 'deployment' : 'rollback'), t => {
+    const demo = environment(t, scenario, {push: true}), result = demo.run();
+    assert.equal(result.status, scenario === 'success' ? 0 : 1, result.stderr);
+    const calls = result.commands.filter(args => args[0] === 'docker' && args[1] === 'compose');
+    assert.ok(calls.length > 0);
+    for (const args of calls) {
+      const paths = args.flatMap((value, index) => value === '--env-file' ? [args[index + 1]] : []);
+      assert.deepEqual(paths, [path.join(demo.deploy, '.env'), path.join(demo.deploy, '.env.push')]);
+      assert.ok(!args.some(value => value.includes('HUB_PUSH_SUBJECT=')));
+    }
+  });
+}
 
 for (const scenario of ['unhealthy', 'health-fails', 'volume-change', 'rollback-fails']) {
   test(scenario + ' restores the previous image and blocks repeat deployment of that revision', t => {

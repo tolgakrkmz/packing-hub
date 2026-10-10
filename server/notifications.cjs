@@ -146,6 +146,26 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     db.prepare('DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?').run(user.id, input.endpoint);
     return {ok: true};
   }
+  const testCooldown = new Map();
+  async function testDevice(input, user) {
+    access(user);
+    if (typeof input.endpoint !== 'string' || input.endpoint.length > 2048) throw problem(400, 'INVALID_DATA');
+    if (!transport.send) throw problem(503, 'PUSH_NOT_CONFIGURED');
+    if (!Object.keys(types).some(type => enabled(user, type))) throw problem(403, 'FORBIDDEN');
+    const current = db.prepare('SELECT id,endpoint FROM push_subscriptions WHERE user_id=? AND endpoint=? AND public_key=?').get(user.id, input.endpoint, transport.publicKey);
+    if (!current) throw problem(410, 'DEVICE_NOT_SUBSCRIBED');
+    for (const [id, until] of testCooldown) if (until <= now()) testCooldown.delete(id);
+    if (testCooldown.has(current.id)) throw problem(429, 'RATE_LIMITED');
+    testCooldown.set(current.id, now() + 30000);
+    let status = 0;
+    try { status = await transport.send(current.endpoint); } catch {}
+    if (status === 404 || status === 410) {
+      db.prepare('DELETE FROM push_subscriptions WHERE id=?').run(current.id);
+      throw problem(410, 'DEVICE_NOT_SUBSCRIBED');
+    }
+    if (status < 200 || status >= 300) throw problem(502, 'PUSH_DELIVERY_FAILED');
+    return {ok: true};
+  }
   function systemStatus(status) {
     const values = {systemDatabase: status.database?.state, systemDisk: status.disk?.state,
       systemBackup: [status.backups?.state, status.secondary?.state, status.manual?.state].includes('failed') ? 'failed' : [status.backups?.state, status.secondary?.state].includes('warning') ? 'warning' : status.backups?.state === 'ok' && status.secondary?.state === 'ok' ? 'ok' : 'unknown', systemUpdate: status.updates?.state};
@@ -192,6 +212,6 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   }
   function flush() { if (!working && !stopped) running = deliver(); return running; }
   async function close() { stopped = true; await running; }
-  return {sync, list, preferences, updatePreferences, read, device, subscribe, unsubscribe, systemStatus, flush, close};
+  return {sync, list, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
 }
 module.exports = {createNotifications};

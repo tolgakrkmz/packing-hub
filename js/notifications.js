@@ -30,6 +30,7 @@ window.HubNotifications = (() => {
     enable.hidden = subscribed || installFirst || permission() === 'denied';
     enable.disabled = busy || !supported || !preferences?.publicKey || !preferences.types.some(type => type.enabled);
     const disable = document.getElementById('notificationDisable'); disable.hidden = !subscribed; disable.disabled = busy;
+    const test = document.getElementById('notificationTest'); test.hidden = !subscribed; test.disabled = busy || !preferences.types.some(type => type.enabled);
     document.getElementById('notificationNever').checked = prompt.muted();
   }
   async function inspectDevice() {
@@ -168,6 +169,13 @@ window.HubNotifications = (() => {
     });
     document.getElementById('notificationEnable').addEventListener('click', () => enable().catch(() => { message.textContent = 'Включването не успя. Опитай по-късно от „Настройки“.'; }));
     document.getElementById('notificationDisable').addEventListener('click', () => stopDevice().catch(showError));
+    document.getElementById('notificationTest').addEventListener('click', async () => {
+      if (busy || !subscribed || !subscription) return;
+      busy = true; refreshDeviceUI();
+      try { await send('/test', 'POST', {endpoint: subscription.endpoint}); message.textContent = 'Тестовото известие е изпратено. Провери дали се появи на устройството.'; }
+      catch { message.textContent = 'Тестът не беше изпратен. Изчакай малко и провери дали известията са включени.'; }
+      finally { busy = false; refreshDeviceUI(); }
+    });
     document.getElementById('notificationNever').addEventListener('change', event => { if (event.target.checked) prompt.never(); else prompt.reset(); });
     HubServer.watch('notifications', load); setInterval(() => { if (!document.hidden) load(); }, 30000);
     await load();

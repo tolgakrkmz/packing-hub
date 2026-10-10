@@ -58,6 +58,8 @@ async function exerciseNotifications({admin, hub, base, device, expect, screensh
   await invited.goto(base + '/notifications.html#settings'); await expect(invited.locator('#notificationNever')).toBeChecked();
   await invited.locator('#notificationEnable').click(); await expect(invited.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са включени.');
   assert.equal(await invited.evaluate(() => window.demoRequests), 1); assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n, 1);
+  await invited.locator('#notificationTest').click(); await expect(invited.locator('#notificationMessage')).toContainText('Тестовото известие е изпратено.');
+  await invited.locator('[data-hub-language=en]').click(); await expect(invited.locator('#notificationTest')).toHaveText('Test notifications'); await invited.locator('[data-hub-language=bg]').click();
   await invited.locator('#notificationDisable').click(); await expect(invited.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са изключени.'); assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n, 0);
   // Blocked permission shows instructions and makes no native permission request.
   await invited.evaluate(() => { window.demoPermission = 'denied'; sessionStorage.clear(); localStorage.removeItem('portfolio-hub-notification-prompt:' + window.HUB_SERVER_BOOT.user.id); });

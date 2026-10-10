@@ -128,6 +128,8 @@ test('HTTP inbox routes enforce login, CSRF, module rights, methods and current 
   assert.equal((await request('/api/notifications/preferences', 'POST', {})).status, 405);
   const device = subscription('demo-http'); assert.equal((await request('/api/notifications/subscriptions', 'POST', device)).status, 201);
   assert.equal((await request('/api/notifications/device', 'POST', {endpoint: device.endpoint})).status, 200);
+  assert.equal((await request('/api/notifications/test', 'POST', {endpoint: device.endpoint}, {'X-CSRF-Token': ''})).status, 403);
+  assert.equal((await request('/api/notifications/test', 'GET')).status, 405);
   const publicWorker = await fetch(base + '/js/notification-worker.js'); assert.equal(publicWorker.headers.get('service-worker-allowed'), '/');
   assert.equal((await fetch(base + '/manifest.webmanifest')).headers.get('content-type'), 'application/manifest+json; charset=utf-8');
   await hub.auth.update(login.user.id, {permissions: {canViewNotifications: false}}, login.user);
@@ -170,4 +172,22 @@ test('device inspection binds an existing opt-in to the current login without re
   assert.equal(s.inbox.device({endpoint: device.endpoint}, s.viewer, digest(next.token)).subscribed, false);
   assert.equal(s.inbox.device({endpoint: device.endpoint}, s.admin, digest(next.token)).subscribed, true);
   s.auth.logout(next.token); assert.equal(s.inbox.device({endpoint: device.endpoint}, s.admin, digest(first.token)).subscribed, false);
+});
+test('device test sends only to an owned allowed device, throttles retries and creates no production or inbox records', async t => {
+  let status = 201, sent = 0;
+  const s = await model(t, {push: pushConfig(async () => { sent++; return {status}; })}), device = subscription('demo-test');
+  const other = await s.auth.create('demo-test-other', password, 'admin');
+  s.inbox.subscribe(device, s.admin, 'demo-session');
+  await assert.rejects(s.inbox.testDevice({endpoint: device.endpoint}, other), {code: 'DEVICE_NOT_SUBSCRIBED'});
+  assert.equal(sent, 0);
+  assert.deepEqual(await s.inbox.testDevice({endpoint: device.endpoint}, s.admin), {ok: true});
+  await assert.rejects(s.inbox.testDevice({endpoint: device.endpoint}, s.admin), {code: 'RATE_LIMITED'});
+  assert.equal(sent, 1); assert.equal(s.inbox.list(s.admin).count, 0); assert.equal(s.store.get('production-log').data.entries.length, 0);
+  s.time('2026-10-10T12:01:00+03:00'); status = 410;
+  await assert.rejects(s.inbox.testDevice({endpoint: device.endpoint}, s.admin), {code: 'DEVICE_NOT_SUBSCRIBED'});
+  assert.equal(s.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n, 0);
+  s.inbox.subscribe(device, s.admin, 'demo-session'); status = 503;
+  await assert.rejects(s.inbox.testDevice({endpoint: device.endpoint}, s.admin), {code: 'PUSH_DELIVERY_FAILED'});
+  s.inbox.updatePreferences(Object.fromEntries(s.inbox.preferences(s.admin).types.map(type => [type.key, false])), s.admin);
+  await assert.rejects(s.inbox.testDevice({endpoint: device.endpoint}, s.admin), {code: 'FORBIDDEN'});
 });

@@ -168,7 +168,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           const user = authorized('canViewNotifications');
           if (pathname === '/api/notifications' && request.method === 'GET') { syncNotifications(); return json(response, 200, notifications.list(user, url.searchParams.get('before'))); }
           if (pathname === '/api/notifications/preferences' && request.method === 'GET') return json(response, 200, notifications.preferences(user));
-          const methods = {'/api/notifications/preferences': 'PATCH', '/api/notifications/read': 'POST', '/api/notifications/device': 'POST', '/api/notifications/subscriptions': 'POST', '/api/notifications/unsubscribe': 'POST'};
+          const methods = {'/api/notifications/preferences': 'PATCH', '/api/notifications/read': 'POST', '/api/notifications/device': 'POST', '/api/notifications/subscriptions': 'POST', '/api/notifications/unsubscribe': 'POST', '/api/notifications/test': 'POST'};
           if (!methods[pathname]) throw problem(404, 'NOT_FOUND');
           if (request.method !== methods[pathname]) throw problem(405, 'METHOD_REJECTED');
           const input = await jsonBody(request, 4096), fresh = authorized('canViewNotifications');
@@ -176,6 +176,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           if (pathname.endsWith('/read')) return json(response, 200, notifications.read(input, fresh));
           if (pathname.endsWith('/device')) return json(response, 200, notifications.device(input, fresh, crypto.createHash('sha256').update(token).digest('hex')));
           if (pathname.endsWith('/unsubscribe')) return json(response, 200, notifications.unsubscribe(input, fresh));
+          if (pathname.endsWith('/test')) { const result = await notifications.testDevice(input, fresh); authorized('canViewNotifications'); return json(response, 200, result); }
           return json(response, 201, notifications.subscribe(input, fresh, crypto.createHash('sha256').update(token).digest('hex')));
         }
         if (pathname === '/api/tasks/summary') {

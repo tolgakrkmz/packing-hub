@@ -122,6 +122,11 @@ unconfigured, off and on states. Native permission is requested only after a
 button click. An already granted browser permission still needs explicit device
 opt-in after account revocation or a key change.
 
+After enabling a device, **Test notifications** sends a payload-free notice only
+to that owned device, at most once per 30 seconds. It does not create tasks,
+production reports or inbox rows. Provider acceptance is not proof of delivery;
+confirm the notice on the phone, including with its screen locked, and open it.
+
 The shared-design invitation appears after 30 visible seconds on a page, only
 when a permitted type is enabled, push is configured, no current subscription
 exists, and the device supports push or the iPhone installation instructions.
@@ -152,9 +157,13 @@ node scripts/configure-push.cjs .env.push
 docker compose --env-file .env --env-file .env.push up -d --build
 ```
 
-The file supplies `HUB_PUSH_PRIVATE_JWK` and a public project URI for
+Run these commands in the existing Compose deployment directory. The file supplies `HUB_PUSH_PRIVATE_JWK` and a public project URI for
 `HUB_PUSH_SUBJECT`; it belongs only on the local deployment host and never in
-Git/Trello. Retain it across updates, with the private deployment settings. The
+Git/Trello. Retain it across updates, with the private deployment settings. Manual
+Compose commands must load both files as above. The current auto-updater and its
+installer also load `.env.push` when present in the deployment directory; rerun
+the installer from reviewed `main` to update an older installed script. This
+release changes `compose.yaml`, so the first deployment is manual. The
 HTTPS address must have a certificate trusted by the phone. The server needs
 outbound HTTPS to supported browser push hosts; opening the inbox also requires
 access to the application. Requests accept only known browser push domains,
