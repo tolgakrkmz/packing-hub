@@ -1,8 +1,9 @@
 /* Task text and identities stay out of browser persistence and translation. */
 (() => {
-  const $ = id => document.getElementById(id), admin = typeof HubServer !== 'undefined' && HubServer.user.role === 'admin';
+  const $ = id => document.getElementById(id), admin = typeof HubServer !== 'undefined' && HubServer.can('canManageTasks');
   if (typeof HubServer === 'undefined') { $('taskMessage').textContent = 'Задачите са достъпни в сървърната версия след вход с личен акаунт.'; $('taskContent').hidden = true; return; }
-  const supervisor = HubServer.user.role === 'operator' && HubServer.user.taskSupervisor, reader = !admin && !supervisor;
+  const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
+  const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
   let state, view = 'shift', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, previewSequence = 0;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
@@ -69,8 +70,8 @@
     else {
       const final = ['completed', 'cancelled'].includes(item.status);
       if (supervisor && item.owner.id === HubServer.user.id && !final && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Отчети', () => openAction(item, 'report'), ''));
-      if (supervisor && item.kind === 'global' && !final) actions.append(button('Добави напредък', () => openAction(item, 'progress')));
-      if (admin && item.status === 'review') actions.append(button('Потвърди приключване', () => openAction(item, 'approve'), ''), button('Върни за работа', () => openAction(item, 'return')));
+      if (supervisor && item.kind === 'global' && !final && (item.owner.id === HubServer.user.id || item.participants.some(person => person.id === HubServer.user.id))) actions.append(button('Добави напредък', () => openAction(item, 'progress')));
+      if (reviewer && item.status === 'review') actions.append(button('Потвърди приключване', () => openAction(item, 'approve'), ''), button('Върни за работа', () => openAction(item, 'return')));
       if (admin && !final) {
         if (item.kind === 'global' || state.now < item.due && !item.report) actions.append(button('Промени', () => openEditor(item)));
         actions.append(button('Отмени', () => openAction(item, 'cancel')));
@@ -100,7 +101,7 @@
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
       if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
-      $('taskSubtitle').textContent = admin ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
+      $('taskSubtitle').textContent = reviewer ? assigner ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : 'Следи отчетите и потвърждавай решените проблеми.' : admin ? 'Редактирай задачи и проследявай изпълнението им.' : assigner ? 'Възлагай сменни и глобални задачи и проследявай изпълнението им.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
       render();
     } catch (error) { $('taskMessage').textContent = error.message; }
   }
@@ -122,7 +123,7 @@
     } else ++previewSequence;
   }
   function openEditor(item = null, recurring = false) {
-    editing = item ? {item, recurring} : null; creationKey = null; $('taskForm').reset(); $('editorFeedback').textContent = state.supervisors.length ? '' : 'В „Акаунти“ включи прегледа на задачи, обозначи началник смяна и избери екип.';
+    editing = item ? {item, recurring} : null; creationKey = null; $('taskForm').reset(); $('editorFeedback').textContent = state.supervisors.length ? '' : 'Няма активни началници смяна с право за преглед. Настрой ги в „Акаунти“ с право за отчитане и избран екип.';
     $('editorTitle').textContent = item ? recurring ? 'Промени бъдещите задачи' : 'Промени задача' : 'Възложи задача'; $('saveTask').textContent = item ? 'Запази' : 'Възложи';
     $('taskKind').value = item?.kind || 'shift'; $('taskKind').disabled = !!item; $('taskRepeat').value = recurring ? 'every-shift' : 'once'; $('taskRepeat').disabled = !!item;
     $('taskFrom').disabled = !!item; $('taskUntil').disabled = !!item; $('editReasonLabel').hidden = !item; $('editReason').required = !!item;
@@ -162,7 +163,7 @@
   for (const control of document.querySelectorAll('[data-close]')) control.addEventListener('click', () => { if (!busy) $(control.dataset.close).close(); });
   for (const id of dialogs) $(id).addEventListener('cancel', event => { if (busy) event.preventDefault(); });
   for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom']) $(id).addEventListener('change', editorFields);
-  $('newTask').hidden = !admin; $('newTask').addEventListener('click', () => { if (state) openEditor(); }); $('ownerFilterLabel').hidden = supervisor;
+  $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
   for (const id of ['ownerFilter', 'taskSearch', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', render);
   $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });

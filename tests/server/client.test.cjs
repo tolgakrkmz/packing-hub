@@ -8,7 +8,8 @@ function client() {
   let loaded, events, fetchData = async () => response(1);
   const element = () => ({append() {}, setAttribute() {}, addEventListener() {}, hidden: false});
   const context = vm.createContext({
-    window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer'}, csrf: 'fictional-csrf', version: 'demo-version'}},
+    HubPermissions: require('../../js/permission-model.js'),
+    window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}},
     location: {pathname: '/production-log.html'},
     document: {addEventListener: (_, callback) => { loaded = callback; }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },

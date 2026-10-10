@@ -77,3 +77,10 @@
   .account-actions button[type=submit]{width:100%}
   .account-actions .account-danger{width:100%}
 }
+
+.account-permission-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.account-permission-module{min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.account-permission-module>summary{display:flex;justify-content:space-between;gap:12px;padding:12px;cursor:pointer;font-weight:650;min-height:44px}
+.account-permission-module>summary small{color:var(--text-muted);font-variant-numeric:tabular-nums;font-weight:400}
+.account-permission-module .account-permission-grid{grid-template-columns:minmax(0,1fr);padding:0 10px 10px}
+@media(max-width:600px){.account-permission-modules{grid-template-columns:minmax(0,1fr)}}

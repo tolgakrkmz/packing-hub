@@ -10,6 +10,8 @@ const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
+const {exerciseModulePermissions} = require('../tests/browser/module-permissions.cjs');
+const {exerciseTaskAssignment} = require('../tests/browser/task-assignment.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
 const {openAdminModule,exerciseAdminPanel} = require('../tests/browser/admin-panel.cjs');
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
@@ -49,6 +51,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--permissions-only')) {
+      await exerciseModulePermissions({admin, hub, base, device, expect, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--admin-panel-only')) {
       await exerciseAdminPanel({admin,hub,base,device,expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
@@ -128,11 +134,16 @@ async function main() {
       await exerciseAccountDeletion({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); console.log('PASS account deletion browser workflow'); return;
     }
+    if (process.argv.includes('--task-assignment-only')) {
+      await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--tasks-only')) {
       await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;
     }
-    await admin.getByRole('link', {name: 'Акаунти', exact: true}).click();
+    await openAdminModule(admin,'accounts');
     for (const [username, role] of [['demo-operator', 'operator'], ['demo-observer', 'observer']]) {
       await admin.locator('#newAccountButton').click();
       await admin.locator('#accountUsername').fill(username); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption(role); await admin.locator('#accountForm button[type=submit]').click();
@@ -153,7 +164,7 @@ async function main() {
     const operatorForm = admin.locator(`.account-card[data-id="${operatorId}"]`);
     await operatorForm.locator('..').locator('summary').first().click();
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeChecked();
-    await expect(operatorForm.locator('[data-permission=canImportData]')).toBeDisabled();
+    await expect(operatorForm.locator('[data-permission=canImportData]')).toBeEnabled();
     await operatorForm.locator('[data-permission=canEditReports]').check();
     await operatorForm.locator('button[type=submit]').click();
     await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
@@ -164,7 +175,7 @@ async function main() {
     await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
     assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {});
     await operatorForm.locator('select[aria-label="Роля"]').selectOption('observer');
-    await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeDisabled();
+    await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeEnabled();
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).not.toBeChecked();
     await operatorForm.locator('select[aria-label="Роля"]').selectOption('operator');
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeChecked();
@@ -360,7 +371,7 @@ async function main() {
     await admin.locator('#accountForm [data-permission=canExportReports]').uncheck();
     await admin.locator('#accountForm [data-permission=canCreateReports]').uncheck();
     await admin.locator('#accountForm [data-permission=canEditReports]').check();
-    await expect(admin.locator('#accountForm [data-permission=canImportData]')).toBeDisabled();
+    await expect(admin.locator('#accountForm [data-permission=canImportData]')).toBeEnabled();
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
     const limited = await device('demo-permissions', true);
     await limited.goto(base + '/production-log.html'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
@@ -380,7 +391,7 @@ async function main() {
     await expect(limited).toHaveURL(base + '/index.html');
     await limited.goto(base + '/production-log.html'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
     await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
-    await limited.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+    await openAdminModule(limited, 'data-import');
     const downloadPromise = limited.waitForEvent('download'); await limited.locator('#reportExport').click(); const download = await downloadPromise;
     assert.equal(download.suggestedFilename(), 'production-log.json'); const chunks = []; for await (const chunk of await download.createReadStream()) chunks.push(chunk);
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), hub.store.get('production-log').data);
@@ -403,6 +414,8 @@ async function main() {
     console.log('RUN shift and global tasks, approvals, missed reports and responsive task screens');
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
     await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
+    await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
+    await exerciseModulePermissions({admin, hub, base, device, expect, screenshotDir});
     console.log('PASS shift and global tasks, approvals, missed reports and responsive task screens');
     console.log('RUN account deletion, confirmation, retry, independent drafts and live logout');
     await exerciseAccountDeletion({admin, hub, base, device, expect});

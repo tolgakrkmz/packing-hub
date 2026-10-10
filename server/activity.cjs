@@ -1,3 +1,4 @@
+const {can} = require('./permissions.cjs');
 const {problem} = require('./store.cjs');
 
 // Read the existing metadata journal; report bodies and credentials never enter this view.
@@ -5,7 +6,7 @@ function createActivity(store) {
   const {db} = store;
   db.exec('CREATE INDEX IF NOT EXISTS audit_user_id ON audit(user_id,id DESC); CREATE INDEX IF NOT EXISTS audit_at ON audit(at)');
   function list(params, user) {
-    if (user?.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canViewActivity')) throw problem(403, 'FORBIDDEN');
     const allowed = ['userId', 'from', 'to', 'before', 'limit', 'action'];
     if ([...params.keys()].some(key => !allowed.includes(key) || params.getAll(key).length !== 1)) throw problem(400, 'INVALID_ACTIVITY_FILTER');
     const number = (key, fallback) => {

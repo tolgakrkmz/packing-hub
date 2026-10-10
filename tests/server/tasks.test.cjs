@@ -4,6 +4,7 @@ const {randomUUID} = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const http = require('node:http');
 const {createHubServer} = require('../../server/server.cjs');
 const {openStore} = require('../../server/store.cjs');
 const {accounts} = require('../../server/accounts.cjs');
@@ -65,7 +66,7 @@ test('task badges count only work awaiting the account, and expose no task conte
   assert.equal((await s.request('/api/tasks/summary', s.chief)).status, 401);
   assert.equal((await s.request('/api/tasks/summary', await s.login('demo-chief-a'))).status, 403);
 });
-test('task viewing defaults to admin and supervisors; admin alone assigns; each supervisor sees only their assignments', async t => {
+test('task viewing defaults to admin and supervisors; only admin assigns by default; supervisors see their assignments', async t => {
   const s = await setup(t), operator = await s.login('demo-operator'), observer = await s.login('demo-observer');
   for (const user of [operator, observer]) {
     for (const route of ['/tasks.html', '/api/tasks']) assert.equal((await s.request(route, user)).status, 403);
@@ -78,6 +79,94 @@ test('task viewing defaults to admin and supervisors; admin alone assigns; each 
   assert.equal((await s.change(id, s.chief, {action: 'cancel', note: 'Fictional cancellation'})).status, 403);
   assert.equal((await s.request('/api/tasks', s.chief, 'POST', s.payload())).status, 403);
   for (const route of ['/api/data/tasks', '/api/export/tasks']) assert.equal((await s.request(route, s.chief)).status, 404);
+});
+test('explicit assignment grants shift, global and recurring creation and preview without administrative powers', async t => {
+  const s = await setup(t);
+  for (const role of ['operator', 'observer']) {
+    const original = await s.login('demo-' + role);
+    assert.equal(original.user.permissions.canAssignTasks, false);
+    assert.equal((await s.request('/api/accounts/' + original.user.id, s.admin, 'PATCH', {permissions: {canAssignTasks: true}})).status, 200);
+    assert.equal((await s.request('/api/tasks', original)).status, 401);
+    const user = await s.login('demo-' + role);
+    assert.equal(user.user.role, role); assert.equal(user.user.taskSupervisor, false);
+    assert.equal(user.user.permissions.canAssignTasks, true); assert.equal(user.user.permissions.canViewTasks, true);
+    assert.equal((await s.request('/tasks.html', user)).status, 200);
+    const roster = (await s.list(user)).supervisors;
+    assert.ok(roster.some(person => person.id === s.chief.user.id));
+    for (const person of roster) assert.deepEqual(Object.keys(person).sort(), ['id', 'team', 'username']);
+    assert.equal((await s.request('/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id, user)).status, 200);
+    const ids = [];
+    for (const extra of [{}, {kind: 'global', dueDate: '2026-12-03', dueTime: '17:00', participantIds: [s.other.user.id]}, {repeat: 'every-shift', until: '2026-12-05'}]) {
+      const payload = s.payload(extra), response = await s.request('/api/tasks', user, 'POST', payload);
+      assert.equal(response.status, 201); const created = await response.json(); ids.push(created.id);
+      const retry = await s.request('/api/tasks', user, 'POST', payload);
+      assert.equal(retry.status, 201); assert.deepEqual(await retry.json(), created);
+      assert.equal((await s.request('/api/tasks', user, 'POST', {...payload, title: 'Fictional changed retry'})).status, 409);
+    }
+    assert.equal(s.hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE user_id=? AND action='task-create'").get(user.user.id).n, 3);
+    const created = (await s.list(user)).items.find(item => item.id === ids[1]);
+    assert.equal(created.events[0].actor.id, user.user.id);
+    for (const action of ['approve', 'return', 'edit', 'cancel', 'reopen', 'report', 'progress']) assert.equal((await s.change(ids[1], user, {action, note: 'Fictional forbidden action', status: 'completed'})).status, 403);
+    assert.equal((await s.change(ids[2], user, {action: 'stop', note: 'Fictional forbidden stop'}, 1, true)).status, 403);
+    for (const route of ['/api/accounts', '/accounts.html', '/api/data/personnel']) assert.equal((await s.request(route, user)).status, 403);
+    assert.equal((await s.request('/api/accounts/' + user.user.id, user, 'PATCH', {role: 'admin', permissions: {canAssignTasks: true}})).status, 403);
+    assert.equal((await s.request('/api/tasks', user, 'POST', s.payload({assigneeId: s.admin.user.id}))).status, 400);
+    assert.equal((await s.request('/api/tasks', user, 'POST', s.payload(), {'X-CSRF-Token': 'fictional-wrong'})).status, 403);
+    assert.equal((await s.request('/api/tasks', user, 'POST', s.payload(), {Origin: 'https://fictional.invalid'})).status, 403);
+  }
+});
+test('supervisor assigners see their creations without reporting or counting other owners work', async t => {
+  const s = await setup(t);
+  await s.hub.auth.update(s.chief.user.id, {permissions: {canAssignTasks: true}}, s.admin.user);
+  const assigner = await s.login('demo-chief-a');
+  const unrelated = await s.create(s.payload({kind: 'global', assigneeId: s.other.user.id, dueDate: '2026-12-03', dueTime: '17:00'}));
+  const owned = await s.create(s.payload({kind: 'global', dueDate: '2026-12-03', dueTime: '17:00'}));
+  const response = await s.request('/api/tasks', assigner, 'POST', s.payload({kind: 'global', assigneeId: s.other.user.id, dueDate: '2026-12-03', dueTime: '17:00'}));
+  assert.equal(response.status, 201); const {id} = await response.json();
+  const recurring = await s.request('/api/tasks', assigner, 'POST', s.payload({assigneeId: s.other.user.id, repeat: 'every-shift', until: '2026-12-05'}));
+  assert.equal(recurring.status, 201); const scheduleId = (await recurring.json()).id;
+  assert.deepEqual((await s.list(assigner)).items.map(item => item.id).sort(), [id, owned].sort());
+  assert.deepEqual((await s.list(assigner)).schedules.map(item => item.id), [scheduleId]);
+  s.time('2026-12-04T23:00:00+02:00');
+  assert.ok((await s.list(assigner)).items.some(item => item.scheduleId === scheduleId));
+  assert.ok(!(await s.list(assigner)).items.some(item => item.id === unrelated));
+  assert.equal((await (await s.request('/api/tasks/summary', assigner)).json()).count, 1);
+  for (const action of ['progress', 'report', 'approve', 'cancel', 'edit']) assert.equal((await s.change(id, assigner, {action, note: 'Fictional forbidden action', status: 'review'})).status, 403);
+  assert.equal((await s.change(id, s.other, {action: 'report', status: 'review', note: 'Fictional completed work'})).status, 200);
+  assert.equal((await s.change(id, assigner, {action: 'approve'}, 2)).status, 403);
+  assert.equal((await s.change(id, s.admin, {action: 'approve'}, 2)).status, 200);
+  await s.hub.auth.update(assigner.user.id, {permissions: {canAssignTasks: false}}, s.admin.user);
+  const restricted = await s.login('demo-chief-a');
+  assert.deepEqual((await s.list(restricted)).items.map(item => item.id), [owned]);
+  assert.deepEqual((await s.list(restricted)).supervisors, []);
+});
+test('assignment restrictions and revocation block new and in-flight creation while preserving prior tasks', async t => {
+  const s = await setup(t);
+  const operator = await s.login('demo-operator');
+  await s.hub.auth.update(operator.user.id, {permissions: {canAssignTasks: true}}, s.admin.user);
+  const user = await s.login('demo-operator'), response = await s.request('/api/tasks', user, 'POST', s.payload());
+  assert.equal(response.status, 201); const id = (await response.json()).id;
+  const base = 'http://127.0.0.1:' + s.hub.server.address().port, payload = JSON.stringify(s.payload());
+  const received = new Promise(resolve => s.hub.server.once('request', resolve)); let pending;
+  const result = new Promise((resolve, reject) => {
+    pending = http.request(base + '/api/tasks', {method: 'POST', headers: {Origin: base, Cookie: user.cookie, 'X-CSRF-Token': user.csrf, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload)}}, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); });
+    pending.on('error', reject); pending.write(payload.slice(0, 4));
+  });
+  t.after(() => pending.destroy());
+  await received; await s.hub.auth.update(user.user.id, {permissions: {canAssignTasks: false, canViewTasks: true}}, s.admin.user); pending.end(payload.slice(4));
+  assert.equal(await result, 401);
+  const restricted = await s.login('demo-operator');
+  assert.equal((await s.request('/api/tasks', restricted, 'POST', s.payload())).status, 403);
+  assert.equal((await s.request('/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id, restricted)).status, 403);
+  assert.deepEqual((await s.list(restricted)).items.map(item => item.id), [id]);
+  await s.hub.auth.update(user.user.id, {permissions: {canAssignTasks: true, canViewTasks: false}}, s.admin.user);
+  const blocked = await s.login('demo-operator'); assert.equal(blocked.user.permissions.canAssignTasks, false);
+  for (const route of ['/tasks.html', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, blocked)).status, 403);
+  assert.equal((await s.request('/api/tasks', blocked, 'POST', s.payload())).status, 403);
+  await s.hub.auth.update(s.admin.user.id, {permissions: {canAssignTasks: false}}, s.admin.user);
+  const admin = await s.login();
+  assert.equal((await s.request('/api/tasks', admin, 'POST', s.payload())).status, 403);
+  assert.equal((await s.change(id, admin, {action: 'cancel', note: 'Fictional administrator cancellation'})).status, 200);
 });
 test('explicit viewing grants a read-only overview without supervisor, assignment or personnel access', async t => {
   const s = await setup(t), shiftId = await s.create();
@@ -291,4 +380,41 @@ test('tasks, supervisor profiles, event history and recurring catch-up survive a
   store = openStore(filename);
   assert.equal(accounts(store).list().find(user => user.id === chief.id).permissions.canViewTasks, false);
   assert.equal(createTasks(store).list(admin).items.length, view.items.length);
+});
+test('task reporting, management and review can each be delegated to every role independently', async t => {
+  const s = await setup(t);
+  for (const role of ['admin', 'operator', 'observer']) {
+    const owner = await s.hub.auth.create('demo-delegated-owner-' + role, password, role, s.admin.user,
+      {canAssignTasks: false, canManageTasks: false, canReviewTasks: false, canReportTasks: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
+    const reporter = await s.login(owner.username);
+    const id = await s.create(s.payload({kind: 'global', assigneeId: owner.id, dueDate: '2026-12-02', dueTime: '17:00'}));
+    assert.equal((await s.change(id, reporter, {action: 'report', status: 'review', note: 'Fictional delegated resolution'})).status, 200);
+    assert.equal((await s.change(id, reporter, {action: 'approve'}, 2)).status, 403);
+    const reviewer = await s.hub.auth.create('demo-delegated-review-' + role, password, role, s.admin.user, {canReviewTasks: true, canAssignTasks: false, canManageTasks: false, canReportTasks: false});
+    const review = await s.login(reviewer.username);
+    assert.equal((await s.request('/api/tasks/summary', review)).status, 200);
+    assert.equal((await s.change(id, review, {action: 'approve'}, 2)).status, 200);
+    assert.equal((await s.change(id, review, {action: 'reopen', note: 'Fictional reopen'}, 3)).status, 403);
+    await s.hub.auth.update(reviewer.id, {permissions: {canManageTasks: true, canAssignTasks: false, canReviewTasks: false}}, s.admin.user);
+    const manager = await s.login(reviewer.username);
+    assert.equal(manager.user.role, role);
+    assert.equal((await s.change(id, manager, {action: 'reopen', note: 'Fictional delegated reopening'}, 3)).status, 200);
+    assert.equal((await s.change(id, manager, {action: 'cancel', note: 'Fictional delegated cancellation'}, 4)).status, 200);
+    assert.equal((await s.request('/api/tasks', manager, 'POST', s.payload())).status, 403);
+    await s.hub.auth.update(owner.id, {permissions: {canReportTasks: false, canViewTasks: true}}, s.admin.user);
+    const revoked = await s.login(owner.username);
+    const next = await s.create(s.payload({kind: 'global', assigneeId: s.chief.user.id, dueDate: '2026-12-02', dueTime: '17:00'}));
+    assert.equal((await s.change(next, revoked, {action: 'progress', note: 'Fictional denied progress'})).status, 403);
+    assert.equal(s.hub.tasks.list(s.admin.user).supervisors.some(person => person.id === owner.id), false);
+  }
+});
+test('accounts that both report and review receive reminders for their own work and work awaiting review', async t => {
+  const s = await setup(t);
+  await s.hub.auth.update(s.chief.user.id, {permissions: {canReviewTasks: true}}, s.admin.user);
+  const chief = await s.login(s.chief.user.username);
+  await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
+  const id = await s.create(s.payload({kind: 'global', assigneeId: s.other.user.id, dueDate: '2026-12-02', dueTime: '17:00'}));
+  assert.equal((await s.change(id, s.other, {action: 'report', status: 'review', note: 'Fictional review pending'})).status, 200);
+  assert.deepEqual(await (await s.request('/api/tasks/summary', chief)).json(), {count: 2});
+  assert.equal(s.hub.tasks.list(chief.user).items.length, 2);
 });

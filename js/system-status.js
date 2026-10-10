@@ -37,7 +37,8 @@
     $('systemWarnings').hidden = !$('systemWarnings').childElementCount;
     const running = manualPending || data.manual.state === 'running';
     if (data.manual.state === 'running') manualError = '';
-    $('manualBackup').disabled = !data.manual.available || running;
+    $('manualBackup').hidden = !HubServer.can('canBackupSystem');
+    $('manualBackup').disabled = !HubServer.can('canBackupSystem') || !data.manual.available || running;
     $('manualBackup').textContent = running ? 'Архивиране…' : 'Създай архив';
     $('manualHint').textContent = data.manual.available ? 'Резултатът се показва тук. Архивите остават на сървъра.' : 'Контролът на архивите не е настроен.';
     $('manualMessage').dataset.state = manualError || data.manual.state === 'failed' ? 'failed' : data.manual.state;
@@ -74,12 +75,12 @@
   function cancelRefresh() {
     const previous = refreshController; refreshController = null; previous?.abort();
   }
-  if (typeof HubServer === 'undefined' || HubServer.user.role !== 'admin') {
-    $('systemMessage').textContent = 'Този екран е достъпен само за администратор в сървърната версия.'; $('refreshSystem').disabled = true; return;
+  if (typeof HubServer === 'undefined' || !HubServer.can('canViewSystemStatus')) {
+    $('systemMessage').textContent = 'Този екран изисква право за преглед на статуса на системата.'; $('refreshSystem').disabled = true; return;
   }
   $('refreshSystem').addEventListener('click', refresh);
   $('manualBackup').addEventListener('click', async () => {
-    if (destroyed || manualPending || !current?.manual.available || current.manual.state === 'running') return;
+    if (!HubServer.can('canBackupSystem') || destroyed || manualPending || !current?.manual.available || current.manual.state === 'running') return;
     manualError = '';
     const operation = new AbortController(); manualController = operation;
     const timeout = setTimeout(() => operation.abort(), 20000);

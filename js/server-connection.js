@@ -1,14 +1,21 @@
 /* Loaded only by the authenticated server. The offline file-based application remains independent. */
 const HubServer = (() => {
   const boot = window.HUB_SERVER_BOOT;
-  const can = key => boot.user.permissions ? boot.user.permissions[key] === true : key === 'canExportReports' || (key === 'canImportData' || key === 'canEditReports' ? boot.user.role === 'admin' : key === 'canCreateReports' && boot.user.role !== 'observer');
+  const currentModule = location.pathname.split('/').pop().replace(/\.html$/, '');
+  const can = key => {
+    const report = HubPermissions.reports[currentModule];
+    const resolved = report && ['canCreateReports', 'canEditReports'].includes(key) ? report[key === 'canCreateReports' ? 'create' : 'edit'] : key;
+    return boot.user.permissions[resolved] === true;
+  };
+  const canViewModule = name => HubPermissions.canViewModule(boot.user, name);
   const listeners = new Map();
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
+  messages.LAST_ACCOUNT_MANAGER = 'Трябва да остане поне един активен акаунт с право за управление на акаунти.';
   messages.INVALID_PERMISSIONS = 'Провери правата на акаунта.';
   messages.SELF_DELETE = 'Не можеш да изтриеш акаунта, с който си влязъл.';
   messages.NOT_FOUND = 'Записът вече не е наличен. Опресни страницата.';
-  Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да е оператор с избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
+  Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
   async function request(url, options = {}) {
     const headers = {...options.headers};
     if (options.method && options.method !== 'GET') headers['X-CSRF-Token'] = boot.csrf;
@@ -46,7 +53,7 @@ const HubServer = (() => {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
     const page = location.pathname.split('/').pop();
     const readURL = kind === 'personnel' && page === 'pair-targets.html' ? '/api/pair-roster'
-      : kind === 'personnel' && page === 'statistics.html' ? '/api/statistics/workforce' : '/api/data/' + kind;
+      : kind === 'personnel' && page === 'statistics.html' ? '/api/statistics/workforce' : page === 'statistics.html' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
     let ready = false, initialized = false, revision = 0, sequence = 0;
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
@@ -70,7 +77,7 @@ const HubServer = (() => {
     return {
       init: () => refresh().catch(() => {}), refreshFromDisk: refresh,
       async commitData() {
-        if (cfg.readOnly || boot.user.role === 'observer' || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports')) throw new Error('Само за преглед.');
+        if (cfg.readOnly || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[kind].settings)) throw new Error('Само за преглед.');
         if (!ready) throw new Error('Опресни връзката със сървъра.');
         ++sequence;
         const result = await send('/api/data/' + kind, 'PUT', cfg.getData(), {'If-Match': '"' + revision + '"'});
@@ -148,17 +155,17 @@ const HubServer = (() => {
   const roleLabels = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
   function applyPermissions() {
     const module = location.pathname.split('/').pop();
-    const observer = boot.user.role === 'observer';
     let selector = '';
-    if (boot.user.role !== 'admin') selector = 'a[href="personnel.html"],a[href="/personnel.html"]';
-    if (boot.user.role === 'operator') selector += ',a[href="statistics.html"],a[href="/statistics.html"]';
-    if (!can('canViewTasks')) selector += ',a[href="tasks.html"],a[href="/tasks.html"]';
-    if (boot.user.role !== 'admin' && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
-    if (boot.user.role !== 'admin' && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
+    for (const group of HubPermissions.groups.filter(group => group.module)) {
+      if (!canViewModule(group.module)) selector += ',a[href="' + group.module + '.html"],a[href="/' + group.module + '.html"]';
+    }
+    if (!can('canManagePersonnel') && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
+    if (!can('canManageInstructions') && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
     if (['production-log.html', 'line-downtime.html'].includes(module)) {
-      if (!can('canCreateReports')) selector += ',#saveBtn,#retrySaveBtn';
+      if (!can('canCreateReports')) selector += ',#saveBtn';
+      if (!can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[currentModule].settings)) selector += ',#retrySaveBtn';
       if (!can('canEditReports')) selector += ',.del-btn';
-      if (boot.user.role !== 'admin' || !can('canEditReports')) {
+      if (!can(HubPermissions.reports[currentModule].settings)) {
         const goal = document.getElementById('goalInput'); if (goal) goal.disabled = true;
         selector += ',#reasonsAdminPanel';
       }
@@ -175,7 +182,7 @@ const HubServer = (() => {
       document.querySelectorAll('[data-action=report]').forEach(control => {
         if (!(control.dataset.reported === 'true' ? can('canEditReports') : can('canCreateReports')) && !control.hidden) control.hidden = true;
       });
-      if (observer || !can('canCreateReports') && !can('canEditReports')) selector += ',#savePairBtn';
+      if (!can('canCreateReports') && !can('canEditReports')) selector += ',#savePairBtn';
     }
     selector = selector.replace(/^,/, '');
     if (selector) document.querySelectorAll(selector).forEach(control => { if (!control.hidden) control.hidden = true; });
@@ -205,11 +212,9 @@ const HubServer = (() => {
     const reports = ['production-log', 'line-downtime', 'pair-targets'];
     const module = reports.includes(current) ? current : new URLSearchParams(location.search).get('module');
     const query = reports.includes(module) ? '?module=' + module : '';
-    if (boot.user.role === 'admin') {
+    if (canViewModule('admin-panel')) {
       const link = addLink('/admin-panel.html' + query, 'Админ панел');
       if (['system-status','accounts','activity-log','data-import','production-import'].includes(current)) link.setAttribute('aria-current', 'location');
-    } else if (can('canImportData') || can('canExportReports')) {
-      addLink('/data-import.html' + query, 'Импорт / експорт');
     }
     tools.append(links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
@@ -255,7 +260,7 @@ const HubServer = (() => {
         if (sequence !== taskCountSequence) return;
         for (const badge of taskBadges) {
           badge.textContent = String(count); badge.hidden = count === 0;
-          const label = (boot.user.role === 'admin' ? 'Задачи за проверка:' : 'Чакащи задачи:') + ' ' + count;
+          const label = (can('canReviewTasks') && !can('canReportTasks') ? 'Задачи за проверка:' : 'Чакащи задачи:') + ' ' + count;
           badge.setAttribute('aria-label', label); badge.title = label;
         }
       } catch {
@@ -265,5 +270,5 @@ const HubServer = (() => {
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });
-  return {user: boot.user, can, fileSync, directorySync, json, send, watch};
+  return {user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch};
 })();

@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const {randomUUID} = require('node:crypto');
 const {isDeepStrictEqual} = require('node:util');
 const {DatabaseSync} = require('node:sqlite');
-const {can} = require('./permissions.cjs');
+const {can, canViewModule, reports} = require('./permissions.cjs');
 const root = path.resolve(__dirname, '..');
 const sandbox = vm.createContext({});
 for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', 'personnel-model']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), sandbox);
@@ -65,11 +65,13 @@ function openStore(filename) {
   };
   function put(kind, data, revision, user, mode = 'report') {
     validateData(kind, data);
+    if (!canViewModule(user, kind)) throw problem(403, 'FORBIDDEN');
     return transaction(() => {
       const current = get(kind);
       if (current.revision !== revision) throw problem(409, 'CONFLICT');
-      if (['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !(mode === 'import' && can(user, 'canImportData'))) {
-        if (!can(user, 'canCreateReports') && !can(user, 'canEditReports')) throw problem(403, 'FORBIDDEN');
+      const report = reports[kind], importing = mode === 'import' && can(user, 'canImportData');
+      if (report && !importing) {
+        if (!can(user, report.create) && !can(user, report.edit) && !(report.settings && can(user, report.settings))) throw problem(403, 'FORBIDDEN');
         const next = new Map(data.entries.map(entry => [entry.id, entry]));
         const prior = new Map(current.data.entries.map(entry => [entry.id, entry]));
         // Planning and a first pair result are ordinary reporting; correcting a
@@ -80,16 +82,9 @@ function openStore(filename) {
         });
         const added = data.entries.some(entry => !prior.has(entry.id) || kind === 'pair-targets' && !isDeepStrictEqual(prior.get(entry.id), entry) && !prior.get(entry.id)?.result) || kind === 'pair-targets' && current.data.entries.some(entry => !entry.result && !next.has(entry.id));
         const metadata = value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'entries'));
-        if ((corrected || !isDeepStrictEqual(metadata(current.data), metadata(data))) && !can(user, 'canEditReports') || added && !can(user, 'canCreateReports')) throw problem(403, 'FORBIDDEN');
+        if (corrected && !can(user, report.edit) || added && !can(user, report.create) || !isDeepStrictEqual(metadata(current.data), metadata(data)) && !can(user, report.settings || report.edit)) throw problem(403, 'FORBIDDEN');
       }
-      if (user.role !== 'admin') {
-        if (user.role !== 'operator' || !['production-log', 'line-downtime', 'pair-targets'].includes(kind)) throw problem(403, 'FORBIDDEN');
-        if (kind !== 'pair-targets') {
-          const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-          const prior = new Map(data.entries.map(entry => [entry.id, entry]));
-          if ((!can(user, 'canEditReports') && current.data.entries.some(entry => !same(entry, prior.get(entry.id)))) || !same(kind === 'production-log' ? current.data.goalTons : current.data.reasons, kind === 'production-log' ? data.goalTons : data.reasons)) throw problem(403, 'FORBIDDEN');
-        }
-      }
+      if (!report && !importing && !can(user, kind === 'personnel' ? 'canManagePersonnel' : 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
       if (kind === 'pair-targets') {
         try {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -126,7 +121,7 @@ function openStore(filename) {
     });
   }
   function productionImport(input, user) {
-    if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canImportData') || !canViewModule(user, 'production-log')) throw problem(403, 'FORBIDDEN');
     validateData('production-log', input);
     const current = get('production-log');
     const existing = new Map(current.data.entries.map(entry => [entry.id, entry]));
@@ -174,7 +169,7 @@ function openStore(filename) {
   }
   function createNode(name, kind, user) {
     safePath(name);
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
     if (!['directory', 'file'].includes(kind)) throw problem(400, 'WRONG_KIND');
     const parent = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '';
     if (parent && node(parent).kind !== 'directory') throw problem(400, 'INVALID_PATH');
@@ -188,7 +183,7 @@ function openStore(filename) {
     return result;
   }
   function writeFile(name, content, mime, revision, user) {
-    if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(user, 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
     if (name === 'data/package-instructions.json') {
       let data;
       try { data = JSON.parse(content.toString('utf8')); } catch { throw problem(400, 'INVALID_DATA'); }

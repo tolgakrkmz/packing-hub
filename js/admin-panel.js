@@ -1,8 +1,9 @@
 (() => {
-  if (typeof HubServer === 'undefined' || HubServer.user.role !== 'admin') {
-    document.getElementById('adminPanelMessage').textContent = 'Админ панелът е достъпен само за администратори в сървърен режим.';
+  if (typeof HubServer === 'undefined' || !HubServer.canViewModule('admin-panel')) {
+    document.getElementById('adminPanelMessage').textContent = 'Админ панелът изисква право за поне един от неговите модули.';
     return;
   }
+  for (const card of document.querySelectorAll('[data-module]')) card.hidden = !HubServer.canViewModule(card.dataset.module);
   const canImport = HubServer.can('canImportData'), canExport = HubServer.can('canExportReports');
   const transfer = document.getElementById('adminTransfer');
   transfer.hidden = !canImport && !canExport;

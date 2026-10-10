@@ -5,12 +5,8 @@
   const filter = document.getElementById('accountFilter');
   const createForm = document.getElementById('accountForm');
   const roles = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
-  const permissionLabels = {canImportData: 'Импорт на данни', canExportReports: 'Експорт на отчети', canCreateReports: 'Добавяне на отчети', canEditReports: 'Корекции и изтриване на отчети', canViewTasks: 'Преглед на „Задачи“'};
-  const defaults = {
-    admin: {canImportData: true, canExportReports: true, canCreateReports: true, canEditReports: true, canViewTasks: true},
-    operator: {canImportData: false, canExportReports: true, canCreateReports: true, canEditReports: false, canViewTasks: false},
-    observer: {canImportData: false, canExportReports: true, canCreateReports: false, canEditReports: false, canViewTasks: false}
-  };
+  const {groups, permissionsFor} = HubPermissions;
+  const editable = HubServer.can('canManageAccounts');
   const cards = new Map();
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -28,8 +24,8 @@
     const team = element('select'); team.setAttribute('aria-label', 'Екип за задачи'); team.dataset.taskTeam = '';
     for (const value of ['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ']) { const option = element('option', '', value || 'Избери екип'); option.value = value; team.append(option); }
     team.value = initial.taskTeam || '';
-    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи. Друг акаунт с право за преглед вижда всички задачи без промени. Изключеният преглед блокира достъпа и възлагането към този акаунт.'));
-    const refresh = () => { flag.disabled = role.value !== 'operator'; if (flag.disabled) flag.checked = false; team.disabled = !flag.checked; team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
+    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи и възложените от него, ако има право за възлагане. Самото право за преглед не разрешава промени. Изключеният преглед или отчитане блокира възлагането към този акаунт.'));
+    const refresh = () => { team.disabled = !flag.checked; team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
     role.addEventListener('change', refresh); flag.addEventListener('change', refresh);
     form.addEventListener('reset', () => setTimeout(() => { flag.checked = false; team.value = ''; refresh(); }, 0));
     form.insertBefore(group, form.querySelector('.account-actions')); refresh();
@@ -40,29 +36,39 @@
     const group = element('fieldset', 'account-permissions');
     group.append(element('legend', '', 'Права на акаунта'));
     const controls = new Map();
-    const grid = element('div', 'account-permission-grid');
-    for (const [key, text] of Object.entries(permissionLabels)) {
-      const label = element('label', 'account-flag');
-      const input = element('input'); input.type = 'checkbox'; input.dataset.permission = key;
-      const copy = element('span'); const status = element('small');
-      copy.append(element('span', 'account-flag-title', text), status); label.append(input, copy); grid.append(label);
-      controls.set(key, {input, status});
-      input.addEventListener('change', () => { overrides[key] = input.checked; refresh(); });
+    const modules = element('div', 'account-permission-modules');
+    const sections = new Map();
+    for (const definition of groups) {
+      const section = element('details', 'account-permission-module'); section.open = true;
+      const summary = element('summary'); const count = element('small');
+      summary.append(element('span', '', definition.title), count); section.append(summary);
+      const grid = element('div', 'account-permission-grid');
+      for (const [key, text] of Object.entries(definition.flags)) {
+        const label = element('label', 'account-flag');
+        const input = element('input'); input.type = 'checkbox'; input.dataset.permission = key;
+        const copy = element('span'), status = element('small');
+        copy.append(element('span', 'account-flag-title', text), status); label.append(input, copy); grid.append(label);
+        controls.set(key, {input, status, definition});
+        input.addEventListener('change', () => { overrides[key] = input.checked; refresh(); });
+      }
+      section.append(grid); modules.append(section); sections.set(definition, count);
     }
     const footer = element('div', 'account-permission-footer');
     const state = element('small');
     const reset = element('button', 'account-secondary', 'Върни правата по роля'); reset.type = 'button';
-    footer.append(state, reset); group.append(grid, footer);
-    const allowed = key => ['canExportReports', 'canViewTasks'].includes(key) || (key === 'canImportData' ? role.value === 'admin' : role.value !== 'observer');
-    const inherited = key => defaults[role.value][key] || key === 'canViewTasks' && role.value === 'operator' && !!form.querySelector('[data-task-supervisor]')?.checked;
-    const read = () => Object.fromEntries(Object.entries(overrides).filter(([key]) => allowed(key)));
+    footer.append(state, reset); group.append(modules, footer);
+    group.append(element('small', '', 'Всяка роля може да получи всички права. Действията включват преглед, освен когато той е изрично изключен. Общите права за отчетите се наследяват от трите отчетни модула, докато не зададеш индивидуално право за тях.'));
+    const read = () => ({...overrides});
     const refresh = () => {
-      for (const [key, {input, status}] of controls) {
-        input.disabled = !allowed(key);
-        input.checked = allowed(key) && (Object.hasOwn(overrides, key) ? overrides[key] : inherited(key));
-        status.textContent = !allowed(key) ? key === 'canImportData' ? 'Само за администратори' : 'Недостъпно за наблюдател' : Object.hasOwn(overrides, key) ? 'Индивидуално право' : 'Според ролята';
+      const effective = permissionsFor({role: role.value, permissionOverrides: overrides, taskSupervisor: !!form.querySelector('[data-task-supervisor]')?.checked});
+      for (const [key, {input, status, definition}] of controls) {
+        input.checked = Object.hasOwn(overrides, key) ? overrides[key] : effective[key];
+        status.textContent = Object.hasOwn(overrides, key) ? 'Индивидуално право' : 'Наследено право';
+        if (input.checked && definition.view && !effective[definition.view]) status.textContent = 'Изисква включен преглед на модула';
+        if (key === definition.view && !Object.hasOwn(overrides, key) && !HubPermissions.defaults[role.value][key] && effective[key]) status.textContent = 'Включено с действието';
       }
-      const custom = Object.keys(read()).length > 0;
+      for (const [definition, count] of sections) count.textContent = Object.keys(definition.flags).filter(key => effective[key]).length + ' / ' + Object.keys(definition.flags).length;
+      const custom = Object.keys(overrides).length > 0;
       state.textContent = custom ? 'Индивидуални права' : 'Права според ролята'; reset.disabled = !custom;
     };
     reset.addEventListener('click', () => { overrides = {}; refresh(); });
@@ -131,6 +137,7 @@
       } catch (error) { status.textContent = error.message; }
       finally { button.disabled = false; deleteButton.disabled = ownAccount; }
     });
+    if (!editable) { for (const control of form.querySelectorAll('input,select,button')) control.disabled = true; actions.hidden = true; passwordDetails.hidden = true; }
     details.append(form);
     const previous = cards.get(user.id);
     if (previous) previous.details.replaceWith(details);
@@ -146,6 +153,7 @@
     if (open) document.getElementById('accountUsername').focus();
     else document.getElementById('newAccountButton').focus({preventScroll: true});
   }
+  document.getElementById('newAccountButton').hidden = !editable;
   const createPermissions = permissionControls(createForm, document.getElementById('accountRole'));
   const createTaskProfile = taskProfileControls(createForm, document.getElementById('accountRole'));
   document.getElementById('newAccountButton').addEventListener('click', () => setCreateOpen(document.getElementById('accountCreate').hidden));

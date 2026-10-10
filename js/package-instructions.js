@@ -576,7 +576,7 @@ const bulkEl = {
 };
 
 // Initialize the admin UI after both control groups exist.
-applyPackageInstructionsAdminUI(typeof HubServer === 'undefined' || HubServer.user.role === 'admin');
+applyPackageInstructionsAdminUI(typeof HubServer === 'undefined' || HubServer.can('canManageInstructions'));
 
 let bulkCandidates = [];
 
