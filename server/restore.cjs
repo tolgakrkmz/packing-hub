@@ -23,6 +23,7 @@ function restoreArchive(archive, directory) {
     db.exec('PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; BEGIN IMMEDIATE');
     if (!db.prepare("SELECT 1 FROM users WHERE role='admin' AND active=1 AND deleted_at IS NULL").get()) throw new Error('RECOVERY_ADMIN_UNAVAILABLE');
     db.prepare('DELETE FROM sessions').run();
+    if (db.prepare("SELECT 1 FROM sqlite_schema WHERE name='push_subscriptions'").get()) db.prepare('DELETE FROM push_subscriptions').run();
     db.prepare("INSERT INTO audit(at,user_id,action,module) VALUES(?,NULL,'restore','system')").run(Date.now());
     db.exec('COMMIT');
   } finally { db.close(); }

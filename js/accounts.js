@@ -58,6 +58,7 @@
     const reset = element('button', 'account-secondary', 'Върни правата по роля'); reset.type = 'button';
     footer.append(state, reset); group.append(modules, footer);
     group.append(element('small', '', 'Всяка роля може да получи всички права. Действията включват преглед, освен когато той е изрично изключен. Общите права за отчетите се наследяват от трите отчетни модула, докато не зададеш индивидуално право за тях.'));
+    group.append(element('small', '', 'Флаговете за известия разрешават получаването, без да дават достъп до модул. Потребителят избира лично кои от разрешените видове да включи.'));
     const read = () => ({...overrides});
     const refresh = () => {
       const effective = permissionsFor({role: role.value, permissionOverrides: overrides, taskSupervisor: !!form.querySelector('[data-task-supervisor]')?.checked});

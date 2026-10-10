@@ -22,6 +22,9 @@ async function checkPassword(password, stored) {
 }
 function accounts(store) {
   const {db} = store;
+  function revokePush(column, value) {
+    if (db.prepare("SELECT 1 FROM sqlite_schema WHERE name='push_subscriptions'").get()) db.prepare('DELETE FROM push_subscriptions WHERE ' + column + '=?').run(value);
+  }
   const dummy = crypto.randomBytes(16).toString('hex') + ':' + crypto.randomBytes(64).toString('hex');
   function taskProfile(values, role, previous = {}) {
     const supervisor = values.taskSupervisor === undefined ? !!previous.task_supervisor : values.taskSupervisor;
@@ -76,6 +79,7 @@ function accounts(store) {
       const next = {role, taskSupervisor: !!tasks.supervisor, permissionOverrides: overrides};
       if (can(publicUser(row), 'canManageAccounts') && row.active && (!active || !can(next, 'canManageAccounts')) && !db.prepare('SELECT * FROM users WHERE active=1 AND deleted_at IS NULL AND id<>?').all(id).some(other => can(publicUser(other), 'canManageAccounts'))) throw problem(409, 'LAST_ACCOUNT_MANAGER');
       db.prepare('UPDATE users SET hash=?,role=?,active=?,permissions=?,task_supervisor=?,task_team=? WHERE id=?').run(hash, role, active, JSON.stringify(overrides), tasks.supervisor, tasks.team, id);
+      revokePush('user_id', id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       store.audit(actor, 'account-update', 'accounts');
     });
@@ -92,6 +96,7 @@ function accounts(store) {
       if (id === actor.id) throw problem(409, 'SELF_DELETE');
       // Keep the identity reserved so historical assignments cannot pass to a new account.
       db.prepare('UPDATE users SET active=0,deleted_at=?,hash=? WHERE id=?').run(Date.now(), dummy, id);
+      revokePush('user_id', id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       store.audit(actor, 'account-delete', 'accounts');
       return {id};
@@ -100,6 +105,7 @@ function accounts(store) {
   function logout(token) {
     const current = session(token);
     return store.transaction(() => {
+      revokePush('session_hash', digest(token));
       const result = db.prepare('DELETE FROM sessions WHERE hash=?').run(digest(token));
       if (current) store.audit(current.user, 'logout', 'accounts');
       return result;

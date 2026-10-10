@@ -20,7 +20,9 @@ esac
 [[ -f "$deploy_dir/compose.yaml" && -f "$deploy_dir/.env" ]] || { echo 'The existing Compose file and local .env are required.'; exit 1; }
 compose_help=$(docker compose up --help)
 [[ $compose_help == *--wait-timeout* ]] || { echo 'Docker Compose with --wait-timeout is required.'; exit 1; }
-container=$(docker compose --project-directory "$deploy_dir" -f "$deploy_dir/compose.yaml" ps -q package-hub)
+compose_files=(-f "$deploy_dir/compose.yaml")
+if [[ -f "$deploy_dir/.env.push" ]]; then compose_files+=(--env-file "$deploy_dir/.env" --env-file "$deploy_dir/.env.push"); fi
+container=$(docker compose --project-directory "$deploy_dir" "${compose_files[@]}" ps -q package-hub)
 [[ $container =~ ^[0-9a-f]{12,64}$ ]] || { echo 'The existing application container was not found.'; exit 1; }
 project=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container")
 [[ $project =~ ^[a-z0-9][a-z0-9_-]*$ ]] || { echo 'The existing Compose project could not be verified.'; exit 1; }

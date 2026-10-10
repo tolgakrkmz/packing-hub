@@ -1,29 +1,29 @@
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 async function openAdminModule(page, module) {
-  await page.locator('.server-links a').click();
+  await page.locator('.server-links a[href^="/admin-panel.html"]').click();
   await page.locator('.admin-card[data-module="'+module+'"]').click();
 }
 async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) {
-  await expect(admin.locator('.server-links a')).toHaveCount(1);
-  await expect(admin.locator('.server-links a')).toHaveText('Админ панел');
-  await admin.locator('.server-links a').click();
+  await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveCount(1);
+  await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveText('Админ панел');
+  await admin.locator('.server-links a[href^="/admin-panel.html"]').click();
   await expect(admin.locator('h1')).toHaveText('Админ панел');
   await expect(admin.locator('.admin-card:visible')).toHaveCount(4);
-  await expect(admin.locator('.server-links a')).toHaveAttribute('aria-current','page');
+  await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('aria-current','page');
   await admin.locator('[data-module=accounts]').focus();
   await admin.keyboard.press('Enter');
   await expect(admin.locator('h1')).toHaveText('Потребители');
-  await expect(admin.locator('.server-links a')).toHaveAttribute('aria-current','location');
+  await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('aria-current','location');
   for (const module of ['activity-log','system-status']) {
     await openAdminModule(admin,module);
     await expect(admin).toHaveURL(base+'/'+module+'.html');
-    await expect(admin.locator('.server-links a')).toHaveCount(1);
-    await expect(admin.locator('.server-links a')).toHaveAttribute('aria-current','location');
+    await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveCount(1);
+    await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('aria-current','location');
   }
   for (const module of ['production-log','line-downtime','pair-targets']) {
     await admin.goto(base+'/'+module+'.html');
-    await expect(admin.locator('.server-links a')).toHaveAttribute('href','/admin-panel.html?module='+module);
+    await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('href','/admin-panel.html?module='+module);
     await openAdminModule(admin,'data-import');
     await expect(admin.locator('#reportExportKind')).toHaveValue(module);
   }
@@ -47,10 +47,10 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     const username='demo-panel-'+role;
     await hub.auth.create(username,'Fictional-password-123',role);
     const page=await device(username,true);
-    await expect(page.locator('.server-links a')).toHaveCount(1);
-    await expect(page.locator('.server-links a')).toHaveText('Админ панел');
+    await expect(page.locator('.server-links a[href^="/admin-panel.html"]')).toHaveCount(1);
+    await expect(page.locator('.server-links a[href^="/admin-panel.html"]')).toHaveText('Админ панел');
     for (const method of ['GET','HEAD']) assert.equal((await page.request.fetch(base+'/admin-panel.html',{method})).status(),200);
-    await page.locator('.server-links a').click();
+    await page.locator('.server-links a[href^="/admin-panel.html"]').click();
     await expect(page.locator('.admin-card:visible')).toHaveCount(1);
     await page.locator('#adminTransfer').click();
     await expect(page.locator('#reportExport')).toBeVisible();
@@ -64,7 +64,7 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     const username='demo-panel-'+suffix;
     await hub.auth.create(username,'Fictional-password-123','admin',undefined,permissions);
     const page=await device(username,true);
-    await page.locator('.server-links a').click();
+    await page.locator('.server-links a[href^="/admin-panel.html"]').click();
     await expect(page.locator('.admin-card:visible')).toHaveCount(description ? 4 : 3);
     if (description) {
       await expect(page.locator('#adminTransferDescription')).toHaveText(description);

@@ -62,6 +62,7 @@ test('viewing denials gate direct pages, APIs, exports, roster, statistics and i
     const session = await login(user.username);
     for (const method of ['GET', 'HEAD']) assert.equal((await request('/' + group.module + '.html', session, method)).status, 403);
     const routes = {
+      notifications: ['/notifications.html', '/api/notifications', '/api/notifications/preferences'],
       'production-log': ['/api/data/production-log', '/api/export/production-log'],
       'line-downtime': ['/api/data/line-downtime', '/api/export/line-downtime'],
       'pair-targets': ['/api/data/pair-targets', '/api/pair-roster', '/api/export/pair-targets'],

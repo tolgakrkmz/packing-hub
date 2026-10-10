@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Известия · Package Hub</title>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+</head>
+<body>
+  <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
+  <main class="notification-page">
+    <header><h1>Известия</h1><p>Важните събития за твоя акаунт.</p></header>
+    <p id="notificationMessage" role="status" aria-live="polite"></p>
+    <div class="notification-tabs" role="tablist" aria-label="Известия">
+      <button id="notificationInboxTab" type="button" role="tab" aria-selected="true" aria-controls="notificationInbox">Получени</button>
+      <button id="notificationSettingsTab" type="button" role="tab" aria-selected="false" aria-controls="notificationSettings">Настройки</button>
+    </div>
+    <section id="notificationInbox" role="tabpanel" aria-labelledby="notificationInboxTab">
+      <div class="notification-actions"><p id="notificationUnread" role="status"></p><button id="notificationReadAll" type="button">Прочети всички</button></div>
+      <div id="notificationList"></div><button id="notificationMore" type="button" hidden>Още известия</button>
+    </section>
+    <section id="notificationSettings" role="tabpanel" aria-labelledby="notificationSettingsTab" hidden>
+      <h2>Какво да получавам</h2><p>Показват се само видовете, разрешени за твоя акаунт. Администраторът управлява достъпа от „Акаунти“.</p>
+      <form id="notificationPreferences"><div id="notificationTypes"></div><button type="submit">Запази настройките</button></form>
+      <section class="notification-device"><h2>Това устройство</h2><p id="notificationDeviceState" role="status"></p><p id="notificationDeviceHint"></p>
+        <div class="notification-actions"><button id="notificationEnable" type="button">Включи известията</button><button id="notificationTest" type="button" hidden>Тествай известията</button><button id="notificationDisable" type="button" hidden>Изключи на това устройство</button></div>
+        <label class="notification-check"><input id="notificationNever" type="checkbox"><span>Не ме подсещай на това устройство</span></label>
+      </section>
+    </section>
+    <p class="notification-footnote">Телефонът показва общо известие. Подробностите остават в приложението. Доставката зависи от връзката и настройките на телефона.</p>
+  </main>
+</body>
+</html>

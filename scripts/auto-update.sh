@@ -27,6 +27,10 @@ run() { "$@" >>"$log" 2>&1; }
 git_source() { git -c "safe.directory=$SOURCE_DIR" -C "$SOURCE_DIR" "$@"; }
 compose() {
   local files=(-f "$DEPLOY_DIR/compose.yaml" -f "$BUILD_OVERRIDE")
+  if [[ -f "$DEPLOY_DIR/.env.push" ]]; then
+    [[ -f "$DEPLOY_DIR/.env" ]] || fail 'Push configuration requires the existing local deployment settings.'
+    files+=(--env-file "$DEPLOY_DIR/.env" --env-file "$DEPLOY_DIR/.env.push")
+  fi
   local maintenance_override=${MAINTENANCE_OVERRIDE:-/etc/package-hub-maintenance.compose.yaml}
   if [[ -f $maintenance_override ]]; then files+=(-f "$maintenance_override"); fi
   docker compose --project-directory "$DEPLOY_DIR" "${files[@]}" -p "$COMPOSE_PROJECT" "$@"

@@ -7,13 +7,14 @@ const {accounts} = require('./accounts.cjs');
 const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
+const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, taskPhotos, maintenanceSocket}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
@@ -23,6 +24,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   tasks.maintain();
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
+  const notifications = createNotifications(store, {...notificationOptions, ...(taskNow ? {taskNow} : {})});
   const assets = new Map();
   for (const dir of ['', 'css', 'js']) for (const leaf of fs.readdirSync(path.join(root, dir))) {
     const file = dir ? dir + '/' + leaf : leaf;
@@ -32,6 +34,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     inspect(file, body);
     assets.set('/' + file, body);
   }
+  if (!fs.lstatSync(path.join(root, 'manifest.webmanifest')).isFile()) throw new Error('Unapproved static source.');
+  const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest')); inspect('manifest.webmanifest', manifest); assets.set('/manifest.webmanifest', manifest);
   const markFile = 'assets/package-hub-mark.svg';
   if (!fs.lstatSync(path.join(root, markFile)).isFile()) throw new Error('Unapproved static source.');
   const mark = fs.readFileSync(path.join(root, markFile));
@@ -63,7 +67,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     try { const value = JSON.parse((await body(request, limit)).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
     catch (error) { if (error.status) throw error; throw problem(400, 'INVALID_DATA'); }
   }
+  function syncNotifications() { try { tasks.tick(); notifications.sync(); } catch { /* Retry on the next tick without exposing local content. */ } }
   function broadcast(module, revision) {
+    syncNotifications();
     const payload = `event: change\ndata: ${JSON.stringify({module, revision})}\n\n`;
     for (const client of clients) if (auth.session(client.token)) client.response.write(payload); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }
@@ -157,6 +163,21 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
             return json(response, 200, {user});
           }
           throw problem(405, 'METHOD_REJECTED');
+        }
+        if (pathname.startsWith('/api/notifications')) {
+          const user = authorized('canViewNotifications');
+          if (pathname === '/api/notifications' && request.method === 'GET') { syncNotifications(); return json(response, 200, notifications.list(user, url.searchParams.get('before'))); }
+          if (pathname === '/api/notifications/preferences' && request.method === 'GET') return json(response, 200, notifications.preferences(user));
+          const methods = {'/api/notifications/preferences': 'PATCH', '/api/notifications/read': 'POST', '/api/notifications/device': 'POST', '/api/notifications/subscriptions': 'POST', '/api/notifications/unsubscribe': 'POST', '/api/notifications/test': 'POST'};
+          if (!methods[pathname]) throw problem(404, 'NOT_FOUND');
+          if (request.method !== methods[pathname]) throw problem(405, 'METHOD_REJECTED');
+          const input = await jsonBody(request, 4096), fresh = authorized('canViewNotifications');
+          if (pathname.endsWith('/preferences')) return json(response, 200, notifications.updatePreferences(input, fresh));
+          if (pathname.endsWith('/read')) return json(response, 200, notifications.read(input, fresh));
+          if (pathname.endsWith('/device')) return json(response, 200, notifications.device(input, fresh, crypto.createHash('sha256').update(token).digest('hex')));
+          if (pathname.endsWith('/unsubscribe')) return json(response, 200, notifications.unsubscribe(input, fresh));
+          if (pathname.endsWith('/test')) { const result = await notifications.testDevice(input, fresh); authorized('canViewNotifications'); return json(response, 200, result); }
+          return json(response, 201, notifications.subscribe(input, fresh, crypto.createHash('sha256').update(token).digest('hex')));
         }
         if (pathname === '/api/tasks/summary') {
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
@@ -266,11 +287,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (!can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
         response.writeHead(302, {Location: '/data-import.html#production'}); return response.end();
       }
-      const contentType = assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
+      const contentType = assetName === '/manifest.webmanifest' ? 'application/manifest+json' : assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
+      if (assetName === '/js/notification-worker.js') response.setHeader('Service-Worker-Allowed', '/');
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
       if (session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
-      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<link rel="stylesheet" href="/css/server.css">') : asset);
+      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">') : asset);
     } catch (error) {
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});
       else response.end();
@@ -287,13 +309,22 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   heartbeat.unref();
   const photoCleanup = setInterval(() => { try { tasks.maintain(); } catch { /* Retry next hour; do not log private task data. */ } }, 3600000);
   photoCleanup.unref();
-  const close = async () => { clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, tasks, maintenance, close};
+  let statusRunning = false, notificationStopped = false, statusWork;
+  function checkNotificationStatus() {
+    if (statusRunning || notificationStopped) return;
+    statusRunning = true;
+    statusWork = maintenance.status().then(status => { if (!notificationStopped) notifications.systemStatus(status); }).catch(() => {}).finally(() => { statusRunning = false; });
+  }
+  const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(() => {}); }, 30000); notificationTick.unref();
+  const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
+  const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
+  return {server, store, auth, imports, tasks, maintenance, notifications, close};
 }
 if (require.main === module) {
   process.umask(0o077);
   try {
     const hub = createHubServer({filename: process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite', publicOrigin: process.env.HUB_PUBLIC_ORIGIN || '', allowHttp: process.env.HUB_ALLOW_HTTP === 'true', maintenanceSocket: process.env.HUB_MAINTENANCE_SOCKET,
+      notifications: {push: {privateKey: process.env.HUB_PUSH_PRIVATE_JWK, subject: process.env.HUB_PUSH_SUBJECT}},
       taskPhotos: {retentionMonths: Number(process.env.HUB_TASK_PHOTO_RETENTION_MONTHS || 6), limitBytes: Number(process.env.HUB_TASK_PHOTO_LIMIT_MB || 512) * 1024 * 1024}});
     hub.server.listen(Number(process.env.PORT || 3000), '0.0.0.0', () => console.log('Package Hub server started.'));
     for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => hub.close().then(() => process.exit(0)));

@@ -1,3 +1,4 @@
+const {reportChanges} = require('./store.cjs');
 /* Private staging and atomic migration of reviewed legacy module formats. */
 const fs = require('node:fs');
 const os = require('node:os');
@@ -201,8 +202,9 @@ function createImports(store, filename) {
     const result = store.transaction(() => {
       const value = checked(), revisions = {};
       for (const [kind, data] of Object.entries(value.updates)) {
+        const detail = reportChanges(store.get(kind).data, data);
         store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
-        store.audit(user, 'import', kind); revisions[kind] = store.get(kind).revision;
+        store.audit(user, 'import', kind, detail); revisions[kind] = store.get(kind).revision;
       }
       for (const name of [...value.directories].sort((a, b) => a.split('/').length - b.split('/').length)) store.db.prepare("INSERT INTO files(path,kind) VALUES(?,'directory')").run(name);
       for (const file of value.fileUpdates) {
