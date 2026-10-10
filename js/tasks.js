@@ -7,6 +7,12 @@
   let state, view = 'shift', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
+  const requiresPhotos = item => item?.requiresPhotos !== false;
+  const photoList = (item, plural, single) => Array.isArray(item?.[plural]) ? item[plural] : item?.[single] ? [item[single]] : [];
+  const problemPhotos = item => photoList(item, 'problemPhotos', 'problemPhoto');
+  const solutionPhotos = item => photoList(item, 'photos', 'photo');
+  const requiredPhotoCount = item => Math.max(1, problemPhotos(item).length);
+  const photoRequirementLabel = item => requiresPhotos(item) ? 'Изисква снимки' : 'Снимки не се изискват';
   const dialogs = ['taskEditor', 'taskAction', 'taskHistory', 'taskPhotoViewer'];
   const draftOpen = () => busy || dialogs.some(id => $(id).open);
   function renderPhotoPolicy() {
@@ -37,8 +43,9 @@
     }
     return 'data:image/jpeg;base64,' + btoa(parts.join(''));
   }
-  function photoView(item, photo, label, recurring = false) {
-    const figure = el('figure', '', 'task-photo'); figure.append(el('figcaption', label));
+  function photoView(item, photo, label, recurring = false, index = 0, total = 1) {
+    label = (HubI18n.language === 'en' ? label === 'Проблем' ? 'Problem' : 'Solution' : label) + (total > 1 ? ' ' + (index + 1) : '');
+    const figure = el('figure', '', 'task-photo'); figure.append(el('figcaption', label, '', true));
     if (!photo?.available) { figure.append(el('p', photo ? 'Снимката е изтрита след срока за съхранение.' : 'Няма снимка от предишната версия.', 'task-muted')); return figure; }
     const url = '/api/tasks/' + (recurring ? 'schedules/' : 'items/') + item.id + '/photos/' + photo.id;
     const control = button('Отвори снимката', () => {
@@ -49,17 +56,27 @@
     img.addEventListener('error', () => { control.replaceChildren(el('span', 'Снимката не е достъпна. Опресни задачите.')); });
     control.replaceChildren(img, el('span', 'Отвори снимката')); figure.append(control); return figure;
   }
+  const photoViews = (item, list, label, recurring = false) => list.map((photo, index) => photoView(item, photo, label, recurring, index, list.length));
   function photoPicker(prefix) {
-    let value = null, pending = false, failed = false, original = null, sequence = 0;
+    let entries = [], pending = false, failed = false, original = null, sequence = 0, expected = 0;
     const input = $(prefix + 'Photo'), camera = $(prefix + 'Camera'), preview = $(prefix + 'PhotoPreview'), info = $(prefix + 'PhotoInfo'), clear = $(prefix + 'PhotoClear');
-    function reset(existing = null, item = null, recurring = false) {
-      ++sequence; value = null; pending = false; failed = false; original = {existing, item, recurring}; input.value = ''; camera.value = ''; preview.replaceChildren(); info.textContent = ''; clear.hidden = true;
-      if (existing && item) preview.append(photoView(item, existing, 'Проблем', recurring));
+    const clearFeedback = () => { $(prefix === 'problem' ? 'editorFeedback' : 'actionFeedback').textContent = ''; };
+    function render() {
+      preview.replaceChildren(); clear.hidden = !entries.length && !failed && !pending;
+      entries.forEach((entry, index) => {
+        const row = el('div', '', 'task-photo-choice');
+        if (entry.photo) row.append(photoView(original.item, entry.photo, 'Проблем', original.recurring, index, entries.length));
+        else { const img = el('img', '', 'task-photo-preview'); img.alt = 'Избрана снимка'; img.src = 'data:image/jpeg;base64,' + entry.data; row.append(img); }
+        row.append(button('Премахни снимката', () => { if (!busy && !pending) { entries.splice(index, 1); failed = false; info.textContent = ''; clearFeedback(); render(); } })); preview.append(row);
+      });
+      const count = $(prefix + 'PhotoCount'); count.setAttribute('translate', 'no');
+      count.textContent = HubI18n.language === 'en' ? expected ? `Solution photos: ${entries.length} / ${expected} required.` : `Selected photos: ${entries.length} / ${state?.photoPolicy.maxPhotos || 10}.` : expected ? `Снимки на решението: ${entries.length} / ${expected} задължителни.` : `Избрани снимки: ${entries.length} / ${state?.photoPolicy.maxPhotos || 10}.`;
     }
-    async function choose(event) {
-      if (busy) return;
-      const file = event.target.files[0]; if (!file) return;
-      const current = ++sequence; pending = true; failed = false; value = null; clear.hidden = false; preview.replaceChildren(); info.textContent = 'Подготвяне на снимката…';
+    function reset(existing = [], item = null, recurring = false, required = 0) {
+      ++sequence; entries = existing.map(photo => ({photo})); pending = false; failed = false; original = {existing, item, recurring}; expected = required;
+      input.value = ''; camera.value = ''; input.disabled = busy; camera.disabled = busy; info.textContent = ''; render();
+    }
+    async function encode(file) {
       let bitmap;
       try {
         if (!file.type.startsWith('image/') || file.size > 20 * 1024 * 1024) throw new Error('Избери снимка до 20 MB, която браузърът може да отвори (JPEG, PNG или WebP).');
@@ -78,14 +95,23 @@
           result = null; edge = Math.floor(edge * .75);
         }
         if (!result) throw new Error('Снимката е прекалено голяма. Избери по-малка снимка.');
-        if (sequence !== current) return;
-        result = withoutMetadata(result); value = result.split(',')[1]; const img = el('img', '', 'task-photo-preview'); img.alt = 'Избрана снимка'; img.src = result; preview.append(img);
-        info.textContent = 'Снимката е готова за запис.';
-      } catch (error) { if (sequence === current) { failed = true; info.textContent = error.message.startsWith('Избери') || error.message.startsWith('Снимката') ? error.message : 'Снимката не може да се отвори. Избери JPEG, PNG или WebP.'; } }
-      finally { bitmap?.close(); if (sequence === current) pending = false; }
+        return withoutMetadata(result).split(',')[1];
+      } finally { bitmap?.close(); }
     }
-    input.addEventListener('change', choose); camera.addEventListener('change', choose); clear.addEventListener('click', () => { if (!busy) reset(original?.existing, original?.item, original?.recurring); });
-    return {reset, get value() { return value; }, get pending() { return pending; }, get failed() { return failed; }};
+    async function choose(event) {
+      if (busy || pending) return;
+      const files = [...event.target.files]; if (!files.length) return;
+      const current = ++sequence; pending = true; failed = false; clear.hidden = false; input.disabled = true; camera.disabled = true; clearFeedback(); info.textContent = 'Подготвяне на снимката…';
+      try {
+        if (entries.length + files.length > state.photoPolicy.maxPhotos) throw new Error('Можеш да добавиш до 10 снимки.');
+        const added = [];
+        for (const file of files) { added.push({data: await encode(file)}); if (sequence !== current) return; }
+        entries.push(...added); info.textContent = entries.length === 1 ? 'Снимката е готова за запис.' : 'Снимките са готови за запис.';
+      } catch (error) { if (sequence === current) { failed = true; info.textContent = /^(Избери|Снимката|Можеш)/.test(error.message) ? error.message : 'Снимката не може да се отвори. Избери JPEG, PNG или WebP.'; } }
+      finally { if (sequence === current) { pending = false; input.disabled = busy; camera.disabled = busy; input.value = ''; camera.value = ''; render(); } }
+    }
+    input.addEventListener('change', choose); camera.addEventListener('change', choose); clear.addEventListener('click', () => { if (!busy) { clearFeedback(); reset([], original?.item, original?.recurring, expected); } });
+    return {reset, render, get values() { return entries.map(entry => entry.photo ? {id: entry.photo.id} : entry.data); }, get count() { return entries.length; }, get valid() { return entries.every(entry => !entry.photo || entry.photo.available); }, get pending() { return pending; }, get failed() { return failed; }};
   }
   const problemPicker = photoPicker('problem'), solutionPicker = photoPicker('solution');
   function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
@@ -120,7 +146,7 @@
   }
   function history(item) {
     const content = $('historyContent'); content.replaceChildren(el('h3', item.title, '', true));
-    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true)); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot?.problemPhoto) row.append(photoView(item, entry.snapshot.problemPhoto, 'Проблем', !item.kind)); if (entry.photo) row.append(photoView(item, entry.photo, 'Решение')); content.append(row); }
+    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true), el('span', photoRequirementLabel(entry.snapshot), 'task-badge')); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot) row.append(...photoViews(item, problemPhotos(entry.snapshot), 'Проблем', !item.kind)); row.append(...photoViews(item, solutionPhotos(entry), 'Решение')); content.append(row); }
     $('taskHistory').showModal();
   }
   function card(item, recurring = false) {
@@ -130,11 +156,15 @@
     const badges = el('div', '', 'task-badges');
     const status = recurring ? item.stoppedAt ? 'Повторението е спряно' : 'Активно повторение' : statusLabels[item.displayStatus];
     badges.append(el('span', status, 'task-badge' + (alert ? ' alert' : item.status === 'completed' ? ' good' : '')));
+    badges.append(el('span', photoRequirementLabel(item), 'task-badge'));
     if (item.priority === 'high') badges.append(el('span', 'Висок приоритет', 'task-badge alert'));
     if (item.overdue) badges.append(el('span', 'Просрочена', 'task-badge alert')); if (item.late) badges.append(el('span', 'Закъснял отчет', 'task-badge alert'));
     node.append(badges, el('p', item.description, 'task-description', true));
-    const evidence = el('div', '', 'task-photos'); evidence.append(photoView(item, item.problemPhoto, 'Проблем', recurring));
-    if (item.report) evidence.append(photoView(item, item.report.photo, 'Решение')); node.append(evidence);
+    if (requiresPhotos(item) || problemPhotos(item).length || solutionPhotos(item.report).length) {
+      const evidence = el('div', '', 'task-photos');
+      if (requiresPhotos(item) || problemPhotos(item).length) evidence.append(...photoViews(item, problemPhotos(item).length ? problemPhotos(item) : [null], 'Проблем', recurring));
+      if (item.report && (requiresPhotos(item) || solutionPhotos(item.report).length)) evidence.append(...photoViews(item, solutionPhotos(item.report).length ? solutionPhotos(item.report) : [null], 'Решение')); node.append(evidence);
+    }
     node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
     if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
     const lastNote = [...item.events].reverse().find(entry => entry.note); if (lastNote) node.append(el('p', lastNote.note, 'task-description', true));
@@ -181,6 +211,7 @@
   }
   function editorFields() {
     const global = $('taskKind').value === 'global', recurring = $('taskRepeat').value === 'every-shift';
+    $('problemPhotoFields').hidden = !$('taskRequiresPhotos').checked;
     $('shiftFields').hidden = global || !!editing && !editing.recurring; $('globalFields').hidden = !global; $('taskParticipants').hidden = !global;
     $('taskUntilLabel').hidden = !recurring; $('taskFrom').required = !global && !editing; $('taskUntil').required = !global && recurring && !editing;
     $('taskDueDate').required = global; $('taskDueTime').required = global;
@@ -198,7 +229,8 @@
   }
   function openEditor(item = null, recurring = false) {
     editing = item ? {item, recurring} : null; creationKey = null; $('taskForm').reset(); $('editorFeedback').textContent = state.supervisors.length ? '' : 'Няма активни началници смяна с право за преглед. Настрой ги в „Акаунти“ с право за отчитане и избран екип.';
-    problemPicker.reset(item?.problemPhoto, item, recurring); $('problemPhotoHelp').textContent = item ? 'Избери нова снимка, за да замениш проблема. Предишната остава в историята.' : 'Добави снимка на проблема. При повторение тя се използва за всички смени.';
+    problemPicker.reset(problemPhotos(item), item, recurring); $('problemPhotoHelp').textContent = item ? 'Добави или премахни снимки на проблема. Предишните остават в историята.' : 'Добави една или повече снимки на проблема. При повторение се използват за всички смени.';
+    $('taskRequiresPhotos').checked = requiresPhotos(item);
     $('editorTitle').textContent = item ? recurring ? 'Промени бъдещите задачи' : 'Промени задача' : 'Възложи задача'; $('saveTask').textContent = item ? 'Запази' : 'Възложи';
     $('taskKind').value = item?.kind || 'shift'; $('taskKind').disabled = !!item; $('taskRepeat').value = recurring ? 'every-shift' : 'once'; $('taskRepeat').disabled = !!item;
     $('taskFrom').disabled = !!item; $('taskUntil').disabled = !!item; $('editReasonLabel').hidden = !item; $('editReason').required = !!item;
@@ -215,7 +247,7 @@
     $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); $('taskEditor').showModal(); $('taskTitle').focus();
   }
   function openAction(item, action, recurring = false) {
-    acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); $('solutionPhotoFields').hidden = action !== 'report';
+    acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'report' || !requiresPhotos(item);
     $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
     $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
     for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
@@ -231,20 +263,24 @@
   }
   $('taskForm').addEventListener('submit', event => {
     event.preventDefault();
-    if (problemPicker.pending) { $('editorFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
-    if (problemPicker.failed) { $('editorFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
-    if (!editing && !problemPicker.value) { $('editorFeedback').textContent = 'Добави снимка преди запис.'; return; }
+    const needsPhoto = $('taskRequiresPhotos').checked;
+    if (needsPhoto && problemPicker.pending) { $('editorFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
+    if (needsPhoto && problemPicker.failed) { $('editorFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
+    if (needsPhoto && (!problemPicker.count || !problemPicker.valid)) { $('editorFeedback').textContent = 'Добави снимка преди запис.'; return; }
     const payload = {title: $('taskTitle').value, description: $('taskDescription').value, priority: $('taskPriority').value, assigneeId: Number($('taskOwner').value), participantIds: $('taskKind').value === 'global' ? [...$('participantOptions').querySelectorAll('input:checked')].map(input => Number(input.value)) : [], kind: $('taskKind').value, repeat: $('taskRepeat').value, from: $('taskFrom').value, until: $('taskUntil').value, dueDate: $('taskDueDate').value, dueTime: $('taskDueTime').value, note: $('editReason').value};
-    if (problemPicker.value) payload.problemPhoto = problemPicker.value;
+    payload.requiresPhotos = needsPhoto;
+    if (needsPhoto) payload.problemPhotos = problemPicker.values;
     if (!editing) { const signature = JSON.stringify(payload); if (!creationKey || creationKey.signature !== signature) creationKey = {signature, id: crypto.randomUUID()}; payload.requestId = creationKey.id; }
     mutate($('taskForm'), $('editorFeedback'), () => editing ? HubServer.send('/api/tasks/' + (editing.recurring ? 'schedules/' : 'items/') + editing.item.id, 'PATCH', {...payload, action: 'edit'}, {'If-Match': '"' + editing.item.revision + '"'}) : HubServer.send('/api/tasks', 'POST', payload));
   });
   $('actionForm').addEventListener('submit', event => {
     event.preventDefault();
     if (solutionPicker.pending) { $('actionFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
-    if (acting.action === 'report' && !solutionPicker.value) { $('actionFeedback').textContent = 'Добави снимка преди запис.'; return; }
+    if (acting.action === 'report' && requiresPhotos(acting.item) && !solutionPicker.count) { $('actionFeedback').textContent = 'Добави снимка преди запис.'; return; }
+    if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.failed) { $('actionFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
+    if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.count !== requiredPhotoCount(acting.item)) { $('actionFeedback').textContent = 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.'; return; }
     const payload = {action: acting.action, status: $('reportStatus').value, note: $('actionNote').value};
-    if (acting.action === 'report') payload.solutionPhoto = solutionPicker.value;
+    if (acting.action === 'report' && requiresPhotos(acting.item)) payload.solutionPhotos = solutionPicker.values;
     const signature = JSON.stringify(payload); if (!actionKey || actionKey.signature !== signature) actionKey = {signature, id: crypto.randomUUID()}; payload.requestId = actionKey.id;
     mutate($('actionForm'), $('actionFeedback'), () => HubServer.send('/api/tasks/' + (acting.recurring ? 'schedules/' : 'items/') + acting.item.id, 'PATCH', payload, {'If-Match': '"' + acting.item.revision + '"'}));
   });
@@ -254,12 +290,12 @@
   $('taskEditor').addEventListener('close', () => problemPicker.reset()); $('taskAction').addEventListener('close', () => solutionPicker.reset());
   $('taskPhotoViewer').addEventListener('close', () => $('photoViewerImage').removeAttribute('src'));
   $('photoViewerImage').addEventListener('error', () => { if ($('taskPhotoViewer').open) $('photoViewerFeedback').textContent = 'Снимката не е достъпна. Опресни задачите.'; });
-  for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom']) $(id).addEventListener('change', editorFields);
+  for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom', 'taskRequiresPhotos']) $(id).addEventListener('change', editorFields);
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
   for (const id of ['ownerFilter', 'taskSearch', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', render);
   $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });
-  document.addEventListener('click', event => { if (event.target.closest('[data-hub-language]')) renderPhotoPolicy(); });
+  document.addEventListener('click', event => { if (event.target.closest('[data-hub-language]')) { renderPhotoPolicy(); problemPicker.render(); solutionPicker.render(); if (!draftOpen()) render(); } });
   HubServer.watch('tasks', refresh, draftOpen); HubServer.watch('accounts', refresh, draftOpen);
   setInterval(() => { if (!draftOpen()) refresh(); }, 30000); refresh();
 })();

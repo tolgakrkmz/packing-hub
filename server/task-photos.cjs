@@ -3,6 +3,7 @@ const path = require('node:path');
 const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const MAX_BYTES = 300 * 1024, MAX_EDGE = 1280;
+const MAX_PHOTOS = 10, REQUEST_BYTES = Math.ceil(MAX_BYTES / 3) * 4 * MAX_PHOTOS + 64 * 1024;
 const FINAL = ['completed', 'cancelled', 'not-done', 'not-applicable'];
 
 // Accept bounded, metadata-free JPEGs produced by the browser canvas encoder.
@@ -51,8 +52,18 @@ function jpeg(input) {
   }
   invalid();
 }
+const photoList = (item, plural, single) => Array.isArray(item?.[plural]) ? item[plural] : item?.[single] ? [item[single]] : [];
+function photoInputs(input, plural, single) {
+  if (input[plural] !== undefined) {
+    if (!Array.isArray(input[plural]) || input[single] != null) throw problem(400, 'TASK_PHOTO_INVALID');
+    if (input[plural].length > MAX_PHOTOS) throw problem(400, 'TASK_PHOTO_LIMIT');
+    return input[plural];
+  }
+  return input[single] != null ? [input[single]] : [];
+}
 function references(item) {
-  return [item.problemPhoto, item.report?.photo, ...(item.events || []).flatMap(event => [event.photo, event.snapshot?.problemPhoto])].filter(Boolean);
+  return [...photoList(item, 'problemPhotos', 'problemPhoto'), ...photoList(item.report, 'photos', 'photo'),
+    ...(item.events || []).flatMap(event => [...photoList(event, 'photos', 'photo'), ...photoList(event.snapshot, 'problemPhotos', 'problemPhoto')])];
 }
 function afterMonths(at, months) {
   const date = new Date(at), day = date.getUTCDate();
@@ -74,6 +85,16 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
     db.prepare('INSERT INTO task_photos(id,content,created_at) VALUES(?,?,?)').run(id, value.content, at);
     return {id, at, bytes: value.content.length, width: value.width, height: value.height};
   }
+  function addMany(inputs, at, existing = []) {
+    const seen = new Set();
+    return inputs.map(input => {
+      if (typeof input === 'string') return add(input, at);
+      const previous = input && typeof input === 'object' && Object.keys(input).length === 1 && existing.find(photo => photo.id === input.id);
+      if (!previous || seen.has(previous.id) || !exists(previous.id)) throw problem(400, 'TASK_PHOTO_INVALID');
+      seen.add(previous.id); return previous;
+    });
+  }
+  const exists = id => !!db.prepare('SELECT 1 FROM task_photos WHERE id=?').get(id);
   // Call inside the task transaction, after recurring shifts have materialized.
   function cleanup(items, schedules, at, scheduleEnd) {
     const keep = new Set();
@@ -90,9 +111,12 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
     for (const photo of db.prepare('SELECT id FROM task_photos').all()) if (!keep.has(photo.id)) remove.run(photo.id);
   }
   function decorate(item, available = new Set(db.prepare('SELECT id FROM task_photos').all().map(row => row.id))) {
-    const mark = photo => photo ? {...photo, available: available.has(photo.id)} : null;
-    return {...item, problemPhoto: mark(item.problemPhoto), report: item.report ? {...item.report, photo: mark(item.report.photo)} : null,
-      events: (item.events || []).map(event => ({...event, ...(event.photo ? {photo: mark(event.photo)} : {}), ...(event.snapshot?.problemPhoto ? {snapshot: {...event.snapshot, problemPhoto: mark(event.snapshot.problemPhoto)}} : {})}))};
+    const mark = photo => ({...photo, available: available.has(photo.id)});
+    const problems = value => { const list = photoList(value, 'problemPhotos', 'problemPhoto').map(mark); return {...value, problemPhotos: list, problemPhoto: list[0] || null}; };
+    const solutions = value => { const list = photoList(value, 'photos', 'photo').map(mark); return {...value, photos: list, photo: list[0] || null}; };
+    // Single-photo aliases allow older clients to read existing evidence safely.
+    return {...problems(item), report: item.report ? solutions(item.report) : null,
+      events: (item.events || []).map(event => ({...solutions(event), ...(event.snapshot ? {snapshot: problems(event.snapshot)} : {})}))};
   }
   function get(item, id) {
     if (!references(item).some(photo => photo.id === id)) throw problem(404, 'NOT_FOUND');
@@ -100,7 +124,7 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
     if (!photo) throw problem(410, 'TASK_PHOTO_EXPIRED');
     return Buffer.from(photo.content);
   }
-  return {add, cleanup, decorate, get, exists: id => !!db.prepare('SELECT 1 FROM task_photos WHERE id=?').get(id),
-    policy: () => ({retentionMonths, limitBytes, usedBytes: usedBytes(), maxBytes: MAX_BYTES, maxEdge: MAX_EDGE})};
+  return {add, addMany, cleanup, decorate, get, exists,
+    policy: () => ({retentionMonths, limitBytes, usedBytes: usedBytes(), maxBytes: MAX_BYTES, maxEdge: MAX_EDGE, maxPhotos: MAX_PHOTOS})};
 }
-module.exports = {createTaskPhotos, jpeg, afterMonths, MAX_BYTES, MAX_EDGE};
+module.exports = {createTaskPhotos, jpeg, afterMonths, photoList, photoInputs, MAX_BYTES, MAX_EDGE, MAX_PHOTOS, REQUEST_BYTES};

@@ -1245,6 +1245,14 @@ Object.assign(HUB_EN_MESSAGES, {
 Object.assign(HUB_EN_MESSAGES, {"Двойки": "Pairs", "Инструкции": "Instructions", "Статистика": "Statistics", "Редактирай задачи и проследявай изпълнението им.": "Edit tasks and track their progress."});
 Object.assign(HUB_EN_MESSAGES, {
   "Проблем — снимка": "Problem — photo", "Решение — снимка": "Solution — photo", "Проблем": "Problem", "Решение": "Solution",
+  "Изисква снимки": "Requires photos", "Снимки не се изискват": "Photos are not required",
+  "Премахни снимката": "Remove photo", "Снимките са готови за запис.": "The photos are ready to save.",
+  "Можеш да добавиш до 10 снимки.": "You can add up to 10 photos.",
+  "Броят на снимките на решението трябва да е равен на броя на снимките на проблема.": "The number of solution photos must equal the number of problem photos.",
+  "Добави една или повече снимки на проблема. При повторение се използват за всички смени.": "Add one or more problem photos. Recurring shifts share these photos.",
+  "Добави или премахни снимки на проблема. Предишните остават в историята.": "Add or remove problem photos. Previous photos stay in history.",
+  "Всеки отчет изисква толкова нови снимки на решението или текущото състояние, колкото са снимките на проблема, включително при неизпълнена задача.": "Every report requires as many new solution or current-state photos as there are problem photos, including unfinished work.",
+  "При включена отметка снимките „Проблем“ и „Решение“ са задължителни.": "When checked, Problem and Solution photos are required.",
   "Избери снимка": "Choose photo", "Снимай": "Take photo", "Избрана снимка": "Selected photo", "Отвори снимката": "Open photo", "Премахни избора": "Clear selection",
   "Добави снимка на проблема. При повторение тя се използва за всички смени.": "Add a photo of the problem. Recurring shifts share this photo.",
   "Избери нова снимка, за да замениш проблема. Предишната остава в историята.": "Choose a new problem photo. The previous photo stays in history.",
