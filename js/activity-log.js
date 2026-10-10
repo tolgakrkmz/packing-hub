@@ -1,8 +1,8 @@
 (() => {
   const el = id => document.getElementById(id);
   const message = el('activityMessage');
-  if (typeof HubServer === 'undefined' || HubServer.user.role !== 'admin') {
-    message.textContent = 'Журналът е достъпен само за администратори в сървърен режим.';
+  if (typeof HubServer === 'undefined' || !HubServer.can('canViewActivity')) {
+    message.textContent = 'Журналът изисква право за преглед на потребителската активност.';
     el('refreshActivity').disabled = true;
     return;
   }

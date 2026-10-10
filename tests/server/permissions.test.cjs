@@ -45,21 +45,36 @@ test('role defaults and explicit restrictions survive a reopen; migration preser
   assert.equal(accounts(store).list()[0].permissions.canExportReports, false);
   assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 4);
 });
-test('only administrators manage permissions; values are strictly boolean and role ceilings cannot be bypassed', async t => {
+test('account managers control strictly boolean overrides for every role', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), operator = await login('operator');
   assert.equal((await change(operator, operator, {canImportData: true})).status, 403);
-  for (const permissions of [null, [], {canExportReports: 'false'}, {canImportData: 1}, {unknown: true}, JSON.parse('{"__proto__":true}')]) {
+  for (const permissions of [null, [], {canExportReports: 'false'}, {canImportData: 1}, {canAssignTasks: 'true'}, {canAssignTasks: null}, {unknown: true}, JSON.parse('{"__proto__":true}')]) {
     assert.equal((await change(admin, operator, permissions)).status, 400);
     assert.equal((await request('/api/session', operator)).status, 200);
   }
   assert.equal((await request('/api/accounts', admin, 'POST', {username: 'demo-restricted', password, role: 'operator', permissions: {canExportReports: false}})).status, 201);
   const all = {canImportData: true, canCreateReports: true, canEditReports: true, canExportReports: true};
   await hub.auth.update(operator.user.id, {permissions: all}, admin.user); const enabled = await login('operator');
-  assert.equal(enabled.user.permissions.canImportData, false);
-  assert.equal((await request('/api/import/batches', enabled, 'POST', {})).status, 403);
+  assert.equal(enabled.user.permissions.canImportData, true);
+  assert.equal((await request('/api/import/batches', enabled, 'POST', {})).status, 400);
   const observer = await login('observer'); await hub.auth.update(observer.user.id, {permissions: all}, admin.user); const reader = await login('observer');
-  assert.equal(reader.user.permissions.canCreateReports, false); assert.equal(reader.user.permissions.canEditReports, false);
-  assert.equal((await request('/api/data/production-log', reader, 'PUT', {entries: [], goalTons: 3000}, {'If-Match': '"1"'})).status, 403);
+  assert.equal(reader.user.permissions.canCreateReports, true); assert.equal(reader.user.permissions.canEditReports, true);
+  assert.equal((await request('/api/data/production-log', reader, 'PUT', {entries: [], goalTons: 3000}, {'If-Match': '"1"'})).status, 200);
+});
+test('assignment overrides survive reopening and reset to safe role defaults without a schema change', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-task-assignment-demo-')); t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const filename = path.join(directory, 'demo.sqlite'); let store = openStore(filename), auth = accounts(store);
+  const admin = await auth.create('demo-admin', password, 'admin'), operator = await auth.create('demo-assigner', password, 'operator'), observer = await auth.create('demo-observer', password, 'observer');
+  assert.equal(admin.permissions.canAssignTasks, true); assert.equal(operator.permissions.canAssignTasks, false); assert.equal(observer.permissions.canAssignTasks, false);
+  await auth.update(operator.id, {permissions: {canAssignTasks: true, canExportReports: false}}, admin); store.close();
+  store = openStore(filename); auth = accounts(store);
+  const user = auth.list().find(user => user.id === operator.id);
+  assert.equal(user.permissions.canAssignTasks, true); assert.equal(user.permissions.canViewTasks, true); assert.equal(user.permissions.canExportReports, false);
+  assert.equal(user.role, 'operator'); assert.equal(user.taskSupervisor, false);
+  await auth.update(operator.id, {permissions: {}}, admin); store.close();
+  store = openStore(filename); t.after(() => store.close());
+  assert.deepEqual(accounts(store).list().find(user => user.id === operator.id).permissions, defaults.operator);
+  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 4);
 });
 test('export permission gates every supported download, retains viewing and records only audit metadata', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), observer = await login('observer');
@@ -138,7 +153,7 @@ test('restricted administrators retain export access while every import stage st
   await change(actor, restricted, {canImportData: true, canCreateReports: false, canEditReports: false}); const importer = await login();
   assert.equal((await request('/api/import/production-log/apply', importer, 'POST', source.documents['production-log'], {'If-Match': '"1"'})).status, 200);
 });
-test('permission updates close live sessions immediately and role downgrades remove inherited privileged access', async t => {
+test('permission updates close live sessions immediately and explicit rights survive role changes', async t => {
   const {login, request, change} = await setup(t); const admin = await login(), operator = await login('operator');
   const stream = await request('/api/events', operator); const reader = stream.body.getReader();
   try {
@@ -146,7 +161,7 @@ test('permission updates close live sessions immediately and role downgrades rem
     assert.match(Buffer.from((await reader.read()).value).toString(), /event: logout/);
     assert.equal((await request('/api/session', operator)).status, 401);
     await request('/api/accounts/' + operator.user.id, admin, 'PATCH', {role: 'observer', permissions: {canEditReports: true}});
-    const downgraded = await login('operator'); assert.equal(downgraded.user.permissions.canEditReports, false);
+    const downgraded = await login('operator'); assert.equal(downgraded.user.permissions.canEditReports, true);
     assert.equal((await request('/api/accounts/' + admin.user.id, admin, 'PATCH', {active: false})).status, 409);
   } finally { await reader.cancel(); }
 });
@@ -204,4 +219,21 @@ test('pair selection uses a minimal active-packer roster and workforce counts di
   const updated = {...roster, employees: roster.employees.map(person => ({...person, active: false}))}; hub.store.put('personnel', updated, 2, admin.user);
   const current = await (await request('/api/statistics/workforce', observer)).json(); assert.equal(current.revision, 3); assert.equal(current.data.counts.totalActive, 0);
   assert.equal((await (await request('/api/pair-roster', operator)).json()).data.employees.length, 0);
+});
+test('the complete module permission matrix persists across reopening and retains overrides when roles change', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-module-rights-demo-')); t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const filename = path.join(directory, 'demo.sqlite'); const {keys} = require('../../server/permissions.cjs');
+  const rights = Object.fromEntries(keys.map(key => [key, true]));
+  let store = openStore(filename), auth = accounts(store);
+  const admin = await auth.create('demo-manager', password, 'admin');
+  const user = await auth.create('demo-flexible', password, 'observer', admin, rights, () => {}, {taskSupervisor: true, taskTeam: 'В'});
+  for (const key of keys) await assert.rejects(auth.update(user.id, {permissions: {[key]: 'true'}}, admin), error => error.code === 'INVALID_PERMISSIONS');
+  store.close(); store = openStore(filename); t.after(() => store.close()); auth = accounts(store);
+  assert.deepEqual(auth.list().find(item => item.id === user.id).permissionOverrides, rights);
+  assert.deepEqual(auth.list().find(item => item.id === user.id).permissions, rights);
+  await auth.update(user.id, {role: 'operator'}, admin);
+  const operator = auth.list().find(item => item.id === user.id);
+  assert.deepEqual(operator.permissions, rights); assert.equal(operator.taskSupervisor, true); assert.equal(operator.taskTeam, 'В');
+  await auth.update(user.id, {permissions: {}, taskSupervisor: false}, admin);
+  assert.deepEqual(auth.list().find(item => item.id === user.id).permissions, defaults.operator);
 });

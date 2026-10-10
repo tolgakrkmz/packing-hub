@@ -40,15 +40,16 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
   const access = user => { if (!can(user, 'canViewTasks')) throw problem(403, 'FORBIDDEN'); };
-  const supervisor = user => user.role === 'operator' && user.taskSupervisor === true;
-  const admin = user => { access(user); if (user.role !== 'admin') throw problem(403, 'FORBIDDEN'); };
+  const supervisor = user => user.taskSupervisor === true;
+  const manager = user => { access(user); if (!can(user, 'canManageTasks')) throw problem(403, 'FORBIDDEN'); };
+  const assigner = user => { access(user); if (!can(user, 'canAssignTasks')) throw problem(403, 'FORBIDDEN'); };
   function text(value, max, required = false) {
     if (typeof value !== 'string' || value.length > max || required && !value.trim()) throw problem(400, 'INVALID_TASK');
     return value.trim();
   }
   function roster() {
-    return db.prepare("SELECT id,username,role,permissions,task_team FROM users WHERE active=1 AND role='operator' AND task_supervisor=1 ORDER BY username").all()
-      .filter(row => can({...row, taskSupervisor: true, permissionOverrides: JSON.parse(row.permissions)}, 'canViewTasks'))
+    return db.prepare("SELECT id,username,role,permissions,task_team FROM users WHERE active=1 AND task_supervisor=1 AND deleted_at IS NULL ORDER BY username").all()
+      .filter(row => can({...row, taskSupervisor: true, permissionOverrides: JSON.parse(row.permissions)}, 'canReportTasks'))
       .map(row => ({id: row.id, username: row.username, team: row.task_team}));
   }
   function assignments(input) {
@@ -75,7 +76,8 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     return row(table, id);
   }
   function revision(value, expected) { if (value.revision !== expected) throw problem(409, 'CONFLICT'); }
-  const visible = (item, user) => !supervisor(user) || item.owner.id === user.id || item.participants.some(person => person.id === user.id);
+  const assignedTo = (item, user) => item.owner.id === user.id || item.participants.some(person => person.id === user.id);
+  const visible = (item, user) => !supervisor(user) || can(user, 'canManageTasks') || can(user, 'canReviewTasks') || assignedTo(item, user) || can(user, 'canAssignTasks') && item.events.some(entry => entry.action === 'created' && entry.actor.id === user.id);
   function event(user, action, note, at) { return {at, actor: {id: user.id, username: user.username}, action, note}; }
   function itemFrom(source, period, at) {
     const events = source.events.map(entry => entry.action === 'created' ? {...entry, snapshot: {...entry.snapshot, due: period.due}} : entry);
@@ -107,7 +109,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   function list(user) {
     access(user); const at = now();
     store.transaction(() => materialize(at));
-    return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), supervisors: user.role === 'admin' ? roster() : [],
+    return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), supervisors: can(user, 'canManageTasks') || can(user, 'canAssignTasks') ? roster() : [],
       items: all('task_items').filter(item => visible(item, user)).map(item => derived(item, at)), schedules: all('task_schedules').filter(item => visible(item, user))};
   }
   function summary(user) {
@@ -115,8 +117,8 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     store.transaction(() => materialize(at));
     // Count work awaiting this account, without sending task content to other pages.
     const count = all('task_items').filter(item => {
-      if (user.role === 'admin') return item.status === 'review';
-      if (!supervisor(user) || !visible(item, user)) return false;
+      if (can(user, 'canReviewTasks') && item.status === 'review') return true;
+      if (!can(user, 'canReportTasks') || !assignedTo(item, user)) return false;
       if (item.kind === 'shift') return item.status === 'pending' && item.shift.start <= at;
       return ['pending', 'in-progress', 'blocked'].includes(item.status);
     }).length;
@@ -134,7 +136,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     });
   }
   function create(input, user) {
-    admin(user); const at = now(), values = fields(input);
+    assigner(user); const at = now(), values = fields(input);
     if (!['shift', 'global'].includes(input.kind)) throw problem(400, 'INVALID_TASK');
     if (input.kind === 'shift' && values.participants.length) throw problem(400, 'INVALID_TASK');
     return idempotent(input, user, () => {
@@ -160,7 +162,8 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
   }
   function change(id, input, expected, user, isSchedule = false) {
     access(user); const at = now();
-    if (user.role !== 'admin' && !supervisor(user)) throw problem(403, 'FORBIDDEN');
+    const required = ['approve', 'return'].includes(input.action) ? 'canReviewTasks' : ['report', 'progress'].includes(input.action) ? 'canReportTasks' : 'canManageTasks';
+    if (!can(user, required)) throw problem(403, 'FORBIDDEN');
     return store.transaction(() => {
       materialize(at);
       const table = isSchedule ? 'task_schedules' : 'task_items', item = row(table, id);
@@ -168,7 +171,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
       revision(item, expected);
       let note = text(input.note ?? '', 4000);
       if (isSchedule) {
-        admin(user);
+        manager(user);
         if (item.stoppedAt) throw problem(409, 'TASK_STATE');
         if (input.action === 'stop') { if (!note) throw problem(400, 'TASK_REASON'); item.stoppedAt = at; }
         else if (input.action === 'edit') {
@@ -180,7 +183,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
       } else {
         if (['completed', 'cancelled'].includes(item.status) && input.action !== 'reopen') throw problem(409, 'TASK_STATE');
         if (input.action === 'edit') {
-          admin(user); if (!note) throw problem(400, 'TASK_REASON');
+          manager(user); if (!note) throw problem(400, 'TASK_REASON');
           if (item.kind === 'shift' && (at >= item.due || item.report)) throw problem(409, 'TASK_STATE');
           const value = fields(input);
           if (item.kind === 'shift' && value.participants.length) throw problem(400, 'INVALID_TASK');
@@ -192,16 +195,18 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
           }
           Object.assign(item, value);
         } else if (input.action === 'report') {
-          if (user.role !== 'operator' || !user.taskSupervisor || item.owner.id !== user.id) throw problem(403, 'FORBIDDEN');
+          if (!can(user, 'canReportTasks') || item.owner.id !== user.id) throw problem(403, 'FORBIDDEN');
           if (item.kind === 'shift' && at < item.shift.start) throw problem(409, 'TASK_NOT_STARTED');
           const allowed = item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review'];
           if (!allowed.includes(input.status)) throw problem(400, 'INVALID_TASK');
           if (input.status !== 'completed' && !note) throw problem(400, 'TASK_REASON');
           item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
         } else if (input.action === 'progress') {
-          if (item.kind !== 'global' || user.role !== 'operator' || !user.taskSupervisor || !note) throw problem(400, 'INVALID_TASK');
+          if (!assignedTo(item, user)) throw problem(403, 'FORBIDDEN');
+          if (item.kind !== 'global' || !can(user, 'canReportTasks') || !note) throw problem(400, 'INVALID_TASK');
         } else if (['approve', 'return', 'reopen', 'cancel'].includes(input.action)) {
-          admin(user);
+          if (['approve', 'return'].includes(input.action)) { if (!can(user, 'canReviewTasks')) throw problem(403, 'FORBIDDEN'); }
+          else manager(user);
           if (input.action === 'approve' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
           if (input.action === 'return' && (item.kind !== 'global' || item.status !== 'review')) throw problem(409, 'TASK_STATE');
           if (input.action === 'reopen' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)) throw problem(409, 'TASK_STATE');
@@ -216,7 +221,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now} = {}) {
     });
   }
   function preview(date, assigneeId, user) {
-    admin(user);
+    assigner(user);
     const owner = roster().find(person => person.id === assigneeId);
     if (!owner) throw problem(400, 'INVALID_TASK_ASSIGNEE');
     return {shift: shift(date, owner.team), timezone};

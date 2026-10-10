@@ -5,7 +5,7 @@ const path = require('node:path');
 const {randomUUID} = require('node:crypto');
 const {isDeepStrictEqual} = require('node:util');
 const {defaults, problem, safePath, validateData, personnelModel} = require('./store.cjs');
-const {can} = require('./permissions.cjs');
+const {can, canViewModule} = require('./permissions.cjs');
 const limits = {fileBytes: 20 * 1024 * 1024, totalBytes: 1024 * 1024 * 1024, files: 5000, jsonBytes: 20 * 1024 * 1024};
 const lifetime = 4 * 60 * 60 * 1000;
 const same = (a, b) => isDeepStrictEqual(a, b);
@@ -38,6 +38,7 @@ function createImports(store, filename) {
     let manifest;
     try { manifest = JSON.parse(fs.readFileSync(path.join(directory, id, 'manifest.json'), 'utf8')); }
     catch { throw problem(404, 'IMPORT_EXPIRED'); }
+    if (Object.keys(manifest.documents).some(kind => !canViewModule(user, kind))) throw problem(403, 'FORBIDDEN');
     if (manifest.owner !== user.id) throw problem(403, 'FORBIDDEN');
     if (manifest.created + lifetime < Date.now()) { discard(id, user); throw problem(404, 'IMPORT_EXPIRED'); }
     return manifest;
@@ -52,6 +53,7 @@ function createImports(store, filename) {
     if (!can(user, 'canImportData')) throw problem(403, 'FORBIDDEN');
     if (!input || typeof input.documents !== 'object' || !input.documents || Array.isArray(input.documents) || !Object.keys(input.documents).length || !Array.isArray(input.files) || typeof input.includeSettings !== 'boolean') throw problem(400, 'INVALID_DATA');
     for (const [kind, data] of Object.entries(input.documents)) validateData(kind, data);
+    if (Object.keys(input.documents).some(kind => !canViewModule(user, kind))) throw problem(403, 'FORBIDDEN');
     const profiles = input.documents['package-instructions'];
     const names = new Set(); let bytes = 0;
     if (input.files.length > limits.files) throw problem(413, 'TOO_LARGE');

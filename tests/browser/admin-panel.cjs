@@ -48,9 +48,11 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     await hub.auth.create(username,'Fictional-password-123',role);
     const page=await device(username,true);
     await expect(page.locator('.server-links a')).toHaveCount(1);
-    await expect(page.locator('.server-links a')).toHaveText('Импорт / експорт');
-    for (const method of ['GET','HEAD']) assert.equal((await page.request.fetch(base+'/admin-panel.html',{method})).status(),403);
+    await expect(page.locator('.server-links a')).toHaveText('Админ панел');
+    for (const method of ['GET','HEAD']) assert.equal((await page.request.fetch(base+'/admin-panel.html',{method})).status(),200);
     await page.locator('.server-links a').click();
+    await expect(page.locator('.admin-card:visible')).toHaveCount(1);
+    await page.locator('#adminTransfer').click();
     await expect(page.locator('#reportExport')).toBeVisible();
     await page.context().close();
   }

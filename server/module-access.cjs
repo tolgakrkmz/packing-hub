@@ -1,11 +1,5 @@
-/* Purpose-specific read views keep the personnel module administrator-only. */
-const {can} = require('./permissions.cjs');
-function canViewModule(user, module) {
-  if (module === 'tasks') return can(user, 'canViewTasks');
-  if (module === 'personnel') return user?.role === 'admin';
-  if (module === 'statistics') return ['admin', 'observer'].includes(user?.role);
-  return ['admin', 'operator', 'observer'].includes(user?.role);
-}
+/* Purpose-specific read views avoid granting the complete personnel module. */
+const {canViewModule} = require('./permissions.cjs');
 function pairRoster(employees) {
   return employees.filter(person => person.active !== false && typeof person.role === 'string' && person.role.trim().toLowerCase() === 'опаковчик')
     .map(({id, name, category, team, role}) => ({id, name, category, team, role, active: true}));

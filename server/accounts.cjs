@@ -1,12 +1,12 @@
 const crypto = require('node:crypto');
 const {promisify} = require('node:util');
 const {problem} = require('./store.cjs');
-const {validateOverrides, permissionsFor} = require('./permissions.cjs');
+const {validateOverrides, permissionsFor, can} = require('./permissions.cjs');
 const scrypt = promisify(crypto.scrypt);
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const publicUser = row => {
   const permissionOverrides = validateOverrides(JSON.parse(row.permissions || '{}'));
-  const user = {id: row.id, username: row.username, role: row.role, active: !!row.active, permissionOverrides, taskSupervisor: !!row.task_supervisor && row.role === 'operator', taskTeam: row.task_team || ''};
+  const user = {id: row.id, username: row.username, role: row.role, active: !!row.active, permissionOverrides, taskSupervisor: !!row.task_supervisor, taskTeam: row.task_team || ''};
   return {...user, permissions: permissionsFor(user)};
 };
 async function passwordHash(password) {
@@ -26,7 +26,7 @@ function accounts(store) {
   function taskProfile(values, role, previous = {}) {
     const supervisor = values.taskSupervisor === undefined ? !!previous.task_supervisor : values.taskSupervisor;
     const team = values.taskTeam === undefined ? previous.task_team || '' : values.taskTeam;
-    if (typeof supervisor !== 'boolean' || typeof team !== 'string' || !['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ'].includes(team) || supervisor && role !== 'operator' || supervisor && !team) throw problem(400, 'INVALID_TASK_PROFILE');
+    if (typeof supervisor !== 'boolean' || typeof team !== 'string' || !['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ'].includes(team) || supervisor && !team) throw problem(400, 'INVALID_TASK_PROFILE');
     return {supervisor: supervisor ? 1 : 0, team: supervisor ? team : ''};
   }
   async function create(username, password, role, actor, permissions = {}, authorize = () => {}, profile = {}) {
@@ -66,13 +66,15 @@ function accounts(store) {
     if (!['admin', 'operator', 'observer'].includes(role) || values.active !== undefined && typeof values.active !== 'boolean') throw problem(400, 'INVALID_ACCOUNT');
     const hash = values.password === undefined ? row.hash : await passwordHash(values.password);
     const overrides = values.permissions === undefined ? JSON.parse(row.permissions) : validateOverrides(values.permissions);
-    const tasks = taskProfile({...values, ...(role !== 'operator' ? {taskSupervisor: false, taskTeam: ''} : {})}, role, row);
+    const tasks = taskProfile(values, role, row);
     authorize();
     store.transaction(() => {
       const current = db.prepare('SELECT * FROM users WHERE id=?').get(id);
       if (!current || current.deleted_at !== null) throw problem(404, 'NOT_FOUND');
       if (current.hash !== row.hash || current.role !== row.role || current.active !== row.active || current.permissions !== row.permissions || current.task_supervisor !== row.task_supervisor || current.task_team !== row.task_team) throw problem(409, 'CONFLICT');
       if (row.role === 'admin' && row.active && (role !== 'admin' || !active) && db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1").get().n <= 1) throw problem(409, 'LAST_ADMIN');
+      const next = {role, taskSupervisor: !!tasks.supervisor, permissionOverrides: overrides};
+      if (can(publicUser(row), 'canManageAccounts') && row.active && (!active || !can(next, 'canManageAccounts')) && !db.prepare('SELECT * FROM users WHERE active=1 AND deleted_at IS NULL AND id<>?').all(id).some(other => can(publicUser(other), 'canManageAccounts'))) throw problem(409, 'LAST_ACCOUNT_MANAGER');
       db.prepare('UPDATE users SET hash=?,role=?,active=?,permissions=?,task_supervisor=?,task_team=? WHERE id=?').run(hash, role, active, JSON.stringify(overrides), tasks.supervisor, tasks.team, id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       store.audit(actor, 'account-update', 'accounts');
@@ -81,11 +83,12 @@ function accounts(store) {
   }
   function remove(id, actor, authorize = () => {}) {
     authorize();
-    if (actor?.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (!can(actor, 'canManageAccounts')) throw problem(403, 'FORBIDDEN');
     return store.transaction(() => {
       const row = db.prepare('SELECT * FROM users WHERE id=?').get(id);
       if (!row || row.deleted_at !== null) throw problem(404, 'NOT_FOUND');
       if (row.role === 'admin' && row.active && db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1 AND deleted_at IS NULL").get().n <= 1) throw problem(409, 'LAST_ADMIN');
+      if (row.active && can(publicUser(row), 'canManageAccounts') && !db.prepare('SELECT * FROM users WHERE active=1 AND deleted_at IS NULL AND id<>?').all(id).some(other => can(publicUser(other), 'canManageAccounts'))) throw problem(409, 'LAST_ACCOUNT_MANAGER');
       if (id === actor.id) throw problem(409, 'SELF_DELETE');
       // Keep the identity reserved so historical assignments cannot pass to a new account.
       db.prepare('UPDATE users SET active=0,deleted_at=?,hash=? WHERE id=?').run(Date.now(), dummy, id);

@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('transferOffline').hidden = false;
     return;
   }
-  const allowed = {export:HubServer.can('canExportReports'), production:HubServer.can('canImportData'), modules:HubServer.can('canImportData')};
+  const allowed = {export:HubServer.can('canExportReports'), production:HubServer.can('canImportData') && HubServer.canViewModule('production-log'), modules:HubServer.can('canImportData')};
   const tabs = [...document.querySelectorAll('[data-transfer-tab]')];
   const available = tabs.filter(tab => allowed[tab.dataset.transferTab]);
   for (const tab of tabs) tab.hidden = !allowed[tab.dataset.transferTab];
@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (allowed.export) {
     const module = new URLSearchParams(location.search).get('module');
     const kind = $('reportExportKind');
+    for (const option of [...kind.options]) if (!HubServer.canViewModule(option.value)) option.remove();
+    if (!kind.options.length) { $('reportExport').hidden = true; kind.disabled = true; return; }
     if ([...kind.options].some(option => option.value === module)) kind.value = module;
     const update = () => { $('reportExport').href = '/api/export/' + kind.value; $('reportExport').download = kind.value + '.json'; };
     kind.addEventListener('change', update); update();

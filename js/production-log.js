@@ -61,7 +61,7 @@ const writer = createReportWriter({
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
 goalInput.addEventListener('change', async ()=>{
-  if(writer.busy) return;
+  if(writer.busy || typeof HubServer !== 'undefined' && !HubServer.can('canManageProductionSettings')) return;
   let v = parseInt(goalInput.value || '0', 10);
   if(v < 0) v = 0;
   await writer.run(current => ({...current,goalTons:v}), () => { goalInput.value = v; }, 'Целта е записана.');

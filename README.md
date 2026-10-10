@@ -39,7 +39,7 @@ them a read-only overview of all tasks, history and statistics. This does not gr
 assignment, reporting, approval or personnel access. Disabling access revokes the
 account's sessions immediately and removes it from new-assignment choices.
 
-In **Accounts**, set an operator's **Shift supervisor (tasks)** flag and team,
+In **Accounts**, set an account's **Shift supervisor (tasks)** flag and team,
 and keep **View Tasks** enabled. Use one personal account per supervisor: the
 account ID is the responsible person, and the team determines the shift schedule.
 Multiple personal accounts may belong to the same team; an assignment is always
@@ -50,7 +50,19 @@ does not grant personnel, statistics, account or import access. Existing account
 remain unmarked when the database migrates. Account changes revoke active
 sessions; existing assignment snapshots remain in history.
 
-Only administrators assign tasks. A shift task has one responsible supervisor and
+Administrators inherit **Can assign tasks**. An account manager can enable it for
+selected operators or observers in **Admin panel → Accounts**. This includes
+task viewing unless **View Tasks** is explicitly disabled. Delegated accounts
+can assign specific shifts, recurring shifts and global tasks, with the same
+assignee checks, preview, deadlines and retry protection as administrators.
+The flag grants no account, personnel, import, report-write or supervisor rights.
+Separate **Manage Tasks** and **Review Tasks** flags control editing/cancellation/recurrence and approval/return. **Report assigned tasks** controls reporting and progress for the responsible account or participants. Every role can receive these flags.
+Revoking the flag ends active sessions immediately. Existing tasks and their
+assignment history remain intact; old accounts keep their existing defaults.
+Supervisors with assignment permission also see tasks they created for others;
+reporting, participation and reminder counts still concern their own assignments.
+
+A shift task has one responsible supervisor and
 uses that team's scheduled shift, with a preview of its start and deadline. Assign
 a specific shift or repeat over a period of up to 366 days in the A–D rotation.
 Rest days are skipped. Stickers tasks use a specific regular shift, 09:00–17:00
@@ -63,8 +75,8 @@ amended before their deadline; past reports require an explicit reopen and reaso
 
 A global task has one primary owner, optional supervisor participants and a
 deadline. Participants add progress/handover notes; only the owner reports its
-state. The owner marks it **Ready for review**, then an administrator approves
-completion or returns it with a reason. Administrators can amend active tasks,
+state. The owner marks it **Ready for review**, then an account with review permission approves
+completion or returns it with a reason. Accounts with task management permission can amend active tasks,
 cancel or reopen them; changes and reasons remain in each task's event history.
 
 The Tasks tile and the Tasks link in the server toolbar show a small count of
@@ -104,45 +116,49 @@ part of legacy imports, generic module replacement, report exports or offline
 file mode. Deploy the reviewed server code/container to enable them; the legacy
 production folder and its live files remain independent.
 
-Administrators can set individual account permissions to **Role default**,
-**Allowed**, or **Denied** in Accounts. Existing accounts inherit role defaults
-when the database is upgraded; accounts, reports and sessions are preserved.
-Saving account changes revokes its sessions immediately, including live streams.
+Account managers configure permissions as module cards in **Admin panel → Accounts**.
+Roles supply defaults; every flag can be explicitly allowed or denied for every
+role, including operator and observer. Resetting restores inheritance. Existing
+accounts retain their defaults and saved overrides without a data migration.
+Saving changes revokes the account's sessions immediately, including live streams
+and requests still reading a body or hashing a password.
 
-| Permission | Administrator | Operator | Observer |
-| --- | --- | --- | --- |
-| Import data | Allowed | Unavailable | Unavailable |
-| Export reports | Allowed | Allowed | Allowed |
-| Add reports | Allowed | Allowed | Unavailable |
-| Correct/delete recorded reports | Allowed | Denied | Unavailable |
-| View Tasks | Allowed | Denied (allowed for designated supervisors) | Denied |
+| Module | Separate permissions |
+| --- | --- |
+| Production | View, add reports, correct/delete reports, change target |
+| Downtime | View, add reports, correct/delete reports, manage reasons |
+| Pairs | View, plan/first result, correct recorded results |
+| Personnel | View, manage |
+| Instructions | View, manage index and attachments |
+| Statistics | View reports and aggregate workforce statistics |
+| Tasks | View, assign, report assigned work, manage, approve/return |
+| Accounts | View accounts/permissions, manage accounts/permissions |
+| Activity | View visits and action history |
+| System status | View, request backup |
+| Transfer | Import data, export reports |
 
-Role limits remain enforced even for explicit overrides. Import permission
-controls both import workflows independently of report write permissions.
-Operators with correction permission can correct/delete production and downtime
-entries and correct pair results; goals, downtime reasons, personnel, instructions
-and account management retain administrator restrictions. For pairs, creating or
-changing an unreported plan, removing an unreported plan, and entering its first
-result use the add-report permission. Recorded plans retain validation safeguards.
-Operators now need an explicit correction grant to change an already reported
-pair result.
+Actions inherit module viewing unless viewing is explicitly denied. An explicit
+view denial blocks the page, data API and that module's actions even for admins.
+Common add/edit report flags remain supported for existing accounts; production,
+downtime and pairs inherit them until a module-specific override is set. Settings
+have separate flags. Pair validation, immutable cancellation history and ownership
+checks still apply regardless of role. Task profiles and teams are available to
+all roles; new assignees need a profile, team and effective reporting access.
+Account management grants authority to change all permissions; at least one active
+account must retain this right. The last administrator is also retained for the
+existing recovery workflow.
 
-The Personnel / Shifts module and its full data API are administrator-only.
-Statistics is available to administrators and observers; operators cannot open
-it or access its workforce API. Navigation follows these fixed role limits.
-Pair planning uses a separate read-only list of active packers with only the
-fields needed for selection. Workforce statistics receive aggregate counts,
-not personnel identities, notes, settings or movement history. Both read views
-refresh automatically after administrator changes to personnel.
+Pair planning receives only the active-packer fields needed for selection.
+Statistics receives aggregate workforce counts and uses its own authorized
+report-data endpoints; it grants no access to full personnel records. Both read
+views update after personnel changes. Module navigation follows effective rights.
 
-The server bar links to the shared **Import & export** screen at
-`data-import.html`. Report downloads, production-history import and module/attachment
-import have separate tabs; switching tabs retains selected files and checked
-previews. The previous `production-import.html` address redirects to the
-production tab. Only permitted actions appear: export-only accounts can download
-reports, import-only administrators can import, and accounts with neither
-permission cannot open the screen. In file mode it shows guidance without sending
-data or enabling server controls.
+The header has one **Admin panel** link for accounts with any permitted panel
+module. Only available cards appear. Transfer tabs retain selected files and
+previews. Import is independent of normal write permissions, includes viewing
+of importable modules unless explicitly denied, and rejects a denied module at
+creation, preview and application. Exports also require viewing the chosen report.
+The old `production-import.html` redirects to the production tab.
 
 JSON downloads use the authenticated `/api/export/<module>` endpoints for
 production, downtime and pairs. Exports use current server data and record only
@@ -157,13 +173,13 @@ A new database starts empty, without employee seeds, reports or default accounts
 Clients use the same data through a browser, without picking JSON files or
 installing an application. Statistics reads the shared module data.
 
-An administrator creates accounts and assigns these roles:
+An account manager creates accounts with these initial role defaults:
 
-| Role | Access |
+| Role | Default access |
 | --- | --- |
 | Administrator | All modules, corrections, personnel, instructions, goals/reasons and accounts. |
-| Operator | Read all modules; append production/downtime; plan and report pairs. Cannot change existing production/downtime, personnel, instructions, goals/reasons or accounts. |
-| Observer | Read modules, reports and attachments. Cannot write. |
+| Operator | Read production, downtime, pairs and instructions; add reports and plan pairs; export reports. |
+| Observer | Read production, downtime, pairs, instructions and statistics; export reports. |
 
 In Production and scrap, accounts without permission to create reports see no
 New entry panel. The date selector remains available beside the daily total;
@@ -500,10 +516,10 @@ target-host exercise; no real archive is needed in development or GitHub.
 
 ### Administrator system status
 
-The authenticated header replaces its Tasks shortcut with **System status** for
-administrators. Tasks remain available from the home module tile, with their
-pending counter also shown in the Tasks heading. Operators and observers cannot
-open the status page or use either administration API, including direct requests.
+The authenticated header opens **Admin panel**, whose System status card requires
+the status-viewing flag. Backup requests require a separate backup flag. Both can
+be delegated to any role; direct page and API access enforce the same rights.
+Tasks remain on the home screen, with pending counts also in the Tasks heading.
 The page uses the shared Package Hub theme and supports BG/EN and small screens.
 The Bulgarian [practical scenarios and test coverage](SYSTEM-STATUS-SCENARIOS.md)
 explain how this task complements backup and recovery.
@@ -722,17 +738,16 @@ in `scripts/check-publication.cjs`; arbitrary images remain blocked.
 ## Account management
 
 The Accounts screen shows a compact searchable list with filters for activity and
-role. Expand an account to change its role, active status and the four permission
-checkboxes: import, export, report creation and report correction/deletion.
-Unavailable rights stay disabled according to role limits. Unchanged rights keep
-their existing inheritance; Reset permissions to role restores role defaults.
+role. Expand an account to change its role, active status and permissions grouped
+into collapsible module cards. All flags are available for all roles. Unchanged
+rights keep their inheritance; Reset permissions to role restores role defaults.
 Password changes and new-account creation expand on demand. Saving one account
 keeps unsaved edits in other accounts. Controls adapt to narrow phone screens.
-Administrators can delete another account after confirmation. Deletion immediately
+Account managers can delete another account after confirmation. Deletion immediately
 revokes its sessions and removes it from the account list and assignment choices.
 The identity and username remain reserved to preserve task/report history; its
 password is discarded. Deleted accounts cannot be restored through account edits.
-The signed-in account and the last active administrator cannot be deleted.
+The signed-in account, last active administrator and last effective account manager cannot be deleted.
 
 ## Responsive interface
 
@@ -824,7 +839,7 @@ available. Reasons count reports, not downtime minutes.
 ## Administrator activity log
 
 In server mode, **Admin panel → User activity** opens the
-account journal. Only administrators can access the page and its API. It shows
+account journal. The page and API require activity-viewing permission. It shows
 the last successful sign-in or page visit for each account, including inactive
 and deleted accounts, and a newest-first history filtered by account, period
 and action. Load older records in pages of 50. Times use the viewing device's
@@ -853,22 +868,23 @@ node scripts/run-server-browser-tests.cjs --headless --activity-only
 
 ## Administrator panel
 
-Administrators have one **Admin panel** link in the shared header. The panel
+Accounts with access to any administration module have one **Admin panel** link in the shared header. The panel
 contains cards for Accounts, User activity, System status, and Import / export.
-Additional administration modules belong here. Only administrators can open
-the panel, including through direct GET and HEAD requests. The existing module
-URLs remain available with their existing permissions. The header highlights
+Additional administration modules belong here. Any role can open the panel when
+its effective permissions allow at least one card, including direct GET and HEAD
+requests. Individual module URLs require their corresponding viewing flag. The header highlights
 the panel while visiting one of its modules.
 
-The transfer card appears only when the administrator has import or export
+The transfer card appears only when the account has import or export
 permission. Its description reflects those permissions. Opening it from a
 report module via the panel keeps that module selected for export. Operators
-and observers retain their direct transfer link when permitted.
+and observers also use this single panel entry when permitted.
 
 Focused browser verification:
 
 ```sh
 node scripts/run-server-browser-tests.cjs --headless --admin-panel-only
+node scripts/run-server-browser-tests.cjs --headless --permissions-only
 ```
 
 ## Tests

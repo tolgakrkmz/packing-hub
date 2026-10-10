@@ -3,6 +3,7 @@ let selectedShift = null;
 let entries = [];
 let reasons = [];
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
+const canManageReasons = typeof HubServer === 'undefined' || HubServer.can('canManageDowntimeSettings');
 
 function defaultReasons(){
   return [
@@ -137,7 +138,7 @@ function escapeDowntimeText(value){
 }
 
 function renderReasonsAdmin(){
-  if(!canEditReports){
+  if(!canManageReasons){
     reasonsAdminPanel.style.display = 'none';
     return;
   }
@@ -151,7 +152,7 @@ function renderReasonsAdmin(){
 }
 
 addReasonBtn.addEventListener('click', async ()=>{
-  if(!canEditReports || writer.busy) return;
+  if(!canManageReasons || writer.busy) return;
   const val = newReasonInput.value.trim();
   if(!val) return;
   await writer.run(current => {
@@ -163,7 +164,7 @@ addReasonBtn.addEventListener('click', async ()=>{
 });
 
 async function removeReason(r){
-  if(!canEditReports || writer.busy) return;
+  if(!canManageReasons || writer.busy) return;
   if(!confirm('Да изтрия причина "'+r+'"? Стари записи с нея остават непроменени.')) return;
   await writer.run(current => ({...current,reasons:current.reasons.filter(value => value !== r)}), () => {}, 'Причината е изтрита.');
 }

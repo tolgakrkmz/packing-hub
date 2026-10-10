@@ -82,9 +82,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (!fresh) throw problem(401, 'LOGIN_REQUIRED');
         return fresh.user;
       };
-      const currentAdmin = () => {
+      const authorized = key => {
         const user = currentUser();
-        if (user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+        if (!can(user, key)) throw problem(403, 'FORBIDDEN');
         return user;
       };
       const mutation = !['GET', 'HEAD'].includes(request.method);
@@ -112,18 +112,19 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
         if (pathname === '/api/admin/activity') {
-          const user = currentAdmin();
+          const user = authorized('canViewActivity');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           return json(response, 200, activity.list(url.searchParams, user));
         }
         if (pathname === '/api/admin/status' || pathname === '/api/admin/backup') {
-          currentAdmin();
+          const right = pathname === '/api/admin/status' ? 'canViewSystemStatus' : 'canBackupSystem';
+          authorized(right);
           if (pathname === '/api/admin/status' && request.method === 'GET') {
-            const result = await maintenance.status(); currentAdmin();
+            const result = await maintenance.status(); authorized(right);
             return json(response, 200, result);
           }
           if (pathname === '/api/admin/backup' && request.method === 'POST') {
-            const input = await jsonBody(request, 1024); currentAdmin();
+            const input = await jsonBody(request, 1024); authorized(right);
             if (Object.keys(input).length) throw problem(400, 'INVALID_DATA');
             const result = await maintenance.backup();
             return json(response, 202, result);
@@ -139,17 +140,17 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return;
         }
         if (pathname === '/api/accounts' || /^\/api\/accounts\/\d+$/.test(pathname)) {
-          if (session.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+          if (!can(session.user, request.method === 'GET' ? 'canViewAccounts' : 'canManageAccounts')) throw problem(403, 'FORBIDDEN');
           if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list()});
           const input = await jsonBody(request);
           if (request.method === 'DELETE' && pathname !== '/api/accounts') {
-            const result = auth.remove(Number(pathname.split('/').pop()), currentAdmin(), currentAdmin);
+            const result = auth.remove(Number(pathname.split('/').pop()), authorized('canManageAccounts'), () => authorized('canManageAccounts'));
             broadcast('accounts', 0);
             return json(response, 200, result);
           }
-          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, currentAdmin(), input.permissions, currentAdmin, input)});
+          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, authorized('canManageAccounts'), input.permissions, () => authorized('canManageAccounts'), input)});
           if (request.method === 'PATCH') {
-            const user = await auth.update(Number(pathname.split('/').pop()), input, currentAdmin(), currentAdmin);
+            const user = await auth.update(Number(pathname.split('/').pop()), input, authorized('canManageAccounts'), () => authorized('canManageAccounts'));
             broadcast('accounts', 0);
             return json(response, 200, {user});
           }
@@ -177,20 +178,27 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/pair-roster' || pathname === '/api/statistics/workforce') {
-          if (pathname === '/api/statistics/workforce' && !canViewModule(session.user, 'statistics')) throw problem(403, 'FORBIDDEN');
+          if (!canViewModule(session.user, pathname === '/api/pair-roster' ? 'pair-targets' : 'statistics')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           const current = store.get('personnel');
           const data = pathname === '/api/pair-roster' ? {employees: pairRoster(current.data.employees)} : {counts: workforceCounts(current.data.employees)};
           return json(response, 200, {data, revision: current.revision});
         }
+        const statisticsData = pathname.match(/^\/api\/statistics\/data\/(production-log|line-downtime|pair-targets)$/);
+        if (statisticsData) {
+          if (!canViewModule(session.user, 'statistics')) throw problem(403, 'FORBIDDEN');
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, store.get(statisticsData[1]));
+        }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
-        if (document?.[1] === 'personnel' && !canViewModule(session.user, 'personnel')) throw problem(403, 'FORBIDDEN');
+        if (document && !canViewModule(session.user, document[1])) throw problem(403, 'FORBIDDEN');
         const exportReport = pathname.match(/^\/api\/export\/([a-z-]+)$/);
         if (exportReport) {
           if (!can(session.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           const kind = exportReport[1];
           if (!['production-log', 'line-downtime', 'pair-targets'].includes(kind)) throw problem(404, 'NOT_FOUND');
+          if (!canViewModule(session.user, kind)) throw problem(403, 'FORBIDDEN');
           store.audit(session.user, 'export', kind);
           return json(response, 200, store.get(kind).data, {'Content-Disposition': 'attachment; filename="' + kind + '.json"'});
         }
@@ -223,6 +231,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/folders') {
+          if (!canViewModule(session.user, 'package-instructions')) throw problem(403, 'FORBIDDEN');
           const name = url.searchParams.get('path') || '';
           if (request.method === 'GET') return json(response, 200, {entries: store.children(name)});
           if (request.method === 'POST') { const input = await jsonBody(request); store.createNode(input.path, input.kind, currentUser()); return json(response, 201, {ok: true}); }
@@ -230,7 +239,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         if (pathname === '/api/files') {
           const name = url.searchParams.get('path');
-          if (['personnel.json', 'data/personnel.json'].includes(name) && !canViewModule(session.user, 'personnel')) throw problem(403, 'FORBIDDEN');
+          if (!canViewModule(session.user, ['personnel.json', 'data/personnel.json'].includes(name) ? 'personnel' : 'package-instructions')) throw problem(403, 'FORBIDDEN');
           if (request.method === 'GET') { const file = store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
           if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), currentUser()); broadcast('package-instructions', result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
@@ -242,11 +251,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login.html'}); return response.end(); }
-      if (['/admin-panel.html', '/accounts.html', '/system-status.html', '/activity-log.html'].includes(assetName) && session?.user.role !== 'admin') throw problem(403, 'FORBIDDEN');
-      if (assetName === '/tasks.html' && !canViewModule(session?.user, 'tasks')) throw problem(403, 'FORBIDDEN');
-      if (assetName === '/personnel.html' && !canViewModule(session?.user, 'personnel')) throw problem(403, 'FORBIDDEN');
-      if (assetName === '/statistics.html' && !canViewModule(session?.user, 'statistics')) throw problem(403, 'FORBIDDEN');
-      if (assetName === '/data-import.html' && !can(session?.user, 'canImportData') && !can(session?.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
+      const moduleName = assetName.slice(1, -5);
+      if (assetName.endsWith('.html') && !['index', 'login', 'production-import'].includes(moduleName) && !canViewModule(session?.user, moduleName)) throw problem(403, 'FORBIDDEN');
       if (assetName === '/production-import.html') {
         if (!can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
         response.writeHead(302, {Location: '/data-import.html#production'}); return response.end();
@@ -255,7 +261,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
       if (request.method === 'HEAD') return response.end();
       if (session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
-      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/server-connection.js"></script>\n<link rel="stylesheet" href="/css/server.css">') : asset);
+      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<link rel="stylesheet" href="/css/server.css">') : asset);
     } catch (error) {
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});
       else response.end();

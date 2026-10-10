@@ -28,7 +28,7 @@ test('activity page and API are administrator-only, including direct access, rev
   const admin = await login('admin');
   for (const role of ['operator','observer']) {
     const user = await login(role);
-    for (const method of ['GET','HEAD']) for (const page of ['admin-panel','activity-log']) assert.equal((await request('/'+page+'.html',user,method)).status,403);
+    for (const method of ['GET','HEAD']) for (const page of ['admin-panel','activity-log']) assert.equal((await request('/'+page+'.html',user,method)).status,page === 'admin-panel' ? 200 : 403);
     assert.equal((await request('/api/admin/activity?userId='+user.user.id,user)).status,403);
     assert.equal((await request('/api/admin/activity',user,'POST',{})).status,403);
   }
