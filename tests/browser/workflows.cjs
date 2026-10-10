@@ -98,6 +98,18 @@ async function run(browser, base, {headed = false} = {}) {
     assert.deepEqual((await read('production-log.json')).entries.map(row => [row.date, row.shift, row.tonnage, row.brak]), [
       ['2026-10-04', 'А', 3000, 20], ['2026-10-05', 'Б', 2000, 30], ['2026-09-30', 'А', 1000, 10], ['2025-12-31', 'Г', 4000, 40], ['2026-10-05', 'СТИКЕРИ', 500, 5]
     ]);
+    await expect(page.locator('#dayVal')).toHaveText('2500 кг');
+    await expect(page.locator('#dayBrakVal')).toHaveText('35 кг');
+    for (const [date, tonnage, scrap] of [['2026-10-04', '3000', '20'], ['2026-09-30', '1000', '10'], ['2026-10-06', '0', '0'], ['2026-10-05', '2500', '35']]) {
+      await page.locator('#dateInput').fill(date);
+      await page.locator('#dateInput').dispatchEvent('change');
+      await expect(page.locator('#dayVal')).toHaveText(tonnage + ' кг');
+      await expect(page.locator('#dayBrakVal')).toHaveText(scrap + ' кг');
+    }
+    await page.locator('[data-hub-language=en]').click();
+    await expect(page.locator('.day-scrap span')).toHaveText('Total scrap');
+    await expect(page.locator('#dayBrakVal')).toHaveText('35 kg');
+    await page.locator('[data-hub-language=bg]').click();
     await page.locator('#goalInput').fill('12');
     await page.locator('#goalInput').press('Tab');
     await saved('production-log.json', data => data.goalTons === 12);
@@ -105,6 +117,9 @@ async function run(browser, base, {headed = false} = {}) {
     await expect(page.locator('#connDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
     await expect(page.locator('#goalInput')).toHaveValue('12');
     await expect(page.locator('#goalCur')).toHaveText('5,5 т');
+    await page.locator('#dateInput').fill('2026-10-05');
+    await page.locator('#dateInput').dispatchEvent('change');
+    await expect(page.locator('#dayBrakVal')).toHaveText('35 кг');
     await go('line-downtime');
     await connect('#openFileBtn', 'line-downtime.json');
     await page.locator('[data-shift="А"]').click();

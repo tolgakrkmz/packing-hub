@@ -150,9 +150,12 @@ function fmtDate(d){
 
 function renderDayTotal(){
   const d = dateInput.value;
-  const total = entries.filter(e=>e.date===d).reduce((a,e)=>a+e.tonnage,0);
+  const rows = entries.filter(e=>e.date===d);
+  const total = rows.reduce((a,e)=>a+e.tonnage,0);
+  const brak = rows.reduce((a,e)=>a+e.brak,0);
   document.getElementById('dayLabel').textContent = (d===localDateStr(new Date())) ? 'днес' : fmtDate(d);
   document.getElementById('dayVal').textContent = fmt(total)+' кг';
+  document.getElementById('dayBrakVal').textContent = fmt(brak)+' кг';
 }
 
 function renderGoal(){
