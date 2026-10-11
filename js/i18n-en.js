@@ -1,5 +1,18 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "При избор на един профил попълни клиента, за да се запази отделно от другите клиенти.": "When selecting one profile folder, enter the customer to keep it separate from other customers.",
+  "Номер на профил (по избор)": "Profile number (optional)",
+  "Клиент, профил или файл…": "Customer, profile or file…",
+  "Търси по клиент, номер на профил, име или име на файл.": "Search by customer, profile number, name or filename.",
+  "Избраната външна папка е:": "The selected external folder is:",
+  "Автоматично разпознаване": "Automatic detection",
+  "Обща папка с клиенти": "Folder containing customers",
+  "Папка на един клиент": "One customer folder",
+  "Папка на един профил": "One profile folder",
+  "Вторият копира инструкции от избраната папка, включително подпапките. Провери клиента и номера преди импорт; можеш да ги коригираш.": "The second copies instructions from the selected folder, including subfolders. Check the customer and number before importing; you can edit them.",
+  "⚠ папката вече е в индекса": "⚠ folder already indexed",
+  "Папката вече е в индекса. Избери друго име.": "This folder is already indexed. Choose a different name.",
+
   "Администраторски панел": "Administration",
   "Потребители": "Users",
   "Профили, роли и права на едно място.": "Accounts, roles and permissions in one place.",

@@ -459,6 +459,33 @@ unprivileged user, with a read-only application filesystem and a persistent
 `hub-data` volume. Expose only this app through Funnel. The Docker build context
 excludes demo data, databases, environment files, Git history and test artifacts.
 
+### Flexible packing instruction folders
+
+**Bulk import** accepts customer folders containing profile folders, flat profile
+folders and documents placed directly in a customer folder. It discovers deeper
+folders too. Attachments below an identified profile stay with that profile and
+retain their relative paths. Profile identifiers keep letters and leading zeroes.
+
+Choose automatic detection or explicitly select a folder containing customers,
+one customer's folder or one profile's folder. Review the displayed source paths
+and edit the customer, number, name or category before importing. Unrecognized
+numbers receive an internal identifier. When selecting one profile folder, enter
+the customer to keep its destination separate from other customers. Equal profile
+numbers for different customers remain separate records; an already indexed folder
+is skipped during repeat imports. This import adds new folders; it does not replace existing ones.
+
+Search includes customer names, profile numbers, names and attachment filenames.
+Images open in the gallery; PDFs and other documents retain their download links.
+Folder selection requires a browser with directory-picker support. In shared
+server mode, imported attachments are available to accounts with instruction
+viewing permission, including mobile devices.
+
+```sh
+node --test tests/instruction-folders.test.cjs
+node scripts/run-browser-tests.cjs --headless --packing-only
+node scripts/run-server-browser-tests.cjs --headless --packing-only
+```
+
 ### Import all legacy module data
 
 Keep an untouched local copy of the current production folder after the last

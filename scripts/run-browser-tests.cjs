@@ -118,7 +118,8 @@ async function main() {
       require('node:assert/strict').deepEqual(errors, []);
       await context.close(); return;
     }
-    await run(browser, `http://127.0.0.1:${server.address().port}`, {headed});
+    await run(browser, `http://127.0.0.1:${server.address().port}`, {headed, packingOnly: process.argv.includes('--packing-only')});
+    if (process.argv.includes('--packing-only')) return;
     await exerciseOfflineSystemStatus(browser, `http://127.0.0.1:${server.address().port}`, expect);
   } finally {
     if (browser) await browser.close();

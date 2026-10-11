@@ -56,6 +56,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--packing-only')) {
+      await require('../tests/browser/instruction-folders.cjs').exerciseInstructionFolders({admin, hub, base, device, expect});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--routes-only')) {
       await require('../tests/browser/routes.cjs').exerciseRoutes({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); return;
