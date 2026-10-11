@@ -232,8 +232,12 @@ and a late flag. Missed recurring shifts are materialized at the next server rea
 or write, including after an outage, so no browser needs to remain open.
 
 The task dashboard separates active shift tasks, global tasks, history, recurring
-plans and statistics. Period statistics count ended applicable shift tasks,
-completed/not-done/unreported results, distinct shifts with missing reports and
+plans and statistics. History groups tasks by whether they have a current report,
+with counts and the newest deadline first in each group (newest assignment first
+when deadlines match). Not-done and not-applicable reports remain in Reported;
+returned or reopened tasks move to Unreported until a new report is submitted.
+Owner, search and period filters apply to both groups. Period statistics count
+ended applicable shift tasks, completed/not-done/unreported results, distinct shifts with missing reports and
 late reports per owner. Several missing tasks in one shift count as one missing
 shift. Cancelled and inapplicable tasks are excluded from the completion rate.
 Consecutive misses are shown separately for not-done and unreported recurring

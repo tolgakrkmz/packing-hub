@@ -144,6 +144,25 @@
     wrap.append(el('p', 'Броят се само приключили смени след гратисния период. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.', 'task-muted'));
     return wrap;
   }
+  function renderHistory(items) {
+    const wrap = el('div', '', 'task-history-groups');
+    const newestFirst = [...items].sort((a, b) => b.due - a.due || b.createdAt - a.createdAt);
+    for (const [key, label, reported, description, noResults] of [
+      ['reported', 'Отчетени', true, 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
+      ['unreported', 'Неотчетени', false, 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.']
+    ]) {
+      const values = newestFirst.filter(item => !!item.report === reported);
+      const section = el('section', '', 'task-history-group'); section.dataset.historyGroup = key;
+      const heading = el('h2', '', 'task-history-heading'); heading.id = 'taskHistoryHeading-' + key;
+      heading.append(el('span', label), el('span', String(values.length), 'task-badge', true));
+      section.setAttribute('aria-labelledby', heading.id);
+      section.append(heading, el('p', description, 'task-muted'));
+      if (!values.length) section.append(empty(noResults));
+      else { const list = el('div', '', 'task-list'); for (const item of values) list.append(card(item)); section.append(list); }
+      wrap.append(section);
+    }
+    return wrap;
+  }
   function history(item) {
     const content = $('historyContent'); content.replaceChildren(el('h3', item.title, '', true));
     for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true), el('span', photoRequirementLabel(entry.snapshot), 'task-badge')); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot) row.append(...photoViews(item, problemPhotos(entry.snapshot), 'Проблем', !item.kind)); row.append(...photoViews(item, solutionPhotos(entry), 'Решение')); content.append(row); }
@@ -189,7 +208,9 @@
     for (const [label, count] of [['Активни задачи', items.filter(item => !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)).length], ['Неотчетени', items.filter(item => item.displayStatus === 'unreported').length], ['Готови за проверка', items.filter(item => item.status === 'review').length], ['Просрочени глобални', items.filter(item => item.overdue).length]]) { const metric = el('div', '', 'task-metric'); metric.append(el('strong', String(count)), el('span', label)); overview.append(metric); }
     $('taskPeriod').hidden = !['stats', 'history'].includes(view);
     const content = $('taskContent'); content.replaceChildren();
-    if (view === 'stats') { if (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value) content.append(empty('Избери валиден период.')); else content.append(renderStats(items)); return; }
+    if (['stats', 'history'].includes(view) && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
+    if (view === 'stats') { content.append(renderStats(items)); return; }
+    if (view === 'history') { content.append(el('p', 'Най-новите задачи са най-отгоре във всеки раздел.', 'task-muted'), renderHistory(items.filter(period))); return; }
     const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item));
     values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
     if (!values.length) content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.'));
