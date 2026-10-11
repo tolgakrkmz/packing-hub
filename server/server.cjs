@@ -248,6 +248,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
         if (document && !canViewModule(session.user, document[1])) throw problem(403, 'FORBIDDEN');
+        const history = pathname.match(/^\/api\/reports\/(production-log|line-downtime|pair-targets)\/history$/);
+        if (history) {
+          if (request.method !== 'GET') throw problem(405,'METHOD_REJECTED');
+          const id = url.searchParams.get('entryId');
+          return json(response,200,id === null ? store.reportHistoryList(history[1],currentUser()) : store.reportHistory(history[1],id,currentUser()));
+        }
         const operation = pathname.match(/^\/api\/reports\/(production-log|line-downtime|pair-targets)\/operations$/);
         if (operation) {
           if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
@@ -291,7 +297,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         if (document) {
           if (request.method === 'GET') { const current = store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
-          if (request.method === 'PUT') { const result = store.put(document[1], await jsonBody(request, importLimits.jsonBytes), revisionFor(request), currentUser()); broadcast(document[1], result.revision); return json(response, 200, result); }
+          if (request.method === 'PUT') { const input = await jsonBody(request, importLimits.jsonBytes); const result = store.put(document[1], input.data || input, revisionFor(request), currentUser(), 'report', false, {reason:input.data ? input.reason : undefined}); broadcast(document[1], result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/folders') {
@@ -317,7 +323,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
       const moduleName = assetName.slice(1, -5);
-      if (assetName.endsWith('.html') && !['index', 'login', 'production-import'].includes(moduleName) && !canViewModule(session?.user, moduleName)) throw problem(403, 'FORBIDDEN');
+      if (assetName.endsWith('.html') && !['index', 'login', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
+        if (moduleName === 'admin-panel') { staticAssets.send('/admin-denied.html',request,response,403); return; }
+        throw problem(403,'FORBIDDEN');
+      }
       if (assetName === '/production-import.html') {
         if (!can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
         response.writeHead(302, {Location: '/data-import' + url.search + '#production'}); return response.end();

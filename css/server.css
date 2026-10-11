@@ -31,3 +31,6 @@
 .server-mode [data-state=conflict],.server-mode [data-state=rejected]{color:var(--red)}
 .server-mode [data-state=unconfirmed]{color:var(--amber)}
 .server-mode [data-state=success]{color:var(--teal)}
+
+.report-reason{color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:16px;width:min(480px,calc(100vw - 32px));box-sizing:border-box}.report-reason::backdrop{background:#0009}.report-reason label,.report-reason textarea{display:block;width:100%;box-sizing:border-box}.report-reason textarea{min-height:110px;margin:12px 0;color:var(--text);background:var(--bg);border:1px solid var(--border);padding:10px}.report-reason button{margin:6px}.report-reason h2{font-size:20px}
+.report-reason{max-height:calc(100dvh - 32px);overflow:auto;padding:24px;font-size:16px;line-height:1.5;font-family:inherit}.report-reason textarea{font-size:16px;line-height:1.5;font-family:inherit;border-radius:8px}.report-reason button{min-height:44px;padding:10px 16px;border:1px solid var(--border);border-radius:8px;background:var(--teal);color:var(--bg);font:inherit;cursor:pointer}.report-reason #reportCorrectionCancel{background:var(--panel-2);color:var(--text)}

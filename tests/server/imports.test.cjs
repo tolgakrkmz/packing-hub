@@ -119,3 +119,23 @@ test('a failure while inserting an attachment rolls back every document, directo
   store.db.exec('DROP TRIGGER deny_demo');
   imports.apply(id, imports.preview(id, user).token, user); assert.equal(store.get('personnel').data.employees.length, 2);
 });
+
+test('bulk import preserves existing report snapshots, records imported actors and refuses tombstone resurrection atomically',t => {
+  const {store,imports,stage}=setup(t), data=fixture();
+  const legacy={...entry('demo-existing-history')};delete legacy.breakdown;
+  store.put('production-log',{entries:[legacy],goalTons:3000},1,user);
+  const prior=store.reportHistory('production-log',legacy.id,user);
+  const id=stage(data);imports.apply(id,imports.preview(id,user).token,user);
+  assert.deepEqual(store.get('production-log').data.entries.find(row=>row.id===legacy.id),legacy);
+  assert.deepEqual(store.reportHistory('production-log',legacy.id,user),prior);
+  const imported=data.payload.documents['production-log'].entries[0];
+  assert.equal(store.reportHistory('production-log',imported.id,user).events[0].accountId,user.id);
+  const live=store.get('production-log');
+  store.reportOperation('production-log',{operationId:require('node:crypto').randomUUID(),action:'delete',entryId:imported.id,reason:'Fictional removal'},live.versions[imported.id],user);
+  const changed=fixture();changed.payload.documents.personnel.moveLog.push({date:'2026-10-05',type:'update',detail:'Fictional blocked import'});
+  const second=stage(changed), preview=imports.preview(second,user), before=store.get('personnel');
+  const count=store.db.prepare('SELECT count(*) AS n FROM report_history').get().n;
+  assert.throws(()=>imports.apply(second,preview.token,user),{code:'REPORT_CONFLICT'});
+  assert.deepEqual(store.get('personnel'),before);assert.equal(store.db.prepare('SELECT count(*) AS n FROM report_history').get().n,count);
+  assert.ok(!store.get('production-log').data.entries.some(row=>row.id===imported.id));
+});

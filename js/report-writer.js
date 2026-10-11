@@ -47,6 +47,11 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
   async function run(change, onSuccess, successMessage, operation = null) {
     if(busy) return false;
     busy = true;
+    if(operation && operation.action !== 'create' && !operation.reason) {
+      const reason = await HubServer.correctionReason();
+      if(reason === null) { busy = false; return false; }
+      operation.reason = reason;
+    }
     retry = null;
     retryButton.hidden = true;
     if(reviewButton) reviewButton.hidden = true;

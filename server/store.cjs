@@ -30,6 +30,7 @@ function validateData(kind, data) {
     if (kind === 'package-instructions' && Object.keys(data).some(key => ['__proto__', 'constructor', 'prototype'].includes(key))) throw new Error();
   } catch { throw problem(400, 'INVALID_DATA'); }
 }
+function validReason(value) { return typeof value === 'string' && value.trim().length > 0 && value.length <= 1000; }
 function reportChanges(before, after) {
   const prior = new Map((before.entries || []).map(entry => [entry.id, entry]));
   const next = new Map((after.entries || []).map(entry => [entry.id, entry]));
@@ -42,6 +43,7 @@ function openStore(filename) {
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
     CREATE TABLE IF NOT EXISTS documents(kind TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS report_versions(kind TEXT NOT NULL, entry_id TEXT NOT NULL, version INTEGER NOT NULL, PRIMARY KEY(kind,entry_id));
+    CREATE TABLE IF NOT EXISTS report_history(kind TEXT NOT NULL, entry_id TEXT NOT NULL, version INTEGER NOT NULL, action TEXT NOT NULL, at INTEGER NOT NULL, user_id INTEGER, account TEXT NOT NULL, reason TEXT NOT NULL, before_data TEXT, after_data TEXT, PRIMARY KEY(kind,entry_id,version));
     CREATE TABLE IF NOT EXISTS report_operations(user_id INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, signature TEXT NOT NULL, permission TEXT NOT NULL, receipt TEXT NOT NULL, PRIMARY KEY(user_id,kind,id));
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator','observer')), active INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires INTEGER NOT NULL);
@@ -82,21 +84,33 @@ function openStore(filename) {
     try { const result = work(); db.exec('COMMIT'); return result; }
     catch (error) { db.exec('ROLLBACK'); throw error; }
   };
-  function updateDocument(kind, data) {
+  function updateDocument(kind, data, user, context = {}) {
     const before = get(kind);
     if (Object.hasOwn(reports, kind)) {
       const prior = new Map(before.data.entries.map(entry => [entry.id, entry]));
       const next = new Map(data.entries.map(entry => [entry.id, entry]));
       for (const id of prior.keys()) db.prepare('INSERT OR IGNORE INTO report_versions VALUES(?,?,?)').run(kind,id,before.versions[id]);
       for (const id of new Set([...prior.keys(), ...next.keys()])) {
-        if (!isDeepStrictEqual(prior.get(id), next.get(id))) db.prepare('INSERT INTO report_versions VALUES(?,?,?) ON CONFLICT(kind,entry_id) DO UPDATE SET version=excluded.version').run(kind, id, before.revision + 1);
+        if (!isDeepStrictEqual(prior.get(id), next.get(id))) {
+          const old = prior.get(id), value = next.get(id);
+          if (!old && context.action !== 'restore' && db.prepare('SELECT 1 FROM report_versions WHERE kind=? AND entry_id=?').get(kind,id)) throw problem(409,'REPORT_CONFLICT');
+          const firstPairReport = kind === 'pair-targets' && old && !old.result && !old.cancellation && value?.result &&
+            isDeepStrictEqual(Object.fromEntries(Object.entries(old).filter(([key]) => !['result','areas','updatedAt'].includes(key))), Object.fromEntries(Object.entries(value).filter(([key]) => !['result','areas','updatedAt'].includes(key))));
+          const cancellationReason = kind === 'pair-targets' && old && !old.result && !old.cancellation && value?.cancellation ?
+            value.cancellation.reasonText || pairModel.CANCELLATION_REASONS.find(item => item.key === value.cancellation.reasonKey)?.label : undefined;
+          const reason = context.reason || cancellationReason;
+          if (old && !firstPairReport && !validReason(reason)) throw problem(428, 'CORRECTION_REASON_REQUIRED');
+          db.prepare('INSERT INTO report_versions VALUES(?,?,?) ON CONFLICT(kind,entry_id) DO UPDATE SET version=excluded.version').run(kind, id, before.revision + 1);
+          db.prepare('INSERT INTO report_history VALUES(?,?,?,?,?,?,?,?,?,?)').run(kind,id,before.revision+1,context.action || (old ? value ? 'update' : 'delete' : 'create'),Date.now(),user?.id || null,user?.username || '',reason?.trim() || '',old ? JSON.stringify(old) : null,value ? JSON.stringify(value) : null);
+        }
       }
     }
     db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
   }
-  function put(kind, data, revision, user, mode = 'report', withinTransaction = false) {
+  function put(kind, data, revision, user, mode = 'report', withinTransaction = false, context = {}) {
     validateData(kind, data);
     if (!canViewModule(user, kind)) throw problem(403, 'FORBIDDEN');
+    if (context.reason !== undefined && !validReason(context.reason)) throw problem(400,'INVALID_OPERATION');
     const work = () => {
       const current = get(kind);
       if (current.revision !== revision) throw problem(409, 'CONFLICT');
@@ -113,7 +127,7 @@ function openStore(filename) {
         });
         const added = data.entries.some(entry => !prior.has(entry.id) || kind === 'pair-targets' && !isDeepStrictEqual(prior.get(entry.id), entry) && !prior.get(entry.id)?.result) || kind === 'pair-targets' && current.data.entries.some(entry => !entry.result && !next.has(entry.id));
         const metadata = value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'entries'));
-        if (corrected && !can(user, report.edit) || added && !can(user, report.create) || !isDeepStrictEqual(metadata(current.data), metadata(data)) && !can(user, report.settings || report.edit)) throw problem(403, 'FORBIDDEN');
+        if (corrected && !can(user, report.edit) || added && !['restore','delete'].includes(context.action) && !can(user, report.create) || !isDeepStrictEqual(metadata(current.data), metadata(data)) && !can(user, report.settings || report.edit)) throw problem(403, 'FORBIDDEN');
       }
       if (!report && !importing && !can(user, kind === 'personnel' ? 'canManagePersonnel' : 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
       if (kind === 'pair-targets') {
@@ -121,12 +135,16 @@ function openStore(filename) {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
           const planFields = ['id', 'date', 'shiftCode', 'team', 'members', 'targetKg', 'targetCrates', 'createdAt'];
           const remaining = new Set(data.entries.map(entry => entry.id));
-          // Every saved pair stays in history. Unreported plans are cancelled
-          // with a reason, and the resulting snapshot cannot be rewritten.
-          if (current.data.entries.some(entry => !remaining.has(entry.id))) throw new Error();
+          // Ordinary planning keeps cancelled snapshots immutable. Deletions
+          // and restores use protected history and the record operation checks.
+          if (context.action !== 'delete' && current.data.entries.some(entry => !remaining.has(entry.id))) throw new Error();
           for (const entry of data.entries) {
             const previous = current.data.entries.find(item => item.id === entry.id);
             if (previous && isDeepStrictEqual(previous, entry)) continue;
+            // A restore uses an already-validated historical snapshot. Schema
+            // and duplicate-membership checks still run in validateData(), but
+            // today's roster must not rewrite or reject historical membership.
+            if (!previous && context.action === 'restore') continue;
             if (previous?.cancellation) throw new Error();
             if (entry.cancellation) {
               if (!previous) throw new Error();
@@ -146,7 +164,7 @@ function openStore(filename) {
           }
         } catch { throw problem(400, 'INVALID_PAIR_CHANGE'); }
       }
-      updateDocument(kind, data);
+      updateDocument(kind, data, user, context);
       audit(user, 'write', kind, reportChanges(current.data, data));
       return get(kind);
     };
@@ -157,9 +175,9 @@ function openStore(filename) {
     if (!report) throw problem(404, 'NOT_FOUND');
     if (!canViewModule(user, kind)) throw problem(403, 'FORBIDDEN');
     if (!input || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.operationId) ||
-      !['create','update','delete'].includes(input.action) || typeof input.entryId !== 'string' || !input.entryId.trim() || input.entryId.length > 200 ||
-      Object.keys(input).some(key => !['operationId','action','entryId','entry'].includes(key)) ||
-      (input.action !== 'delete' && (!input.entry || input.entry.id !== input.entryId)) || input.action === 'delete' && input.entry !== undefined) throw problem(400, 'INVALID_OPERATION');
+      !['create','update','delete','restore'].includes(input.action) || typeof input.entryId !== 'string' || !input.entryId.trim() || input.entryId.length > 200 ||
+      Object.keys(input).some(key => !['operationId','action','entryId','entry','reason','sourceVersion'].includes(key)) ||
+      (['create','update'].includes(input.action) && (!input.entry || input.entry.id !== input.entryId)) || ['delete','restore'].includes(input.action) && input.entry !== undefined || input.reason !== undefined && !validReason(input.reason) || (input.action === 'restore' ? !Number.isSafeInteger(input.sourceVersion) || input.sourceVersion < 1 : input.sourceVersion !== undefined)) throw problem(400, 'INVALID_OPERATION');
     if (input.action !== 'create' && (!Number.isSafeInteger(expected) || expected < 1)) throw problem(428, 'REVISION_REQUIRED');
     const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
     const signature = createHash('sha256').update(JSON.stringify(canonical({input, expected: expected ?? null}))).digest('hex');
@@ -173,13 +191,41 @@ function openStore(filename) {
       const current = get(kind), entry = current.data.entries.find(item => item.id === input.entryId);
       const permission = kind === 'pair-targets' && input.action === 'update' && !entry?.result ? report.create : input.action === 'create' ? report.create : report.edit;
       if (!can(user, permission)) throw problem(403, 'FORBIDDEN');
-      if (input.action === 'create' ? !!entry : !entry || current.versions[input.entryId] !== expected) throw problem(409, 'REPORT_CONFLICT');
-      const entries = input.action === 'create' ? [...current.data.entries, input.entry] : input.action === 'delete' ? current.data.entries.filter(item => item.id !== input.entryId) : current.data.entries.map(item => item.id === input.entryId ? input.entry : item);
-      const saved = put(kind, {...current.data, entries}, current.revision, user, 'report', true);
-      const receipt = {operationId: input.operationId, entryId: input.entryId, action: input.action, version: saved.versions[input.entryId] ?? saved.revision, status: 'confirmed', message: input.action === 'delete' ? 'REPORT_DELETED' : 'REPORT_SAVED'};
+      const version = db.prepare('SELECT version FROM report_versions WHERE kind=? AND entry_id=?').get(kind,input.entryId)?.version ?? current.versions[input.entryId];
+      if (input.action === 'create' ? !!entry || version !== undefined : input.action === 'restore' ? !!entry || version !== expected : !entry || version !== expected) throw problem(409, 'REPORT_CONFLICT');
+      if (permission === report.edit && !validReason(input.reason)) throw problem(428, 'CORRECTION_REASON_REQUIRED');
+      let restored;
+      if (input.action === 'restore') {
+        const source = db.prepare('SELECT before_data,after_data FROM report_history WHERE kind=? AND entry_id=? AND version=?').get(kind,input.entryId,input.sourceVersion);
+        if (!source) throw problem(404, 'NOT_FOUND');
+        restored = JSON.parse(source.after_data || source.before_data);
+        if (kind === 'pair-targets' && !restored.cancellation && current.data.entries.some(item => !item.cancellation && pairModel.inScope(item,restored) && item.members.some(person => restored.members.some(member => member.id === person.id)))) throw problem(409,'REPORT_CONFLICT');
+      }
+      const entries = input.action === 'restore' ? [...current.data.entries, restored] : input.action === 'create' ? [...current.data.entries, input.entry] : input.action === 'delete' ? current.data.entries.filter(item => item.id !== input.entryId) : current.data.entries.map(item => item.id === input.entryId ? input.entry : item);
+      const saved = put(kind, {...current.data, entries}, current.revision, user, 'report', true, {reason:input.reason,action:input.action});
+      const receipt = {operationId: input.operationId, entryId: input.entryId, action: input.action, version: saved.versions[input.entryId] ?? saved.revision, status: 'confirmed', message: input.action === 'delete' ? 'REPORT_DELETED' : input.action === 'restore' ? 'REPORT_RESTORED' : 'REPORT_SAVED'};
       db.prepare('INSERT INTO report_operations VALUES(?,?,?,?,?,?)').run(user.id, kind, input.operationId, signature, permission, JSON.stringify(receipt));
       return {...saved, receipt, replayed: false};
     });
+  }
+  function reportHistory(kind, entryId, user) {
+    if (!Object.hasOwn(reports,kind)) throw problem(404,'NOT_FOUND');
+    if (!canViewModule(user,kind) || !can(user,reports[kind].edit)) throw problem(403,'FORBIDDEN');
+    const current = get(kind), live = current.data.entries.find(item => item.id === entryId);
+    const version = db.prepare('SELECT version FROM report_versions WHERE kind=? AND entry_id=?').get(kind,entryId)?.version ?? current.versions[entryId];
+    if (!version) throw problem(404,'NOT_FOUND');
+    const events = db.prepare('SELECT version,action,at,user_id,account,reason,before_data,after_data FROM report_history WHERE kind=? AND entry_id=? ORDER BY version DESC').all(kind,entryId).map(({user_id,before_data,after_data,...event}) => ({...event,accountId:user_id,before:JSON.parse(before_data),after:JSON.parse(after_data)}));
+    return {entryId,version,deleted:!live,current:live || null,events};
+  }
+  function reportHistoryList(kind, user) {
+    if (!Object.hasOwn(reports,kind)) throw problem(404,'NOT_FOUND');
+    if (!canViewModule(user,kind) || !can(user,reports[kind].edit)) throw problem(403,'FORBIDDEN');
+    const current = get(kind), live = new Map(current.data.entries.map(item => [item.id,item]));
+    const rows = db.prepare('SELECT v.entry_id,v.version,h.before_data,h.after_data FROM report_versions v LEFT JOIN report_history h ON h.kind=v.kind AND h.entry_id=v.entry_id AND h.version=v.version WHERE v.kind=?').all(kind);
+    const versions = new Map(rows.map(row => [row.entry_id,row.version]));
+    const snapshots = new Map(rows.map(row => [row.entry_id,JSON.parse(row.after_data || row.before_data || 'null')]));
+    for (const [id,version] of Object.entries(current.versions)) versions.set(id,version);
+    return {entries:[...versions].sort(([a,av],[b,bv]) => bv-av || a.localeCompare(b)).map(([id,version]) => ({entryId:id,version,deleted:!live.has(id),date:(live.get(id) || snapshots.get(id))?.date || null,shift:(live.get(id) || snapshots.get(id))?.shift || (live.get(id) || snapshots.get(id))?.team || null}))};
   }
   function productionImport(input, user) {
     if (!can(user, 'canImportData') || !canViewModule(user, 'production-log')) throw problem(403, 'FORBIDDEN');
@@ -266,6 +312,6 @@ function openStore(filename) {
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  return {db, get, put, updateDocument, reportOperation, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  return {db, get, put, updateDocument, reportOperation, reportHistory, reportHistoryList, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges};

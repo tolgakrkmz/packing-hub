@@ -224,7 +224,9 @@
         await rosterSync.refreshFromDisk({fresh:true});
         const entry = edit.original ? JSON.parse(edit.original) : null;
         const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId});
-        editing.attempt = {key,operation:{operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
+        const reason = entry && (entry.result || edit.mode === 'plan') ? await HubServer.correctionReason() : undefined;
+        if(reason === null) return false;
+        editing.attempt = {key,operation:{...(reason ? {reason} : {}),operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
       }
       const result = await sync.commitOperation(editing.attempt.operation);
       acceptPairs(result.data); $('pageError').textContent = result.message; $('pageError').dataset.state = 'success';

@@ -35,7 +35,8 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   assert.deepEqual(user.permissionOverrides, {canAssignTasks: true});
   const assigner = await device(user.username, true);
   await expect(assigner.locator('a[href="/tasks"]')).toBeVisible();
-  await expect(assigner.getByRole('link', {name: 'Админ панел', exact: true})).toHaveCount(1);
+  await expect(assigner.getByRole('link', {name: 'Админ панел', exact: true})).toHaveCount(0);
+  await expect(assigner.locator('.server-links a[href^="/data-import"]')).toBeVisible();
   await assigner.goto(base + '/tasks'); await expect(assigner.locator('#newTask')).toBeVisible();
   async function assign(page, kind, title) {
     const language = kind === 'global' ? 'en' : 'bg';

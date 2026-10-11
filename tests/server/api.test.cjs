@@ -251,7 +251,7 @@ test('login failures are generic and repeated attempts are throttled', async t =
 });
 test('pair writes enforce the active packer roster and preserve reported plans while retaining historical members', async t => {
   const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
-  const put = (kind, data, revision, user = admin) => request('/api/data/' + kind, user, {method: 'PUT', data, headers: {'If-Match': '"' + revision + '"'}});
+  const put = (kind, data, revision, user = admin) => request('/api/data/' + kind, user, {method: 'PUT', data:{data,reason:'Fictional pair correction'}, headers: {'If-Match': '"' + revision + '"'}});
   const roster = await (await request('/api/data/personnel', admin)).json();
   roster.data.employees = [1, 2, 3].map(number => ({id: 'demo-person-' + number, name: 'Demo API Person ' + number, category: 'stickers', team: '1 смяна', role: number === 3 ? 'Отговорник' : 'Опаковчик', active: true, note: ''}));
   assert.equal((await put('personnel', roster.data, 1)).status, 200);

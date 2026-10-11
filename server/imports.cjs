@@ -11,11 +11,11 @@ const limits = {fileBytes: 20 * 1024 * 1024, totalBytes: 1024 * 1024 * 1024, fil
 const lifetime = 4 * 60 * 60 * 1000;
 const same = (a, b) => isDeepStrictEqual(a, b);
 const clone = value => JSON.parse(JSON.stringify(value));
-function mergeRows(current, incoming, key, summary, normalize = value => value) {
-  const rows = current.map(normalize), byId = new Map(rows.map(row => [row[key], row]));
+function mergeRows(current, incoming, key, summary, normalize = value => value, preserveCurrent = false) {
+  const rows = current.map(row => preserveCurrent ? row : normalize(row)), byId = new Map(rows.map(row => [row[key], row]));
   for (const row of incoming.map(normalize)) {
     if (!byId.has(row[key])) { rows.push(row); byId.set(row[key], row); summary.added++; }
-    else if (same(byId.get(row[key]), row)) summary.duplicates++;
+    else if (same(normalize(byId.get(row[key])), row)) summary.duplicates++;
     else summary.conflicts++;
   }
   return rows;
@@ -113,7 +113,7 @@ function createImports(store, filename) {
       } else {
         const field = kind === 'personnel' ? 'employees' : 'entries'; summary.total = input[field].length;
         const normalize = kind === 'personnel' ? row => ({...row, ...clone(personnelModel.normalizeEmployee(row))}) : kind === 'production-log' ? row => ({...row, breakdown: row.breakdown ?? null}) : row => row;
-        data[field] = mergeRows(current[field], input[field], 'id', summary, normalize);
+        data[field] = mergeRows(current[field], input[field], 'id', summary, normalize, kind !== 'personnel');
         if (kind === 'personnel') {
           data.schemaVersion = 3;
           data.moveLog = mergeHistory(current.moveLog || [], input.moveLog || []);
@@ -203,7 +203,7 @@ function createImports(store, filename) {
       const value = checked(), revisions = {};
       for (const [kind, data] of Object.entries(value.updates)) {
         const detail = reportChanges(store.get(kind).data, data);
-        store.updateDocument(kind, data);
+        store.updateDocument(kind, data, user);
         store.audit(user, 'import', kind, detail); revisions[kind] = store.get(kind).revision;
       }
       for (const name of [...value.directories].sort((a, b) => a.split('/').length - b.split('/').length)) store.db.prepare("INSERT INTO files(path,kind) VALUES(?,'directory')").run(name);

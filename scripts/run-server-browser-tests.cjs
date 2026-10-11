@@ -47,6 +47,16 @@ async function main() {
       const context = await browser.newContext({timezoneId: 'Europe/Sofia', ...(mobile ? {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true} : {})});
       await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
       await context.addInitScript(() => { window.showOpenFilePicker = () => { throw new Error('Online mode must not ask for a local JSON file'); }; });
+      // Existing workflow suites supply a fictional correction reason. The
+      // history suite exercises the visible mandatory-reason dialog itself.
+      if (!process.argv.includes('--report-history-only')) await context.addInitScript(() => {
+        new MutationObserver(() => {
+          const dialog = document.getElementById('reportCorrectionDialog');
+          if (!dialog?.open) return;
+          dialog.querySelector('textarea').value = 'Fictional regression correction';
+          dialog.querySelector('form').requestSubmit();
+        }).observe(document,{subtree:true,childList:true});
+      });
       const page = await context.newPage(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message));
       await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
       await page.goto(base + '/'); await expect(page).toHaveURL(base + '/login');
@@ -66,6 +76,10 @@ async function main() {
       await require('../tests/browser/paged-lists.cjs').exerciseServerPagedLists({admin, hub, base, expect});
       await require('../tests/browser/refresh-sync.cjs').exerciseTaskRefresh({page:admin,base,expect});
       assert.deepEqual(errors, []); return;
+    }
+    if (process.argv.includes('--report-history-only')) {
+      await require('../tests/browser/report-history.cjs').exerciseReportHistory({admin,hub,base,device,expect,screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors,[]); return;
     }
     if (process.argv.includes('--report-operations-only')) {
       await require('../tests/browser/report-operations.cjs').exerciseReportOperations({admin,hub,base,device,expect});
@@ -391,7 +405,7 @@ async function main() {
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
     await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
     await admin.goto(base + '/personnel'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
-    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
+    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-card').filter({hasText:'Demo Imported Box'}).locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
     console.log('PASS all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
     console.log('RUN responsive shared modules, accounts and imports at 320–1440 px');
     for (const width of [320, 390, 768, 1440]) {
@@ -436,11 +450,18 @@ async function main() {
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
     const limited = await device('demo-permissions', true);
     await limited.goto(base + '/production-log'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
-    await expect(limited.locator('#reportEntryPanel')).toBeHidden(); await expect(limited.locator('#dayFilter #dateInput')).toBeVisible();
+    await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#reportDateRow #dateInput')).toBeVisible();
     await expect(limited.locator('#saveBtn')).toBeHidden(); await expect(limited.locator('#reportExport')).toHaveCount(0); await expect(limited.locator('#goalInput')).toBeDisabled();
     const firstMonth = limited.locator('.history-month').first();
     if (!await firstMonth.evaluate(element => element.open)) await firstMonth.locator('summary').click();
     await expect(firstMonth.locator('.del-btn').first()).toBeVisible();
+    const correctedId = hub.store.get('production-log').data.entries.find(entry => !entry.breakdown).id;
+    await firstMonth.locator('.edit-report-btn[data-id="' + correctedId + '"]').click();
+    await expect(limited.locator('#saveBtn')).toBeVisible();
+    await limited.locator('#tonInput').fill('1234'); await limited.locator('#saveBtn').click();
+    await expect(limited.locator('#msg')).toHaveAttribute('data-state','success');
+    assert.equal(hub.store.get('production-log').data.entries.find(entry => entry.id === correctedId).tonnage,1234);
+    await expect(limited.locator('#saveBtn')).toBeHidden();
     assert.equal(await limited.evaluate(async () => (await fetch('/api/export/production-log')).status), 403);
     const account = hub.auth.list().find(user => user.username === 'demo-permissions');
     const limitedForm = admin.locator(`.account-card[data-id="${account.id}"]`);

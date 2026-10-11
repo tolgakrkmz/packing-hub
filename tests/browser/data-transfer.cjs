@@ -99,11 +99,12 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
     const canExport = permissions.canExportReports !== false;
     await expect(page.locator('.server-bar #reportExport, .server-bar #reportExportKind')).toHaveCount(0);
     if (!canImport && !canExport) {
-      await expect(page.getByRole('link', {name:'Импорт / експорт', exact:true})).toHaveCount(0);
+      await expect(page.locator('.server-links a[href^="/admin-panel"], .server-links a[href^="/data-import"]')).toHaveCount(0);
       assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 403);
     } else {
-      if (role === 'admin') await openAdminModule(page,'data-import');
-      else await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
+      await expect(page.locator('.server-bar')).toBeVisible();
+      if (await page.locator('.server-links a[href^="/admin-panel"]').isVisible()) await openAdminModule(page,'data-import');
+      else await page.locator('.server-links a[href^="/data-import"]').click();
       await page.goto(base + '/data-import#' + (canImport ? 'export' : 'modules'));
       await expect(page.locator(`[data-transfer-tab=${canExport ? 'export' : 'production'}]`)).toHaveAttribute('aria-selected', 'true');
       assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 200);

@@ -63,7 +63,7 @@ test('new tonnage, corrections, no-op saves, explicit recipient flags and prefer
   s.store.put('production-log', {entries: [report('demo-row')], goalTons: 3000}, 1, s.admin); s.inbox.sync(); s.inbox.sync();
   assert.deepEqual(s.inbox.list(viewer).items.map(item => item.type), ['productionAdded']);
   assert.equal(s.inbox.list(s.chief).count, 0);
-  s.store.put('production-log', {entries: [{...report('demo-row'), tonnage: 2000}], goalTons: 3000}, 2, s.admin); s.inbox.sync();
+  s.store.put('production-log', {entries: [{...report('demo-row'), tonnage: 2000}], goalTons: 3000}, 2, s.admin, 'report', false, {reason:'Fictional correction'}); s.inbox.sync();
   assert.equal(s.inbox.list(viewer).count, 1); assert.equal(s.inbox.list(s.admin).items[0].type, 'productionChanged');
   const current = s.store.get('production-log'); s.store.put('production-log', current.data, current.revision, s.admin); s.inbox.sync(); assert.equal(s.inbox.list(s.admin).count, 2);
   s.inbox.updatePreferences({productionAdded: false}, viewer);
