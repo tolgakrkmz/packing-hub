@@ -71,11 +71,11 @@ test('only named backup service sources are allowed; host configuration and arch
 });
 test('only the named technical scenario documents are allowed and private content is still blocked', () => {
   const restricted = 'Synthetic Restricted Example';
-  for (const file of ['BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-SCENARIOS.md']) {
+  for (const file of ['BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-SCENARIOS.md', 'RESTART-OUTAGE-SCENARIOS.md', 'scripts/check-restart-readiness.sh']) {
     assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed technical scenarios')));
     assert.throws(() => inspect(file, Buffer.from(restricted), [restricted.toLowerCase()]), /Private source/);
   }
-  for (const other of ['RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-REPORT.md', 'private/SYSTEM-STATUS-SCENARIOS.md']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
+  for (const other of ['RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-REPORT.md', 'private/SYSTEM-STATUS-SCENARIOS.md', 'RESTART-OUTAGE-REPORT.md', 'private/RESTART-OUTAGE-SCENARIOS.md', 'scripts/private-restart.sh', 'scripts/restart-host.conf']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
 });
 test('only the named maintenance adapter, units, override and fictional Python tests are approved', () => {
   for (const file of ['scripts/maintenance-host.py', 'scripts/install-maintenance.sh', 'scripts/package-hub-maintenance.socket', 'scripts/package-hub-maintenance.service', 'compose.maintenance.yaml', 'tests/maintenance-host-test.py']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));

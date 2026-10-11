@@ -459,6 +459,32 @@ unprivileged user, with a read-only application filesystem and a persistent
 `hub-data` volume. Expose only this app through Funnel. The Docker build context
 excludes demo data, databases, environment files, Git history and test artifacts.
 
+### Restart and outage acceptance
+
+Use the Bulgarian [restart and outage procedure](RESTART-OUTAGE-SCENARIOS.md)
+for the existing Linux host, planned reboot acceptance, UPS/BIOS checks and
+controlled entry of locally collected outage records. A read-only host audit
+reports fixed technical status codes without printing private host configuration:
+
+```sh
+sudo bash scripts/check-restart-readiness.sh /absolute/existing/compose/project
+```
+
+It checks enabled/active boot services and timers, the existing container's
+restart policy, health, persistent database volume and localhost HTTP endpoint.
+It does not change services or restart the host. Process-restart tests use a fresh
+fictional database and cover confirmed records, attachments, sessions, access
+rights and rollback of an interrupted transaction:
+
+```sh
+node --test tests/restart-readiness.test.cjs tests/server/restart.test.cjs
+```
+
+These tests do not certify a real host reboot, external HTTPS or power-loss
+durability. Local hardware and network acceptance remains required. Keep the
+same Compose project/volume and reconcile unconfirmed writes before retrying
+outage records. A manually stopped container stays stopped with `unless-stopped`.
+
 ### Flexible packing instruction folders
 
 **Bulk import** accepts customer folders containing profile folders, flat profile
