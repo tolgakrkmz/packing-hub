@@ -10,6 +10,7 @@ const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {createStatisticsReads} = require('./statistics.cjs');
+const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
@@ -44,7 +45,6 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     inspect(file, image);
     assets.set('/' + file, image);
   }
-  const version = crypto.createHash('sha256').update(Buffer.concat([...assets.values()])).digest('hex').slice(0, 12);
   // Only approved top-level HTML screens have clean routes. Static files and
   // unknown paths never fall back to a page.
   const pages = new Map([...assets.keys()].filter(name => name.endsWith('.html')).map(name => [name === '/index.html' ? '/' : name.slice(0, -5), name]));
@@ -52,6 +52,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     const route = name === 'index' ? '/' : '/' + name;
     return pages.has(route) ? 'href="' + route + suffix + '"' : match;
   });
+  const staticAssets = createStaticAssets(assets,{transformHTML:(name,html) => {
+    const content = pageLinks(html);
+    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
+  }});
+  const {version} = staticAssets;
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
   const clients = new Set(), attempts = new Map();
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${origin.protocol === 'https:' ? '; Secure' : ''}`;
@@ -321,13 +326,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         const canonical = assetName === '/index.html' ? '/' : assetName.slice(0, -5);
         if (pathname !== canonical) { response.writeHead(308, {Location: canonical + url.search}); return response.end(); }
       }
-      const contentType = assetName === '/manifest.webmanifest' ? 'application/manifest+json' : assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName.endsWith('.png') ? 'image/png' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
-      if (assetName === '/js/notification-worker.js') response.setHeader('Service-Worker-Allowed', '/');
-      response.writeHead(200, {'Content-Type': contentType + (contentType === 'image/png' ? '' : '; charset=utf-8')});
-      if (request.method === 'HEAD') return response.end();
-      if (session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
-      const content = assetName.endsWith('.html') ? pageLinks(asset.toString('utf8')) : asset;
-      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">') : content);
+      staticAssets.send(assetName,request,response);
+      if (request.method === 'GET' && session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
+      return;
     } catch (error) {
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});
       else response.end();

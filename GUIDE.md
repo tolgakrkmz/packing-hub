@@ -1326,11 +1326,13 @@ personal browser profile and does not record screenshots or traces.
 node scripts/run-performance-benchmarks.cjs
 node scripts/run-performance-benchmarks.cjs --quick
 node scripts/run-targeted-read-benchmarks.cjs
+node scripts/run-static-asset-benchmarks.cjs
 node scripts/run-browser-tests.cjs --headless --i18n-only
 node scripts/run-browser-tests.cjs --headless --lists-only
 node scripts/run-server-browser-tests.cjs --headless --lists-only
 node scripts/run-browser-tests.cjs --headless --statistics-only
 node scripts/run-server-browser-tests.cjs --headless --statistics-only
+node scripts/run-server-browser-tests.cjs --headless --static-only
 ```
 
 The full run compares 200 and 2000 reports/tasks at CPU rates 1 and 4, in BG and
@@ -1560,6 +1562,65 @@ cache invalidation, out-of-order responses, scope changes during reads, request
 failure and manual retry, BG/EN, retained unaffected DOM, access denial and
 read-only projections. Counter parity tests cover 2000 mixed tasks, participants,
 shift boundaries, read notifications, missing/moved targets and revoked rights.
+
+Step 6 prepares static delivery once at server startup from the existing reviewed
+source allowlist. A deterministic version hash covers only those public source
+files and their paths. Served HTML links JavaScript, CSS and public images with
+`?v=<version>`; the injected navigation logo uses the same version. CSS image
+references and manifest icons also receive versioned URLs. A source change gets
+a different version on the next server start. Offline HTML/CSS/JS files retain
+their original relative links; version rewriting happens only on the server.
+
+An exact current-version URL receives `public, max-age=31536000, immutable`.
+Plain, stale or ambiguous version URLs receive `public, no-cache` and must
+revalidate. The manifest and notification worker always revalidate, keeping their
+stable URLs and the worker's root scope. Each available representation has its
+own strong ETag; matching `If-None-Match` requests return 304 with no body.
+HTML pages, login/redirects, the account/session bootstrap, APIs, task photos,
+attachments and errors continue to use `no-store`. The notification worker still
+has no fetch handler or Cache Storage entries.
+
+Text responses of at least 256 bytes get precomputed gzip (level 6) and Brotli
+(quality 5) variants when compression reduces their size. Responses negotiate
+the client's supported coding and quality preferences, including exclusions and
+an uncompressed fallback. `Vary: Accept-Encoding`, representation-specific ETags
+and encoded `Content-Length` keep cached variants distinct. GET and HEAD share
+the same headers; HEAD has no body. PNG files stay in their existing encoded
+form. Compression and HTML transformations run once in memory at startup, rather
+than on each request. No API, session or private-file compression is added.
+The header behavior follows [HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-12.5.3)
+and [cache directives](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control).
+
+The static benchmark measured the same 29 public resources referenced by the
+statistics page, before step 6 at `f61b2eb45beda1396d08abd592ee5f97341d08df`
+and after the change. It used Node 24.19.0, Chrome 154.0.8037.99, loopback HTTP,
+five-sample medians and an isolated fictional login:
+
+| Static response bodies | Before | Step 6 |
+| --- | ---: | ---: |
+| Uncompressed | 380,696 bytes | 380,699 bytes |
+| gzip requested | 380,696 bytes | 109,056 bytes |
+| Brotli requested | 380,696 bytes | 102,871 bytes |
+| Conditional repeat | Full bodies, no 304s | 0 body bytes, 29 responses with 304 |
+
+Brotli reduces this measured static payload by 73.0%, and gzip by 71.4%.
+Sequential loopback request medians stayed near 13–16 ms; they do not demonstrate
+a meaningful latency improvement on this fast local connection. HTTP body sizes
+exclude headers. The benchmark also performs real browser navigations without
+Playwright routing, which would disable the HTTP cache. First-load resource
+transfer fell from 384,088 to 105,772 bytes. A repeat navigation fell from 28
+static requests and 384,088 bytes to zero static requests/transfer, with all 28
+resource entries reused from the browser cache. HTML, session and API requests
+still run; this is not a zero-request page load or a live-installation result.
+
+Validation includes 177 related unit/API tests and browser checks for lossless
+decompression, weighted/excluded encodings, validators
+across encodings, GET/HEAD/304 headers, stale/duplicate version parameters,
+no-store behavior on real synthetic photos and attachments, session revocation,
+module access, navigation, statistics and notifications. A real-browser fixture
+changes releases at the same origin while its cache is warm: it loads new code
+without manually clearing the cache. A second account receives its own fresh
+bootstrap while reusing public source files.
 
 ## Publication
 

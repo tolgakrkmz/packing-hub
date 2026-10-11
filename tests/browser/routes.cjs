@@ -41,7 +41,8 @@ async function exerciseRoutes({admin, hub, base, device, expect}) {
   await reader.goto(base + '/statistics');
   await expect(reader.locator('#connDot')).toHaveClass(/\bon\b/);
   await expect.poll(() => reads.includes('/api/statistics/workforce')).toBe(true);
-  assert.ok(reads.includes('/api/statistics/data/production-log'));
+  assert.ok(reads.includes('/api/statistics/period/production-log'));
+  assert.ok(!reads.includes('/api/statistics/data/production-log'));
   assert.ok(!reads.includes('/api/data/personnel'));
   assert.equal((await reader.request.get(base + '/personnel')).status(), 403);
   await reader.locator('.server-logout').click();

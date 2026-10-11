@@ -317,7 +317,7 @@ const HubServer = (() => {
     const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
     const top = document.createElement('div'); top.className = 'server-top';
     const brand = document.createElement('a'); brand.className = 'hub-brand'; brand.href = '/'; brand.setAttribute('translate', 'no');
-    const mark = document.createElement('img'); mark.src = '/assets/package-hub-mark.svg'; mark.alt = ''; mark.width = 44; mark.height = 44;
+    const mark = document.createElement('img'); mark.src = '/assets/package-hub-mark.svg?v=' + encodeURIComponent(boot.version); mark.alt = ''; mark.width = 44; mark.height = 44;
     const wordmark = document.createElement('span'); wordmark.className = 'hub-wordmark'; wordmark.textContent = 'Package ';
     const hubName = document.createElement('span'); hubName.className = 'brand-hub'; hubName.textContent = 'Hub'; wordmark.append(hubName); brand.append(mark, wordmark);
     const session = document.createElement('div'); session.className = 'server-session';
