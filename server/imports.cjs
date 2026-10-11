@@ -203,7 +203,7 @@ function createImports(store, filename) {
       const value = checked(), revisions = {};
       for (const [kind, data] of Object.entries(value.updates)) {
         const detail = reportChanges(store.get(kind).data, data);
-        store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+        store.updateDocument(kind, data);
         store.audit(user, 'import', kind, detail); revisions[kind] = store.get(kind).revision;
       }
       for (const name of [...value.directories].sort((a, b) => a.split('/').length - b.split('/').length)) store.db.prepare("INSERT INTO files(path,kind) VALUES(?,'directory')").run(name);

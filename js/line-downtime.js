@@ -2,6 +2,7 @@ const SHIFTS = ["А","Б","В","Г","СТИКЕРИ"];
 let selectedShift = null;
 let entries = [];
 let reasons = [];
+let editingReport = null;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 const canManageReasons = typeof HubServer === 'undefined' || HubServer.can('canManageDowntimeSettings');
 
@@ -119,7 +120,31 @@ function updateSaveEnabled(){
   const dur = computeDuration(startInput.value, endInput.value);
   const ok = !!selectedShift && dur !== null;
   saveBtn.disabled = writer.busy || !ok;
-  saveBtn.textContent = writer.busy ? 'Записва се...' : ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
+  saveBtn.textContent = writer.busy ? 'Записва се...' : editingReport ? 'Запази корекцията' : ok ? ('Запиши авария — смяна '+selectedShift) : (selectedShift ? 'Въведете начало и край' : 'Изберете смяна за запис');
+  if(typeof HubServer !== 'undefined') saveBtn.hidden = !(editingReport ? canEditReports : HubServer.can('canCreateReports'));
+  document.getElementById('cancelReportEdit').hidden = !editingReport;
+}
+document.getElementById('cancelReportEdit').addEventListener('click', () => {
+  if(writer.busy) return;
+  editingReport = null; writer.clearRetry(); selectedShift = null; updateSaveEnabled();
+});
+function editEntry(id) {
+  if(!canEditReports || writer.busy || typeof HubServer === 'undefined') return;
+  const entry = entries.find(item => item.id === id);
+  if(!entry) return;
+  writer.clearRetry(); editingReport = {entry:JSON.parse(JSON.stringify(entry)),version:sync.recordVersion(id)};
+  selectedShift = entry.shift; dateInput.value = entry.date;
+  startInput.value = entry.start; endInput.value = entry.end;
+  if(!reasons.includes(entry.reason)) {
+    const option = document.createElement('option'); option.value = entry.reason; option.textContent = entry.reason; reasonSelect.append(option);
+  }
+  reasonSelect.value = entry.reason;
+  otherReasonInput.value = entry.reasonNote || '';
+  otherReasonRow.style.display = reasonSelect.value === 'Друго' ? 'flex' : 'none'; noteInput.value = entry.note || '';
+  durationReadout.textContent = fmtDur(entry.durationMin);
+  document.querySelectorAll('.shift-btn').forEach(button => { for(const shift of SHIFTS) button.classList.remove('sel-'+shift); if(button.dataset.shift === selectedShift) button.classList.add('sel-'+selectedShift); });
+  updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
+  dateInput.scrollIntoView?.({block:'center'});
 }
 
 reasonSelect.addEventListener('change', ()=>{
@@ -128,8 +153,9 @@ reasonSelect.addEventListener('change', ()=>{
 
 function renderReasonSelect(){
   const prev = reasonSelect.value;
-  reasonSelect.innerHTML = reasons.map(r=>'<option data-i18n-exact value="'+escapeDowntimeText(r)+'">'+escapeDowntimeText(r)+'</option>').join('');
-  if(reasons.includes(prev)) reasonSelect.value = prev;
+  const choices = prev && !reasons.includes(prev) ? [...reasons,prev] : reasons;
+  reasonSelect.innerHTML = choices.map(r=>'<option data-i18n-exact value="'+escapeDowntimeText(r)+'">'+escapeDowntimeText(r)+'</option>').join('');
+  if(prev) reasonSelect.value = prev;
   otherReasonRow.style.display = (reasonSelect.value === 'Друго') ? 'flex' : 'none';
 }
 
@@ -214,7 +240,7 @@ saveBtn.addEventListener('click', async ()=>{
     return;
   }
 
-  const entry = writer.entry({
+  const draft = {
     date: dateInput.value,
     shift: selectedShift,
     start: startInput.value,
@@ -223,10 +249,13 @@ saveBtn.addEventListener('click', async ()=>{
     reason: reason,
     reasonNote: (reason === 'Друго') ? reasonNote : '',
     note: noteInput.value.trim()
-  });
+  };
+  const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);
+  const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
 
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    editingReport = null;
     startInput.value = '';
     endInput.value = '';
     noteInput.value = '';
@@ -237,14 +266,14 @@ saveBtn.addEventListener('click', async ()=>{
     document.querySelectorAll('.shift-btn').forEach(b=>{
       b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
     });
-  }, 'Записано: смяна '+entry.shift+', '+fmtDur(entry.durationMin)+' престой, причина: '+entry.reason+(entry.reasonNote ? ' – '+entry.reasonNote : '')+'.');
+  }, 'Записано: смяна '+entry.shift+', '+fmtDur(entry.durationMin)+' престой, причина: '+entry.reason+(entry.reasonNote ? ' – '+entry.reasonNote : '')+'.',operation);
 });
 
 async function deleteEntry(id){
   if(!canEditReports || writer.busy) return;
   const original = entries.find(entry => entry.id === id);
   if(!original) return;
-  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
+  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.',writer.operation('delete',original));
 }
 
 function fmtDate(d){
@@ -320,7 +349,7 @@ function renderHistory(){
   sorted.forEach(e=>{
     const reasonText = '<span data-i18n-exact>'+escapeDowntimeText(e.reason)+'</span>' + (e.reasonNote ? ' <span class="note-inline" translate="no">– '+escapeDowntimeText(e.reasonNote)+'</span>' : '');
     const delCell = canEditReports
-      ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
+      ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeDowntimeText(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeDowntimeText(e.id)+'" title="Изтрий">✕</button></td>'
       : '<td></td>';
     html += '<tr>'
       + '<td>'+e.date+'</td>'
@@ -335,6 +364,7 @@ function renderHistory(){
   wrap.innerHTML = html;
 
   if(canEditReports){
+    wrap.querySelectorAll('.edit-report-btn').forEach(button => button.addEventListener('click', () => editEntry(button.dataset.id)));
     wrap.querySelectorAll('.del-btn').forEach(b=>{
       b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
     });
@@ -342,6 +372,7 @@ function renderHistory(){
 }
 
 function render(){
+  updateSaveEnabled();
   renderReasonSelect();
   renderDayTotal();
   renderMonthSummary();

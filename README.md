@@ -29,6 +29,41 @@ targets module opens directly without a role login.
 
 ## Shared server mode
 
+### Concurrent reports and safe retries
+
+Production, downtime and pair forms send an operation for one report. Independent
+reports from two devices are retained without retrying a whole module. Editing or
+deleting a report checks the version captured when it was opened. A conflicting
+change keeps the draft in the open page; **Review current record** displays the
+server's version before an explicit new attempt. A deleted report cannot be
+silently recreated by a stale edit. Pair removal continues to use cancellation
+with a reason and preserves history.
+
+Each attempt has a stable operation ID. SQLite commits the report, its version
+and a confirmation receipt together. Retrying an interrupted response returns
+the same receipt without another write, audit event or notification. The result
+also includes current module data, so replaying an old receipt never rolls back
+a later correction. Changing an unconfirmed draft retains its report identity
+and requires review if the original attempt already committed. All module view,
+creation and correction flags are checked again on the server, including retries.
+
+The status distinguishes a server-confirmed result, an unconfirmed response,
+a rejected change and a conflict. Drafts remain in the open page; closing or
+reloading the page does not provide durable offline draft storage.
+
+Deploy the reviewed server and HTML/CSS/JS together. Startup adds private SQLite
+version and receipt tables and initializes versions for existing reports; it
+preserves report data and accepts older backups through additive migration.
+Imports and legacy whole-module writes update the same record versions. Exported
+JSON and offline files keep their existing format. Keep live data files local.
+
+Verification with fictional fixtures:
+
+```sh
+node --test tests/server/report-operations.test.cjs tests/server/client.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --report-operations-only
+```
+
 ### Page addresses
 
 The server home page uses `/`; screens use paths such as `/production-log`,

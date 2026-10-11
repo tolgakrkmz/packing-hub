@@ -15,6 +15,13 @@ const HubServer = (() => {
   messages.INVALID_PERMISSIONS = 'Провери правата на акаунта.';
   messages.SELF_DELETE = 'Не можеш да изтриеш акаунта, с който си влязъл.';
   messages.NOT_FOUND = 'Записът вече не е наличен. Опресни страницата.';
+  Object.assign(messages, {
+    REPORT_CONFLICT: 'Записът е променен или изтрит от друг потребител. Черновата остава във формата. Прегледай актуалния запис преди нов опит.',
+    OPERATION_REUSED: 'Този опит вече е използван за друга промяна. Прегледай актуалния запис.',
+    INVALID_OPERATION: 'Провери данните за записа.',
+    REVISION_REQUIRED: 'Прегледай актуалната версия на записа преди промяна.'
+  });
+  const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.'};
   Object.assign(messages, {TASK_PHOTO_REQUIRED: 'Добави снимка преди запис.', TASK_PHOTO_INVALID: 'Снимката не е валидна. Избери я отново.', TASK_PHOTO_STORAGE: 'Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.', TASK_PHOTO_EXPIRED: 'Снимката е изтрита след срока за съхранение.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
@@ -56,7 +63,7 @@ const HubServer = (() => {
     const page = currentModule;
     const readURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
       : kind === 'personnel' && page === 'statistics' ? '/api/statistics/workforce' : page === 'statistics' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
-    let ready = false, initialized = false, revision = 0, sequence = 0;
+    let ready = false, initialized = false, revision = 0, sequence = 0, versions = {};
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
     const panel = registerConnectionPanel(el.connDot);
@@ -68,16 +75,28 @@ const HubServer = (() => {
       const current = ++sequence;
       try {
         const result = await json(readURL);
-        if (current !== sequence) return;
+        if (current !== sequence) return result;
         if (initialized) await cfg.onRefresh(result.data); else await cfg.onConnect(result.data);
-        initialized = true; revision = result.revision; ready = true;
+        initialized = true; revision = result.revision; versions = result.versions || {}; ready = true;
         status(true, 'Свързан с общата база'); cfg.render();
+        return result;
       } catch (error) { ready = false; status(false, error.message); throw error; }
     }
     el.refreshBtn?.addEventListener('click', () => refresh().catch(() => {}));
     watch(kind, refresh, cfg.isBusy);
     return {
       init: () => refresh().catch(() => {}), refreshFromDisk: refresh,
+      recordVersion: id => versions[id],
+      async commitOperation(operation) {
+        ++sequence;
+        const {version, ...input} = operation;
+        const result = await send('/api/reports/' + kind + '/operations', 'POST', input, version ? {'If-Match': '"' + version + '"'} : {});
+        ++sequence;
+        if (result.receipt?.operationId !== operation.operationId || result.receipt.status !== 'confirmed' || !receiptMessages[result.receipt.message]) throw new Error('Сървърът не потвърди резултата. Опитай отново.');
+        revision = result.revision; versions = result.versions; ready = true;
+        await cfg.onRefresh(result.data);
+        return {...result, message: receiptMessages[result.receipt.message]};
+      },
       async commitData() {
         if (cfg.readOnly || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[kind].settings)) throw new Error('Само за преглед.');
         if (!ready) throw new Error('Опресни връзката със сървъра.');
@@ -87,6 +106,42 @@ const HubServer = (() => {
       },
       get isReady() { return ready; }, get fileHandle() { return initialized ? handle : null; }
     };
+  }
+  async function reviewRecord(sync, id, restoreDraft = () => {}) {
+    const result = await sync.refreshFromDisk();
+    restoreDraft();
+    const entry = result.data.entries.find(item => item.id === id);
+    const dialog = document.createElement('dialog');
+    dialog.className = 'report-review';
+    const heading = document.createElement('h2'); heading.textContent = 'Актуален запис на сървъра';
+    const description = document.createElement('p');
+    description.textContent = entry ? 'Черновата ти остава във формата. Използвай тази версия само след преглед на промените.' : 'Записът е изтрит. Черновата ти остава във формата.';
+    dialog.append(heading, description);
+    if (entry) {
+      const details = document.createElement('dl');
+      const labels = {date:'Дата',shift:'Смяна',shiftCode:'Смяна',team:'Екип',tonnage:'Тонаж (кг)',brak:'Брак (кг)',start:'Начало',end:'Край',durationMin:'Минути',reason:'Причина',reasonNote:'Обяснение',note:'Бележка',targetKg:'Цел (кг)',targetCrates:'Цел (каси)'};
+      const values = Object.entries(labels).filter(([key]) => entry[key] !== undefined).map(([key,label]) => [label,entry[key]]);
+      if (entry.breakdown) values.push(['Автоматична / ръчна (кг)',entry.breakdown.autoKg+' / '+entry.breakdown.manKg],['Автоматична / ръчна (каси)',entry.breakdown.autoCrates+' / '+entry.breakdown.manCrates]);
+      if (entry.members) values.push(['Двойка',entry.members.map(person => person.name).join(' + ')],['Зони',entry.areas.map(area => area === 'auto' ? 'Автоматична' : 'Ръчна').join(', ')]);
+      if (entry.result) values.push(['Резултат (кг / каси)',entry.result.kg+' / '+entry.result.crates],['Причина',[PairTargets.REASONS.find(item => item.key === entry.result.reasonKey)?.label,entry.result.reasonText].filter(Boolean).join(' · ') || '—']);
+      if (entry.cancellation) values.push(['Отменена',[PairTargets.CANCELLATION_REASONS.find(item => item.key === entry.cancellation.reasonKey)?.label,entry.cancellation.reasonText].filter(Boolean).join(' · ')]);
+      for (const [label,value] of values) {
+        const term = document.createElement('dt'); term.textContent = label;
+        const detail = document.createElement('dd'); detail.textContent = String(value); detail.setAttribute('translate','no');
+        details.append(term,detail);
+      }
+      dialog.append(details);
+    }
+    const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = 'Използвай тази версия за нов опит'; accept.hidden = !entry;
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Затвори';
+    dialog.append(accept,close); document.body.append(dialog);
+    return new Promise(resolve => {
+      const finish = value => { dialog.close(); dialog.remove(); resolve(value); };
+      accept.addEventListener('click', () => finish({entry,version:result.versions[id]}));
+      close.addEventListener('click', () => finish(null));
+      dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+      dialog.showModal();
+    });
   }
   const fileURL = name => '/api/files?path=' + encodeURIComponent(name);
   function serverFile(name) {
@@ -164,7 +219,7 @@ const HubServer = (() => {
     if (!can('canManagePersonnel') && module === 'personnel') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
     if (!can('canManageInstructions') && module === 'package-instructions') selector += ',#addBtn,#bulkBtn,.cat-select';
     if (['production-log', 'line-downtime'].includes(module)) {
-      if (!can('canCreateReports')) selector += ',#saveBtn';
+      if (!can('canCreateReports') && !can('canEditReports')) selector += ',#saveBtn';
       if (!can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[currentModule].settings)) selector += ',#retrySaveBtn';
       if (!can('canEditReports')) selector += ',.del-btn';
       if (!can(HubPermissions.reports[currentModule].settings)) {
@@ -172,7 +227,7 @@ const HubServer = (() => {
         selector += ',#reasonsAdminPanel';
       }
     }
-    if (module === 'production-log' && !can('canCreateReports')) {
+    if (module === 'production-log' && !can('canCreateReports') && !can('canEditReports')) {
       selector += ',#reportEntryPanel';
       const dateRow = document.getElementById('reportDateRow'), filter = document.getElementById('dayFilter');
       if (dateRow && filter && dateRow.parentElement !== filter) {
@@ -274,5 +329,5 @@ const HubServer = (() => {
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });
-  return {user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch};
+  return {user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
 })();

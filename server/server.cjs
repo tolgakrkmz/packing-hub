@@ -230,6 +230,14 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
         if (document && !canViewModule(session.user, document[1])) throw problem(403, 'FORBIDDEN');
+        const operation = pathname.match(/^\/api\/reports\/(production-log|line-downtime|pair-targets)\/operations$/);
+        if (operation) {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const input = await jsonBody(request);
+          const result = store.reportOperation(operation[1], input, input.action === 'create' ? undefined : revisionFor(request), currentUser());
+          if (!result.replayed) broadcast(operation[1], result.revision);
+          return json(response, 200, result);
+        }
         const exportReport = pathname.match(/^\/api\/export\/([a-z-]+)$/);
         if (exportReport) {
           if (!can(session.user, 'canExportReports')) throw problem(403, 'FORBIDDEN');
