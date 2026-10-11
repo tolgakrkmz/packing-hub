@@ -11,6 +11,9 @@ js/**
 !assets/
 assets/**
 !assets/package-hub-mark.svg
+!assets/package-hub-icon-180.png
+!assets/package-hub-icon-192.png
+!assets/package-hub-icon-512.png
 !server/
 server/**
 !server/*.cjs

@@ -36,11 +36,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   }
   if (!fs.lstatSync(path.join(root, 'manifest.webmanifest')).isFile()) throw new Error('Unapproved static source.');
   const manifest = fs.readFileSync(path.join(root, 'manifest.webmanifest')); inspect('manifest.webmanifest', manifest); assets.set('/manifest.webmanifest', manifest);
-  const markFile = 'assets/package-hub-mark.svg';
-  if (!fs.lstatSync(path.join(root, markFile)).isFile()) throw new Error('Unapproved static source.');
-  const mark = fs.readFileSync(path.join(root, markFile));
-  inspect(markFile, mark);
-  assets.set('/' + markFile, mark);
+  for (const file of ['assets/package-hub-mark.svg', 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']) {
+    if (!fs.lstatSync(path.join(root, file)).isFile()) throw new Error('Unapproved static source.');
+    const image = fs.readFileSync(path.join(root, file));
+    inspect(file, image);
+    assets.set('/' + file, image);
+  }
   const version = crypto.createHash('sha256').update(Buffer.concat([...assets.values()])).digest('hex').slice(0, 12);
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
   const clients = new Set(), attempts = new Map();
@@ -287,12 +288,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (!can(session?.user, 'canImportData')) throw problem(403, 'FORBIDDEN');
         response.writeHead(302, {Location: '/data-import.html#production'}); return response.end();
       }
-      const contentType = assetName === '/manifest.webmanifest' ? 'application/manifest+json' : assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
+      const contentType = assetName === '/manifest.webmanifest' ? 'application/manifest+json' : assetName.endsWith('.js') ? 'text/javascript' : assetName.endsWith('.css') ? 'text/css' : assetName.endsWith('.png') ? 'image/png' : assetName === '/assets/package-hub-mark.svg' ? 'image/svg+xml' : 'text/html';
       if (assetName === '/js/notification-worker.js') response.setHeader('Service-Worker-Allowed', '/');
-      response.writeHead(200, {'Content-Type': contentType + '; charset=utf-8'});
+      response.writeHead(200, {'Content-Type': contentType + (contentType === 'image/png' ? '' : '; charset=utf-8')});
       if (request.method === 'HEAD') return response.end();
       if (session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
-      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">') : asset);
+      return response.end(session && assetName.endsWith('.html') && assetName !== '/login.html' ? asset.toString('utf8').replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">') : asset);
     } catch (error) {
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});
       else response.end();
