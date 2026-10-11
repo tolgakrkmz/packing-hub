@@ -22,6 +22,12 @@ async function exerciseNotifications({admin, hub, base, device, expect, screensh
   await page.reload(); await expect(page.locator('.notification-row')).toHaveCount(1); await expect(page.locator('.notification-count')).toHaveText('1');
   await assertResponsive(page, 'mobile inbox');
   await page.locator('[data-hub-language=en]').click(); await expect(page.locator('.notification-row')).toContainText('There is a new production report.');
+  await expect(page.locator('#notificationMore')).toBeHidden();
+  for (let i = 0; i < 5; i++) hub.store.audit(hub.auth.list()[0], 'write', 'production-log', {added: true});
+  await page.reload(); await expect(page.locator('.notification-row')).toHaveCount(3);
+  await expect(page.locator('.notification-count')).toHaveText('6'); await expect(page.locator('#notificationMore')).toBeVisible();
+  await page.locator('#notificationMore').click(); await expect(page.locator('.notification-row')).toHaveCount(6); await expect(page.locator('#notificationMore')).toBeHidden();
+  await page.reload(); await expect(page.locator('.notification-row')).toHaveCount(3);
   await page.locator('[data-hub-language=bg]').click(); await page.locator('#notificationReadAll').click(); await expect(page.locator('.notification-count')).toBeHidden();
   await page.locator('#notificationSettingsTab').click(); await expect(page.locator('[data-type=productionAdded]')).toBeChecked(); await expect(page.locator('[data-type=productionChanged]')).toHaveCount(0);
   await page.locator('[data-type=productionAdded]').uncheck(); await page.locator('#notificationPreferences button').click(); await expect(page.locator('#notificationMessage')).toHaveText('Настройките са запазени.');

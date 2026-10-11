@@ -102,8 +102,10 @@ and assignment. Other categories require an explicit receiving flag. A user can
 turn off any permitted type in **Notifications → Settings**. Current rights are
 rechecked when listing the inbox and before push delivery.
 
-The toolbar bell opens a local inbox with unread count, read/all-read actions,
-links to authorized modules and paginated history. Rows retain 90 days, up to
+The toolbar bell opens a local inbox showing the latest three notices with unread
+count, read/all-read actions and links to authorized modules. **More notifications**
+loads three older notices at a time; the unread count covers all eligible history.
+Rows retain 90 days, up to
 1,000 per account. Events committed before notification installation are not
 replayed; cursors and deadline markers survive restart. New reports, corrections
 and unchanged saves are distinguished. Task notices go to the responsible account
