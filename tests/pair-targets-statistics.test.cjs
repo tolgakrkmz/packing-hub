@@ -103,7 +103,7 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
     document:{getElementById(id) { if (!controls.has(id)) controls.set(id,new Control()); return controls.get(id); }},
     createFileSync(cfg) { config = cfg; return {init() { inits++; }}; }
   });
-  for (const file of ['shift-schedule','pair-targets-model','pair-targets-statistics-model','pair-targets-statistics']) load(ui,file);
+  for (const file of ['shift-schedule','pair-targets-model','pair-targets-statistics-model','statistics-units','pair-targets-statistics']) load(ui,file);
   const dashboard = vm.runInContext("createPairTargetsStatistics({dbName:'demo-pairs',localStorageKey:'demo-pairs',getPeriod:() => period,onDataChange:() => {}})", ui);
   assert.equal(config.readOnly, true);
   assert.equal(config.strictJson, true);

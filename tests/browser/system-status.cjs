@@ -175,7 +175,7 @@ async function exerciseOfflineSystemStatus(browser, base, expect) {
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.method()); });
   try {
-    await page.goto(base + '/system-status');
+    await page.goto(base + '/system-status.html');
     await expect(page.locator('#systemContent')).toBeHidden();
     await expect(page.locator('#refreshSystem')).toBeDisabled();
     await expect(page.locator('#manualBackup')).toBeDisabled();

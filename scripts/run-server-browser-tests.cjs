@@ -266,9 +266,9 @@ async function main() {
     await operator.locator('#breakdownToggle').check();
     for (const [id, value] of Object.entries({autoKgInput: '2400', autoCrateInput: '96', manKgInput: '600', manCrateInput: '24', brakInput: '30'})) await operator.locator('#' + id).fill(value);
     await operator.locator('#saveBtn').click(); await expect(operator.locator('#msg')).toContainText('Записано');
-    await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await expect(observer.locator('#dashboardActual')).toHaveText('3 т');
     assert.equal(hub.store.get('production-log').data.entries[0].tonnage, 3000);
-    await observer.locator('[data-stats-tab=production]').click(); await expect(observer.locator('#tableContainer')).toContainText('3000 кг');
+    await observer.locator('[data-stats-tab=production]').click(); await expect(observer.locator('#tableContainer')).toContainText('3 т');
     await observer.locator('[data-stats-tab=downtime]').click();
     await operator.goto(base + '/line-downtime'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
     await operator.locator('[data-shift="А"]').click(); await operator.locator('#dateInput').fill('2026-10-05'); await operator.locator('#startInput').fill('23:45'); await operator.locator('#endInput').fill('00:15'); await operator.locator('#otherReasonInput').fill('Fictional online midnight downtime'); await operator.locator('#saveBtn').click();
@@ -293,7 +293,7 @@ async function main() {
     const employees = hub.store.get('personnel').data.employees;
     await operator.locator('#memberOne').selectOption(employees[0].id); await operator.locator('#memberTwo').selectOption(employees[1].id); await operator.locator('#targetKg').fill('1000'); await operator.locator('#targetCrates').fill('40'); await operator.locator('#areaManual').check(); await operator.locator('#savePairBtn').click();
     await expect(operator.locator('#pairsList')).toContainText('Очаква отчет'); await operator.locator('#pairsList [data-action=report]').click(); await operator.locator('#actualKg').fill('1100'); await operator.locator('#actualCrates').fill('44'); await operator.locator('#savePairBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Постигнат');
-    await expect(observer.locator('#pairStatsBody')).toContainText(/1\s?100\s*\/\s*1\s?000/); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await expect(observer.locator('#pairStatsBody')).toContainText(/1,1\s*\/\s*1/); await expect(observer.locator('#dashboardActual')).toHaveText('3 т');
     await expect(operator.locator('#pairsList [data-action=report]')).toBeHidden();
     console.log('PASS personnel, Stickers pair planning/reporting and live pair statistics');
     console.log('RUN shared packing instructions and attachments → phone reads them');
@@ -303,13 +303,13 @@ async function main() {
     await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await expect(observer.locator('#addBtn')).toBeHidden(); await observer.locator('#searchInput').fill('900101'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional instruction from the shared database.'); await expect(observer.locator('.cat-select')).toBeHidden(); await observer.locator('.gallery img').click(); await expect(observer.locator('#lightbox')).toHaveClass(/open/);
     console.log('PASS shared packing instructions and attachments → phone reads them');
     console.log('RUN production history import → live report, duplicate prevention and stale preview protection');
-    await observer.goto(base + '/statistics'); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await observer.goto(base + '/statistics'); await expect(observer.locator('#dashboardActual')).toHaveText('3 т');
     await admin.goto(base + '/production-import');
     const history = {goalTons: 9000, entries: [{id: 'demo-import-history', date: '2026-10-04', shift: 'А', tonnage: 2000, brak: 20, breakdown: null}]};
     const select = data => admin.locator('#importFile').setInputFiles({name: 'production-log.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data))});
     await select(history); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=added]')).toHaveText('1');
     await admin.locator('#applyImport').click(); await expect(admin.locator('#importMessage')).toContainText('Импортът е завършен');
-    await expect(observer.locator('#dashboardActual')).toHaveText('5,0 т'); assert.equal(hub.store.get('production-log').data.goalTons, 3000);
+    await expect(observer.locator('#dashboardActual')).toHaveText('5 т'); assert.equal(hub.store.get('production-log').data.goalTons, 3000);
     await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=duplicates]')).toHaveText('1'); await expect(admin.locator('#applyImport')).toBeDisabled();
     await select({...history, entries: [{...history.entries[0], tonnage: 1}]}); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=conflicts]')).toHaveText('1'); await expect(admin.locator('#applyImport')).toBeDisabled();
     await select({...history, entries: [{...history.entries[0], id: 'demo-import-stale'}]}); await admin.locator('#previewImport').click(); await expect(admin.locator('#applyImport')).toBeEnabled();
@@ -350,7 +350,7 @@ async function main() {
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Данните са проверени. Потвърди общото добавяне.');
     await expect(admin.locator('[data-module=personnel]')).toContainText('2'); await expect(admin.locator('[data-module=attachments]')).toContainText('3');
     await admin.locator('#confirmDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Всички избрани данни са добавени. Провери модулите и отчетите.');
-    await expect(observer.locator('#dashboardActual')).toHaveText('7,0 т'); await observer.locator('[data-stats-tab=pairs]').click(); await expect(observer.locator('#pairStatsBody')).toContainText('Demo Legacy Person 1');
+    await expect(observer.locator('#dashboardActual')).toHaveText('7 т'); await observer.locator('[data-stats-tab=pairs]').click(); await expect(observer.locator('#pairStatsBody')).toContainText('Demo Legacy Person 1');
     assert.equal(hub.store.get('line-downtime').data.entries.length, 2); assert.equal(hub.store.get('personnel').data.settings.stickersStage1, 3); assert.equal(hub.store.get('production-log').data.goalTons, 5000);
     assert.equal(hub.store.db.prepare('SELECT 1 FROM files WHERE path=?').get('unrelated-demo.txt'), undefined);
     console.log('PASS import JSON equality, conflicting folder copies and explicit-file priority');
