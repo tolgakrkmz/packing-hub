@@ -1065,6 +1065,8 @@ Object.assign(HUB_EN_MESSAGES, {
   'Нямат подаден отчет за текущото състояние.': 'Have no submitted report for the current state.',
   'Няма отчетени задачи по тези критерии.': 'No reported tasks match these filters.',
   'Няма неотчетени задачи по тези критерии.': 'No unreported tasks match these filters.',
+  'Отменени': 'Cancelled', 'Задачи с отменено възлагане.': 'Tasks whose assignment has been cancelled.',
+  'Няма отменени задачи по тези критерии.': 'No cancelled tasks match these filters.',
   'Последно възложените задачи са най-отгоре.': 'The most recently assigned tasks appear first.',
   'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.': 'Assign tasks, monitor reports and approve resolved problems.',
   'Твоите сменни задачи и общите проблеми, в които участваш.': 'Your shift tasks and shared problems you participate in.',
