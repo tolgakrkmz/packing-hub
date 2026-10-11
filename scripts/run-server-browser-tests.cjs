@@ -57,6 +57,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--report-operations-only')) {
+      await require('../tests/browser/report-operations.cjs').exerciseReportOperations({admin,hub,base,device,expect});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--packing-only')) {
       await require('../tests/browser/instruction-folders.cjs').exerciseInstructionFolders({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); return;
@@ -93,6 +97,7 @@ async function main() {
       await page.goto(base+'/pair-targets');
       await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
       await exercisePairCancellation({page,base,expect,statisticsPage:admin,
+        failureText:'Промяната не е потвърдена',
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
         read:async () => hub.store.get('pair-targets').data,
         replace:async data => hub.store.put('pair-targets',data,hub.store.get('pair-targets').revision,user),
@@ -110,11 +115,11 @@ async function main() {
         },
         failNextWrite:async () => {
           const handler = async route => {
-            if(route.request().method() !== 'PUT') return route.fallback();
+            if(route.request().method() !== 'POST') return route.fallback();
             await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'DEMO_WRITE_FAILURE'})});
-            await page.unroute('**/api/data/pair-targets',handler);
+            await page.unroute('**/api/reports/pair-targets/operations',handler);
           };
-          await page.route('**/api/data/pair-targets',handler);
+          await page.route('**/api/reports/pair-targets/operations',handler);
         }
       });
       assert.deepEqual(errors,[]);

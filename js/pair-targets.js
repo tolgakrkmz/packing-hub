@@ -124,9 +124,11 @@
     if(busy || !pairsLoaded || !rosterLoaded) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
     const scope = entry || context;
-    editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null};
+    editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null,
+      version:sync.recordVersion?.(entry?.id),newId:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2),attempt:null};
     $('pairForm').reset();
     $('dialogError').textContent = '';
+    $('reviewPairBtn').hidden = true;
     $('dialogTitle').textContent = mode === 'cancel' ? 'Отмяна на двойката' : mode === 'report' ? 'Отчет на двойката' : entry ? 'Промяна на двойката' : 'Нова двойка';
     $('savePairBtn').textContent = mode === 'cancel' ? 'Отмени двойката' : 'Запази';
     $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode !== 'plan' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
@@ -206,6 +208,52 @@
       render();
     }
   }
+  async function saveServer(edit, inputs) {
+    const key = JSON.stringify({...inputs,now:undefined});
+    let previous = JSON.parse(JSON.stringify(data));
+    busy = true;
+    const locked = Array.from(document.querySelectorAll('#pairForm input, #pairForm select, #pairForm textarea, #pairDialog button, #connPanel button')).map(control => [control,control.disabled]);
+    locked.forEach(([control]) => { control.disabled = true; });
+    $('dialogError').textContent = 'Записва се...'; $('dialogError').dataset.state = 'pending'; $('reviewPairBtn').hidden = true;
+    try {
+      if(!editing.attempt || editing.attempt.key !== key) {
+        if(!edit.id && editing.attempt && data.entries.some(entry => entry.id === edit.newId)) {
+          const error = new Error('Черновата е променена след непотвърден опит. Прегледай актуалния запис.'); error.code = 'REPORT_CONFLICT'; error.status = 409; throw error;
+        }
+        if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
+        await rosterSync.refreshFromDisk();
+        const entry = edit.original ? JSON.parse(edit.original) : null;
+        const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId});
+        editing.attempt = {key,operation:{operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
+      }
+      const result = await sync.commitOperation(editing.attempt.operation);
+      acceptPairs(result.data); $('pageError').textContent = result.message; $('pageError').dataset.state = 'success';
+      return true;
+    } catch(error) {
+      data = previous;
+      const conflict = error.code === 'REPORT_CONFLICT';
+      $('dialogError').dataset.state = conflict ? 'conflict' : !editing.attempt || error.status && error.status < 500 ? 'rejected' : 'unconfirmed';
+      $('dialogError').textContent = (conflict ? 'Конфликт. Двойката е променена. ' : !editing.attempt || error.status && error.status < 500 ? 'Записът не е направен. ' : 'Промяната не е потвърдена. ')+(error.status || !editing.attempt ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново със същата чернова.');
+      $('reviewPairBtn').hidden = !conflict;
+      return false;
+    } finally {
+      busy = false; locked.forEach(([control,disabled]) => { control.disabled = disabled; }); render();
+    }
+  }
+  $('reviewPairBtn').addEventListener('click', async () => {
+    if(busy || !editing?.attempt) return;
+    const edit = editing;
+    $('reviewPairBtn').disabled = true;
+    try {
+      const reviewed = await HubServer.reviewRecord(sync,edit.attempt.operation.entryId);
+      if(reviewed && editing === edit) {
+        if(reviewed.entry.cancellation) { $('dialogError').textContent = 'Двойката е отменена и остава в историята. Черновата ти остава във формата.'; return; }
+        edit.id = reviewed.entry.id; edit.original = JSON.stringify(reviewed.entry); edit.version = reviewed.version; edit.attempt = null;
+        $('dialogError').textContent = 'Версията е прегледана. Натисни „Запази“, за да запазиш черновата.'; $('reviewPairBtn').hidden = true;
+      }
+    } catch(error) { $('dialogError').textContent = error.message; }
+    finally { $('reviewPairBtn').disabled = false; }
+  });
   $('pairForm').addEventListener('submit', async event => {
     event.preventDefault();
     if(!editing || busy) return;
@@ -214,6 +262,10 @@
       kg:$('actualKg').value,crates:$('actualCrates').value,reasonKey:$('reasonKey').value,reasonText:$('reasonText').value,
       cancellationReason:$('cancellationReason').value,cancellationText:$('cancellationText').value,
       workAreas:[$('areaAuto').checked ? 'auto' : null,$('areaManual').checked ? 'manual' : null].filter(Boolean),now:new Date().toISOString()};
+    if(sync.commitOperation) {
+      if(await saveServer(edit,inputs)) closeDialog();
+      return;
+    }
     const saved = await mutate(() => {
       if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
       const entry = data.entries.find(item => item.id === edit.id);

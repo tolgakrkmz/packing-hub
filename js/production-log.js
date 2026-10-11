@@ -3,6 +3,7 @@ let selectedShift = null;
 let entries = [];
 let addedHistoryMonth = null;
 let goalTons = 3000;
+let editingReport = null;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
 const dateInput = document.getElementById('dateInput');
@@ -83,7 +84,27 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
 
 function updateSaveEnabled(){
   saveBtn.disabled = writer.busy || !selectedShift;
-  saveBtn.textContent = writer.busy ? 'Записва се...' : selectedShift ? 'Запиши смяна ' + selectedShift : 'Изберете смяна за запис';
+  saveBtn.textContent = writer.busy ? 'Записва се...' : editingReport ? 'Запази корекцията' : selectedShift ? 'Запиши смяна ' + selectedShift : 'Изберете смяна за запис';
+  if(typeof HubServer !== 'undefined') saveBtn.hidden = !(editingReport ? canEditReports : HubServer.can('canCreateReports'));
+  document.getElementById('cancelReportEdit').hidden = !editingReport;
+}
+document.getElementById('cancelReportEdit').addEventListener('click', () => {
+  if(writer.busy) return;
+  editingReport = null; writer.clearRetry(); selectedShift = null; updateSaveEnabled();
+});
+function editEntry(id) {
+  if(!canEditReports || writer.busy || typeof HubServer === 'undefined') return;
+  const entry = entries.find(item => item.id === id);
+  if(!entry) return;
+  writer.clearRetry(); editingReport = {entry:JSON.parse(JSON.stringify(entry)),version:sync.recordVersion(id)};
+  selectedShift = entry.shift; dateInput.value = entry.date;
+  tonInput.value = entry.tonnage; brakInput.value = entry.brak;
+  breakdownToggle.checked = !!entry.breakdown;
+  simpleTonRow.style.display = entry.breakdown ? 'none' : 'flex'; breakdownRows.style.display = entry.breakdown ? 'block' : 'none';
+  for(const [control,key] of [[autoKgInput,'autoKg'],[autoCrateInput,'autoCrates'],[manKgInput,'manKg'],[manCrateInput,'manCrates']]) control.value = entry.breakdown?.[key] || 0;
+  document.querySelectorAll('.shift-btn').forEach(button => { for(const shift of SHIFTS) button.classList.remove('sel-'+shift); if(button.dataset.shift === selectedShift) button.classList.add('sel-'+selectedShift); });
+  updateTotalReadout(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
+  dateInput.scrollIntoView?.({block:'center'});
 }
 
 document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
@@ -225,15 +246,18 @@ saveBtn.addEventListener('click', async ()=>{
   } else {
     tonnage = parseInt(tonInput.value||'0',10);
   }
-  const entry = writer.entry({
+  const draft = {
     date: dateInput.value,
     shift: selectedShift,
     tonnage: tonnage,
     brak: parseInt(brakInput.value||'0',10),
     breakdown: breakdown
-  });
+  };
+  const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);
+  const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    editingReport = null;
     addedHistoryMonth = entry.date.slice(0,7);
     tonInput.value = 0;
     brakInput.value = 0;
@@ -246,17 +270,18 @@ saveBtn.addEventListener('click', async ()=>{
     document.querySelectorAll('.shift-btn').forEach(b=>{
       b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
     });
-  }, 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.');
+  }, 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.',operation);
 });
 
 async function deleteEntry(id){
   if(!canEditReports || writer.busy) return;
   const original = entries.find(entry => entry.id === id);
   if(!original) return;
-  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.');
+  await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.',writer.operation('delete',original));
 }
 
 function render(){
+  updateSaveEnabled();
   renderDayTotal();
   renderGoal();
 
@@ -314,7 +339,7 @@ grid.innerHTML = SHIFTS.map(s=>{
           + '</td></tr>';
       }
       const delCell = canEditReports
-        ? '<td style="text-align:right"><button class="del-btn" data-id="'+e.id+'" title="Изтрий">✕</button></td>'
+        ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeReportId(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeReportId(e.id)+'" title="Изтрий">✕</button></td>'
         : '<td></td>';
       html += '<tr>'
         + '<td>'+e.date+'</td>'
@@ -332,10 +357,12 @@ grid.innerHTML = SHIFTS.map(s=>{
   addedHistoryMonth = null;
 
   if(canEditReports){
+    wrap.querySelectorAll('.edit-report-btn').forEach(button => button.addEventListener('click', () => editEntry(button.dataset.id)));
     wrap.querySelectorAll('.del-btn').forEach(b=>{
       b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
     });
   }
 }
+function escapeReportId(value) { return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 
 sync.init();

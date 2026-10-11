@@ -43,3 +43,12 @@ test('live refresh waits for a busy save and then accepts the latest data', asyn
   c.busy(false); await new Promise(resolve => setTimeout(resolve, 240));
   assert.equal(reads, 1); assert.deepEqual(c.accepted, [1, 2]);
 });
+test('an overlapping live read does not discard the explicit review snapshot or apply it over newer data', async () => {
+  const c = client(); await c.sync.init();
+  let release, reads = 0;
+  c.fetching(() => ++reads === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response(3)));
+  const review = c.sync.refreshFromDisk();
+  await c.sync.refreshFromDisk(); release(response(2));
+  assert.equal((await review).revision,2);
+  assert.deepEqual(c.accepted,[1,3]);
+});

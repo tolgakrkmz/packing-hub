@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {assertResponsive} = require('./responsive.cjs');
 const employees = [1,2].map(id => ({id:'demo-cancellation-person-'+id,name:'Demo Cancellation Person '+id,category:'stickers',team:'1 смяна',role:'Опаковчик',active:true,note:''}));
-async function exercisePairCancellation({page,base,expect,read,replace,failNextWrite,statisticsPage=page,checkReadOnly=async () => {},screenshotDir}) {
+async function exercisePairCancellation({page,base,expect,read,replace,failNextWrite,failureText='Записът не е направен',statisticsPage=page,checkReadOnly=async () => {},screenshotDir}) {
   const saved = predicate => expect.poll(async () => {
     try { return predicate(await read()); }
     catch(error) {
@@ -58,7 +58,7 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
   }
   await failNextWrite();
   await page.locator('#savePairBtn').click();
-  await expect(page.locator('#dialogError')).toContainText('Записът не е направен');
+  await expect(page.locator('#dialogError')).toContainText(failureText);
   await expect(page.locator('#cancellationText')).toHaveValue('Fictional cleaning note');
   await expect(page.locator('#cancellationReason')).toHaveValue('cleaning');
   assert.equal((await read()).entries[0].cancellation,undefined);
