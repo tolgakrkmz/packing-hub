@@ -21,9 +21,9 @@ test('only unchanged, reviewed demo fixtures are accepted',() => {
     assert.throws(() => inspect(file,Buffer.concat([content,Buffer.from(' ')])),/fixture has changed/);
   }
 });
-test('only the exact reviewed static logo source is approved; arbitrary images and SVG changes are blocked',() => {
+test('only the exact reviewed logo source and PNG exports are approved; arbitrary images and SVG changes are blocked',() => {
   const file = 'assets/package-hub-mark.svg';
-  assert.deepEqual(Object.keys(approvedAssets), [file]);
+  assert.deepEqual(Object.keys(approvedAssets), [file, 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']);
   const content = fs.readFileSync(path.join(root,file));
   assert.doesNotThrow(() => inspect(file,content));
   for(const other of ['assets/other.svg','assets/package-hub-mark.png','assets/private/logo.svg','js/logo.svg']) assert.throws(() => inspect(other,content),/Unapproved/);
@@ -37,6 +37,20 @@ test('only the exact reviewed static logo source is approved; arbitrary images a
   const restricted = 'Synthetic Restricted Example';
   assert.throws(() => inspect(file,content,[path.basename(file).toLowerCase()]),/Private source/);
   assert.throws(() => inspect(file,Buffer.from(restricted)),error => !error.message.includes(restricted));
+});
+test('PNG approval requires the reviewed bytes and regular file mode; hidden additions and arbitrary binary files are blocked', () => {
+  for (const size of [180, 192, 512]) {
+    const file = `assets/package-hub-icon-${size}.png`, content = fs.readFileSync(path.join(root, file));
+    assert.doesNotThrow(() => inspect(file, content));
+    assert.throws(() => inspect(file, content, [], '120000'), /Unapproved/);
+    assert.throws(() => inspect(file, content, [path.basename(file).toLowerCase()]), /Private source/);
+    const altered = Buffer.from(content); altered[altered.length - 1] ^= 1;
+    assert.throws(() => inspect(file, altered), /static asset has changed/);
+    assert.throws(() => inspect(file, Buffer.concat([content, Buffer.from('Synthetic Restricted Example')])), /static asset has changed/);
+    for (const other of ['assets/photo.png', 'assets/package-hub-icon-256.png', 'data/logo.png', 'js/logo.js']) {
+      assert.throws(() => inspect(other, content), /Unapproved|Binary/);
+    }
+  }
 });
 test('documents, backups, unknown data files and symlinks are blocked',() => {
   for(const file of ['data/personnel-copy.json','data/profiles/company.pdf','backup/report.json','private/config.js','js/archive.zip']) {

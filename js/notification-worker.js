@@ -5,7 +5,7 @@ self.addEventListener('push', event => {
   // Ignore any payload: no account, production or employee content on the lock screen.
   event.waitUntil(self.registration.showNotification('Package Hub', {
     body: 'Имате ново известие / You have a new notification',
-    tag: 'hub-notification', icon: '/assets/package-hub-mark.svg'
+    tag: 'hub-notification', icon: '/assets/package-hub-icon-192.png'
   }));
 });
 self.addEventListener('notificationclick', event => {
