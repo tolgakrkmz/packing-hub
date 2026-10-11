@@ -4,10 +4,11 @@ const {installStorage} = require('./storage.cjs');
 const {assertResponsive} = require('./responsive.cjs');
 const expect = baseExpect.configure({timeout: 8000});
 
-async function run(browser, base, {headed = false} = {}) {
+async function run(browser, base, {headed = false, packingOnly = false} = {}) {
   let passed = 0;
   const failures = [];
   async function scenario(name, work, options = {}) {
+    if (packingOnly && !name.startsWith('Packing instruction')) return;
     const {fallback = false, ...browserOptions} = options;
     const context = await browser.newContext({timezoneId: 'Europe/Sofia', locale: 'bg-BG', ...browserOptions});
     const errors = [];
@@ -474,6 +475,65 @@ async function run(browser, base, {headed = false} = {}) {
     await page.locator('[data-cat=""]').click();
     await page.locator('.result-head').click();
     await expect(page.locator('.result-text')).toHaveText('Fictional external import');
+
+    await page.evaluate(async () => {
+      await window.__browserTest.write('flexible/Demo customer A/001234/instruction.txt', 'Fictional customer A steps');
+      await window.__browserTest.write('flexible/Demo customer A/001234/Instructions/Revision 1/demo-sheet.pdf', '%PDF-1.4\nFictional PDF attachment');
+      await window.__browserTest.write('flexible/Demo customer A/001234/Instructions/demo.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect width="30" height="30" fill="blue"/></svg>');
+      await window.__browserTest.write('flexible/Demo customer B/001234/instruction.txt', 'Fictional customer B steps');
+      await window.__browserTest.write('flexible/Demo customer B/general-demo.pdf', '%PDF-1.4\nFictional general attachment');
+    });
+    await page.locator('#bulkBtn').click();
+    await page.evaluate(() => { window.__browserTest.nextDirectory = 'flexible'; });
+    await page.locator('#scanExternalBtn').click();
+    await expect(page.locator('#bulkResults .bulk-check')).toHaveCount(3);
+    await expect(page.locator('#bulkResults .bulk-client').first()).toHaveValue('Demo customer A');
+    await page.locator('#bulkImportBtn').click();
+    await saved('packing/data/package-instructions.json', data => Object.values(data).filter(row => row.number === '001234').length === 2);
+    await expect(page.locator('#bulkPanel')).toBeHidden();
+    await page.locator('#searchInput').fill('001234');
+    await expect(page.locator('.result-card')).toHaveCount(2);
+    const customerB = page.locator('.result-card').filter({hasText: 'Demo customer B'});
+    await customerB.locator('.result-head').click();
+    await expect(customerB.locator('.result-text')).toHaveText('Fictional customer B steps');
+    await customerB.locator('.cat-select').selectOption('special');
+    await saved('packing/data/package-instructions.json', data => Object.values(data).some(row => row.client === 'Demo customer B' && row.number === '001234' && row.category === 'special'));
+    const customerA = page.locator('.result-card').filter({hasText: 'Demo customer A'});
+    await customerA.locator('.result-head').click();
+    await expect(customerA.locator('.result-text')).toHaveText('Fictional customer A steps');
+    await expect(customerA.locator('.cat-select')).toHaveValue('');
+    await expect(customerA.locator('.gallery img')).toBeVisible();
+    const nestedDownload = page.waitForEvent('download');
+    await customerA.locator('.file-tile').click();
+    assert.equal((await nestedDownload).suggestedFilename(), 'demo-sheet.pdf');
+    await page.locator('#searchInput').fill('demo-sheet.pdf');
+    await expect(page.locator('.result-card')).toHaveCount(1);
+    await page.locator('.result-head').click();
+    await expect(page.locator('.result-text')).toHaveText('Fictional customer A steps');
+    await page.locator('#bulkBtn').click();
+    await page.locator('#scanExternalBtn').click();
+    await expect(page.locator('#bulkResults .bulk-check')).toHaveCount(3);
+    await expect(page.locator('#bulkResults .bulk-check:checked')).toHaveCount(0);
+    await expect(page.locator('#bulkSelectAll')).not.toBeChecked();
+    await page.locator('#bulkSelectAll').check();
+    await expect(page.locator('#bulkResults .bulk-check:checked')).toHaveCount(3);
+    await page.locator('#bulkImportBtn').click();
+    await expect(page.locator('#bulkStatus')).toHaveText('Готово — импортирани 0 от 3.');
+    assert.equal(Object.values(await read('packing/data/package-instructions.json')).filter(row => row.number === '001234').length, 2);
+    await page.locator('#bulkCancelBtn').click();
+    await page.locator('#addBtn').click();
+    await page.locator('#numberInput').fill('900004');
+    await page.locator('#nameInput').fill('Demo retry profile');
+    await page.locator('#categoryInput').selectOption('standard');
+    await page.evaluate(() => { window.__browserTest.fault = {file: 'package-instructions.json', stage: 'open'}; });
+    await page.locator('#saveBtn').click();
+    await expect(page.locator('#formMsg')).toHaveText('Възникна грешка при запазването.');
+    await page.locator('#searchInput').fill('900004');
+    await expect(page.locator('.result-card')).toHaveCount(0);
+    assert.equal((await read('packing/data/package-instructions.json'))['900004'], undefined);
+    await page.locator('#saveBtn').click();
+    await saved('packing/data/package-instructions.json', data => !!data['900004']);
+    await expect(page.locator('#formPanel')).toBeHidden();
   });
 
   await scenario('Connection creation, cancelled picker, invalid/wrong files, refresh and restored connection', async t => {

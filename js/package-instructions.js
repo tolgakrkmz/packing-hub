@@ -41,7 +41,11 @@ let rootDirHandle = null;
 let selectedImageFiles = [];
 let instructionsWriting = false;
 
-const detailsCache = {};
+const detailsCache = Object.create(null);
+
+function clearDetailsCache() {
+  Object.keys(detailsCache).forEach(key => delete detailsCache[key]);
+}
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
 
@@ -73,7 +77,7 @@ function generateUniqueFallbackNumber() {
   let candidate;
   do {
     candidate = 'AUTO' + Math.floor(100000 + Math.random() * 900000);
-  } while (dbIndex[candidate]);
+  } while (Object.hasOwn(dbIndex, candidate));
   return candidate;
 }
 
@@ -88,6 +92,7 @@ const sync = createDirectorySync({
   },
   onRefresh: (data) => {
     dbIndex = data || {};
+    clearDetailsCache();
     renderSearch();
   },
   render: () => {
@@ -127,12 +132,24 @@ async function updateIndexOnDisk(mutatorFn) {
   dbIndex = latest;
 }
 
-/* Apply only the profiles edited by this operation to the latest index. */
+/* Append new folders without replacing another customer's profile. */
 async function saveIndexDatabase(numbers) {
   const edits = Object.fromEntries(numbers.map(number => [number, JSON.parse(JSON.stringify(dbIndex[number]))]));
-  await updateIndexOnDisk((latest) => {
-    for (const number of numbers) latest[number] = edits[number];
-  });
+  const previous = {...dbIndex};
+  numbers.forEach(number => delete previous[number]);
+  try {
+    await updateIndexOnDisk((latest) => {
+      for (const number of numbers) {
+        if (Object.hasOwn(latest, number) || HubInstructionFolders.existingKey(latest, edits[number].folderName) !== undefined) {
+          throw new Error('Instruction folder already indexed');
+        }
+        latest[number] = edits[number];
+      }
+    });
+  } catch (error) {
+    dbIndex = await readIndexFromDisk().catch(() => previous);
+    throw error;
+  }
 }
 
 async function resolveNestedDirHandle(baseHandle, relativePath, create) {
@@ -148,36 +165,6 @@ async function getProfileFolderHandle(folderName) {
   const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
   const profilesDir = await dataDir.getDirectoryHandle('profiles', { create: true });
   return resolveNestedDirHandle(profilesDir, folderName, false);
-}
-
-// Rebuild the index from existing profile folders when no index is available.
-async function rebuildIndexFromFolders() {
-  const freshIndex = {};
-  if (!rootDirHandle) return freshIndex;
-
-  try {
-    const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
-    const profilesDir = await dataDir.getDirectoryHandle('profiles', { create: true });
-
-    const { candidates } = await scanCandidatesFromDir(profilesDir, { copyNeeded: false, skipExisting: false });
-
-    candidates.forEach(c => {
-      const number = c.number || ('AUTO' + Math.floor(100000 + Math.random() * 900000));
-      freshIndex[number] = {
-        number,
-        name: c.name,
-        client: c.client || '',
-        category: c.category || null,
-        folderName: c.originalPath,
-        images: c.files,
-        timestamp: Date.now()
-      };
-    });
-  } catch (err) {
-    console.error('Грешка при автоматично разпознаване на папките:', err);
-  }
-
-  return freshIndex;
 }
 
 el.addBtn.addEventListener('click', () => {
@@ -265,11 +252,18 @@ el.saveBtn.addEventListener('click', async () => {
   el.formMsg.textContent = "Създаване на папки и запис на файлове...";
 
   try {
-    const folderName = `${name || 'NoName'} - ${number}`;
+    dbIndex = await readIndexFromDisk();
+    const key = HubInstructionFolders.allocateKey(dbIndex, number);
+    const folderName = [client, `${name || 'NoName'} - ${number}`].filter(Boolean).join('/');
+    if (HubInstructionFolders.existingKey(dbIndex, folderName) !== undefined) {
+      el.formMsg.textContent = 'Папката вече е в индекса. Избери друго име.';
+      el.saveBtn.disabled = false; el.saveBtn.textContent = 'Запази';
+      return;
+    }
 
     const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
     const profilesDir = await dataDir.getDirectoryHandle('profiles', { create: true });
-    const profileFolder = await profilesDir.getDirectoryHandle(folderName, { create: true });
+    const profileFolder = await resolveNestedDirHandle(profilesDir, folderName, true);
 
     if (instructions) {
       const textFileHandle = await profileFolder.getFileHandle('instruction.txt', { create: true });
@@ -287,7 +281,7 @@ el.saveBtn.addEventListener('click', async () => {
       savedImageNames.push(file.name);
     }
 
-    dbIndex[number] = {
+    dbIndex[key] = {
       number: number,
       name: name,
       client: client,
@@ -297,8 +291,8 @@ el.saveBtn.addEventListener('click', async () => {
       timestamp: Date.now()
     };
 
-    await saveIndexDatabase([number]);
-    delete detailsCache[number];
+    await saveIndexDatabase([key]);
+    delete detailsCache[folderName];
 
     el.formMsg.style.color = 'green';
     el.formMsg.textContent = "Профилът е записан успешно!";
@@ -357,8 +351,8 @@ function getFilteredProfiles() {
     const name = String(profile.name || '').toLowerCase();
     const client = String(profile.client || '').toLowerCase();
     const number = String(profile.number || '').toLowerCase();
-    // Rank name and customer matches above profile-number matches.
-    return name.includes(query) || client.includes(query) || number.includes(query);
+    const files = (profile.images || []).join(' ').toLowerCase();
+    return name.includes(query) || client.includes(query) || number.includes(query) || files.includes(query);
   });
 }
 
@@ -431,8 +425,8 @@ async function toggleCard(card, profile) {
   card.classList.add('open');
   const body = card.querySelector('.result-body');
 
-  if (detailsCache[profile.number]) {
-    body.innerHTML = detailsCache[profile.number];
+  if (detailsCache[profile.folderName]) {
+    body.innerHTML = detailsCache[profile.folderName];
     wireGalleryClicks(body);
     wireCategorySelect(body, card, profile);
     return;
@@ -442,7 +436,7 @@ async function toggleCard(card, profile) {
 
   try {
     const html = await loadProfileDetailsHtml(profile);
-    detailsCache[profile.number] = html;
+    detailsCache[profile.folderName] = html;
     body.innerHTML = html;
     wireGalleryClicks(body);
     wireCategorySelect(body, card, profile);
@@ -454,10 +448,11 @@ async function toggleCard(card, profile) {
 
 function categorySelectHtml(profile) {
   const current = profile.category || '';
+  const selectId = 'catSelect-' + encodeURIComponent(profile.folderName);
   return `
     <div class="cat-edit-row">
-      <label for="catSelect-${escapeHtml(profile.number)}">Категория:</label>
-      <select class="cat-select" id="catSelect-${escapeHtml(profile.number)}" data-number="${escapeHtml(profile.number)}">
+      <label for="${escapeHtml(selectId)}">Категория:</label>
+      <select class="cat-select" id="${escapeHtml(selectId)}" data-number="${escapeHtml(profile.number)}">
         <option value="" ${current === '' ? 'selected' : ''}>Некатегоризиран</option>
         <option value="standard" ${current === 'standard' ? 'selected' : ''}>Стандартен</option>
         <option value="special" ${current === 'special' ? 'selected' : ''}>Специален</option>
@@ -472,19 +467,20 @@ function wireCategorySelect(body, card, profile) {
 
   select.addEventListener('change', async (e) => {
     const newCategory = e.target.value || null;
-    if (!dbIndex[profile.number]) return;
+    const key = HubInstructionFolders.existingKey(dbIndex, profile.folderName);
+    if (key === undefined) return;
 
     const previous = profile.category;
     instructionsWriting = true; select.disabled = true;
     try {
       await updateIndexOnDisk(latest => {
-        if(!latest[profile.number]) throw new Error('Profile unavailable');
-        latest[profile.number].category = newCategory;
+        if(!Object.hasOwn(latest, key) || latest[key].folderName !== profile.folderName) throw new Error('Profile unavailable');
+        latest[key].category = newCategory;
       });
       profile.category = newCategory;
       const badge = card.querySelector('.cat-badge');
       if (badge) badge.outerHTML = categoryBadgeHtml(newCategory);
-      delete detailsCache[profile.number];
+      delete detailsCache[profile.folderName];
     } catch {
       select.value = previous || '';
       el.resultCount.textContent = 'Записът не е направен. Опитай отново.';
@@ -513,7 +509,7 @@ async function loadProfileDetailsHtml(profile) {
   const galleryItems = [];
   for (const imgName of (profile.images || [])) {
     try {
-      const fileHandle = await profileFolder.getFileHandle(imgName, { create: false });
+      const fileHandle = await HubInstructionFolders.fileHandle(profileFolder, imgName);
       const file = await fileHandle.getFile();
 
       if (isImageName(imgName)) {
@@ -527,14 +523,14 @@ async function loadProfileDetailsHtml(profile) {
       } else {
         const url = URL.createObjectURL(file);
         galleryItems.push(`
-          <a class="file-tile" href="${url}" download="${escapeHtml(imgName)}">
+          <a class="file-tile" href="${url}" download="${escapeHtml(imgName.split('/').pop())}">
             <div class="file-tile-icon">${fileIconFor(imgName)}</div>
             <div class="file-tile-name" translate="no">${escapeHtml(imgName)}</div>
           </a>
         `);
       }
     } catch (err) {
-      console.warn('Файлът липсва на диска:', imgName);
+      console.warn('Приложението не може да бъде заредено.');
     }
   }
 
@@ -568,6 +564,7 @@ const bulkEl = {
   bulkPanel: document.getElementById('bulkPanel'),
   scanLocalBtn: document.getElementById('scanLocalBtn'),
   scanExternalBtn: document.getElementById('scanExternalBtn'),
+  importLayout: document.getElementById('importLayout'),
   bulkResults: document.getElementById('bulkResults'),
   bulkStatus: document.getElementById('bulkStatus'),
   bulkImportBtn: document.getElementById('bulkImportBtn'),
@@ -579,102 +576,14 @@ const bulkEl = {
 applyPackageInstructionsAdminUI(typeof HubServer === 'undefined' || HubServer.can('canManageInstructions'));
 
 let bulkCandidates = [];
+let bulkCloseTimer = null;
 
-function parseProfileFolderName(folderName) {
-  const digitMatches = folderName.match(/\d+/g) || [];
-  let longest = '';
-  digitMatches.forEach(d => { if (d.length > longest.length) longest = d; });
-
-  const idx = folderName.lastIndexOf(' - ');
-  if (idx !== -1) {
-    const tail = folderName.slice(idx + 3).trim();
-    if (tail === longest) {
-      return { name: folderName.slice(0, idx).trim(), number: tail };
-    }
-  }
-
-  return { name: folderName, number: longest };
-}
-
-async function inspectFolderDirect(handle) {
-  let instructionText = '';
-  try {
-    const txtHandle = await handle.getFileHandle('instruction.txt');
-    const file = await txtHandle.getFile();
-    instructionText = await file.text();
-  } catch (e) { /* An instruction file is optional when inspecting an existing profile folder. */ }
-
-  const files = [];
-  for await (const [fname, fhandle] of handle.entries()) {
-    if (fhandle.kind === 'file' && fname !== 'instruction.txt') {
-      files.push(fname);
-    }
-  }
-  return { instructionText, files };
-}
-
-async function scanCandidatesFromDir(dirHandle, { copyNeeded, skipExisting }) {
-  const results = [];
-  let skippedEmpty = 0;
-
-  for await (const [name, handle] of dirHandle.entries()) {
-    if (handle.kind !== 'directory') continue;
-
-    const direct = await inspectFolderDirect(handle);
-    const isProfileItself = direct.instructionText.trim() || direct.files.length > 0;
-
-    if (isProfileItself) {
-      const parsed = parseProfileFolderName(name);
-      if (skipExisting && parsed.number && dbIndex[parsed.number]) continue;
-
-      results.push({
-        client: '',
-        originalPath: name,
-        sourceHandle: handle,
-        name: parsed.name,
-        number: parsed.number,
-        category: '',
-        instructionText: direct.instructionText,
-        files: direct.files,
-        copyNeeded
-      });
-      continue;
-    }
-
-    let foundAnySubfolder = false;
-    for await (const [subName, subHandle] of handle.entries()) {
-      if (subHandle.kind !== 'directory') continue;
-      foundAnySubfolder = true;
-
-      const subDirect = await inspectFolderDirect(subHandle);
-      if (!subDirect.instructionText.trim() && subDirect.files.length === 0) {
-        skippedEmpty++;
-        continue;
-      }
-
-      const parsed = parseProfileFolderName(subName);
-      if (skipExisting && parsed.number && dbIndex[parsed.number]) continue;
-
-      results.push({
-        client: name,
-        originalPath: `${name}/${subName}`,
-        sourceHandle: subHandle,
-        name: parsed.name,
-        number: parsed.number,
-        category: '',
-        instructionText: subDirect.instructionText,
-        files: subDirect.files,
-        copyNeeded
-      });
-    }
-
-    if (!foundAnySubfolder) skippedEmpty++;
-  }
-
-  return { candidates: results, skippedEmpty };
+async function scanCandidatesFromDir(dirHandle, options) {
+  return HubInstructionFolders.scan(dirHandle, {...options, index: dbIndex});
 }
 
 function openBulkPanel() {
+  clearTimeout(bulkCloseTimer);
   if (!rootDirHandle) {
     alert('Свържете папката с проекта първо.');
     return;
@@ -688,6 +597,7 @@ function openBulkPanel() {
 
 bulkEl.bulkBtn.addEventListener('click', openBulkPanel);
 bulkEl.bulkCancelBtn.addEventListener('click', () => {
+  clearTimeout(bulkCloseTimer);
   bulkEl.bulkPanel.style.display = 'none';
 });
 
@@ -713,7 +623,7 @@ bulkEl.scanExternalBtn.addEventListener('click', async () => {
   try {
     const externalDir = await window.showDirectoryPicker();
     bulkEl.bulkStatus.textContent = 'Сканиране на избраната папка...';
-    const { candidates, skippedEmpty } = await scanCandidatesFromDir(externalDir, { copyNeeded: true, skipExisting: false });
+    const { candidates, skippedEmpty } = await scanCandidatesFromDir(externalDir, { copyNeeded: true, skipExisting: false, layout: bulkEl.importLayout.value });
     bulkCandidates = candidates;
     renderBulkCandidates(skippedEmpty);
   } catch (error) {
@@ -738,7 +648,7 @@ function renderBulkCandidates(skippedEmpty) {
   bulkEl.bulkStatus.textContent = `Намерени ${bulkCandidates.length} папки.${skippedNote}`;
 
   bulkEl.bulkResults.innerHTML = bulkCandidates.map((c, i) => {
-    const conflict = c.number && dbIndex[c.number];
+    const conflict = HubInstructionFolders.existingKey(dbIndex, HubInstructionFolders.destinationPath(c)) !== undefined;
     return `
       <div class="bulk-row" data-idx="${i}">
         <input type="checkbox" class="bulk-check" ${conflict ? '' : 'checked'} data-idx="${i}">
@@ -746,6 +656,7 @@ function renderBulkCandidates(skippedEmpty) {
         <div class="bulk-name-col">
           <input type="text" class="bulk-name" placeholder="име" value="${escapeHtml(c.name)}" data-idx="${i}">
           <input type="text" class="bulk-client" placeholder="клиент (по избор)" value="${escapeHtml(c.client)}" data-idx="${i}">
+          <span class="bulk-path" translate="no">${escapeHtml(c.originalPath)}</span>
         </div>
         <select class="bulk-category" data-idx="${i}">
           <option value="" ${!c.category ? 'selected' : ''}>Некатегоризиран</option>
@@ -753,15 +664,23 @@ function renderBulkCandidates(skippedEmpty) {
           <option value="special" ${c.category === 'special' ? 'selected' : ''}>Специален</option>
         </select>
         <span class="bulk-filecount">${c.files.length} файл${c.files.length === 1 ? '' : 'а'}${c.instructionText ? ', текст ✓' : ''}</span>
-        ${conflict ? '<span class="bulk-conflict">⚠ номерът вече съществува</span>' : ''}
+        ${conflict ? '<span class="bulk-conflict">⚠ папката вече е в индекса</span>' : ''}
       </div>
     `;
   }).join('');
 
+  const updateSelection = () => {
+    const checks = Array.from(bulkEl.bulkResults.querySelectorAll('.bulk-check'));
+    const selected = checks.filter(cb => cb.checked).length;
+    bulkEl.bulkSelectAll.checked = selected === checks.length;
+    bulkEl.bulkSelectAll.indeterminate = selected > 0 && selected < checks.length;
+  };
+  bulkEl.bulkResults.querySelectorAll('.bulk-check').forEach(cb => cb.addEventListener('change', updateSelection));
+  updateSelection();
+
   bulkEl.bulkResults.querySelectorAll('.bulk-number').forEach(input => {
     input.addEventListener('input', (e) => {
       bulkCandidates[e.target.dataset.idx].number = e.target.value.trim();
-      refreshConflictBadge(e.target.dataset.idx);
     });
   });
   bulkEl.bulkResults.querySelectorAll('.bulk-name').forEach(input => {
@@ -771,7 +690,16 @@ function renderBulkCandidates(skippedEmpty) {
   });
   bulkEl.bulkResults.querySelectorAll('.bulk-client').forEach(input => {
     input.addEventListener('input', (e) => {
-      bulkCandidates[e.target.dataset.idx].client = e.target.value.trim();
+      const candidate = bulkCandidates[e.target.dataset.idx];
+      candidate.client = e.target.value.trim();
+      const row = e.target.closest('.bulk-row');
+      const conflict = HubInstructionFolders.existingKey(dbIndex, HubInstructionFolders.destinationPath(candidate)) !== undefined;
+      row.querySelector('.bulk-conflict')?.remove();
+      if (conflict) {
+        row.insertAdjacentHTML('beforeend', '<span class="bulk-conflict">⚠ папката вече е в индекса</span>');
+        row.querySelector('.bulk-check').checked = false;
+        updateSelection();
+      }
     });
   });
   bulkEl.bulkResults.querySelectorAll('.bulk-category').forEach(select => {
@@ -781,20 +709,8 @@ function renderBulkCandidates(skippedEmpty) {
   });
 }
 
-function refreshConflictBadge(idx) {
-  const row = bulkEl.bulkResults.querySelector(`.bulk-row[data-idx="${idx}"]`);
-  if (!row) return;
-  const c = bulkCandidates[idx];
-  const existingBadge = row.querySelector('.bulk-conflict');
-  const conflict = c.number && dbIndex[c.number];
-  if (conflict && !existingBadge) {
-    row.insertAdjacentHTML('beforeend', '<span class="bulk-conflict">⚠ номерът вече съществува</span>');
-  } else if (!conflict && existingBadge) {
-    existingBadge.remove();
-  }
-}
-
 bulkEl.bulkSelectAll.addEventListener('change', (e) => {
+  bulkEl.bulkSelectAll.indeterminate = false;
   bulkEl.bulkResults.querySelectorAll('.bulk-check').forEach(cb => { cb.checked = e.target.checked; });
 });
 
@@ -810,6 +726,7 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
   bulkEl.bulkImportBtn.disabled = true;
   instructionsWriting = true;
   try {
+  dbIndex = await readIndexFromDisk();
   const dataDir = await rootDirHandle.getDirectoryHandle('data', { create: true });
   const profilesDir = await dataDir.getDirectoryHandle('profiles', { create: true });
 
@@ -817,16 +734,17 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
   const completedNumbers = [];
   for (const idx of checkedIdxs) {
     const c = bulkCandidates[idx];
+    const destPath = HubInstructionFolders.destinationPath(c);
+    if (HubInstructionFolders.existingKey(dbIndex, destPath) !== undefined) continue;
     if (!c.number) c.number = generateUniqueFallbackNumber();
+    const key = HubInstructionFolders.allocateKey(dbIndex, c.number);
 
     bulkEl.bulkStatus.innerHTML = `Импортиране ${done + 1} от ${checkedIdxs.length}: <span translate="no">${escapeHtml(c.name || c.number)}</span>...`;
 
     try {
-      let destPath;
       let savedImageNames = c.files;
 
       if (c.copyNeeded) {
-        destPath = c.originalPath;
         const destFolderHandle = await resolveNestedDirHandle(profilesDir, destPath, true);
 
         if (c.instructionText) {
@@ -838,19 +756,17 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
 
         savedImageNames = [];
         for (const fname of c.files) {
-          const srcFileHandle = await c.sourceHandle.getFileHandle(fname);
+          const srcFileHandle = await HubInstructionFolders.fileHandle(c.sourceHandle, fname);
           const srcFile = await srcFileHandle.getFile();
-          const destFileHandle = await destFolderHandle.getFileHandle(fname, { create: true });
+          const destFileHandle = await HubInstructionFolders.fileHandle(destFolderHandle, fname, true);
           const w = await destFileHandle.createWritable();
           await w.write(srcFile);
           await w.close();
           savedImageNames.push(fname);
         }
-      } else {
-        destPath = c.originalPath;
       }
 
-      dbIndex[c.number] = {
+      dbIndex[key] = {
         number: c.number,
         name: c.name,
         client: c.client || '',
@@ -859,11 +775,11 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
         images: savedImageNames,
         timestamp: Date.now()
       };
-      delete detailsCache[c.number];
-      completedNumbers.push(c.number);
+      delete detailsCache[destPath];
+      completedNumbers.push(key);
       done++;
     } catch (error) {
-      console.error(`Грешка при импорт на ${c.number}:`, error);
+      console.error('Грешка при импорт на инструкция.');
     }
   }
 
@@ -871,7 +787,7 @@ bulkEl.bulkImportBtn.addEventListener('click', async () => {
   bulkEl.bulkStatus.textContent = `Готово — импортирани ${done} от ${checkedIdxs.length}.`;
   bulkEl.bulkImportBtn.disabled = false;
 
-  setTimeout(() => {
+  bulkCloseTimer = setTimeout(() => {
     bulkEl.bulkPanel.style.display = 'none';
     renderSearch();
   }, 1200);
