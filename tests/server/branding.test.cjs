@@ -30,17 +30,17 @@ test('reviewed SVG and install/notification PNG icons are public for GET and HEA
     }
   }
   for (const route of ['/assets/other.svg', '/assets/package-hub-mark.png', '/assets/private.svg', '/data/personnel.json']) assert.equal((await fetch(base + route)).status, 404);
-  assert.equal((await fetch(base + '/index.html', {redirect: 'manual'})).status, 302);
+  assert.equal((await fetch(base + '/', {redirect: 'manual'})).status, 302);
   for (const route of ['/api/data/personnel', '/api/accounts', '/server-session.js']) assert.equal((await fetch(base + route)).status, 401);
   const assertInstallLinks = html => {
     assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="assets\/package-hub-icon-180\.png">/);
     assert.equal((html.match(/rel="manifest"/g) || []).length, 1);
   };
-  const loginPage = await fetch(base + '/login.html');
+  const loginPage = await fetch(base + '/login');
   assert.equal(loginPage.status, 200); assertInstallLinks(await loginPage.text());
   await hub.auth.create('demo-icon-admin', 'Fictional-password-123', 'admin');
   const login = await hub.auth.login('demo-icon-admin', 'Fictional-password-123');
-  for (const route of ['/index.html', '/notifications.html']) {
+  for (const route of ['/', '/notifications']) {
     const page = await fetch(base + route, {headers: {Cookie: 'hub-local-session=' + login.token}});
     assert.equal(page.status, 200); assertInstallLinks(await page.text());
   }

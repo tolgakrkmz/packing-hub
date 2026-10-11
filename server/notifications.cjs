@@ -104,7 +104,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     const page = rows.filter(item => !before || item.sequence < Number(before));
     const items = page.slice(0, 50);
     return {count: rows.filter(item => item.read_at === null).length, nextBefore: page.length > 50 ? String(items.at(-1).sequence) : null,
-      items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: '/' + types[item.type].module + '.html'}))};
+      items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: '/' + types[item.type].module}))};
   }
   function preferences(user) {
     access(user);

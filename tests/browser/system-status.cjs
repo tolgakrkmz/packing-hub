@@ -27,13 +27,13 @@ async function statusFixture(directory) {
     calls: () => calls, reply: code => { manualReply = code; }, close: async () => { fs.statfsSync = original; await new Promise(resolve => server.close(resolve)); }};
 }
 async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, screenshotDir}) {
-  await expect(admin.locator('.server-links a[href="/tasks.html"]')).toHaveCount(0);
-  await expect(admin.locator('a[href="tasks.html"]')).toBeVisible();
+  await expect(admin.locator('.server-links a[href="/tasks"]')).toHaveCount(0);
+  await expect(admin.locator('a[href="/tasks"]')).toBeVisible();
   await require('./admin-panel.cjs').openAdminModule(admin,'system-status');
   await expect(admin.locator('#summaryLabel')).toHaveText('Проверките са успешни');
   await expect(admin.locator('#databaseState')).toHaveText('Изправно');
   await expect(admin.locator('#backupState')).toHaveText('Изправно');
-  await expect(admin.locator('.server-links a[href="/admin-panel.html"]')).toHaveAttribute('aria-current', 'location');
+  await expect(admin.locator('.server-links a[href="/admin-panel"]')).toHaveAttribute('aria-current', 'location');
   // A restored page must check again before showing an old successful summary.
   await admin.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
   fixture.set(value => { value.backups.secondaryAvailable = false; });
@@ -121,9 +121,9 @@ async function exerciseSystemStatus({admin, hub, base, device, expect, fixture, 
   for (const role of ['operator', 'observer']) {
     await hub.auth.create('demo-status-' + role, 'Fictional-password-123', role);
     const page = await device('demo-status-' + role, true);
-    await expect(page.locator('.server-links a[href="/system-status.html"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/system-status"]')).toHaveCount(0);
     assert.equal(await page.evaluate(async () => (await fetch('/api/admin/status')).status), 403);
-    assert.equal(await page.evaluate(async () => (await fetch('/system-status.html')).status), 403);
+    assert.equal(await page.evaluate(async () => (await fetch('/system-status')).status), 403);
     assert.equal(await page.evaluate(async () => (await fetch('/api/admin/backup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.HUB_SERVER_BOOT.csrf}, body: '{}'})).status), 403);
   }
   fixture.healthy(); fixture.set(value => { Object.assign(value.backups, {mode: 'single', lastSecondary: null, secondaryAvailable: false}); });
@@ -175,7 +175,7 @@ async function exerciseOfflineSystemStatus(browser, base, expect) {
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.method()); });
   try {
-    await page.goto(base + '/system-status.html');
+    await page.goto(base + '/system-status');
     await expect(page.locator('#systemContent')).toBeHidden();
     await expect(page.locator('#refreshSystem')).toBeDisabled();
     await expect(page.locator('#manualBackup')).toBeDisabled();

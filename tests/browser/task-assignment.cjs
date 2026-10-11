@@ -6,7 +6,7 @@ const password = 'Fictional-password-123';
 async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime, screenshotDir}) {
   setTime('2026-12-01T15:00:00+02:00');
   const owner = await hub.auth.create('demo-assignment-owner', password, 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
-  await admin.goto(base + '/accounts.html');
+  await admin.goto(base + '/accounts');
   await admin.locator('[data-hub-language=bg]').click();
   await admin.locator('#newAccountButton').click();
   await admin.locator('#accountUsername').fill('demo-task-assigner'); await admin.locator('#accountPassword').fill(password);
@@ -34,9 +34,9 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   const user = hub.auth.list().find(user => user.username === 'demo-task-assigner');
   assert.deepEqual(user.permissionOverrides, {canAssignTasks: true});
   const assigner = await device(user.username, true);
-  await expect(assigner.locator('a[href="tasks.html"]')).toBeVisible();
+  await expect(assigner.locator('a[href="/tasks"]')).toBeVisible();
   await expect(assigner.getByRole('link', {name: 'Админ панел', exact: true})).toHaveCount(1);
-  await assigner.goto(base + '/tasks.html'); await expect(assigner.locator('#newTask')).toBeVisible();
+  await assigner.goto(base + '/tasks'); await expect(assigner.locator('#newTask')).toBeVisible();
   async function assign(page, kind, title) {
     const language = kind === 'global' ? 'en' : 'bg';
     await page.locator('[data-hub-language=' + language + ']').click();
@@ -62,7 +62,7 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   await assigner.locator('#refreshTasks').click(); await expect(assigner.locator('#taskContent')).toContainText('Готова за проверка');
   for (const name of ['Промени', 'Отмени', 'Отчети', 'Добави напредък', 'Потвърди приключване', 'Върни за работа']) await expect(assigner.getByRole('button', {name, exact: true})).toHaveCount(0);
   const chief = await hub.auth.create('demo-assignment-chief', password, 'operator', null, {canAssignTasks: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
-  const chiefPage = await device(chief.username, true); await chiefPage.goto(base + '/tasks.html');
+  const chiefPage = await device(chief.username, true); await chiefPage.goto(base + '/tasks');
   await assign(chiefPage, 'global', 'Fictional supervisor delegated task');
   await expect(chiefPage.locator('#ownerFilterLabel')).toBeVisible();
   await expect(chiefPage.getByRole('button', {name: 'Добави напредък', exact: true})).toHaveCount(0);
@@ -78,9 +78,9 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   const edit = entry.locator('form');
   await edit.locator('[data-permission=canViewTasks]').uncheck(); await edit.locator('[data-permission=canViewTasks]').check();
   await edit.locator('[data-permission=canAssignTasks]').uncheck(); await edit.locator('button[type=submit]').click();
-  await expect(assigner).toHaveURL(base + '/login.html');
+  await expect(assigner).toHaveURL(base + '/login');
   await assigner.locator('#username').fill(user.username); await assigner.locator('#password').fill(password); await assigner.locator('#loginForm button').click();
-  await expect(assigner).toHaveURL(base + '/index.html'); await assigner.goto(base + '/tasks.html');
+  await expect(assigner).toHaveURL(base + '/'); await assigner.goto(base + '/tasks');
   await expect(assigner.locator('#newTask')).toBeHidden();
   assert.equal((await assigner.request.get(base + '/api/tasks/preview?date=2026-12-01&assigneeId=' + owner.id)).status(), 403);
   await expect(assigner.locator('#taskContent')).toContainText('Fictional delegated shift task');

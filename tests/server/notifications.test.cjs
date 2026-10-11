@@ -135,7 +135,7 @@ test('HTTP inbox routes enforce login, CSRF, module rights, methods and current 
   await hub.auth.update(login.user.id, {permissions: {canViewNotifications: false}}, login.user);
   const fresh = await hub.auth.login('demo-admin', password);
   assert.equal((await request('/api/notifications', 'GET', null, {Cookie: 'hub-local-session=' + fresh.token})).status, 403);
-  assert.equal((await request('/notifications.html', 'GET', null, {Cookie: 'hub-local-session=' + fresh.token})).status, 403);
+  assert.equal((await request('/notifications', 'GET', null, {Cookie: 'hub-local-session=' + fresh.token})).status, 403);
 });
 test('revocation during a pending push prevents the next device from receiving any request', async t => {
   let release, started; const began = new Promise(resolve => { started = resolve; });

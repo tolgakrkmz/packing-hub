@@ -47,15 +47,19 @@ async function main() {
       await context.addInitScript(() => { window.showOpenFilePicker = () => { throw new Error('Online mode must not ask for a local JSON file'); }; });
       const page = await context.newPage(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message));
       await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
-      await page.goto(base + '/index.html'); await expect(page).toHaveURL(base + '/login.html');
+      await page.goto(base + '/'); await expect(page).toHaveURL(base + '/login');
       await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
       await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#loginForm button')).toHaveText('Sign in'); await expect(page.locator('#username')).toHaveValue(username); await expect(page.locator('#password')).toHaveValue(demoPassword);
       await page.locator('[data-hub-language=bg]').click(); await page.locator('#loginForm button').click();
-      await expect(page).toHaveURL(base + '/index.html');
+      await expect(page).toHaveURL(base + '/');
       return page;
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--routes-only')) {
+      await require('../tests/browser/routes.cjs').exerciseRoutes({admin, hub, base, device, expect});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--permissions-only')) {
       await exerciseModulePermissions({admin, hub, base, device, expect, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); return;
@@ -81,7 +85,7 @@ async function main() {
       hub.store.put('personnel',{...personnel.data,employees},personnel.revision,user);
       await hub.auth.create('demo-cancel-operator',demoPassword,'operator',user);
       const page = await device('demo-cancel-operator');
-      await page.goto(base+'/pair-targets.html');
+      await page.goto(base+'/pair-targets');
       await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
       await exercisePairCancellation({page,base,expect,statisticsPage:admin,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
@@ -91,7 +95,7 @@ async function main() {
           for(const [username,permissions] of [['demo-cancel-reader',{canCreateReports:false,canEditReports:true}],['demo-cancel-observer',{}]]) {
             await hub.auth.create(username,demoPassword,username.endsWith('observer') ? 'observer' : 'operator',user,permissions);
             const reader = await device(username);
-            await reader.goto(base+'/pair-targets.html');
+            await reader.goto(base+'/pair-targets');
             await reader.locator('#stickersShiftBtn').click();
             await expect(reader.locator('#pairsList [data-action=cancel]')).toHaveCount(1);
             await expect(reader.locator('#addPairBtn')).toBeHidden();
@@ -118,7 +122,7 @@ async function main() {
       assert.deepEqual(errors, []); return;
     }
     if (process.argv.includes('--statistics-only')) {
-      await admin.goto(base + '/statistics.html');
+      await admin.goto(base + '/statistics');
       await expect(admin.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
       await exerciseStatisticsPeriod({page:admin, expect,
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
@@ -232,7 +236,7 @@ async function main() {
       // Fresh viewports avoid stitched capture artifacts after the responsive checks.
       const captures = await browser.newContext({storageState: await admin.context().storageState(), viewport: {width: 1280, height: 1600}});
       await captures.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
-      const page = await captures.newPage(); await page.goto(base + '/accounts.html');
+      const page = await captures.newPage(); await page.goto(base + '/accounts');
       const entry = page.locator(`.account-entry:has(.account-card[data-id="${operatorId}"])`);
       await entry.locator('summary').first().click();
       await page.locator('main').screenshot({path: path.join(directory, 'accounts-desktop.png')});
@@ -245,13 +249,13 @@ async function main() {
     await admin.setViewportSize({width: 1280, height: 900});
     // The draft checks revoke the demo users' sessions; sign in again for subsequent flows.
     for (const [page, username] of [[operator, 'demo-operator'], [observer, 'demo-observer']]) {
-      await page.goto(base + '/login.html'); await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
-      await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/index.html');
+      await page.goto(base + '/login'); await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
+      await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/');
     }
     console.log('PASS compact account search, role defaults, reset and independent drafts');
     console.log('RUN operator entry → shared SQLite → observer report updates without reload');
-    await observer.goto(base + '/statistics.html'); await expect(observer.locator('#statsContent')).toBeVisible();
-    await operator.goto(base + '/production-log.html'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
+    await observer.goto(base + '/statistics'); await expect(observer.locator('#statsContent')).toBeVisible();
+    await operator.goto(base + '/production-log'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
     await expect(operator.locator('#reportEntryPanel')).toBeVisible(); await expect(operator.locator('#dayFilter')).toBeHidden();
     await operator.locator('[data-shift="А"]').click();
     await operator.locator('#dateInput').fill('2026-10-05');
@@ -262,26 +266,26 @@ async function main() {
     assert.equal(hub.store.get('production-log').data.entries[0].tonnage, 3000);
     await observer.locator('[data-stats-tab=production]').click(); await expect(observer.locator('#tableContainer')).toContainText('3000 кг');
     await observer.locator('[data-stats-tab=downtime]').click();
-    await operator.goto(base + '/line-downtime.html'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
+    await operator.goto(base + '/line-downtime'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
     await operator.locator('[data-shift="А"]').click(); await operator.locator('#dateInput').fill('2026-10-05'); await operator.locator('#startInput').fill('23:45'); await operator.locator('#endInput').fill('00:15'); await operator.locator('#otherReasonInput').fill('Fictional online midnight downtime'); await operator.locator('#saveBtn').click();
     await expect(operator.locator('#msg')).toContainText('Записано'); await expect(observer.locator('#avKpiRow')).toContainText('0,5 ч');
     console.log('PASS operator entry → shared SQLite → observer report updates without reload');
     console.log('RUN personnel, Stickers pair planning/reporting and live pair statistics');
-    await admin.goto(base + '/personnel.html'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
+    await admin.goto(base + '/personnel'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
     for (const name of ['Demo Online Packer One', 'Demo Online Packer Two']) {
       await admin.locator('#addPersonBtn').click(); await admin.locator('#personName').fill(name); await admin.locator('#personCategory').selectOption('stickers'); await admin.locator('#personRole').selectOption('Опаковчик'); await admin.locator('#personForm button[type=submit]').click(); await expect(admin.locator('#personModal')).not.toHaveClass(/open/);
     }
-    await operator.goto(base + '/index.html'); await expect(operator.locator('a[href="personnel.html"]')).toBeHidden(); await expect(operator.locator('a[href="statistics.html"]')).toBeHidden();
-    assert.equal(await operator.evaluate(async () => (await fetch('/personnel.html')).status), 403);
-    assert.equal(await operator.evaluate(async () => (await fetch('/statistics.html')).status), 403);
-    await observer.goto(base + '/index.html'); await expect(observer.locator('a[href="personnel.html"]')).toBeHidden(); await expect(observer.locator('a[href="statistics.html"]')).toBeVisible();
-    assert.equal(await observer.evaluate(async () => (await fetch('/personnel.html')).status), 403);
-    await observer.goto(base + '/statistics.html');
+    await operator.goto(base + '/'); await expect(operator.locator('a[href="/personnel"]')).toBeHidden(); await expect(operator.locator('a[href="/statistics"]')).toBeHidden();
+    assert.equal(await operator.evaluate(async () => (await fetch('/personnel')).status), 403);
+    assert.equal(await operator.evaluate(async () => (await fetch('/statistics')).status), 403);
+    await observer.goto(base + '/'); await expect(observer.locator('a[href="/personnel"]')).toBeHidden(); await expect(observer.locator('a[href="/statistics"]')).toBeVisible();
+    assert.equal(await observer.evaluate(async () => (await fetch('/personnel')).status), 403);
+    await observer.goto(base + '/statistics');
     await observer.locator('[data-stats-tab=workforce]').click();
     await expect(observer.locator('#personnelConnDot')).toHaveClass(/\bon\b/);
     await expect(observer.locator('#wfStaffSource')).toHaveText('0 производствени');
     await observer.locator('[data-stats-tab=pairs]').click();
-    await operator.goto(base + '/pair-targets.html'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
+    await operator.goto(base + '/pair-targets'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
     const employees = hub.store.get('personnel').data.employees;
     await operator.locator('#memberOne').selectOption(employees[0].id); await operator.locator('#memberTwo').selectOption(employees[1].id); await operator.locator('#targetKg').fill('1000'); await operator.locator('#targetCrates').fill('40'); await operator.locator('#areaManual').check(); await operator.locator('#savePairBtn').click();
     await expect(operator.locator('#pairsList')).toContainText('Очаква отчет'); await operator.locator('#pairsList [data-action=report]').click(); await operator.locator('#actualKg').fill('1100'); await operator.locator('#actualCrates').fill('44'); await operator.locator('#savePairBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Постигнат');
@@ -289,14 +293,14 @@ async function main() {
     await expect(operator.locator('#pairsList [data-action=report]')).toBeHidden();
     console.log('PASS personnel, Stickers pair planning/reporting and live pair statistics');
     console.log('RUN shared packing instructions and attachments → phone reads them');
-    await admin.goto(base + '/package-instructions.html'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/); await admin.locator('#addBtn').click(); await admin.locator('#numberInput').fill('900101'); await admin.locator('#nameInput').fill('Demo Online Box'); await admin.locator('#categoryInput').selectOption('standard'); await admin.locator('#textInput').fill('Fictional instruction from the shared database.');
+    await admin.goto(base + '/package-instructions'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/); await admin.locator('#addBtn').click(); await admin.locator('#numberInput').fill('900101'); await admin.locator('#nameInput').fill('Demo Online Box'); await admin.locator('#categoryInput').selectOption('standard'); await admin.locator('#textInput').fill('Fictional instruction from the shared database.');
     await admin.locator('#imageFileInput').setInputFiles({name: 'demo.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect width="30" height="30" fill="blue"/></svg>')});
     await admin.locator('#saveBtn').click(); await expect(admin.locator('#formPanel')).toBeHidden();
-    await observer.goto(base + '/package-instructions.html'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await expect(observer.locator('#addBtn')).toBeHidden(); await observer.locator('#searchInput').fill('900101'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional instruction from the shared database.'); await expect(observer.locator('.cat-select')).toBeHidden(); await observer.locator('.gallery img').click(); await expect(observer.locator('#lightbox')).toHaveClass(/open/);
+    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await expect(observer.locator('#addBtn')).toBeHidden(); await observer.locator('#searchInput').fill('900101'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional instruction from the shared database.'); await expect(observer.locator('.cat-select')).toBeHidden(); await observer.locator('.gallery img').click(); await expect(observer.locator('#lightbox')).toHaveClass(/open/);
     console.log('PASS shared packing instructions and attachments → phone reads them');
     console.log('RUN production history import → live report, duplicate prevention and stale preview protection');
-    await observer.goto(base + '/statistics.html'); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
-    await admin.goto(base + '/production-import.html');
+    await observer.goto(base + '/statistics'); await expect(observer.locator('#dashboardActual')).toHaveText('3,0 т');
+    await admin.goto(base + '/production-import');
     const history = {goalTons: 9000, entries: [{id: 'demo-import-history', date: '2026-10-04', shift: 'А', tonnage: 2000, brak: 20, breakdown: null}]};
     const select = data => admin.locator('#importFile').setInputFiles({name: 'production-log.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data))});
     await select(history); await admin.locator('#previewImport').click(); await expect(admin.locator('[data-field=added]')).toHaveText('1');
@@ -348,8 +352,8 @@ async function main() {
     console.log('PASS import JSON equality, conflicting folder copies and explicit-file priority');
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
     await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
-    await admin.goto(base + '/personnel.html'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
-    await observer.goto(base + '/package-instructions.html'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
+    await admin.goto(base + '/personnel'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
+    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
     console.log('PASS all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
     console.log('RUN responsive shared modules, accounts and imports at 320–1440 px');
     for (const width of [320, 390, 768, 1440]) {
@@ -365,7 +369,7 @@ async function main() {
     }
     console.log('PASS responsive shared modules, accounts and imports at 320–1440 px');
     console.log('RUN observer controls, page reload persistence and account revocation');
-    await observer.goto(base + '/production-log.html'); await expect(observer.locator('#saveBtn')).toBeHidden();
+    await observer.goto(base + '/production-log'); await expect(observer.locator('#saveBtn')).toBeHidden();
     await expect(observer.locator('#reportEntryPanel')).toBeHidden();
     await expect(observer.locator('#dayFilter #dateInput')).toBeVisible();
     await expect(observer.locator('#tonInput')).toBeHidden(); await expect(observer.locator('#shiftGrid')).toBeHidden();
@@ -382,8 +386,8 @@ async function main() {
     }
     await observer.reload(); await expect(observer.locator('#goalCur')).toHaveText('7,0 т');
     await expect(observer.locator('#reportEntryPanel')).toBeHidden(); await expect(observer.locator('#dayFilter #dateInput')).toBeVisible();
-    await admin.goto(base + '/accounts.html'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('..').locator('summary').first().click(); await form.locator('[data-active]').uncheck(); await form.locator('button[type=submit]').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
-    await expect(observer).toHaveURL(base + '/login.html');
+    await admin.goto(base + '/accounts'); const viewer = hub.auth.list().find(user => user.username === 'demo-observer'); const form = admin.locator(`.account-card[data-id="${viewer.id}"]`); await form.locator('..').locator('summary').first().click(); await form.locator('[data-active]').uncheck(); await form.locator('button[type=submit]').click(); await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
+    await expect(observer).toHaveURL(base + '/login');
     console.log('RUN account permissions, mobile restrictions, authorized export and immediate revocation');
     await admin.locator('#newAccountButton').click();
     await admin.locator('#accountUsername').fill('demo-permissions'); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption('operator');
@@ -393,7 +397,7 @@ async function main() {
     await expect(admin.locator('#accountForm [data-permission=canImportData]')).toBeEnabled();
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
     const limited = await device('demo-permissions', true);
-    await limited.goto(base + '/production-log.html'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
+    await limited.goto(base + '/production-log'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
     await expect(limited.locator('#reportEntryPanel')).toBeHidden(); await expect(limited.locator('#dayFilter #dateInput')).toBeVisible();
     await expect(limited.locator('#saveBtn')).toBeHidden(); await expect(limited.locator('#reportExport')).toHaveCount(0); await expect(limited.locator('#goalInput')).toBeDisabled();
     const firstMonth = limited.locator('.history-month').first();
@@ -405,10 +409,10 @@ async function main() {
     await limitedForm.locator('..').locator('summary').first().click();
     await limitedForm.locator('[data-permission=canExportReports]').check(); await limitedForm.locator('[data-permission=canCreateReports]').check();
     await limitedForm.locator('[data-permission=canEditReports]').uncheck(); await limitedForm.locator('button[type=submit]').click();
-    await expect(limited).toHaveURL(base + '/login.html');
+    await expect(limited).toHaveURL(base + '/login');
     await limited.locator('#username').fill('demo-permissions'); await limited.locator('#password').fill(demoPassword); await limited.locator('#loginForm button').click();
-    await expect(limited).toHaveURL(base + '/index.html');
-    await limited.goto(base + '/production-log.html'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
+    await expect(limited).toHaveURL(base + '/');
+    await limited.goto(base + '/production-log'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
     await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
     await openAdminModule(limited, 'data-import');
     const downloadPromise = limited.waitForEvent('download'); await limited.locator('#reportExport').click(); const download = await downloadPromise;
@@ -420,15 +424,15 @@ async function main() {
     await admin.locator('[data-hub-language=bg]').click();
     const own = hub.auth.list().find(user => user.username === 'demo-admin'), ownForm = admin.locator(`.account-card[data-id="${own.id}"]`);
     await ownForm.locator('..').locator('summary').first().click();
-    await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login.html');
+    await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login');
     await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button').click();
-    await expect(admin).toHaveURL(base + '/index.html');
+    await expect(admin).toHaveURL(base + '/');
     await openAdminModule(admin,'data-import');
     await expect(admin.locator('[data-transfer-tab=production]')).toBeHidden();
     await expect(admin.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(admin.locator('#reportExport')).toBeVisible();
-    assert.equal(await admin.evaluate(async () => (await fetch('/data-import.html')).status), 200);
-    assert.equal(await admin.evaluate(async () => (await fetch('/production-import.html')).status), 403);
+    assert.equal(await admin.evaluate(async () => (await fetch('/data-import')).status), 200);
+    assert.equal(await admin.evaluate(async () => (await fetch('/production-import')).status), 403);
     console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
     console.log('RUN shift and global tasks, approvals, missed reports and responsive task screens');
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);

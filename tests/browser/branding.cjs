@@ -9,7 +9,7 @@ const pages = ['index', 'tasks', 'admin-panel', 'accounts', 'activity-log', 'sys
 
 async function exerciseBranding({admin, hub, base, device, expect, screenshotDir}) {
   console.log('RUN branded login, error feedback and logout');
-  await admin.goto(base + '/login.html');
+  await admin.goto(base + '/login');
   await expect(admin.locator('.hub-brand')).toHaveText('Package Hub');
   await expect(admin.locator('.hub-brand')).toHaveAttribute('translate', 'no');
   await expect(admin.locator('#username')).toHaveAttribute('autocomplete', 'username');
@@ -20,7 +20,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   await admin.locator('#password').fill('Fictional-wrong-password');
   await admin.locator('#loginForm button').click();
   await expect(admin.locator('#loginMessage')).toHaveText('Невалидно потребителско име или парола.');
-  await expect(admin).toHaveURL(base + '/login.html');
+  await expect(admin).toHaveURL(base + '/login');
   await expect(admin.locator('#username')).toHaveValue('demo-admin');
   await expect(admin.locator('#loginForm button')).toBeEnabled();
   await admin.locator('[data-hub-language=en]').click();
@@ -28,9 +28,9 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   await expect(admin.locator('#username')).toHaveValue('demo-admin');
   await admin.locator('#password').fill(password);
   await admin.locator('#loginForm button').click();
-  await expect(admin).toHaveURL(base + '/index.html');
+  await expect(admin).toHaveURL(base + '/');
   await admin.locator('.server-logout').click();
-  await expect(admin).toHaveURL(base + '/login.html');
+  await expect(admin).toHaveURL(base + '/login');
   assert.equal(await admin.evaluate(async () => (await fetch('/api/session')).status), 401);
 
   const assertMark = async () => {
@@ -77,7 +77,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   await admin.locator('#username').fill('demo-admin');
   await admin.locator('#password').fill(password);
   await admin.locator('#loginForm button').click();
-  await expect(admin).toHaveURL(base + '/index.html');
+  await expect(admin).toHaveURL(base + '/');
 
   for (const width of [320, 390, 768, 1440]) {
     await admin.setViewportSize({width, height: 900});
@@ -85,12 +85,12 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
       await admin.goto(`${base}/${name}.html`);
       await expect(admin.locator('.server-bar')).toBeVisible();
       await expect(admin.locator('.hub-brand:visible')).toHaveCount(1);
-      await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/index.html');
+      await expect(admin.locator('.server-bar .hub-brand')).toHaveAttribute('href', '/');
       await assertMark();
       await expect(admin.locator('.server-bar .hub-language')).toHaveCount(1);
-      await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveCount(1);
+      await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveCount(1);
       if (['admin-panel','system-status','accounts','activity-log','data-import','production-import'].includes(name)) {
-        await expect(admin.locator('.server-links a[href^="/admin-panel.html"]')).toHaveAttribute('aria-current',name === 'admin-panel' ? 'page' : 'location');
+        await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveAttribute('aria-current',name === 'admin-panel' ? 'page' : 'location');
       } else await expect(admin.locator('.server-links [aria-current]')).toHaveCount(0);
       for (const language of ['en', 'bg']) {
         await admin.locator(`[data-hub-language=${language}]`).click();
@@ -103,18 +103,18 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   }
 
   console.log('RUN toolbar task badges, transfer navigation and permission boundaries');
-  await admin.goto(base + '/index.html');
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveCount(1);
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeHidden();
+  await admin.goto(base + '/');
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toHaveCount(1);
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toBeHidden();
   // Exercise live count rendering without creating or modifying task records.
   await admin.route('**/api/tasks/summary', route => route.fulfill({json: {count: 3}}));
   await admin.reload();
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveText('3');
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeVisible();
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toHaveAttribute('aria-label', 'Задачи за проверка: 3');
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toHaveText('3');
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toBeVisible();
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toHaveAttribute('aria-label', 'Задачи за проверка: 3');
   await admin.unroute('**/api/tasks/summary');
   await admin.reload();
-  await expect(admin.locator('a[href="tasks.html"] .task-count')).toBeHidden();
+  await expect(admin.locator('a[href="/tasks"] .task-count')).toBeHidden();
 
   for (const kind of ['production-log', 'line-downtime', 'pair-targets']) {
     await admin.goto(`${base}/${kind}.html`);
@@ -138,24 +138,24 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     const username = 'demo-brand-' + role;
     await hub.auth.create(username, password, role);
     const page = await device(username, true);
-    await expect(page.locator('.server-links a[href="/accounts.html"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/data-import.html"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/admin-panel.html"]')).toBeVisible();
-    await expect(page.locator('.server-links a[href="/tasks.html"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/accounts"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/data-import"]')).toHaveCount(0);
+    await expect(page.locator('.server-links a[href="/admin-panel"]')).toBeVisible();
+    await expect(page.locator('.server-links a[href="/tasks"]')).toHaveCount(0);
     await expect(page.locator('.server-bar #reportExportKind')).toHaveCount(0);
     await openAdminModule(page,'data-import');
     await expect(page.locator('#reportExportKind')).toBeVisible();
     await expect(page.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(page.locator('.server-user')).toHaveText(username);
-    assert.equal(await page.evaluate(async () => (await fetch('/accounts.html')).status), 403);
-    assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 200);
+    assert.equal(await page.evaluate(async () => (await fetch('/accounts')).status), 403);
+    assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 200);
     for (const language of ['en', 'bg']) {
       await page.locator(`[data-hub-language=${language}]`).click();
       await assertResponsive(page, `Brand ${role}/${language} at 390px`);
     }
     await page.context().close();
   }
-  await admin.goto(base + '/index.html');
+  await admin.goto(base + '/');
   await admin.setViewportSize({width: 1440, height: 900});
   await admin.locator('[data-hub-language=bg]').click();
   if (screenshotDir) await admin.screenshot({path: path.join(screenshotDir, 'hub-brand-header.png')});

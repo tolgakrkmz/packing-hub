@@ -10,15 +10,15 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
   console.log('RUN unified transfer screen, retained previews and permission boundaries');
   const kinds = ['production-log','line-downtime','pair-targets'];
   const before = kinds.map(kind => hub.store.get(kind).data);
-  await admin.goto(base + '/production-log.html');
+  await admin.goto(base + '/production-log');
   await expect(admin.locator('.server-bar #reportExport, .server-bar #reportExportKind')).toHaveCount(0);
   await openAdminModule(admin,'data-import');
   await expect(admin.locator('[data-transfer-tab=export]')).toHaveAttribute('aria-selected', 'true');
   await expect(admin.locator('#reportExportKind')).toHaveValue('production-log');
-  await admin.goto(base + '/data-import.html#constructor');
+  await admin.goto(base + '/data-import#constructor');
   await expect(admin.locator('[data-transfer-tab=export]')).toHaveAttribute('aria-selected', 'true');
-  await admin.goto(base + '/production-import.html');
-  await expect(admin).toHaveURL(base + '/data-import.html#production');
+  await admin.goto(base + '/production-import');
+  await expect(admin).toHaveURL(base + '/data-import#production');
   await expect(admin.locator('#importFile')).toBeVisible();
   const history = {goalTons:9999, entries:[{id:'demo-transfer-history', date:'2026-10-04', shift:'А', tonnage:1600, brak:16, breakdown:null}]};
   const selected = {name:'production-log.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(history))};
@@ -100,13 +100,13 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
     await expect(page.locator('.server-bar #reportExport, .server-bar #reportExportKind')).toHaveCount(0);
     if (!canImport && !canExport) {
       await expect(page.getByRole('link', {name:'Импорт / експорт', exact:true})).toHaveCount(0);
-      assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 403);
+      assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 403);
     } else {
       if (role === 'admin') await openAdminModule(page,'data-import');
       else await page.getByRole('link', {name:'Импорт / експорт', exact:true}).click();
-      await page.goto(base + '/data-import.html#' + (canImport ? 'export' : 'modules'));
+      await page.goto(base + '/data-import#' + (canImport ? 'export' : 'modules'));
       await expect(page.locator(`[data-transfer-tab=${canExport ? 'export' : 'production'}]`)).toHaveAttribute('aria-selected', 'true');
-      assert.equal(await page.evaluate(async () => (await fetch('/data-import.html')).status), 200);
+      assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 200);
       if (canExport) await expect(page.locator('[data-transfer-tab=export]')).toBeVisible();
       else await expect(page.locator('[data-transfer-tab=export]')).toBeHidden();
       for (const section of ['production','modules']) {
@@ -122,7 +122,7 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
       if (canExport) await expect(page.locator('#reportExport')).toBeVisible();
       else assert.equal(await page.evaluate(async () => (await fetch('/api/export/production-log')).status), 403);
       if (!canImport) {
-        assert.equal(await page.evaluate(async () => (await fetch('/production-import.html')).status), 403);
+        assert.equal(await page.evaluate(async () => (await fetch('/production-import')).status), 403);
         const status = await page.evaluate(async () => (await HubServer.json('/api/import/production-log/preview', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"entries":[]}'}).catch(error => ({status:error.status}))).status);
         assert.equal(status, 403);
       }
@@ -130,7 +130,7 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
     }
     await page.context().close();
   }
-  await admin.goto(base + '/index.html');
+  await admin.goto(base + '/');
   console.log('PASS unified transfers, JSON downloads, drafts, BG/EN, keyboard and role permissions');
 }
 

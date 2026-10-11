@@ -3,7 +3,7 @@ const {assertResponsive} = require('./responsive.cjs');
 async function exerciseAccountDeletion({admin, hub, base, device, expect}) {
   const victim = await hub.auth.create('demo-delete-account', 'Fictional-password-123', 'observer');
   const signedIn = await device(victim.username, true);
-  await admin.goto(base + '/accounts.html');
+  await admin.goto(base + '/accounts');
   const ownId = hub.auth.list().find(user => user.username === 'demo-admin').id;
   const own = admin.locator(`.account-card[data-id="${ownId}"]`);
   const target = admin.locator(`.account-card[data-id="${victim.id}"]`);
@@ -30,7 +30,7 @@ async function exerciseAccountDeletion({admin, hub, base, device, expect}) {
   await expect(admin.locator('#accountMessage')).toHaveText('Account deleted.');
   await expect(target).toHaveCount(0); await expect(admin.locator('#accountEmpty')).toBeVisible();
   await expect(admin.locator('#accountCount')).toHaveText('0 / ' + hub.auth.list().length);
-  await expect(signedIn).toHaveURL(base + '/login.html');
+  await expect(signedIn).toHaveURL(base + '/login');
   await admin.locator('#accountSearch').fill('');
   await expect(own.locator('input[type=password]')).toHaveValue('Fictional-unsaved-draft-123');
   await admin.reload(); await expect(target).toHaveCount(0);

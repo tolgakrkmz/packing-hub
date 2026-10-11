@@ -15,7 +15,7 @@ test('every install entry page includes the touch icon and one standalone manife
   }
   const manifest = JSON.parse(read('manifest.webmanifest'));
   assert.equal(manifest.display, 'standalone'); assert.equal(manifest.id, '/');
-  assert.equal(manifest.start_url, '/notifications.html');
+  assert.equal(manifest.start_url, '/notifications');
   assert.deepEqual(manifest.icons, [192, 512].map(size => ({src: `/assets/package-hub-icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose: 'any'})));
 });
 

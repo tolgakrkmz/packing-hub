@@ -66,11 +66,11 @@ test('account deletion protects self and the last administrator, but permits rem
 });
 test('authentication gates pages, data, attachments and administration; sessions are HttpOnly and logout revokes access', async t => {
   const {request, login} = await setup(t);
-  assert.equal((await request('/production-log.html')).status, 302);
+  assert.equal((await request('/production-log')).status, 302);
   for (const route of ['/api/data/personnel', '/api/accounts', '/api/files?path=data/package-instructions.json', '/server-session.js']) assert.equal((await request(route)).status, 401);
   for (const route of ['/data/personnel.json', '/server/server.cjs', '/.git/config', '/server-state/hub.sqlite']) assert.equal((await request(route)).status, 404);
   const user = await login();
-  assert.equal((await request('/production-log.html', user)).status, 200);
+  assert.equal((await request('/production-log', user)).status, 200);
   const response = await request('/api/login', null, {method: 'POST', data: {username: 'demo-admin', password: fixturePassword}});
   assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
   assert.equal((await request('/api/logout', user, {method: 'POST', data: {}})).status, 200);
@@ -93,7 +93,7 @@ test('HTTPS proxy configuration uses Secure host cookies and restrictive page he
   assert.equal(response.status, 200);
   const cookie = response.headers.get('set-cookie');
   assert.match(cookie, /^__Host-hub-session=/); assert.match(cookie, /; Path=/); assert.match(cookie, /; Secure/); assert.match(cookie, /HttpOnly; SameSite=Strict/);
-  const page = await fetch(base + '/index.html', {headers: {Cookie: cookie.split(';')[0]}});
+  const page = await fetch(base + '/', {headers: {Cookie: cookie.split(';')[0]}});
   assert.match(page.headers.get('content-security-policy'), /object-src 'none'/); assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.equal(page.headers.get('x-content-type-options'), 'nosniff'); assert.match(page.headers.get('strict-transport-security'), /max-age/);
   assert.match(await page.text(), /src="\/server-session.js"/);
@@ -111,9 +111,9 @@ test('operator can append reports but cannot change goals, delete reports, manag
   const personnel = await (await request('/api/data/personnel', await login())).json();
   assert.equal((await put('personnel', operator, personnel.data)).status, 403);
   assert.equal((await request('/api/accounts', operator)).status, 403);
-  assert.equal((await request('/accounts.html', observer)).status, 403);
-  assert.equal((await request('/production-import.html', observer)).status, 403);
-  assert.equal((await request('/data-import.html', observer)).status, 200);
+  assert.equal((await request('/accounts', observer)).status, 403);
+  assert.equal((await request('/production-import', observer)).status, 403);
+  assert.equal((await request('/data-import', observer)).status, 200);
   assert.equal((await request('/api/data/personnel', operator)).status, 403);
   assert.equal((await request('/api/data/personnel', observer)).status, 403);
 });

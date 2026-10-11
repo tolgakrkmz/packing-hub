@@ -99,7 +99,7 @@ test('administration page, direct status API and manual backup reject anonymous,
   const demo = await setup(t);
   for (const role of [null, 'operator', 'observer']) {
     const actor = role ? await demo.login(role) : null;
-    assert.equal((await demo.request('/system-status.html', actor)).status, actor ? 403 : 302);
+    assert.equal((await demo.request('/system-status', actor)).status, actor ? 403 : 302);
     assert.equal((await demo.request('/api/admin/status', actor)).status, actor ? 403 : 401);
     assert.equal((await demo.request('/api/admin/backup', actor, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})).status, actor ? 403 : 401);
   }
@@ -114,7 +114,7 @@ test('administrator receives sanitized status and starts only a fixed asynchrono
   assert.ok(!JSON.stringify(value).includes(demo.socketPath));
   const result = await demo.request('/api/admin/backup', admin, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
   assert.equal(result.status, 202); assert.deepEqual(await result.json(), {state: 'running'});
-  assert.equal((await demo.request('/system-status.html', admin)).status, 200);
+  assert.equal((await demo.request('/system-status', admin)).status, 200);
 });
 test('manual backup requires matching origin and CSRF, an empty bounded body and the allowed method', async t => {
   const demo = await setup(t), admin = await demo.login('admin');
@@ -293,8 +293,8 @@ test('all malformed backup bodies and unsupported administration methods are ref
     for (const method of methods) assert.equal((await demo.request(route, admin, {method})).status, 405);
   }
   assert.equal(demo.count(), 0);
-  const page = await demo.request('/system-status.html', admin, {method: 'HEAD'}); assert.equal(page.status, 200); assert.equal(await page.text(), '');
-  assert.equal((await demo.request('/system-status.html', await demo.login('observer'), {method: 'HEAD'})).status, 403);
+  const page = await demo.request('/system-status', admin, {method: 'HEAD'}); assert.equal(page.status, 200); assert.equal(await page.text(), '');
+  assert.equal((await demo.request('/system-status', await demo.login('observer'), {method: 'HEAD'})).status, 403);
 });
 
 test('revoking the session while the backup body arrives prevents starting the host action', async t => {

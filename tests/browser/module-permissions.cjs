@@ -4,7 +4,7 @@ const {assertResponsive} = require('./responsive.cjs');
 const {keys} = require('../../server/permissions.cjs');
 async function exerciseModulePermissions({admin, hub, base, device, expect, screenshotDir}) {
   const password = 'Fictional-password-123';
-  await admin.goto(base + '/accounts.html'); await admin.locator('#newAccountButton').click();
+  await admin.goto(base + '/accounts'); await admin.locator('#newAccountButton').click();
   const form = admin.locator('#accountForm');
   for (const role of ['admin', 'operator', 'observer']) {
     await admin.locator('#accountRole').selectOption(role);
@@ -28,26 +28,26 @@ async function exerciseModulePermissions({admin, hub, base, device, expect, scre
       canExportReports: false, canViewPairs: false, canAssignTasks: true
     });
     const page = await device(user.username);
-    await expect(page.locator('a[href="personnel.html"]')).toBeVisible();
-    await expect(page.locator('a[href="statistics.html"]')).toBeVisible();
-    await expect(page.locator('a[href="pair-targets.html"]')).toBeHidden();
-    await page.goto(base + '/production-log.html'); await expect(page.locator('#connDot')).toHaveClass(/on/);
+    await expect(page.locator('a[href="/personnel"]')).toBeVisible();
+    await expect(page.locator('a[href="/statistics"]')).toBeVisible();
+    await expect(page.locator('a[href="/pair-targets"]')).toBeHidden();
+    await page.goto(base + '/production-log'); await expect(page.locator('#connDot')).toHaveClass(/on/);
     await expect(page.locator('#goalInput')).toBeEnabled(); await expect(page.locator('#saveBtn')).toBeHidden();
     await page.locator('#goalInput').fill(role === 'operator' ? '1700' : '1800'); await page.locator('#goalInput').blur();
     await expect(page.locator('#msg')).toContainText('Целта е записана.');
     assert.equal(hub.store.get('production-log').data.goalTons, role === 'operator' ? 1700 : 1800);
-    await page.goto(base + '/line-downtime.html'); await expect(page.locator('#connDot')).toHaveClass(/on/);
+    await page.goto(base + '/line-downtime'); await expect(page.locator('#connDot')).toHaveClass(/on/);
     await expect(page.locator('#reasonsAdminPanel')).toBeVisible(); await page.locator('#newReasonInput').fill('Fictional delegated ' + role);
     await page.locator('#addReasonBtn').click(); await expect(page.locator('#reasonsList')).toContainText('Fictional delegated ' + role);
-    await page.goto(base + '/personnel.html'); await expect(page.locator('#connDot')).toHaveClass(/on/);
+    await page.goto(base + '/personnel'); await expect(page.locator('#connDot')).toHaveClass(/on/);
     await expect(page.locator('#addPersonBtn')).toBeHidden(); await expect(page.locator('#settingsBtn')).toBeHidden();
-    await page.goto(base + '/statistics.html'); await expect(page.locator('#connDot')).toHaveClass(/on/);
-    await page.goto(base + '/accounts.html'); await expect(page.locator('#accountList')).toContainText(user.username);
+    await page.goto(base + '/statistics'); await expect(page.locator('#connDot')).toHaveClass(/on/);
+    await page.goto(base + '/accounts'); await expect(page.locator('#accountList')).toContainText(user.username);
     await expect(page.locator('#newAccountButton')).toBeHidden();
     const entry = page.locator('.account-entry').filter({hasText: user.username}); await entry.locator('summary').first().click();
     await expect(entry.locator('select[aria-label="Роля"]')).toBeDisabled(); await expect(entry.locator('button[type=submit]')).toBeHidden();
-    await page.goto(base + '/system-status.html'); await expect(page.locator('#manualBackup')).toBeHidden();
-    await page.goto(base + '/admin-panel.html'); await expect(page.locator('.admin-card:visible')).toHaveCount(2);
+    await page.goto(base + '/system-status'); await expect(page.locator('#manualBackup')).toBeHidden();
+    await page.goto(base + '/admin-panel'); await expect(page.locator('.admin-card:visible')).toHaveCount(2);
     await expect(page.locator('[data-module=activity-log]')).toBeHidden();
     await expect(page.locator('[data-module=data-import]')).toBeHidden();
     if (screenshotDir && role === 'operator') {
@@ -56,7 +56,7 @@ async function exerciseModulePermissions({admin, hub, base, device, expect, scre
     }
     await page.context().close();
   }
-  await admin.goto(base + '/accounts.html');
+  await admin.goto(base + '/accounts');
   const entry = admin.locator('.account-entry').filter({hasText: 'demo-flex-operator'}); await entry.locator('summary').first().click();
   if (screenshotDir) await entry.screenshot({path: require('node:path').join(screenshotDir, 'module-permission-cards.png')});
   console.log('PASS every flag for every role, independent settings, module visibility, read-only administration and BG/EN responsive layouts');

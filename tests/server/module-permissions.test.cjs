@@ -37,7 +37,7 @@ test('delegated operator and observer accounts can manage each module without ch
     const user = await hub.auth.create('demo-full-' + role, password, role, admin, all);
     const session = await login(user.username); assert.equal(session.user.role, role);
     for (const group of groups.filter(group => group.module)) {
-      for (const method of ['GET', 'HEAD']) assert.equal((await request('/' + group.module + '.html', session, method)).status, 200, role + '/' + group.module);
+      for (const method of ['GET', 'HEAD']) assert.equal((await request('/' + group.module, session, method)).status, 200, role + '/' + group.module);
     }
     for (const route of ['/api/accounts', '/api/admin/activity', '/api/admin/status', '/api/pair-roster', '/api/statistics/workforce', '/api/statistics/data/production-log']) assert.equal((await request(route, session)).status, 200, route);
     const put = async (kind, data) => {
@@ -60,9 +60,9 @@ test('viewing denials gate direct pages, APIs, exports, roster, statistics and i
   for (const group of groups.filter(group => group.view)) {
     const user = await hub.auth.create('demo-deny-' + group.module, password, 'admin', admin, {...all, [group.view]: false});
     const session = await login(user.username);
-    for (const method of ['GET', 'HEAD']) assert.equal((await request('/' + group.module + '.html', session, method)).status, 403);
+    for (const method of ['GET', 'HEAD']) assert.equal((await request('/' + group.module, session, method)).status, 403);
     const routes = {
-      notifications: ['/notifications.html', '/api/notifications', '/api/notifications/preferences'],
+      notifications: ['/notifications', '/api/notifications', '/api/notifications/preferences'],
       'production-log': ['/api/data/production-log', '/api/export/production-log'],
       'line-downtime': ['/api/data/line-downtime', '/api/export/line-downtime'],
       'pair-targets': ['/api/data/pair-targets', '/api/pair-roster', '/api/export/pair-targets'],

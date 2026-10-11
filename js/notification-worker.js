@@ -12,8 +12,8 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
-    const inbox = windows.find(client => new URL(client.url).pathname === '/notifications.html');
+    const inbox = windows.find(client => ['/notifications', '/notifications.html'].includes(new URL(client.url).pathname));
     if (inbox) return inbox.focus();
-    return self.clients.openWindow('/notifications.html');
+    return self.clients.openWindow('/notifications');
   })());
 });
