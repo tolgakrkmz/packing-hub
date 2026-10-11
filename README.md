@@ -4,10 +4,7 @@
   <p><strong>Plan shifts. Track output. Keep teams in sync.</strong></p>
   <p>A lightweight production dashboard for shift teams, reports and packing workflows.</p>
   <p>
-    <img src="https://img.shields.io/badge/JavaScript-Vanilla-f7df1e?style=flat-square&amp;logo=javascript&amp;logoColor=15171b" alt="Vanilla JavaScript">
-    <img src="https://img.shields.io/badge/Node.js-24%2B-3fbfa0?style=flat-square&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 24 or newer">
-    <img src="https://img.shields.io/badge/Storage-SQLite-268c76?style=flat-square&amp;logo=sqlite&amp;logoColor=white" alt="SQLite storage">
-    <img src="https://img.shields.io/badge/Interface-BG%20%2F%20EN-f5a623?style=flat-square" alt="Bulgarian and English interface">
+    <img src="assets/readme-badges.svg" width="470" height="28" alt="Vanilla JavaScript · Node.js 24+ · SQLite · BG / EN">
   </p>
   <p>
     <a href="GUIDE.md">📖 Documentation</a> ·

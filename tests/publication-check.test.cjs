@@ -21,9 +21,9 @@ test('only unchanged, reviewed demo fixtures are accepted',() => {
     assert.throws(() => inspect(file,Buffer.concat([content,Buffer.from(' ')])),/fixture has changed/);
   }
 });
-test('only the exact reviewed logo source and PNG exports are approved; arbitrary images and SVG changes are blocked',() => {
+test('only the exact reviewed logo, README badges and PNG exports are approved; arbitrary images and SVG changes are blocked',() => {
   const file = 'assets/package-hub-mark.svg';
-  assert.deepEqual(Object.keys(approvedAssets), [file, 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']);
+  assert.deepEqual(Object.keys(approvedAssets), ['assets/readme-badges.svg', file, 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']);
   const content = fs.readFileSync(path.join(root,file));
   assert.doesNotThrow(() => inspect(file,content));
   for(const other of ['assets/other.svg','assets/package-hub-mark.png','assets/private/logo.svg','js/logo.svg']) assert.throws(() => inspect(other,content),/Unapproved/);
@@ -37,6 +37,16 @@ test('only the exact reviewed logo source and PNG exports are approved; arbitrar
   const restricted = 'Synthetic Restricted Example';
   assert.throws(() => inspect(file,content,[path.basename(file).toLowerCase()]),/Private source/);
   assert.throws(() => inspect(file,Buffer.from(restricted)),error => !error.message.includes(restricted));
+});
+test('README badges require the exact reviewed SVG and regular file mode', () => {
+  const file = 'assets/readme-badges.svg', content = fs.readFileSync(path.join(root, file));
+  assert.doesNotThrow(() => inspect(file, content));
+  assert.throws(() => inspect(file, content, [], '120000'), /Unapproved/);
+  assert.throws(() => inspect('assets/private-badges.svg', content), /Unapproved/);
+  assert.throws(() => inspect(file, Buffer.concat([content, Buffer.from(' ')])), /static asset has changed/);
+  const restricted = 'Synthetic Restricted Example';
+  assert.throws(() => inspect(file, content, ['vanilla javascript']), /Private source/);
+  assert.throws(() => inspect(file, Buffer.from(restricted)), error => !error.message.includes(restricted));
 });
 test('PNG approval requires the reviewed bytes and regular file mode; hidden additions and arbitrary binary files are blocked', () => {
   for (const size of [180, 192, 512]) {
