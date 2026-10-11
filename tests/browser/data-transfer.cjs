@@ -95,14 +95,17 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
     const username = 'demo-transfer-' + suffix;
     await hub.auth.create(username, password, role, undefined, permissions);
     const page = await device(username, true);
+    // The URL changes before the authenticated toolbar finishes mounting.
+    // Wait for it before choosing between permission-specific entry points.
+    await expect(page.locator('.server-bar')).toBeVisible();
     const canImport = role === 'admin' && permissions.canImportData !== false;
     const canExport = permissions.canExportReports !== false;
     await expect(page.locator('.server-bar #reportExport, .server-bar #reportExportKind')).toHaveCount(0);
     if (!canImport && !canExport) {
-      await expect(page.locator('.server-links a[href^="/admin-panel"], .server-links a[href^="/data-import"]')).toHaveCount(0);
+      await expect(page.locator('.server-links a[href^="/admin-panel"]')).toHaveCount(0);
+      await expect(page.locator('.server-links a[href^="/data-import"]')).toHaveCount(0);
       assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 403);
     } else {
-      await expect(page.locator('.server-bar')).toBeVisible();
       if (await page.locator('.server-links a[href^="/admin-panel"]').isVisible()) await openAdminModule(page,'data-import');
       else await page.locator('.server-links a[href^="/data-import"]').click();
       await page.goto(base + '/data-import#' + (canImport ? 'export' : 'modules'));

@@ -405,7 +405,11 @@ async function main() {
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Избраните данни вече са добавени.'); await expect(admin.locator('#confirmDataImport')).toBeDisabled();
     await admin.locator('#cancelDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Импортът е отказан');
     await admin.goto(base + '/personnel'); await admin.locator('[data-filter=inactive]').click(); await expect(admin.locator('#peopleWrap')).toContainText('Demo Legacy Person 1');
-    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202'); await observer.locator('.result-card').filter({hasText:'Demo Imported Box'}).locator('.result-head').click(); await expect(observer.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(observer.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(observer.locator('.gallery img')).toBeVisible();
+    await observer.goto(base + '/package-instructions'); await expect(observer.locator('#connDot')).toHaveClass(/\bon\b/); await observer.locator('#searchInput').fill('900202');
+    // Search rendering is debounced; wait for the matching card rather than
+    // clicking every result while the previous list is still displayed.
+    const importedCard = observer.locator('.result-card').filter({hasText: 'Demo Imported Box'});
+    await importedCard.locator('.result-head').click(); await expect(importedCard.locator('.result-text')).toHaveText('Fictional imported instruction.'); await expect(importedCard.locator('.file-tile-name')).toHaveText('demo.pdf'); await expect(importedCard.locator('.gallery img')).toBeVisible();
     console.log('PASS all-module folder import → historical pairs, personnel, downtime, nested instructions and live totals');
     console.log('RUN responsive shared modules, accounts and imports at 320–1440 px');
     for (const width of [320, 390, 768, 1440]) {
@@ -450,17 +454,27 @@ async function main() {
     await admin.locator('#accountForm button[type=submit]').click(); await expect(admin.locator('#accountList')).toContainText('demo-permissions');
     const limited = await device('demo-permissions', true);
     await limited.goto(base + '/production-log'); await expect(limited.locator('#connDot')).toHaveClass(/\bon\b/);
-    await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#reportDateRow #dateInput')).toBeVisible();
+    // Correctors need the entry panel to edit an existing report. Creating a
+    // fresh report remains unavailable until the account receives that right.
+    await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
     await expect(limited.locator('#saveBtn')).toBeHidden(); await expect(limited.locator('#reportExport')).toHaveCount(0); await expect(limited.locator('#goalInput')).toBeDisabled();
     const firstMonth = limited.locator('.history-month').first();
     if (!await firstMonth.evaluate(element => element.open)) await firstMonth.locator('summary').click();
     await expect(firstMonth.locator('.del-btn').first()).toBeVisible();
     const correctedId = hub.store.get('production-log').data.entries.find(entry => !entry.breakdown).id;
-    await firstMonth.locator('.edit-report-btn[data-id="' + correctedId + '"]').click();
-    await expect(limited.locator('#saveBtn')).toBeVisible();
+    const correctable = firstMonth.locator('.edit-report-btn[data-id="' + correctedId + '"]');
+    await correctable.click(); await expect(limited.locator('#saveBtn')).toBeVisible();
     await limited.locator('#tonInput').fill('1234'); await limited.locator('#saveBtn').click();
-    await expect(limited.locator('#msg')).toHaveAttribute('data-state','success');
-    assert.equal(hub.store.get('production-log').data.entries.find(entry => entry.id === correctedId).tonnage,1234);
+    // History-enabled releases require a reason before confirming a correction.
+    // Both the dialog and a direct committed result are valid readiness signals.
+    const correctionDialog = limited.locator('#reportCorrectionDialog');
+    await expect.poll(async () => await correctionDialog.isVisible() || await limited.locator('#msg').getAttribute('data-state') === 'success').toBe(true);
+    if (await correctionDialog.isVisible()) {
+      await limited.locator('#reportCorrectionReason').fill('Fictional authorized regression correction');
+      await limited.locator('#reportCorrectionConfirm').click();
+    }
+    await expect(limited.locator('#msg')).toHaveAttribute('data-state', 'success');
+    assert.equal(hub.store.get('production-log').data.entries.find(entry => entry.id === correctedId).tonnage, 1234);
     await expect(limited.locator('#saveBtn')).toBeHidden();
     assert.equal(await limited.evaluate(async () => (await fetch('/api/export/production-log')).status), 403);
     const account = hub.auth.list().find(user => user.username === 'demo-permissions');
