@@ -102,8 +102,8 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     if (before !== null && before !== undefined && (!/^\d{1,16}$/.test(before) || !Number.isSafeInteger(Number(before)))) throw problem(400, 'INVALID_DATA');
     const rows = db.prepare('SELECT rowid AS sequence,* FROM notifications WHERE user_id=? ORDER BY rowid DESC').all(user.id).filter(item => visible(item, user));
     const page = rows.filter(item => !before || item.sequence < Number(before));
-    const items = page.slice(0, 50);
-    return {count: rows.filter(item => item.read_at === null).length, nextBefore: page.length > 50 ? String(items.at(-1).sequence) : null,
+    const pageSize = 3, items = page.slice(0, pageSize);
+    return {count: rows.filter(item => item.read_at === null).length, nextBefore: page.length > pageSize ? String(items.at(-1).sequence) : null,
       items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: '/' + types[item.type].module + '.html'}))};
   }
   function preferences(user) {

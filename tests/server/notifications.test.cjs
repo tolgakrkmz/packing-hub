@@ -114,8 +114,16 @@ test('read ownership, durable event cursor, pagination and restart do not leak o
   inbox.read({id}, other); assert.equal(inbox.list(admin).count, 1); store.close();
   store = openStore(filename); tasks = createTasks(store); inbox = createNotifications(store); inbox.sync(); assert.equal(inbox.list(admin).count, 1);
   for (let i = 0; i < 55; i++) store.audit(admin, 'write', 'production-log', {added: true}); inbox.sync();
-  const first = inbox.list(admin), second = inbox.list(admin, first.nextBefore); assert.equal(first.items.length, 50); assert.equal(second.items.length, 6);
-  assert.equal(new Set([...first.items, ...second.items].map(item => item.id)).size, 56); inbox.read({id: 'all'}, admin); assert.equal(inbox.list(admin).count, 0); store.close();
+  const first = inbox.list(admin); assert.equal(first.items.length, 3); assert.equal(first.count, 56);
+  const received = [...first.items]; let cursor = first.nextBefore;
+  while (cursor) {
+    const next = inbox.list(admin, cursor); assert.ok(next.items.length > 0 && next.items.length <= 3);
+    assert.equal(next.count, 56); received.push(...next.items);
+    assert.ok(received.length <= 56); cursor = next.nextBefore;
+  }
+  assert.equal(received.length, 56); assert.equal(new Set(received.map(item => item.id)).size, 56);
+  assert.equal(received.at(-1).id, id);
+  inbox.read({id: 'all'}, admin); assert.equal(inbox.list(admin).count, 0); store.close();
 });
 test('HTTP inbox routes enforce login, CSRF, module rights, methods and current device ownership', async t => {
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, notifications: {push: pushConfig()}});
