@@ -179,9 +179,9 @@ async function exerciseOfflineSystemStatus(browser, base, expect) {
     await expect(page.locator('#systemContent')).toBeHidden();
     await expect(page.locator('#refreshSystem')).toBeDisabled();
     await expect(page.locator('#manualBackup')).toBeDisabled();
-    await expect(page.locator('#systemMessage')).toContainText('само за администратор в сървърната версия');
+    await expect(page.locator('#systemMessage')).toHaveText('Този екран изисква право за преглед на статуса на системата.');
     await page.locator('[data-hub-language=en]').click();
-    await expect(page.locator('#systemMessage')).toContainText('only to an administrator in server mode');
+    await expect(page.locator('#systemMessage')).toHaveText('This screen requires system status viewing permission.');
     await assertResponsive(page, 'Standalone system status notice at 390px');
     assert.deepEqual(apiRequests, []); assert.deepEqual(errors, []);
     console.log('PASS standalone system status: server-only notice, disabled controls, BG/EN, no API requests');
