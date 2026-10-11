@@ -8,8 +8,10 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   const monthLabel = month => new Date(Number(month.slice(0,4)), Number(month.slice(5,7)) - 1, 1).toLocaleDateString('bg-BG', {month:'long', year:'numeric'});
   const statusLabels = {pending:'Очаква отчет', achieved:'Постигнат', missed:'Непостигнат', cancelled:'Отменена'};
   let data = PairTargets.emptyData(), loaded = false, started = false;
+  let version = 0;
+  const cache = createStatisticsCache();
   const elements = Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key, $('pairStats' + key[0].toUpperCase() + key.slice(1))]));
-  const accept = value => { data = PairTargets.validateData(value); loaded = true; };
+  const accept = value => { data = PairTargets.validateData(value); loaded = true; version++; };
   const sync = createFileSync({
     dbName, localStorageKey, suggestedFileName:'pair-targets.json', readOnly:true, strictJson:true,
     defaultData:PairTargets.emptyData, getData:() => data, onConnect:accept, onRefresh:accept, render:onDataChange, elements
@@ -28,11 +30,15 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   }
 
   function render() {
+    cache.update('dashboard', [data, loaded], getPeriod() + '|' + $('pairStatsTeam').value, renderDashboard);
+  }
+  function renderDashboard() {
     const openGroups = new Set(Array.from($('pairStatsBody').querySelectorAll('details[open]')).map(node => node.dataset.group));
     const selectedMonth = getPeriod();
     $('pairStatsPeriod').textContent = monthLabel(selectedMonth);
     $('pairStatsHint').textContent = !loaded ? 'Свържете pair-targets.json от панела за файловете. Статистиката само чете отчетите.' : 'Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Количествата на двойките не се добавят към „Тонаж и брак“.';
-    const result = PairTargetsStatistics.aggregate(data.entries, selectedMonth, $('pairStatsTeam').value);
+    const team = $('pairStatsTeam').value;
+    const result = cache.get('pairs', [data], selectedMonth + '|' + team, () => PairTargetsStatistics.aggregate(data.entries, selectedMonth, team));
     if (!result.planned && !result.cancelled) {
       $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
       return;
@@ -62,6 +68,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   return {
     init() { if (!started) { started = true; sync.init(); } render(); },
     render,
-    getYears() { return data.entries.map(entry => entry.date.slice(0, 4)); }
+    getYears() { return cache.get('years', [data], '', () => data.entries.map(entry => entry.date.slice(0, 4))); },
+    getVersion() { return version; }
   };
 }

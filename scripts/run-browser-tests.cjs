@@ -129,6 +129,13 @@ async function main() {
           await page.locator('#statsFilesBtn').click();
         }
       });
+      await require('../tests/browser/statistics-cache.cjs').exerciseStatisticsCache({page, expect,
+        replaceSource: async (kind, data) => {
+          await write({[kind]:data});
+          const button = {'production-log':'refreshBtn', 'line-downtime':'avRefreshBtn', personnel:'personnelRefreshBtn', 'pair-targets':'pairStatsRefreshBtn'}[kind];
+          await page.locator('#statsFilesBtn').click(); await page.locator('#' + button).click(); await page.locator('#statsFilesBtn').click();
+        }
+      });
       require('node:assert/strict').deepEqual(errors, []);
       await context.close(); return;
     }

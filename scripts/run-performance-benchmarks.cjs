@@ -43,6 +43,11 @@ async function action(page, name, value) {
       observer.observe(document.getElementById('taskContent'), {childList:true});
     });
     if (name === 'month') { const select = document.getElementById('dashboardMonthSelect'); select.value = value; select.dispatchEvent(new Event('change',{bubbles:true})); }
+    if (name === 'section') document.querySelector(`[data-stats-tab="${value}"]`).click();
+    if (name === 'calculate') for (let i=0;i<10;i++) {
+      aggregateByMonth(selectedYear); aggregateByYear(); getMonthlyDashboardData();
+      aggregateWorkforceMonth(getPersonnelSnapshot()); aggregateAvByMonth(selectedYear); aggregateAvByYear();
+    }
     if (name === 'history') render();
     if (name === 'refresh') { await sync.refreshFromDisk(); renderAll(); }
     if (name === 'language') HubI18n.setLanguage(value);
@@ -111,6 +116,8 @@ async function main() {
         await action(page,'language',language);
         await measure(page,'statistics',count,cpu,language,'month',['09','10']);
         await measure(page,'statistics',count,cpu,language,'refresh');
+        await measure(page,'statistics',count,cpu,language,'section',['production','overview']);
+        await measure(page,'statistics',count,cpu,language,'calculate');
         await measure(page,'statistics',count,cpu,language,'tiny-change',['Свързване…','Опресняване…']);
       }
       console.log(JSON.stringify({progress:'production history',count,cpu}));

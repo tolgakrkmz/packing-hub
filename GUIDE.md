@@ -1328,6 +1328,8 @@ node scripts/run-performance-benchmarks.cjs --quick
 node scripts/run-browser-tests.cjs --headless --i18n-only
 node scripts/run-browser-tests.cjs --headless --lists-only
 node scripts/run-server-browser-tests.cjs --headless --lists-only
+node scripts/run-browser-tests.cjs --headless --statistics-only
+node scripts/run-server-browser-tests.cjs --headless --statistics-only
 ```
 
 The full run compares 200 and 2000 reports/tasks at CPU rates 1 and 4, in BG and
@@ -1414,6 +1416,43 @@ resets, empty results, refresh clamping, lazy month edit/delete controls, previe
 during pending searches, keyboard focus and BG/EN layouts at 320–1440 px. The
 existing offline workflows, task/photo/history/permission browser scenarios,
 server instruction imports and 116 related unit/API tests passed.
+Step 3 caches production, downtime, personnel and pair calculations in memory.
+Each calculation retains at most 48 recent period keys. Accepted source snapshots
+are treated as read-only; replacing a source invalidates its cached results.
+Monthly forecasts and workforce measurements also include the local calendar day
+in their keys, and goal changes invalidate the monthly result. The calculations
+and units retain their existing formulas.
+
+Rendering tracks the last displayed inputs separately from the calculation cache.
+Changing only the month preserves the annual tables. Navigating between sections
+preserves charts, tables and open disclosures when their inputs are unchanged.
+Production, personnel, downtime and pair refreshes update their dependent regions;
+returning to an earlier period still renders that period, even if its calculations
+are already cached.
+
+A fresh step 3 control at `665b5927a3bf27a4571e163de666730731cac339` and
+the repeat used the same 2000-record fixture, CPU rate 4 and five-sample medians:
+
+| Action / metric | Before BG / EN (ms) | Step 3 BG / EN (ms) |
+| --- | ---: | ---: |
+| Change month (`settledMs`) | 52 / 73 | 29 / 34 |
+| Change section (`settledMs`) | 57 / 70 | 31 / 30 |
+| Repeated calculation batch (`scriptMs`) | 46 / 44 | 0.4 / 0.3 |
+| Unchanged production file refresh (`settledMs`) | 74 / 93 | 71 / 87 |
+
+The calculation batch invokes six aggregate functions ten times without DOM
+rendering, after warm-up. It demonstrates reuse rather than a user interaction
+latency. Section dispatch fell from 34/33 ms to 0.9/0.9 ms; its two-frame timing
+still has a presentation floor near 30 ms. Unchanged file refresh is effectively
+unchanged within run variation: a newly parsed snapshot still invalidates its
+dependent calculations. Detecting unchanged files and coordinating refreshes
+remain for step 4.
+
+Validation includes 41 related unit tests and both offline/server browser
+statistics scenarios. They check exact totals and units, source/goal/roster
+changes, team filters, empty-data recovery, local day rollover, BG/EN and retained
+DOM nodes in unaffected regions. Existing offline workflows also cover file
+connections, fallback import/export and responsive statistics.
 Further work is tracked in [the performance card](https://trello.com/c/U3DEltWF).
 
 ## Publication

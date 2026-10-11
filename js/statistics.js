@@ -20,6 +20,16 @@ let personnelEmployees = [];
 let personnelCounts = null;
 let personnelLoaded = false;
 
+const statisticsCache = createStatisticsCache();
+function statisticsDay() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+}
+function productionMonthEntries() {
+  const period = `${selectedYear}-${selectedDashboardMonth}`;
+  return statisticsCache.get('month-entries', [entries], period, () => entries.filter(entry => entry.date?.startsWith(period + '-')));
+}
+
 let currentView = 'month';
 const initialPeriod = new Date();
 let selectedYear = String(initialPeriod.getFullYear());
@@ -388,6 +398,9 @@ function getAvailableYears() {
 }
 
 function getReportYears() {
+  return statisticsCache.get('report-years', [entries, avEntries], '', calculateReportYears);
+}
+function calculateReportYears() {
   return [...new Set(entries.concat(avEntries)
     .map(entry => entry.date?.slice(0, 4)).filter(Boolean))].sort();
 }
@@ -403,7 +416,10 @@ function emptyShiftMap() {
   return m;
 }
 
-function aggregateByMonth(
+function aggregateByMonth(year) {
+  return statisticsCache.get('production-months', [entries], String(year), () => calculateProductionMonths(year));
+}
+function calculateProductionMonths(
   year
 ) {
   const months =
@@ -472,6 +488,9 @@ function aggregateByMonth(
 }
 
 function aggregateByYear() {
+  return statisticsCache.get('production-years', [entries, avEntries], '', calculateProductionYears);
+}
+function calculateProductionYears() {
   return getReportYears()
     .map(year => {
       const row = {
@@ -529,11 +548,15 @@ function aggregateByYear() {
 /* Month selection */
 
 function populateMonthSelectors() {
-  el.yearSelect.innerHTML = getAvailableYears()
-    .map(year => `<option value="${year}">${year}</option>`).join('');
+  statisticsCache.update('year-options', [entries, avEntries, pairStatistics.getVersion()], selectedYear, () => {
+    el.yearSelect.innerHTML = getAvailableYears()
+      .map(year => `<option value="${year}">${year}</option>`).join('');
+  });
   el.yearSelect.value = selectedYear;
-  el.dashboardMonthSelect.innerHTML = MONTH_FULL_LABELS
-    .map((name, index) => `<option value="${pad2(index + 1)}">${name}</option>`).join('');
+  statisticsCache.update('month-options', [], '', () => {
+    el.dashboardMonthSelect.innerHTML = MONTH_FULL_LABELS
+      .map((name, index) => `<option value="${pad2(index + 1)}">${name}</option>`).join('');
+  });
   el.dashboardMonthSelect.value = selectedDashboardMonth;
 }
 
@@ -544,6 +567,9 @@ function selectedPeriodLabel() {
 /* Monthly production result */
 
 function getMonthlyDashboardData() {
+  return statisticsCache.get('monthly-dashboard', [entries, goalTons], `${selectedYear}-${selectedDashboardMonth}|${statisticsDay()}`, calculateMonthlyDashboardData);
+}
+function calculateMonthlyDashboardData() {
   if (
     !selectedYear ||
     !selectedDashboardMonth
@@ -559,17 +585,7 @@ function getMonthlyDashboardData() {
       selectedDashboardMonth
     );
 
-  const prefix =
-    `${selectedYear}-${selectedDashboardMonth}-`;
-
-  const rows =
-    entries.filter(
-      e =>
-        e.date &&
-        e.date.startsWith(
-          prefix
-        )
-    );
+  const rows = productionMonthEntries();
 
   if (!rows.length) return null;
 
@@ -1846,7 +1862,10 @@ function renderMonthlyTrendChart(
 
 /* Downtime aggregation */
 
-function aggregateAvByMonth(
+function aggregateAvByMonth(year) {
+  return statisticsCache.get('downtime-months', [avEntries], String(year), () => calculateDowntimeMonths(year));
+}
+function calculateDowntimeMonths(
   year
 ) {
   const months =
@@ -1901,6 +1920,9 @@ function aggregateAvByMonth(
 }
 
 function aggregateAvByYear() {
+  return statisticsCache.get('downtime-years', [avEntries], '', calculateDowntimeYears);
+}
+function calculateDowntimeYears() {
   const years =
     Array.from(
       new Set(
@@ -2030,7 +2052,7 @@ function renderAvKpis(
       : 'Свържи файла на авариите отгоре ("Аварии на автоматична линия"), за да видиш реални данни.';
 }
 
-function renderAvReasons(periodKey, openStates) {
+function calculateDowntimeReasons(periodKey) {
   const groups = new Map();
 
   avEntries.forEach(entry => {
@@ -2052,6 +2074,11 @@ function renderAvReasons(periodKey, openStates) {
   const sorted = Array.from(groups.values()).sort((a, b) =>
     b.durationMin - a.durationMin || b.entries.length - a.entries.length || a.label.localeCompare(b.label, 'bg')
   );
+  return sorted;
+}
+
+function renderAvReasons(periodKey, openStates) {
+  const sorted = statisticsCache.get('downtime-reasons', [avEntries], periodKey, () => calculateDowntimeReasons(periodKey));
   if (!sorted.length) return '';
 
   const periodStateKey = 'period:' + periodKey;
@@ -2711,6 +2738,9 @@ function wfShiftCodeFor(team, dateObj) {
 }
 
 function getPersonnelSnapshot() {
+  return statisticsCache.get('personnel-counts', [personnelEmployees, personnelCounts, personnelLoaded], '', calculatePersonnelSnapshot);
+}
+function calculatePersonnelSnapshot() {
   if (personnelCounts) return personnelCounts;
   if (!personnelLoaded || !personnelEmployees.length) return null;
 
@@ -2741,6 +2771,9 @@ function getPersonnelSnapshot() {
 }
 
 function aggregateWorkforceMonth(counts) {
+  return statisticsCache.get('workforce-month', [entries, counts], `${selectedYear}-${selectedDashboardMonth}|${statisticsDay()}`, () => calculateWorkforceMonth(counts));
+}
+function calculateWorkforceMonth(counts) {
   if (!selectedYear || !selectedDashboardMonth || !counts) return null;
 
   const year = Number(selectedYear);
@@ -3078,7 +3111,10 @@ function renderWorkforceDashboard() {
 
 /* Line and shift breakdown */
 
-function aggregateLineByShift(
+function aggregateLineByShift(scopeEntries) {
+  return statisticsCache.get('line-shifts', [scopeEntries], '', () => calculateLineShifts(scopeEntries));
+}
+function calculateLineShifts(
   scopeEntries
 ) {
   const byShift = {};
@@ -3148,9 +3184,8 @@ function aggregateLineByShift(
 }
 
 function renderLineShiftForSelectedMonth() {
-  const prefix = `${selectedYear}-${selectedDashboardMonth}-`;
   renderLineShiftTable(
-    entries.filter(entry => entry.date?.startsWith(prefix)),
+    productionMonthEntries(),
     selectedPeriodLabel()
   );
 }
@@ -3327,59 +3362,29 @@ function renderLineShiftTable(
 function renderAll() {
   populateMonthSelectors();
   pairStatistics.render();
-  renderMonthlyDashboard();
-  renderLineShiftForSelectedMonth();
+  const period = `${selectedYear}-${selectedDashboardMonth}`, day = statisticsDay();
+  statisticsCache.update('monthly-result', [entries, goalTons, el.connDot.classList.contains('on')], period + '|' + day, renderMonthlyDashboard);
+  statisticsCache.update('line-shift-table', [entries], period, renderLineShiftForSelectedMonth);
+  statisticsCache.update('workforce-dashboard', [entries, personnelEmployees, personnelCounts, personnelLoaded, goalTons], period + '|' + day, renderWorkforceDashboard);
 
   const annual = currentView === 'month';
-  const scopeLabel = annual ? `Годишен преглед ${selectedYear}` : 'Всички години';
-  document.getElementById('productionScopeTitle').textContent = `Тонаж и брак — ${scopeLabel}`;
-  document.getElementById('downtimeScopeTitle').textContent = `Престой на автоматична линия — ${scopeLabel}`;
-  const rows = annual ? aggregateByMonth(selectedYear) : aggregateByYear();
-  renderKpis(rows, annual ? 'месец' : 'година');
-  renderStackedBarChart(el.chartContainer, rows);
-  renderLegend();
-  renderTable(rows, annual ? `месец (${selectedYear})` : 'година');
-
-  renderWorkforceDashboard();
-
-  const avYear =
-    selectedYear ||
-    String(
-      new Date()
-        .getFullYear()
-    );
-
-  if (
-    currentView === 'month'
-  ) {
-    const avRows =
-      aggregateAvByMonth(
-        avYear
-      );
-
-    renderAvKpis(
-      avRows,
-      'месец'
-    );
-
-    renderAvTable(
-      avRows,
-      `месец (${avYear})`
-    );
-  } else {
-    const avRows =
-      aggregateAvByYear();
-
-    renderAvKpis(
-      avRows,
-      'година'
-    );
-
-    renderAvTable(
-      avRows,
-      'година'
-    );
-  }
+  const scope = annual ? selectedYear : 'all';
+  statisticsCache.update('production-breakdown', annual ? [entries] : [entries, avEntries], scope, () => {
+    const scopeLabel = annual ? `Годишен преглед ${selectedYear}` : 'Всички години';
+    document.getElementById('productionScopeTitle').textContent = `Тонаж и брак — ${scopeLabel}`;
+    const rows = annual ? aggregateByMonth(selectedYear) : aggregateByYear();
+    renderKpis(rows, annual ? 'месец' : 'година');
+    renderStackedBarChart(el.chartContainer, rows);
+    renderLegend();
+    renderTable(rows, annual ? `месец (${selectedYear})` : 'година');
+  });
+  statisticsCache.update('downtime-breakdown', [avEntries], scope, () => {
+    const scopeLabel = annual ? `Годишен преглед ${selectedYear}` : 'Всички години';
+    document.getElementById('downtimeScopeTitle').textContent = `Престой на автоматична линия — ${scopeLabel}`;
+    const rows = annual ? aggregateAvByMonth(selectedYear) : aggregateAvByYear();
+    renderAvKpis(rows, annual ? 'месец' : 'година');
+    renderAvTable(rows, annual ? `месец (${selectedYear})` : 'година');
+  });
 }
 
 pairStatistics.init();

@@ -148,6 +148,13 @@ async function main() {
           await admin.locator('#statsFilesBtn').click();
         }
       });
+      await require('../tests/browser/statistics-cache.cjs').exerciseStatisticsCache({page:admin, expect,
+        replaceSource: async (kind, data) => {
+          hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+          const button = {'production-log':'refreshBtn', 'line-downtime':'avRefreshBtn', personnel:'personnelRefreshBtn', 'pair-targets':'pairStatsRefreshBtn'}[kind];
+          await admin.locator('#statsFilesBtn').click(); await admin.locator('#' + button).click(); await admin.locator('#statsFilesBtn').click();
+        }
+      });
       assert.deepEqual(errors, []); return;
     }
     if (status) {
