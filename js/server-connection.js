@@ -229,7 +229,9 @@ const HubServer = (() => {
     eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
     eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
-    eventSource.addEventListener('logout', () => { window.HubNotifications?.stopDevice(true).catch(() => {}); eventSource.close(); location.assign('/login.html'); });
+    // The server emits this for normal session expiry too. Keep the phone's
+    // opt-in; account revocation already removes its subscriptions server-side.
+    eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login.html'); });
     eventSource.addEventListener('version', event => {
       if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
         const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
