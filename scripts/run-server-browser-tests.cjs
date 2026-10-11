@@ -57,6 +57,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--lists-only')) {
+      await require('../tests/browser/paged-lists.cjs').exerciseServerPagedLists({admin, hub, base, expect});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--report-operations-only')) {
       await require('../tests/browser/report-operations.cjs').exerciseReportOperations({admin,hub,base,device,expect});
       assert.deepEqual(errors, []); return;

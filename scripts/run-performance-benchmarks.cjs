@@ -36,6 +36,12 @@ async function action(page, name, value) {
   return page.evaluate(async ({name,value}) => {
     const metrics = window.__perf; metrics.observerMs = []; metrics.observerCalls = 0;
     const start = performance.now();
+    // Wait for actual results, including any search debounce, before measuring presentation.
+    let resultsReady;
+    if (name === 'search') resultsReady = new Promise(resolve => {
+      const observer = new MutationObserver(() => { observer.disconnect(); resolve(); });
+      observer.observe(document.getElementById('taskContent'), {childList:true});
+    });
     if (name === 'month') { const select = document.getElementById('dashboardMonthSelect'); select.value = value; select.dispatchEvent(new Event('change',{bubbles:true})); }
     if (name === 'history') render();
     if (name === 'refresh') { await sync.refreshFromDisk(); renderAll(); }
@@ -43,9 +49,12 @@ async function action(page, name, value) {
     if (name === 'tiny-change') document.getElementById('connText').textContent = value;
     if (name === 'search') { const input = document.getElementById('taskSearch'); input.value = value; input.dispatchEvent(new Event('input',{bubbles:true})); }
     const scriptMs = performance.now()-start;
+    if (resultsReady) await resultsReady;
+    const resultsMs = performance.now()-start;
     // Flush mutation callbacks and two frames; includes presentation work, not Playwright IPC.
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    return {scriptMs,settledMs:performance.now()-start,observerMs:metrics.observerMs.reduce((a,b)=>a+b,0),observerCalls:metrics.observerCalls};
+    return {scriptMs,resultsMs,settledMs:performance.now()-start,observerMs:metrics.observerMs.reduce((a,b)=>a+b,0),observerCalls:metrics.observerCalls,
+      renderedCards:document.querySelectorAll('.task-card').length, renderedRows:document.querySelectorAll('.history-month tbody tr:not(.bd-detail)').length};
   },{name,value});
 }
 async function measure(page, scope, count, cpu, language, name, values = ['']) {
@@ -54,6 +63,7 @@ async function measure(page, scope, count, cpu, language, name, values = ['']) {
   for (let i=0;i<samples;i++) results.push(await action(page,name,values[i%values.length]));
   const row = {scope,count,cpu,language,action:name,samples,
     scriptMs:median(results.map(r=>r.scriptMs)),settledMs:median(results.map(r=>r.settledMs)),
+    resultsMs:median(results.map(r=>r.resultsMs)),renderedCards:results.map(r=>r.renderedCards),renderedRows:results.map(r=>r.renderedRows),
     observerMs:median(results.map(r=>r.observerMs)),observerCalls:median(results.map(r=>r.observerCalls))};
   console.log(JSON.stringify(row)); return row;
 }
@@ -79,7 +89,7 @@ async function main() {
     const offlineBase = 'http://127.0.0.1:'+offline.address().port, onlineBase = 'http://127.0.0.1:'+hub.server.address().port;
     await hub.auth.create('demo-perf-admin','Fictional-performance-123','admin');
     browser = await chromium.launch({channel:'chrome',headless:true});
-    console.log(JSON.stringify({metadata:{browser:browser.version(),node:process.version,baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:root}).toString().trim(),trackedChanges:execFileSync('git',['status','--porcelain','--untracked-files=no'],{cwd:root}).length>0,samples,viewport:'1440x900',network:'loopback; no network throttling',fixtures:'generated fictional records',timing:'median; script and two animation frames; observer included in settled time',limitations:'CPU 4x is a simulation, not a phone; no live server or production data'}}));
+    console.log(JSON.stringify({metadata:{browser:browser.version(),node:process.version,baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:root}).toString().trim(),trackedChanges:execFileSync('git',['status','--porcelain','--untracked-files=no'],{cwd:root}).length>0,samples,viewport:'1440x900',network:'loopback; no network throttling',fixtures:'generated fictional records',timing:'median; script, actual search results (including debounce), and two animation frames; observer included in settled time',limitations:'CPU 4x is a simulation, not a phone; no live server or production data'}}));
     const counts = process.argv.includes('--quick') ? [2000] : [200,2000];
     const cpus = process.argv.includes('--quick') ? [4] : [1,4];
     for (const count of counts) for (const cpu of cpus) {

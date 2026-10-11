@@ -5,6 +5,8 @@
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
   let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
+  const pageSize = 50;
+  let listPage = 1, searchTimer;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
   const requiresPhotos = item => item?.requiresPhotos !== false;
@@ -156,7 +158,7 @@
     ]) {
       const values = newestFirst.filter(item => !!item.report === reported);
       const control = button('', () => {
-        historyView = key; render();
+        historyView = key; listPage = 1; render();
         $('taskContent').querySelector(`[data-history-view="${key}"]`).focus();
       });
       control.dataset.historyView = key; control.setAttribute('aria-pressed', String(historyView === key));
@@ -169,8 +171,8 @@
       heading.append(el('span', label), el('span', String(values.length), 'task-badge', true));
       section.setAttribute('aria-labelledby', heading.id);
       section.append(heading, el('p', description, 'task-muted'));
-      if (!values.length) section.append(empty(noResults));
-      else { const list = el('div', '', 'task-list'); for (const item of values) list.append(card(item)); section.append(list); }
+      if (!values.length) { listPage = 1; section.append(empty(noResults)); }
+      else appendPage(section, values);
       wrap.append(section);
     }
     return wrap;
@@ -216,6 +218,8 @@
   }
   function render() {
     if (!state) return;
+    clearTimeout(searchTimer);
+    $('taskContent').removeAttribute('aria-busy');
     const items = state.items.filter(selected), overview = $('taskOverview'); overview.replaceChildren();
     for (const [label, count] of [['Активни задачи', items.filter(item => !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)).length], ['Неотчетени', items.filter(item => item.displayStatus === 'unreported').length], ['Готови за проверка', items.filter(item => item.status === 'review').length], ['Просрочени глобални', items.filter(item => item.overdue).length]]) { const metric = el('div', '', 'task-metric'); metric.append(el('strong', String(count)), el('span', label)); overview.append(metric); }
     $('taskPeriod').hidden = !['stats', 'history'].includes(view);
@@ -225,8 +229,15 @@
     if (view === 'history') { content.append(renderHistory(items.filter(period))); return; }
     const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item));
     values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
-    if (!values.length) content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.'));
-    else { const list = el('div', '', 'task-list'); for (const item of values) list.append(card(item, view === 'schedules')); content.append(list); }
+    if (!values.length) { listPage = 1; content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.')); }
+    else appendPage(content, values, view === 'schedules');
+  }
+  function appendPage(content, values, recurring = false) {
+    listPage = HubListPagination.clamp(listPage, values.length, pageSize);
+    const list = el('div', '', 'task-list');
+    for (const item of values.slice((listPage - 1) * pageSize, listPage * pageSize)) list.append(card(item, recurring));
+    content.append(list, HubListPagination.create({id: 'taskPagination', page: listPage, total: values.length, size: pageSize,
+      onChange: page => { listPage = page; render(); }}));
   }
   async function refresh() {
     if (draftOpen()) return;
@@ -326,8 +337,12 @@
   for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom', 'taskRequiresPhotos']) $(id).addEventListener('change', editorFields);
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
-  for (const id of ['ownerFilter', 'taskSearch', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', render);
-  $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });
+  for (const id of ['ownerFilter', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', () => { listPage = 1; render(); });
+  $('taskSearch').addEventListener('input', () => {
+    listPage = 1; clearTimeout(searchTimer); $('taskContent').setAttribute('aria-busy', 'true');
+    searchTimer = setTimeout(render, 150);
+  });
+  $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; listPage = 1; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });
   document.addEventListener('click', event => { if (event.target.closest('[data-hub-language]')) { renderPhotoPolicy(); problemPicker.render(); solutionPicker.render(); if (!draftOpen()) render(); } });
   HubServer.watch('tasks', refresh, draftOpen); HubServer.watch('accounts', refresh, draftOpen);
   setInterval(() => { if (!draftOpen()) refresh(); }, 30000); refresh();

@@ -40,6 +40,8 @@ let dbIndex = {};
 let rootDirHandle = null;
 let selectedImageFiles = [];
 let instructionsWriting = false;
+const profilePageSize = 50;
+let profilePage = 1, profileSearchTimer;
 
 const detailsCache = Object.create(null);
 
@@ -319,13 +321,17 @@ el.saveBtn.addEventListener('click', async () => {
 
 
 el.searchInput.addEventListener('input', () => {
-  renderSearch();
+  profilePage = 1;
+  clearTimeout(profileSearchTimer);
+  el.resultsWrap.setAttribute('aria-busy', 'true');
+  profileSearchTimer = setTimeout(renderSearch, 150);
 });
 
 const categoryChips = document.querySelectorAll('.chip[data-cat]');
 categoryChips.forEach(chip => {
   chip.addEventListener('click', () => {
     activeCategoryFilter = chip.dataset.cat;
+    profilePage = 1;
     categoryChips.forEach(c => c.classList.toggle('active', c === chip));
     renderSearch();
   });
@@ -361,6 +367,9 @@ function getFilteredProfiles() {
 }
 
 function renderSearch() {
+  clearTimeout(profileSearchTimer);
+  profileSearchTimer = null;
+  el.resultsWrap.removeAttribute('aria-busy');
   if (!rootDirHandle) {
     el.resultsWrap.innerHTML = '<div class="empty">Свържете папката с проекта, за да видите профилите.</div>';
     el.resultCount.textContent = '';
@@ -368,6 +377,7 @@ function renderSearch() {
   }
 
   const profiles = getFilteredProfiles();
+  profilePage = HubListPagination.clamp(profilePage, profiles.length, profilePageSize);
 
   el.resultCount.textContent = profiles.length
     ? `${profiles.length} резултат${profiles.length === 1 ? '' : 'а'}`
@@ -379,15 +389,26 @@ function renderSearch() {
   }
 
   el.resultsWrap.innerHTML = '';
-  profiles.forEach(profile => {
+  profiles.slice((profilePage - 1) * profilePageSize, profilePage * profilePageSize).forEach(profile => {
     el.resultsWrap.appendChild(createResultCard(profile));
   });
+  el.resultsWrap.appendChild(profilePagination(profiles.length));
 }
+
+function profilePagination(total) {
+  return HubListPagination.create({id: 'profilePagination', page: profilePage,
+    total, size: profilePageSize, onChange: page => { profilePage = page; renderSearch(); }});
+}
+document.addEventListener('click', event => {
+  const pager = document.getElementById('profilePagination');
+  if (pager && event.target.closest('[data-hub-language]')) pager.replaceWith(profilePagination(Number(pager.dataset.total)));
+});
 
 function createResultCard(profile) {
   const card = document.createElement('div');
   card.className = 'result-card';
   card.dataset.number = profile.number;
+  card.dataset.folder = profile.folderName;
 
   const imageCount = (profile.images || []).length;
   const metaText = imageCount ? `${imageCount} файл${imageCount === 1 ? '' : 'а'}` : 'без файлове';
@@ -409,7 +430,14 @@ function createResultCard(profile) {
   `;
 
   const head = card.querySelector('.result-head');
-  head.addEventListener('click', () => toggleCard(card, profile));
+  head.addEventListener('click', () => {
+    // Apply a pending search before opening details, so its timer cannot remove the preview.
+    if (profileSearchTimer) {
+      renderSearch();
+      const current = [...el.resultsWrap.querySelectorAll('.result-card')].find(node => node.dataset.folder === profile.folderName);
+      if (current) toggleCard(current, profile);
+    } else toggleCard(card, profile);
+  });
 
   return card;
 }

@@ -1326,6 +1326,8 @@ personal browser profile and does not record screenshots or traces.
 node scripts/run-performance-benchmarks.cjs
 node scripts/run-performance-benchmarks.cjs --quick
 node scripts/run-browser-tests.cjs --headless --i18n-only
+node scripts/run-browser-tests.cjs --headless --lists-only
+node scripts/run-server-browser-tests.cjs --headless --lists-only
 ```
 
 The full run compares 200 and 2000 reports/tasks at CPU rates 1 and 4, in BG and
@@ -1334,9 +1336,13 @@ environment metadata and median timings from five samples after a warm-up.
 Automatic browser intervals are disabled during measurement; unchanged file
 refresh is exercised explicitly. Server maintenance remains active.
 
-`scriptMs` measures the invoked action; `settledMs` also waits for mutation
-callbacks and two animation frames. It has a frame-duration floor and is not an
-end-to-end user latency metric. `observerMs` measures mutation callbacks and is
+`scriptMs` measures the invoked action. For debounced searches this is only the
+input dispatch, not the later rendering cost. `resultsMs` waits for the actual
+search results to replace the list, including the debounce delay. `settledMs`
+also waits for mutation callbacks and two animation frames after results arrive.
+It has a frame-duration floor and is not a complete user latency metric.
+`renderedCards` and `renderedRows` record the DOM counts for each sample.
+`observerMs` measures mutation callbacks and is
 already part of the action/settled timings; do not add it again. Backend timings
 cover a store read plus JSON serialization or the task summary function, without
 HTTP transport or concurrent clients. CPU rate 4 simulates slower processing;
@@ -1377,9 +1383,38 @@ label callback fell from 246/690 ms to 0.1/0.6 ms in BG/EN. The large English
 history/search operations are effectively unchanged within run variation. Do not
 interpret the small-update improvement as an equivalent whole-application speedup.
 
-Bulk history and task rendering still create all matching rows/cards; incremental
-translation alone does not address those costs. Follow-up work is tracked in
-[the performance card](https://trello.com/c/U3DEltWF).
+Step 2 creates production rows only for expanded months. The latest month opens
+initially; other months create their table when opened and release it when closed.
+Expanded states survive refreshes. Month counts and tonnage still use every report.
+Tasks, task history, recurring plans and instruction profiles show 50 matching
+cards per page. Search and category/owner/date filters operate on the entire
+dataset and reset the page; refresh clamps or retains the current page. Text
+search waits 150 ms after the last input. Opening an instruction while a search
+is pending applies the results first, preserving its preview.
+
+A fresh control run at `3f7f66181501972989227bff3dd6ab2473465282` and the
+step 2 repeat used the same fictional 2000-record dataset, Chrome/Node versions,
+viewport, CPU rate 4 and five-sample medians. Both runs used the updated search
+measurement, so the new debounce is included in the comparison:
+
+| Action (`settledMs`) | Before BG / EN (ms) | Step 2 BG / EN (ms) |
+| --- | ---: | ---: |
+| History: rebuild with latest month open | 1297 / 1843 | 68 / 80 |
+| Tasks: search global tasks | 2631 / 3003 | 237 / 251 |
+
+The history fixture has 25 reports in its latest partial month: the DOM now
+contains 25 report rows instead of 2000, plus every month header. Search creates
+50 cards instead of 2000/1111 for the two queries. Opening additional months adds
+their rows; opening every month can still recreate the large DOM. The backend
+still returns the full datasets. These results describe those measured actions,
+not a whole-site speedup or live-server performance.
+
+Validation covers every page without missing/duplicate records, totals, filter
+resets, empty results, refresh clamping, lazy month edit/delete controls, previews
+during pending searches, keyboard focus and BG/EN layouts at 320–1440 px. The
+existing offline workflows, task/photo/history/permission browser scenarios,
+server instruction imports and 116 related unit/API tests passed.
+Further work is tracked in [the performance card](https://trello.com/c/U3DEltWF).
 
 ## Publication
 

@@ -280,6 +280,53 @@ async function deleteEntry(id){
   await writer.run(current => writer.remove(current,original), () => {}, 'Записът е изтрит.',writer.operation('delete',original));
 }
 
+let historyMonths = new Map();
+function historyTable(rows) {
+  let html = '<table><thead><tr>'
+    + '<th>Дата</th><th>Смяна</th><th style="text-align:right">Тонаж</th><th style="text-align:right">Каси</th><th style="text-align:right">Брак</th><th></th>'
+    + '</tr></thead><tbody>';
+    rows.forEach(e=>{
+      const bd = e.breakdown;
+      const crates = bd ? (bd.autoCrates + bd.manCrates) : null;
+      let detailRow = '';
+      if(bd){
+        detailRow = '<tr class="bd-detail"><td></td><td colspan="5" style="padding:0 8px 9px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">'
+          + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
+          + '</td></tr>';
+      }
+      const delCell = canEditReports
+        ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeReportId(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeReportId(e.id)+'" title="Изтрий">✕</button></td>'
+        : '<td></td>';
+      html += '<tr>'
+        + '<td>'+e.date+'</td>'
+        + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
+        + '<td class="num">'+fmt(e.tonnage)+' кг</td>'
+        + '<td class="num">'+(crates!==null ? fmt(crates) : '—')+'</td>'
+        + '<td class="num brak">'+fmt(e.brak)+' кг</td>'
+        + delCell
+        + '</tr>'
+        + detailRow;
+    });
+  return html + '</tbody></table>';
+}
+
+const historyWrap = document.getElementById('historyWrap');
+// Toggle does not bubble. Capture it once for both initial and refreshed groups.
+historyWrap.addEventListener('toggle', event => {
+  const section = event.target;
+  if (!section.matches('.history-month') || !historyWrap.contains(section)) return;
+  const table = section.querySelector('.history-month-table');
+  if (!section.open) table.replaceChildren();
+  else if (!table.hasChildNodes()) table.innerHTML = historyTable(historyMonths.get(section.dataset.month) || []);
+}, true);
+historyWrap.addEventListener('click', event => {
+  if (!canEditReports) return;
+  const button = event.target.closest('.edit-report-btn, .del-btn');
+  if (!button || !historyWrap.contains(button)) return;
+  if (button.classList.contains('edit-report-btn')) editEntry(button.dataset.id);
+  else deleteEntry(button.dataset.id);
+});
+
 function render(){
   updateSaveEnabled();
   renderDayTotal();
@@ -304,6 +351,8 @@ grid.innerHTML = SHIFTS.map(s=>{
     section.dataset.month, section.open
   ]));
   if(entries.length === 0){
+    historyMonths = new Map();
+    addedHistoryMonth = null;
     wrap.innerHTML = '<div class="empty">Все още няма записи.</div>';
     return;
   }
@@ -315,6 +364,7 @@ grid.innerHTML = SHIFTS.map(s=>{
     if(!months.has(monthKey)) months.set(monthKey, []);
     months.get(monthKey).push(entry);
   });
+  historyMonths = months;
   const monthNames = ['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
   const latestMonth = months.keys().next().value;
   let html = '';
@@ -326,42 +376,10 @@ grid.innerHTML = SHIFTS.map(s=>{
     html += '<details class="history-month" data-month="'+monthKey+'"'+(isOpen ? ' open' : '')+'>'
       + '<summary><span class="history-month-title">'+label+'</span>'
       + '<span class="history-month-stats"><b>'+fmt(tonnage)+' кг</b> · '+rows.length+' '+(rows.length===1 ? 'запис' : 'записа')+'</span></summary>'
-      + '<div class="history-month-table"><table><thead><tr>'
-      + '<th>Дата</th><th>Смяна</th><th style="text-align:right">Тонаж</th><th style="text-align:right">Каси</th><th style="text-align:right">Брак</th><th></th>'
-      + '</tr></thead><tbody>';
-    rows.forEach(e=>{
-      const bd = e.breakdown;
-      const crates = bd ? (bd.autoCrates + bd.manCrates) : null;
-      let detailRow = '';
-      if(bd){
-        detailRow = '<tr class="bd-detail"><td></td><td colspan="5" style="padding:0 8px 9px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">'
-          + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
-          + '</td></tr>';
-      }
-      const delCell = canEditReports
-        ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeReportId(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeReportId(e.id)+'" title="Изтрий">✕</button></td>'
-        : '<td></td>';
-      html += '<tr>'
-        + '<td>'+e.date+'</td>'
-        + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
-        + '<td class="num">'+fmt(e.tonnage)+' кг</td>'
-        + '<td class="num">'+(crates!==null ? fmt(crates) : '—')+'</td>'
-        + '<td class="num brak">'+fmt(e.brak)+' кг</td>'
-        + delCell
-        + '</tr>'
-        + detailRow;
-    });
-    html += '</tbody></table></div></details>';
+      + '<div class="history-month-table">'+(isOpen ? historyTable(rows) : '')+'</div></details>';
   });
   wrap.innerHTML = html;
   addedHistoryMonth = null;
-
-  if(canEditReports){
-    wrap.querySelectorAll('.edit-report-btn').forEach(button => button.addEventListener('click', () => editEntry(button.dataset.id)));
-    wrap.querySelectorAll('.del-btn').forEach(b=>{
-      b.addEventListener('click', ()=>deleteEntry(b.dataset.id));
-    });
-  }
 }
 function escapeReportId(value) { return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 
