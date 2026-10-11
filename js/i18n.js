@@ -34,6 +34,7 @@ const HubI18n = (() => {
     const attributes = ['title', 'placeholder', 'aria-label', 'alt'];
     let observer;
     function localizedText(value, element) {
+      if (language === 'bg') return value;
       // File and folder names are user data, even when they contain familiar UI words.
       if (/ConnText$|^connText$/.test(element.id)) {
         const connected = value.match(/^(Свързан с(?: папка)?:\s*)([\s\S]*)$/);
@@ -42,37 +43,69 @@ const HubI18n = (() => {
       }
       return t(value, !!element.closest('[data-i18n-exact]'));
     }
+    function translateAttribute(element, name) {
+      if (!element.hasAttribute(name)) return;
+      const remembered = attributeState.get(element) || {};
+      const current = element.getAttribute(name), state = remembered[name];
+      const original = state && state.last === current ? state.original : current;
+      const translated = language === 'bg' ? original : t(original, !!element.closest('[data-i18n-exact]'));
+      if (current !== translated) element.setAttribute(name, translated);
+      remembered[name] = {original, last:translated};
+      attributeState.set(element, remembered);
+    }
+    function translateText(node) {
+      const current = node.nodeValue, state = textState.get(node);
+      const original = state && state.last === current ? state.original : current;
+      const translated = localizedText(original, node.parentElement);
+      if (current !== translated) node.nodeValue = translated;
+      textState.set(node, {original, last:translated});
+    }
     function visit(element) {
       if (element.matches(excluded)) return;
       // Options without an explicit value otherwise inherit their translated label.
       if (element.tagName === 'OPTION' && !element.hasAttribute('value')) element.setAttribute('value', element.value);
-      const remembered = attributeState.get(element) || {};
-      for (const name of attributes) {
-        if (!element.hasAttribute(name)) continue;
-        const current = element.getAttribute(name), state = remembered[name];
-        const original = state && state.last === current ? state.original : current;
-        const translated = t(original, !!element.closest('[data-i18n-exact]'));
-        if (current !== translated) element.setAttribute(name, translated);
-        remembered[name] = {original, last:translated};
-      }
-      attributeState.set(element, remembered);
+      for (const name of attributes) translateAttribute(element, name);
       for (const child of element.childNodes) {
         if (child.nodeType === 1) visit(child);
-        else if (child.nodeType === 3) {
-          const current = child.nodeValue, state = textState.get(child);
-          const original = state && state.last === current ? state.original : current;
-          const translated = localizedText(original, element);
-          if (current !== translated) child.nodeValue = translated;
-          textState.set(child, {original, last:translated});
+        else if (child.nodeType === 3) translateText(child);
+      }
+    }
+    const observe = () => observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes});
+    function update(records) {
+      const added = new Set(), texts = new Set(), changedAttributes = new Map();
+      for (const record of records) {
+        if (record.type === 'childList') for (const node of record.addedNodes) added.add(node);
+        else if (record.type === 'characterData') texts.add(record.target);
+        else if (record.type === 'attributes') {
+          if (!changedAttributes.has(record.target)) changedAttributes.set(record.target, new Set());
+          changedAttributes.get(record.target).add(record.attributeName);
         }
       }
+      const eligible = node => node.isConnected && !(node.nodeType === 1 ? node : node.parentElement)?.closest(excluded);
+      const covered = node => {
+        for (let parent = node.parentNode; parent; parent = parent.parentNode) if (added.has(parent)) return true;
+        return false;
+      };
+      // Translate the final DOM once per affected subtree; our own writes must not trigger another pass.
+      observer.disconnect();
+      try {
+        for (const node of added) if (eligible(node) && !covered(node)) {
+          if (node.nodeType === 1) visit(node);
+          else if (node.nodeType === 3) translateText(node);
+        }
+        for (const node of texts) if (eligible(node) && !added.has(node) && !covered(node)) translateText(node);
+        for (const [element,names] of changedAttributes) if (eligible(element) && !added.has(element) && !covered(element)) {
+          for (const name of names) translateAttribute(element, name);
+        }
+      } finally { observe(); }
     }
     apply = () => {
       observer?.disconnect();
-      document.documentElement.lang = language;
-      visit(document.documentElement);
-      document.querySelectorAll('[data-hub-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.hubLanguage === language)));
-      observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes});
+      try {
+        document.documentElement.lang = language;
+        visit(document.documentElement);
+        document.querySelectorAll('[data-hub-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.hubLanguage === language)));
+      } finally { observe(); }
     };
     function init() {
       const bar = document.createElement('div');
@@ -85,7 +118,7 @@ const HubI18n = (() => {
         if (button) setLanguage(button.dataset.hubLanguage);
       });
       (document.querySelector('.wrap, .account-wrap') || document.body).prepend(bar);
-      observer = new MutationObserver(apply);
+      observer = new MutationObserver(update);
       apply();
     }
     for (const name of ['alert', 'confirm', 'prompt']) {

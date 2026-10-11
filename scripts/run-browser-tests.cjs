@@ -46,6 +46,17 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    if (process.argv.includes('--i18n-only')) {
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+      const page = await context.newPage(), errors=[];
+      page.on('pageerror',()=>errors.push('Translation page error'));
+      await page.goto(base+'/index.html');
+      await require('../tests/browser/i18n.cjs').exerciseI18n({page,expect});
+      require('node:assert/strict').deepEqual(errors,[]);
+      await context.close(); return;
+    }
     if (process.argv.includes('--pair-cancellation-only')) {
       const {employees,exercisePairCancellation} = require('../tests/browser/pair-cancellation.cjs');
       const context = await browser.newContext({timezoneId:'Europe/Sofia'});

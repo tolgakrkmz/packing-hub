@@ -1314,6 +1314,73 @@ hooks with `--no-verify`. Local hooks must be installed in every new clone.
 - `server/`: shared SQLite storage, account management and authenticated HTTP API.
 - `Dockerfile`, `compose.yaml`: local CasaOS server deployment.
 
+## Performance measurements
+
+Use Node.js 24+, the browser-test Playwright dependency and an isolated Chrome
+profile. The benchmark serves only reviewed demo source, generates fictional
+records in browser storage and an in-memory SQLite database, and blocks browser
+requests outside its loopback origins. It never opens production data or a
+personal browser profile and does not record screenshots or traces.
+
+```sh
+node scripts/run-performance-benchmarks.cjs
+node scripts/run-performance-benchmarks.cjs --quick
+node scripts/run-browser-tests.cjs --headless --i18n-only
+```
+
+The full run compares 200 and 2000 reports/tasks at CPU rates 1 and 4, in BG and
+EN. `--quick` repeats only 2000 records at CPU rate 4. Output is JSON lines with
+environment metadata and median timings from five samples after a warm-up.
+Automatic browser intervals are disabled during measurement; unchanged file
+refresh is exercised explicitly. Server maintenance remains active.
+
+`scriptMs` measures the invoked action; `settledMs` also waits for mutation
+callbacks and two animation frames. It has a frame-duration floor and is not an
+end-to-end user latency metric. `observerMs` measures mutation callbacks and is
+already part of the action/settled timings; do not add it again. Backend timings
+cover a store read plus JSON serialization or the task summary function, without
+HTTP transport or concurrent clients. CPU rate 4 simulates slower processing;
+loopback networking has no throttling. These are development measurements, not
+results from a physical phone or the live installation.
+
+Initial measurements on 11 October 2026 used Chrome 154.0.8037.99, Node 24.19.0,
+1440×900 and main commit `7450b15a37f6ebaa482d0b996cea15d44b00cb37`.
+At CPU rate 4, English timings in milliseconds were:
+
+| Action | 200 records | 2000 records |
+| --- | ---: | ---: |
+| Statistics: change month | 72 | 93 |
+| Statistics: unchanged file refresh | 95 | 167 |
+| Production: rebuild history | 257 | 1962 |
+| Production: change one status label | 92 | 711 |
+| Tasks: search global tasks | 298 | 3146 |
+
+The old translator traversed the entire document for every observed change. At
+2000 records, its callback consumed approximately 690 ms even for one status
+label. Incremental translation now handles only added subtrees, changed text and
+changed presentation attributes. A full pass remains necessary at initialization
+and when changing language. The focused real-DOM regression verifies BG/EN
+roundtrips, dynamic updates, excluded data, stable option/input values and that an
+unrelated 1000-element subtree is not visited for a small update.
+
+The repeat run with 2000 records at CPU rate 4 measured:
+
+| Action | Before BG / EN (ms) | After BG / EN (ms) |
+| --- | ---: | ---: |
+| History: change one status label | 262 / 711 | 32 / 31 |
+| Statistics: unchanged file refresh | 82 / 167 | 79 / 90 |
+| History: rebuild all rows | 1572 / 1962 | 1345 / 2006 |
+| Tasks: search global tasks | 2830 / 3146 | 2480 / 3154 |
+
+Small changes no longer scale with the total document size: the history status
+label callback fell from 246/690 ms to 0.1/0.6 ms in BG/EN. The large English
+history/search operations are effectively unchanged within run variation. Do not
+interpret the small-update improvement as an equivalent whole-application speedup.
+
+Bulk history and task rendering still create all matching rows/cards; incremental
+translation alone does not address those costs. Follow-up work is tracked in
+[the performance card](https://trello.com/c/U3DEltWF).
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license
