@@ -21,9 +21,9 @@ test('only unchanged, reviewed demo fixtures are accepted',() => {
     assert.throws(() => inspect(file,Buffer.concat([content,Buffer.from(' ')])),/fixture has changed/);
   }
 });
-test('only the exact reviewed logo source and PNG exports are approved; arbitrary images and SVG changes are blocked',() => {
+test('only the exact reviewed logo, README badges and PNG exports are approved; arbitrary images and SVG changes are blocked',() => {
   const file = 'assets/package-hub-mark.svg';
-  assert.deepEqual(Object.keys(approvedAssets), [file, 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']);
+  assert.deepEqual(Object.keys(approvedAssets), ['assets/readme-badges.svg', file, 'assets/package-hub-icon-180.png', 'assets/package-hub-icon-192.png', 'assets/package-hub-icon-512.png']);
   const content = fs.readFileSync(path.join(root,file));
   assert.doesNotThrow(() => inspect(file,content));
   for(const other of ['assets/other.svg','assets/package-hub-mark.png','assets/private/logo.svg','js/logo.svg']) assert.throws(() => inspect(other,content),/Unapproved/);
@@ -37,6 +37,16 @@ test('only the exact reviewed logo source and PNG exports are approved; arbitrar
   const restricted = 'Synthetic Restricted Example';
   assert.throws(() => inspect(file,content,[path.basename(file).toLowerCase()]),/Private source/);
   assert.throws(() => inspect(file,Buffer.from(restricted)),error => !error.message.includes(restricted));
+});
+test('README badges require the exact reviewed SVG and regular file mode', () => {
+  const file = 'assets/readme-badges.svg', content = fs.readFileSync(path.join(root, file));
+  assert.doesNotThrow(() => inspect(file, content));
+  assert.throws(() => inspect(file, content, [], '120000'), /Unapproved/);
+  assert.throws(() => inspect('assets/private-badges.svg', content), /Unapproved/);
+  assert.throws(() => inspect(file, Buffer.concat([content, Buffer.from(' ')])), /static asset has changed/);
+  const restricted = 'Synthetic Restricted Example';
+  assert.throws(() => inspect(file, content, ['vanilla javascript']), /Private source/);
+  assert.throws(() => inspect(file, Buffer.from(restricted)), error => !error.message.includes(restricted));
 });
 test('PNG approval requires the reviewed bytes and regular file mode; hidden additions and arbitrary binary files are blocked', () => {
   for (const size of [180, 192, 512]) {
@@ -69,13 +79,13 @@ test('only named backup service sources are allowed; host configuration and arch
   for (const file of ['server/backups.cjs', 'server/backup-cli.cjs', 'server/restore.cjs', 'server/restore-cli.cjs', 'scripts/backup.sh', 'scripts/install-backups.sh', 'scripts/restore-rehearsal.sh', 'scripts/package-hub-backup.service', 'scripts/package-hub-backup.timer']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
   for (const file of ['scripts/package-hub-backup.conf', 'scripts/private-backup.sh', 'scripts/private-backup.timer', 'backups/status.json', 'backups/host-failure', 'data/backup.sqlite']) assert.throws(() => inspect(file, Buffer.from('Fictional local state')), /Unapproved/);
 });
-test('only the named technical scenario documents are allowed and private content is still blocked', () => {
+test('only the named technical documents are allowed and private content is still blocked', () => {
   const restricted = 'Synthetic Restricted Example';
-  for (const file of ['BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-SCENARIOS.md']) {
+  for (const file of ['GUIDE.md', 'BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-SCENARIOS.md']) {
     assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed technical scenarios')));
     assert.throws(() => inspect(file, Buffer.from(restricted), [restricted.toLowerCase()]), /Private source/);
   }
-  for (const other of ['RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-REPORT.md', 'private/SYSTEM-STATUS-SCENARIOS.md']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
+  for (const other of ['PRIVATE-GUIDE.md', 'private/GUIDE.md', 'RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-REPORT.md', 'private/SYSTEM-STATUS-SCENARIOS.md']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
 });
 test('only the named maintenance adapter, units, override and fictional Python tests are approved', () => {
   for (const file of ['scripts/maintenance-host.py', 'scripts/install-maintenance.sh', 'scripts/package-hub-maintenance.socket', 'scripts/package-hub-maintenance.service', 'compose.maintenance.yaml', 'tests/maintenance-host-test.py']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
