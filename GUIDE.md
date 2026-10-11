@@ -1622,6 +1622,83 @@ changes releases at the same origin while its cache is warm: it loads new code
 without manually clearing the cache. A second account receives its own fresh
 bootstrap while reusing public source files.
 
+### Final measurements — 11 October 2026
+
+The completed six-step implementation at
+`744ee8f2b21b40c97161ed77a384d6e384d630f2` was measured again with a
+clean worktree, Chrome 154.0.8037.99, Node 24.19.0 and a 1440×900 viewport.
+The full browser, targeted-read and static-asset benchmarks ran sequentially,
+without regression tests running alongside them. Every dataset and account was
+fictional. Each timing is a median of five warm samples on loopback networking;
+the full browser run completed with zero page errors.
+
+Final browser timings below are `settledMs`, including mutation callbacks and
+two animation frames. Each cell shows BG / EN milliseconds. Task search includes
+the 150 ms debounce and waits for actual results. Timings near 31 ms have a
+two-frame presentation floor; they do not mean the action itself takes 31 ms.
+
+| Records / simulated CPU rate | Change month | Unchanged refresh | Open latest history month | Change history label | Task search |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 200 / ×1 | 32.9 / 30.9 | 30.8 / 31.4 | 31.0 / 30.7 | 30.9 / 30.8 | 173.6 / 175.7 |
+| 200 / ×4 | 30.4 / 33.7 | 30.7 / 31.0 | 56.4 / 64.3 | 30.2 / 31.5 | 231.5 / 245.0 |
+| 2000 / ×1 | 31.0 / 31.0 | 31.6 / 32.1 | 31.7 / 31.0 | 31.2 / 31.6 | 174.1 / 176.5 |
+| 2000 / ×4 | 31.2 / 33.3 | 31.9 / 30.9 | 68.6 / 77.0 | 30.4 / 31.2 | 238.0 / 250.5 |
+
+The comparable 2000-record, CPU rate 4 actions changed as follows:
+
+| Action (`settledMs`) | Before BG / EN (ms) | Final BG / EN (ms) |
+| --- | ---: | ---: |
+| Change month | 73.6 / 92.6 | 31.2 / 33.3 |
+| Unchanged production file refresh | 82.3 / 166.6 | 31.9 / 30.9 |
+| Rebuild history with latest month open | 1571.5 / 1961.7 | 68.6 / 77.0 |
+| Change one history status label | 261.8 / 711.2 | 30.4 / 31.2 |
+| Search global tasks, including results wait | 2631.2 / 3003.2 | 238.0 / 250.5 |
+
+The first four controls are the initial main run at `7450b15`.
+Search uses the fresh `3f7f661` control with the updated results-aware measurement,
+rather than comparing input dispatch alone against a debounced search. The final
+history DOM contains the selected month's 25 rows rather than all 2000; all month
+headers and totals remain available. Search creates 50 cards per page and filters
+all records. Opening every history month can still create a large DOM.
+At CPU rate 4, the unchanged-refresh action itself measured 6.0 / 6.2 ms,
+with zero mutation callbacks, and section dispatch measured 0.9 / 1.0 ms.
+
+The final authenticated HTTP measurements retained exact production totals:
+
+| Production records | Full / selected-month body bytes | Full / selected-month median (ms) |
+| --- | ---: | ---: |
+| 200 | 36,924 / 4,572 | 4.61 / 2.51 |
+| 2000 | 372,644 / 6,107 | 16.25 / 2.72 |
+
+The selected month has 25 detailed reports in both fixtures; the 2000-record
+response is 98.4% smaller. The single first period request measured 12.59 ms and
+includes indexing the source revision; it is not a stable cold-request estimate.
+With 2000 tasks and 1000 retained inbox rows, the counter/inbox bodies were
+13 / 560 bytes, with HTTP medians of 85.28 / 112.41 ms. Notification maintenance
+remains active and is still a material cost. Task summary function medians were
+0.13 ms for review, 4.29 ms for reporting and 4.66 ms for mixed permissions.
+
+The same 29 public static assets measured 380,699 bytes uncompressed,
+109,056 bytes with gzip and 102,871 bytes with Brotli. Compared with the pre-step-6
+380,696-byte payload, gzip saves 71.4% and Brotli 73.0%. Conditional repeats
+returned 29 responses with 304 and no response bodies. Sequential HTTP medians
+were 17.23 / 14.74 / 14.55 ms for identity / gzip / Brotli; these local timings
+do not demonstrate a meaningful network-latency improvement.
+The real browser's first static-resource transfer was 105,772 bytes. On repeat,
+all 28 resource entries used the cache: zero static requests reached the server
+and static transfer was zero. HTML, session and API requests still execute.
+
+Final regression validation passed all 177 related unit/API tests and all ten
+offline browser workflows, including BG/EN and responsive navigation.
+
+These measurements cover the stated actions and fixtures, rather than a
+whole-site speedup. CPU rate 4 is a processing simulation, not a physical phone;
+there is no network throttling, live-installation measurement or concurrent-client
+load test. Production files and the manual production installation were untouched.
+The batch remains on its dedicated feature branch until an explicitly requested
+review and merge into main; the Trello card remains In Progress until that merge
+and push are complete.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license
