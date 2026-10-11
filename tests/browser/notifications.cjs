@@ -97,5 +97,71 @@ async function exerciseNotifications({admin, hub, base, device, expect, screensh
   assert.deepEqual(await workerPage.evaluate(() => caches.keys()), []); await workerPage.context().close();
   await invited.context().close();
   console.log('PASS notification flags, mobile inbox/settings, deferral/Escape/opt-out, permission click/denial, device toggle, dialog guard and service worker');
+  await exercisePersistence({hub, base, device, expect});
+}
+async function exercisePersistence({hub, base, device, expect}) {
+  console.log('RUN notification persistence across reload, reopening, session expiration and revocation');
+  const user = await hub.auth.create('demo-notice-persistent', password, 'admin');
+  const key = crypto.createECDH('prime256v1'); key.generateKeys();
+  const data = {endpoint: 'https://fcm.googleapis.com/fcm/send/demo-persistent-browser', keys: {p256dh: key.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url')}};
+  let page = await device(user.username, true);
+  const context = page.context();
+  await context.addInitScript(data => {
+    // A browser retains its OS permission and PushSubscription across pages.
+    // These fictional values model that lifecycle without a real push service.
+    const count = name => localStorage.setItem(name, String(Number(localStorage.getItem(name) || 0) + 1));
+    const current = () => localStorage.getItem('demo-notice-subscribed') ? {...data, toJSON: () => data, unsubscribe: async () => { count('demo-notice-unsubscribes'); localStorage.removeItem('demo-notice-subscribed'); return true; }} : null;
+    Object.defineProperty(window, 'Notification', {configurable: true, value: {get permission() { return localStorage.getItem('demo-notice-permission') || 'default'; }, requestPermission: async () => { count('demo-notice-permissions'); localStorage.setItem('demo-notice-permission', 'granted'); return 'granted'; }}});
+    Object.defineProperty(window, 'PushManager', {configurable: true, value: function () {}});
+    const worker = {pushManager: {getSubscription: async () => current(), subscribe: async () => { count('demo-notice-subscribes'); localStorage.setItem('demo-notice-subscribed', 'true'); return current(); }}, getNotifications: async () => []};
+    Object.defineProperty(navigator, 'serviceWorker', {configurable: true, value: {getRegistration: async () => worker, register: async () => worker, ready: Promise.resolve(worker)}});
+    const NativeEventSource = window.EventSource;
+    window.EventSource = function (...args) { return window.demoNoticeEvents = new NativeEventSource(...args); };
+  }, data);
+  const settings = () => page.goto(base + '/notifications.html#settings');
+  const enabled = () => expect(page.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са включени.');
+  const browserState = () => page.evaluate(() => ({permission: Notification.permission, subscribed: !!localStorage.getItem('demo-notice-subscribed'), permissions: Number(localStorage.getItem('demo-notice-permissions')), subscribes: Number(localStorage.getItem('demo-notice-subscribes')), unsubscribes: Number(localStorage.getItem('demo-notice-unsubscribes'))}));
+  const savedState = {permission: 'granted', subscribed: true, permissions: 1, subscribes: 1, unsubscribes: 0};
+  const login = async () => { await page.locator('#username').fill(user.username); await page.locator('#password').fill(password); await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/index.html'); };
+  await settings(); await page.locator('#notificationEnable').click(); await enabled();
+  await page.locator('[data-type=productionAdded]').uncheck(); await page.locator('#notificationPreferences button').click(); await expect(page.locator('#notificationMessage')).toHaveText('Настройките са запазени.');
+  await page.reload(); await enabled(); await expect(page.locator('[data-type=productionAdded]')).not.toBeChecked();
+  await page.clock.runFor(45000); await expect(page.locator('#notificationInvite')).not.toBeVisible();
+  assert.deepEqual(await browserState(), savedState);
+  await page.close(); page = await context.newPage(); await settings(); await enabled();
+  assert.deepEqual(await browserState(), savedState);
+  // A failed inspection cannot turn an existing opt-in into "disabled" or
+  // offer an enable action that unnecessarily replaces a valid subscription.
+  await page.route('**/api/notifications/device', route => route.fulfill({status: 503, contentType: 'application/json', body: JSON.stringify({error: 'SERVER_ERROR'})}));
+  await page.reload(); await expect(page.locator('#notificationDeviceState')).toContainText('Не успяхме да проверим');
+  await expect(page.locator('#notificationEnable')).toBeDisabled(); assert.deepEqual(await browserState(), savedState);
+  await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#notificationDeviceState')).toContainText('We could not check'); await page.locator('[data-hub-language=bg]').click();
+  await page.unroute('**/api/notifications/device');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await enabled();
+  assert.deepEqual(await browserState(), savedState);
+  // The SSE logout event represents both ordinary expiry and account revocation.
+  // Expire only this fictional session, then deliver the same event immediately.
+  hub.store.db.prepare('UPDATE sessions SET expires=? WHERE user_id=?').run(Date.now() - 1, user.id);
+  await page.evaluate(() => window.demoNoticeEvents.dispatchEvent(new MessageEvent('logout', {data: '{}'})));
+  await expect(page).toHaveURL(base + '/login.html');
+  assert.deepEqual(await browserState(), savedState);
+  await login(); await settings(); await enabled();
+  await expect(page.locator('[data-type=productionAdded]')).not.toBeChecked(); assert.deepEqual(await browserState(), savedState);
+  await page.locator('#notificationTest').click(); await expect(page.locator('#notificationMessage')).toContainText('Тестовото известие е изпратено.');
+  // Explicit logout still revokes the device. A granted OS permission cannot
+  // silently revive it, nor a subscription revoked by an administrator.
+  await page.locator('.server-logout').click(); await expect(page).toHaveURL(base + '/login.html');
+  assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id=?').get(user.id).n, 0);
+  assert.equal((await browserState()).subscribed, false);
+  await login(); await settings(); await expect(page.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са изключени.');
+  await page.locator('#notificationEnable').click(); await enabled();
+  await hub.auth.update(user.id, {permissions: {canReceiveProductionChanged: false}}, hub.auth.list()[0]);
+  await page.evaluate(() => window.demoNoticeEvents.dispatchEvent(new MessageEvent('logout', {data: '{}'})));
+  await expect(page).toHaveURL(base + '/login.html'); await login(); await settings();
+  await expect(page.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са изключени.');
+  assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id=?').get(user.id).n, 0);
+  assert.equal((await browserState()).permissions, 1);
+  await context.close();
+  console.log('PASS saved notification preferences and device opt-in survive reload, reopening, failed inspection and session expiration; explicit logout and admin revocation remain effective');
 }
 module.exports = {exerciseNotifications};

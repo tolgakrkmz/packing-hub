@@ -1346,4 +1346,7 @@ Object.assign(HUB_EN_MESSAGES, {
 
 Object.assign(HUB_EN_MESSAGES, {"„По-късно“ отлага поканата със 7 дни.": "Later postpones the invitation for 7 days."});
 
-Object.assign(HUB_EN_MESSAGES, {"Настройките за известия на браузъра не са достъпни. Получените известия остават тук.": "Browser notification settings are unavailable. Your inbox remains available."});
+Object.assign(HUB_EN_MESSAGES, {
+  "Настройките за известия на браузъра не са достъпни. Получените известия остават тук.": "Browser notification settings are unavailable. Your inbox remains available.",
+  "Не успяхме да проверим известията на това устройство. Ще опитаме отново.": "We could not check notifications on this device. We will try again."
+});

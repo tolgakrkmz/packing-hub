@@ -173,6 +173,26 @@ test('device inspection binds an existing opt-in to the current login without re
   assert.equal(s.inbox.device({endpoint: device.endpoint}, s.admin, digest(next.token)).subscribed, true);
   s.auth.logout(next.token); assert.equal(s.inbox.device({endpoint: device.endpoint}, s.admin, digest(first.token)).subscribed, false);
 });
+test('device opt-in and category choices survive session expiry, next-day login and a database restart with stable signing keys', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-notice-persistence-demo-')); t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const filename = path.join(dir, 'demo.sqlite'), push = pushConfig(), device = subscription('demo-persistent'), digest = token => crypto.createHash('sha256').update(token).digest('hex');
+  let store = openStore(filename), auth = accounts(store); createTasks(store);
+  let inbox = createNotifications(store, {push});
+  try {
+    const admin = await auth.create('demo-persistent', password, 'admin'), first = await auth.login(admin.username, password);
+    inbox.subscribe(device, admin, digest(first.token)); inbox.updatePreferences({productionAdded: false, productionChanged: true}, admin);
+    store.db.prepare('UPDATE sessions SET expires=? WHERE user_id=?').run(Date.now() - 86400000, admin.id);
+    assert.equal(auth.session(first.token), null); assert.equal(inbox.device({endpoint: device.endpoint}, admin).subscribed, true);
+    await inbox.close(); store.close();
+    store = openStore(filename); auth = accounts(store); createTasks(store); inbox = createNotifications(store, {push});
+    const next = await auth.login(admin.username, password);
+    assert.equal(auth.session(first.token), null); assert.equal(inbox.device({endpoint: device.endpoint}, next.user, digest(next.token)).subscribed, true);
+    const saved = Object.fromEntries(inbox.preferences(next.user).types.map(type => [type.key, type.enabled]));
+    assert.equal(saved.productionAdded, false); assert.equal(saved.productionChanged, true);
+    auth.logout(next.token); assert.equal(inbox.device({endpoint: device.endpoint}, next.user).subscribed, false);
+    assert.equal(inbox.preferences(next.user).types.find(type => type.key === 'productionAdded').enabled, false);
+  } finally { await inbox.close(); store.close(); }
+});
 test('device test sends only to an owned allowed device, throttles retries and creates no production or inbox records', async t => {
   let status = 201, sent = 0;
   const s = await model(t, {push: pushConfig(async () => { sent++; return {status}; })}), device = subscription('demo-test');
