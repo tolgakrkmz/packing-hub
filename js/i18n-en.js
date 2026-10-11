@@ -1031,7 +1031,7 @@ Object.assign(HUB_EN_MESSAGES, {
   'Отмени': 'Cancel task', 'Отвори отново': 'Reopen', 'Активни задачи': 'Active tasks', 'Неотчетени': 'Unreported',
   'Готови за проверка': 'Ready for review', 'Просрочени глобални': 'Overdue global tasks', 'Избери валиден период.': 'Select a valid period.',
   'Няма повтарящи се задачи.': 'No recurring tasks.', 'Няма задачи по тези критерии.': 'No tasks match these filters.',
-  'Отчетени': 'Reported', 'Имат подаден отчет, независимо от резултата.': 'Have a submitted report, regardless of the result.',
+  'Отчетени': 'Reported', 'Отчети в историята': 'History reports', 'Имат подаден отчет, независимо от резултата.': 'Have a submitted report, regardless of the result.',
   'Нямат подаден отчет за текущото състояние.': 'Have no submitted report for the current state.',
   'Няма отчетени задачи по тези критерии.': 'No reported tasks match these filters.',
   'Няма неотчетени задачи по тези критерии.': 'No unreported tasks match these filters.',
