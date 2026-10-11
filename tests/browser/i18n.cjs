@@ -10,7 +10,7 @@ async function exerciseI18n({page,expect}) {
       +'<div data-i18n-exact><span id="i18nExact">Материал от Демо зона</span></div>'
       +'<select id="i18nOptions"><option>Месечен резултат</option><option value="stable-id">Тонаж и брак</option></select>'
       +'<input id="i18nInput" placeholder="Месечен резултат" value="Тонаж и брак">'
-      +'<span id="i18nFileConnText">Свързан с: Тонаж и брак.json</span><div id="i18nDynamic"></div>';
+      +'<span id="i18nFileConnText">Свързан с: Тонаж и брак.json</span><div id="i18nDynamic"></div><!-- Fictional marker -->';
     document.body.append(host);
   });
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
@@ -30,6 +30,7 @@ async function exerciseI18n({page,expect}) {
     document.getElementById('i18nLabel').title='Тонаж и брак';
     document.getElementById('i18nPrivate').textContent='Месечен резултат';
     document.getElementById('i18nIgnored').textContent='Тонаж и брак';
+    document.getElementById('i18nRegression').lastChild.nodeValue='Месечен резултат';
   });
   await expect(page.locator('#i18nAdded')).toHaveText('Monthly Result');
   await expect(page.locator('#i18nAddedOption')).toHaveText('Production & Scrap');
@@ -38,6 +39,7 @@ async function exerciseI18n({page,expect}) {
   await expect(page.locator('#i18nLabel')).toHaveAttribute('title','Production & Scrap');
   await expect(page.locator('#i18nPrivate')).toHaveText('Месечен резултат');
   await expect(page.locator('#i18nIgnored')).toHaveText('Тонаж и брак');
+  assert.equal(await page.locator('#i18nRegression').evaluate(host=>host.lastChild.nodeValue),'Месечен резултат','DOM comments are not presentation text');
   await page.evaluate(()=>HubI18n.setLanguage('bg'));
   await expect(page.locator('#i18nLabel')).toHaveText('Месечен резултат');
   await expect(page.locator('#i18nLabel')).toHaveAttribute('title','Тонаж и брак');

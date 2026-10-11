@@ -75,7 +75,7 @@ const HubI18n = (() => {
       const added = new Set(), texts = new Set(), changedAttributes = new Map();
       for (const record of records) {
         if (record.type === 'childList') for (const node of record.addedNodes) added.add(node);
-        else if (record.type === 'characterData') texts.add(record.target);
+        else if (record.type === 'characterData' && record.target.nodeType === 3) texts.add(record.target);
         else if (record.type === 'attributes') {
           if (!changedAttributes.has(record.target)) changedAttributes.set(record.target, new Set());
           changedAttributes.get(record.target).add(record.attributeName);
