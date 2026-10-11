@@ -13,6 +13,7 @@ async function exerciseStatisticsCache({page, expect, replaceSource}) {
   await expect(page.locator('#dashboardActual')).toHaveText('3 т');
   const ids = ['chartContainer', 'tableContainer', 'monthlyTrendChart', 'lineShiftContainer', 'wfCapacityChart', 'pairStatsBody', 'avTableContainer'];
   async function remember() {
+    await expect(page.locator('#statsPeriodStatus')).toBeHidden();
     await page.evaluate(ids => {
       window.__statisticsNodes = Object.fromEntries(ids.map(id => [id, document.getElementById(id).firstElementChild]));
     }, ids);

@@ -13,6 +13,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   const elements = Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key, $('pairStats' + key[0].toUpperCase() + key.slice(1))]));
   const accept = value => { data = PairTargets.validateData(value); loaded = true; version++; };
   const sync = createFileSync({
+    getStatisticsPeriod:() => ({month:getPeriod(),scope:'year'}),
     dbName, localStorageKey, suggestedFileName:'pair-targets.json', readOnly:true, strictJson:true,
     defaultData:PairTargets.emptyData, getData:() => data, onConnect:accept, onRefresh:accept, render:onDataChange, elements
   });
@@ -68,7 +69,9 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
   return {
     init() { if (!started) { started = true; sync.init(); } render(); },
     render,
-    getYears() { return cache.get('years', [data], '', () => data.entries.map(entry => entry.date.slice(0, 4))); },
+    refresh:() => sync.refreshFromDisk(),
+    get isCurrent() { return sync.isCurrent; },
+    getYears() { return cache.get('years', [data], '', () => typeof HubServer !== 'undefined' && data.availableYears ? data.availableYears : data.entries.map(entry => entry.date.slice(0, 4))); },
     getVersion() { return version; }
   };
 }

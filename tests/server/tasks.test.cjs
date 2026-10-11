@@ -81,6 +81,29 @@ test('task viewing defaults to admin and supervisors; only admin assigns by defa
   assert.equal((await s.request('/api/tasks', s.chief, 'POST', s.payload())).status, 403);
   for (const route of ['/api/data/tasks', '/api/export/tasks']) assert.equal((await s.request(route, s.chief)).status, 404);
 });
+test('SQL counters preserve mixed review/report roles, participant assignments and shift start boundaries at scale',async t => {
+  const s = await setup(t), {can} = require('../../server/permissions.cjs');
+  const mixed = await s.hub.auth.update(s.chief.user.id,{permissions:{canReviewTasks:true}},s.admin.user);
+  const reader = await s.hub.auth.update((await s.login('demo-observer')).user.id,{permissions:{canViewTasks:true}},s.admin.user);
+  const now = Date.parse('2026-12-01T07:00:00+02:00'), items = [];
+  s.hub.store.transaction(() => {
+    const insert = s.hub.store.db.prepare('INSERT INTO task_items(id,data) VALUES(?,?)');
+    for (let i=0;i<2000;i++) {
+      const item = {id:'demo-counter-'+i,kind:i%2?'shift':'global',status:['pending','in-progress','blocked','review','completed','cancelled'][i%6],
+        owner:{id:i%3?s.chief.user.id:s.other.user.id},participants:i%4?[{id:s.other.user.id}]:[{id:s.chief.user.id},{id:s.other.user.id}],
+        shift:{start:now+(i%5===0?1:i%5===1?0:-1)},due:now-86400000,events:[],createdAt:now,updatedAt:now};
+      insert.run(item.id,JSON.stringify(item)); items.push(item);
+    }
+  });
+  for (const user of [s.admin.user,s.chief.user,s.other.user,mixed,reader]) {
+    const expected = items.filter(item => {
+      if (can(user,'canReviewTasks') && item.status === 'review') return true;
+      if (!can(user,'canReportTasks') || !(item.owner.id === user.id || item.participants.some(person => person.id === user.id))) return false;
+      return item.kind === 'shift' ? item.status === 'pending' && item.shift.start <= now : ['pending','in-progress','blocked'].includes(item.status);
+    }).length;
+    assert.deepEqual(s.hub.tasks.summary(user),{count:expected});
+  }
+});
 test('explicit assignment grants shift, global and recurring creation and preview without administrative powers', async t => {
   const s = await setup(t);
   for (const role of ['operator', 'observer']) {

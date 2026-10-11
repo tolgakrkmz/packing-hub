@@ -9,6 +9,7 @@ async function exerciseRefreshSync({page, expect, replace, online}) {
   await page.locator('[data-hub-language=bg]').click();
   await page.locator('#dashboardMonthSelect').selectOption('10');
   await expect(page.locator('#dashboardActual')).toHaveText('3 т');
+  await expect(page.locator('#statsPeriodStatus')).toBeHidden();
   await page.evaluate(online => {
     const test = window.__refreshTest = {reads:0, block:true, hidden:false};
     Object.defineProperty(document,'hidden',{configurable:true,get:() => test.hidden});
@@ -19,7 +20,7 @@ async function exerciseRefreshSync({page, expect, replace, online}) {
       test.restore = () => { window.fetch = fetch; };
       window.fetch = async (...args) => {
         const response = await fetch(...args);
-        if (args[0] === '/api/statistics/data/production-log') {
+        if (args[0].startsWith('/api/statistics/period/production-log?')) {
           test.reads++;
           if (test.block) await new Promise(resolve => { test.release = resolve; });
         }

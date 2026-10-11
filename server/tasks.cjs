@@ -40,6 +40,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
   db.exec(`CREATE TABLE IF NOT EXISTS task_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
+  db.exec("CREATE INDEX IF NOT EXISTS task_items_status ON task_items(json_extract(data,'$.status'))");
   const photos = createTaskPhotos(store, photoOptions);
   const access = user => { if (!can(user, 'canViewTasks')) throw problem(403, 'FORBIDDEN'); };
   const supervisor = user => user.taskSupervisor === true;
@@ -143,12 +144,16 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     access(user); const at = now();
     store.transaction(() => materialize(at));
     // Count work awaiting this account, without sending task content to other pages.
-    const count = all('task_items').filter(item => {
-      if (can(user, 'canReviewTasks') && item.status === 'review') return true;
-      if (!can(user, 'canReportTasks') || !assignedTo(item, user)) return false;
-      if (item.kind === 'shift') return item.status === 'pending' && item.shift.start <= at;
-      return ['pending', 'in-progress', 'blocked'].includes(item.status);
-    }).length;
+    const review = can(user,'canReviewTasks'), report = can(user,'canReportTasks');
+    if (!review && !report) return {count:0};
+    if (!report) return {count:db.prepare("SELECT count(*) AS count FROM task_items WHERE json_extract(data,'$.status')='review'").get().count};
+    const count = db.prepare(`SELECT count(*) AS count FROM task_items WHERE
+      (? AND json_extract(data,'$.status')='review') OR
+      (? AND (json_extract(data,'$.owner.id')=? OR EXISTS
+        (SELECT 1 FROM json_each(task_items.data,'$.participants') WHERE json_extract(value,'$.id')=?)) AND
+        ((json_extract(data,'$.kind')='shift' AND json_extract(data,'$.status')='pending' AND json_extract(data,'$.shift.start')<=?) OR
+         (json_extract(data,'$.kind')='global' AND json_extract(data,'$.status') IN ('pending','in-progress','blocked'))))`
+    ).get(Number(review),Number(report),user.id,user.id,at).count;
     return {count};
   }
   function idempotent(input, user, work) {

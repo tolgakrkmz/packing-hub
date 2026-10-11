@@ -16,6 +16,7 @@ const HubServer = (() => {
   messages.INVALID_PERMISSIONS = 'Провери правата на акаунта.';
   messages.SELF_DELETE = 'Не можеш да изтриеш акаунта, с който си влязъл.';
   messages.NOT_FOUND = 'Записът вече не е наличен. Опресни страницата.';
+  messages.INVALID_PERIOD = 'Избери валиден месец и година.';
   Object.assign(messages, {
     REPORT_CONFLICT: 'Записът е променен или изтрит от друг потребител. Черновата остава във формата. Прегледай актуалния запис преди нов опит.',
     OPERATION_REUSED: 'Този опит вече е използван за друга промяна. Прегледай актуалния запис.',
@@ -77,10 +78,17 @@ const HubServer = (() => {
   function fileSync(cfg) {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
     const page = currentModule;
-    const readURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
+    const defaultURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
       : kind === 'personnel' && page === 'statistics' ? '/api/statistics/workforce' : page === 'statistics' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
+    const readOnly = cfg.readOnly || page === 'statistics';
+    const readURL = () => {
+      if (page !== 'statistics' || !HubPermissions.reports[kind] || !cfg.getStatisticsPeriod) return defaultURL;
+      const period = cfg.getStatisticsPeriod();
+      return '/api/statistics/period/' + kind + '?month=' + encodeURIComponent(period.month) +
+        (kind === 'line-downtime' ? '&scope=' + encodeURIComponent(period.scope) : '');
+    };
     let ready = false, initialized = false, revision = 0, sequence = 0, versions = {};
-    let pendingRead = null, acceptedText = null, renderedDay = null, connectionState = '';
+    let pendingRead = null, pendingURL = null, acceptedURL = null, acceptedText = null, renderedDay = null, connectionState = '';
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
     const panel = registerConnectionPanel(el.connDot);
@@ -93,16 +101,18 @@ const HubServer = (() => {
       el.connDot.className = 'conn-dot ' + (ok ? 'on' : 'off'); el.connText.textContent = message; panel(ok);
     }
     function refresh({fresh = false} = {}) {
-      if (!fresh && pendingRead) return pendingRead;
+      const url = readURL();
+      if (!fresh && pendingRead && pendingURL === url) return pendingRead;
       const current = ++sequence;
       const operation = (async () => { try {
-        const result = await json(readURL);
-        if (current !== sequence || !fresh && (document.hidden || cfg.isBusy?.())) return result;
+        const result = await json(url);
+        if (current !== sequence || url !== readURL() || !fresh && (document.hidden || cfg.isBusy?.())) return result;
         const text = JSON.stringify(result.data), changed = fresh || text !== acceptedText;
         if (!initialized) await cfg.onConnect(result.data);
         else if (changed) await cfg.onRefresh(result.data);
         if (current !== sequence) return result;
         acceptedText = text;
+        acceptedURL = url;
         initialized = true; revision = result.revision; versions = result.versions || {}; ready = true;
         status(true, 'Свързан с общата база');
         const day = new Date().toDateString();
@@ -111,6 +121,7 @@ const HubServer = (() => {
       } catch (error) { if (current === sequence) { ready = false; status(false, error.message); } throw error; }
       })();
       pendingRead = operation;
+      pendingURL = url;
       operation.finally(() => { if (pendingRead === operation) pendingRead = null; }).catch(() => {});
       return operation;
     }
@@ -120,6 +131,7 @@ const HubServer = (() => {
       init: () => refresh().catch(() => {}), refreshFromDisk: refresh,
       recordVersion: id => versions[id],
       async commitOperation(operation) {
+        if (readOnly) throw new Error('Само за преглед.');
         ++sequence;
         pendingRead = null; acceptedText = null;
         const {version, ...input} = operation;
@@ -133,7 +145,7 @@ const HubServer = (() => {
         return {...result, message: receiptMessages[result.receipt.message]};
       },
       async commitData() {
-        if (cfg.readOnly || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[kind].settings)) throw new Error('Само за преглед.');
+        if (readOnly || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[kind].settings)) throw new Error('Само за преглед.');
         if (!ready) throw new Error('Опресни връзката със сървъра.');
         ++sequence;
         pendingRead = null; acceptedText = null;
@@ -142,7 +154,7 @@ const HubServer = (() => {
         pendingRead = null;
         revision = result.revision;
       },
-      get isReady() { return ready; }, get fileHandle() { return initialized ? handle : null; }
+      get isReady() { return ready; }, get isCurrent() { return ready && acceptedURL === readURL(); }, get fileHandle() { return initialized ? handle : null; }
     };
   }
   async function reviewRecord(sync, id, restoreDraft = () => {}) {

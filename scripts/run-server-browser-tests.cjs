@@ -158,6 +158,10 @@ async function main() {
       });
       await require('../tests/browser/refresh-sync.cjs').exerciseRefreshSync({page:admin,expect,online:true,
         replace:data => hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data),'production-log')});
+      await require('../tests/browser/statistics-requests.cjs').exerciseStatisticsRequests({page:admin,base,expect,
+        replace:async documents => {
+          for (const [kind,data] of Object.entries(documents)) hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data),kind);
+        }});
       assert.deepEqual(errors, []); return;
     }
     if (status) {

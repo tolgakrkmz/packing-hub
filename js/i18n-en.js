@@ -1406,6 +1406,11 @@ Object.assign(HUB_EN_MESSAGES, {
 });
 
 Object.assign(HUB_EN_MESSAGES, {"„По-късно“ отлага поканата със 7 дни.": "Later postpones the invitation for 7 days."});
+Object.assign(HUB_EN_MESSAGES, {
+  "Обновяване на периода…": "Updating the period…",
+  "Периодът не е обновен изцяло. Опитай „Опресни“.": "The period could not be fully updated. Try Refresh.",
+  "Избери валиден месец и година.": "Select a valid month and year."
+});
 
 Object.assign(HUB_EN_MESSAGES, {
   "Настройките за известия на браузъра не са достъпни. Получените известия остават тук.": "Browser notification settings are unavailable. Your inbox remains available.",

@@ -40,6 +40,23 @@ test('every important event has an editable flag; notification flags never grant
   assert.equal(permissions.canViewModule(user, 'production-log'), false);
   assert.equal(available('taskReview', {role: 'observer'}, permissions), false);
 });
+test('count-only notifications match the inbox through reads, visibility changes and revoked permissions',async t => {
+  const s = await model(t);
+  const id = s.tasks.create(s.payload(),s.admin).id; s.inbox.sync();
+  for (const user of [s.admin,s.chief,s.viewer]) assert.deepEqual(s.inbox.summary(user),{count:s.inbox.list(user).count});
+  assert.ok(s.inbox.summary(s.chief).count > 0);
+  s.inbox.read({id:s.inbox.list(s.chief).items[0].id},s.chief);
+  assert.deepEqual(s.inbox.summary(s.chief),{count:s.inbox.list(s.chief).count});
+  // Keep an unread event for a target that no longer exists.
+  s.store.db.prepare("INSERT INTO notifications(id,user_id,type,target,at,event_key) VALUES(?,?,?,?,?,?)").run('demo-missing-counter',s.chief.id,'taskAssigned','demo-missing-task',Date.now(),'demo-missing-counter');
+  assert.deepEqual(s.inbox.summary(s.chief),{count:s.inbox.list(s.chief).count});
+  const task = s.store.db.prepare('SELECT data FROM task_items WHERE id=?').get(id);
+  const moved = JSON.parse(task.data); moved.owner = {id:s.viewer.id,username:s.viewer.username,team:'А'};
+  s.store.db.prepare('UPDATE task_items SET data=? WHERE id=?').run(JSON.stringify(moved),id);
+  assert.equal(s.inbox.summary(s.chief).count,s.inbox.list(s.chief).count);
+  const denied = await s.auth.update(s.chief.id,{permissions:{canViewNotifications:false}},s.admin);
+  assert.throws(() => s.inbox.summary(denied),error => error.status === 403);
+});
 test('new tonnage, corrections, no-op saves, explicit recipient flags and preferences are independent', async t => {
   const s = await model(t);
   const viewer = await s.auth.update(s.viewer.id, {permissions: {canReceiveProductionAdded: true}}, s.admin);

@@ -1325,6 +1325,7 @@ personal browser profile and does not record screenshots or traces.
 ```sh
 node scripts/run-performance-benchmarks.cjs
 node scripts/run-performance-benchmarks.cjs --quick
+node scripts/run-targeted-read-benchmarks.cjs
 node scripts/run-browser-tests.cjs --headless --i18n-only
 node scripts/run-browser-tests.cjs --headless --lists-only
 node scripts/run-server-browser-tests.cjs --headless --lists-only
@@ -1499,6 +1500,66 @@ no periodic reads during simulated hidden visibility, fresh results on resume,
 unchanged-data day rollover, BG/EN and protected task drafts. Unit regressions
 also cover same-size edits, invalid-data recovery, reconnection, stale errors,
 busy writes, attachment reloads and change notifications during slow reads.
+
+Step 5 adds authenticated read-only period projections at
+`/api/statistics/period/{production-log|line-downtime|pair-targets}?month=YYYY-MM`.
+Production and pair statistics receive detailed records only for the selected
+month. Compact production/downtime summaries and available-year metadata still
+cover every report, so annual totals and year selectors remain complete.
+Downtime receives detailed records for the selected year, or every year with
+`scope=all`, because the existing reason and record views need those details.
+The legacy full-document statistics routes remain available.
+
+The server caches only the latest revision of each of these three documents in
+memory. Every request still checks the current session and module access, and a
+document revision change rebuilds its period buckets and summaries. No cache
+files are written. Browser refreshes coalesce only identical period URLs and
+reject responses for an older selection. Scope changes wait for outstanding
+monthly reads. A failed request retains the accepted snapshot and shows a retry
+message; manual refresh clears it after all sources match the selected period.
+Statistics projections cannot be written through the client synchronization API.
+Offline statistics continue to calculate from the complete local files.
+
+Task badges use SQL counts instead of parsing every task into JavaScript.
+Review-only counts use a status index; reporting counts retain owner/participant
+assignment and shift-start checks, including mixed review/report permissions.
+`/api/notifications/summary` returns only the unread count. Its query excludes
+read rows, respects current category permissions and rechecks task visibility;
+the inbox still uses its paginated content endpoint. Notification event/reminder
+maintenance remains active on both endpoints.
+
+On 11 October 2026, the new targeted-read benchmark compared both authenticated
+HTTP routes against the same generated dataset in an in-memory database. The
+selected partial month contains 25 reports. These are five-sample warm medians
+including the response body and client JSON parse, without network throttling:
+
+| Production records | Full response / period response | Full / period time (ms) |
+| --- | ---: | ---: |
+| 200 | 36,924 / 4,572 bytes | 4.96 / 2.75 |
+| 2000 | 372,644 / 6,107 bytes | 16.02 / 2.64 |
+
+The 2000-record period response is 98.4% smaller while retaining exact annual
+totals. The first period request after a revision change also parses and indexes
+the whole source; its single measured sample was 11.98 ms, which is not a stable
+cold-request estimate. Larger selected months and all-year downtime detail can
+still return substantial data.
+
+With 2000 generated tasks and up to 1000 retained inbox rows, the notification
+counter response was 13 bytes versus 560 bytes for the three-item inbox page.
+HTTP medians were 78.65 versus 107.10 ms. Existing maintenance still scans task
+events and dominates much of that time. Task counter function medians were
+0.14 ms for review, 4.34 ms for reporting and 4.71 ms for mixed permissions.
+The separate unchanged quick benchmark compared the previous step at
+`e6aeab50a26ba0cc922ff18e9c9af400d76fc004`: the same 2000-task empty review
+queue fell from 43.7 to 0.2 ms. That comparison measures the function without
+HTTP and does not represent reporting accounts or whole-site speed.
+
+Validation includes 150 related unit/API tests and browser statistics, inbox and
+offline workflows. It covers exact annual/monthly totals, units, empty periods,
+cache invalidation, out-of-order responses, scope changes during reads, request
+failure and manual retry, BG/EN, retained unaffected DOM, access denial and
+read-only projections. Counter parity tests cover 2000 mixed tasks, participants,
+shift boundaries, read notifications, missing/moved targets and revoked rights.
 
 ## Publication
 

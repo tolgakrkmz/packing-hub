@@ -83,7 +83,7 @@ window.HubNotifications = (() => {
     if (countRead) return countRead;
     const sequence = ++countSequence;
     const operation = (async () => { try {
-      const data = await HubServer.json(endpoint);
+      const data = await HubServer.json(endpoint + '/summary');
       if (sequence !== countSequence) return;
       if (badge.textContent !== String(data.count)) badge.textContent = String(data.count);
       if (badge.hidden !== (data.count === 0)) badge.hidden = data.count === 0;

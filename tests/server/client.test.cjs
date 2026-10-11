@@ -4,14 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function client() {
+function client({module = 'production-log', period} = {}) {
   let events, fetchData = async () => response(1), renders = 0;
   const callbacks = new Map();
   const element = () => ({append() {}, setAttribute() {}, addEventListener() {}, hidden: false});
   const context = vm.createContext({
+    URLSearchParams,
     HubPermissions: require('../../js/permission-model.js'),
     window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}},
-    location: {pathname: '/production-log'},
+    location: {pathname: '/' + module},
     document: {hidden:false, addEventListener: (name, callback) => { if (!callbacks.has(name)) callbacks.set(name,[]); callbacks.get(name).push(callback); }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },
     EventSource: class { constructor() { events = new Map(); } addEventListener(name, callback) { events.set(name, callback); } },
@@ -22,7 +23,7 @@ function client() {
   const hub = vm.runInContext('HubServer', context);
   const accepted = [];
   let busy = false;
-  const sync = hub.fileSync({suggestedFileName: 'production-log.json', elements: {connDot: element(), connText: element()}, render() { renders++; }, onConnect: value => accepted.push(value.value), onRefresh: value => accepted.push(value.value), isBusy: () => busy});
+  const sync = hub.fileSync({suggestedFileName: 'production-log.json', getStatisticsPeriod:period, elements: {connDot: element(), connText: element()}, render() { renders++; }, onConnect: value => accepted.push(value.value), onRefresh: value => accepted.push(value.value), isBusy: () => busy});
   for (const callback of callbacks.get('DOMContentLoaded')) callback();
   return {sync, hub, accepted, get renders() { return renders; }, fetching: callback => { fetchData = callback; }, busy: value => { busy = value; }, visibility: hidden => { context.document.hidden = hidden; for (const callback of callbacks.get('visibilitychange') || []) callback(); }, emit: (module = 'production-log') => events.get('change')({data: JSON.stringify({module})})};
 }
@@ -83,4 +84,20 @@ test('one callback watching multiple modules shares its queue and retains a chan
   c.hub.watch('demo-first',refresh); c.hub.watch('demo-second',refresh); c.hub.watch('demo-first',refresh);
   c.emit('demo-first'); c.emit('demo-second'); c.emit('demo-first');
   assert.equal(reads,1); release(); await tick(); assert.equal(reads,2);
+});
+test('changing the statistics period supersedes a slow old-period response without coalescing different URLs',async () => {
+  let month = '2026-10';
+  const c = client({module:'statistics',period:() => ({month,scope:'year'})});
+  let release; const urls = [];
+  c.fetching(url => { urls.push(url); return urls.length === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response(3)); });
+  const stale = c.sync.refreshFromDisk(); month = '2026-09';
+  await c.sync.refreshFromDisk(); release(response(2)); await stale;
+  assert.deepEqual(urls,['/api/statistics/period/production-log?month=2026-10','/api/statistics/period/production-log?month=2026-09']);
+  assert.deepEqual(c.accepted,[3]); assert.equal(c.sync.isReady,true);
+});
+test('statistics projections cannot commit documents or report operations, even when initialized',async () => {
+  const c = client({module:'statistics',period:() => ({month:'2026-10',scope:'year'})}); await c.sync.init();
+  c.fetching(() => { throw new Error('A projection must not write'); });
+  await assert.rejects(c.sync.commitData(),/Само за преглед/);
+  await assert.rejects(c.sync.commitOperation({}),/Само за преглед/);
 });

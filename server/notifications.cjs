@@ -11,6 +11,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     CREATE TABLE IF NOT EXISTS notification_preferences(user_id INTEGER PRIMARY KEY REFERENCES users(id), data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), type TEXT NOT NULL, target TEXT, at INTEGER NOT NULL, read_at INTEGER, event_key TEXT NOT NULL, UNIQUE(user_id,event_key));
     CREATE INDEX IF NOT EXISTS notifications_user_at ON notifications(user_id,at);
+    CREATE INDEX IF NOT EXISTS notifications_unread ON notifications(user_id,read_at,type);
     CREATE TABLE IF NOT EXISTS push_subscriptions(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), session_hash TEXT NOT NULL, endpoint TEXT UNIQUE NOT NULL, public_key TEXT NOT NULL, at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS push_queue(subscription_id TEXT PRIMARY KEY REFERENCES push_subscriptions(id) ON DELETE CASCADE, next_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, generation INTEGER NOT NULL DEFAULT 1);`);
   const state = key => db.prepare('SELECT value FROM notification_state WHERE key=?').get(key)?.value;
@@ -105,6 +106,20 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     const pageSize = 3, items = page.slice(0, pageSize);
     return {count: rows.filter(item => item.read_at === null).length, nextBefore: page.length > pageSize ? String(items.at(-1).sequence) : null,
       items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: '/' + types[item.type].module}))};
+  }
+  function summary(user) {
+    access(user);
+    const permitted = Object.keys(types).filter(type => allowed(user,type));
+    if (!permitted.length) return {count:0};
+    // Read no inbox text or read notifications; check current target visibility.
+    const rows = db.prepare(`SELECT type,target,count(*) AS count FROM notifications
+      WHERE user_id=? AND read_at IS NULL AND type IN (${permitted.map(() => '?').join(',')}) GROUP BY type,target`).all(user.id,...permitted);
+    const targets = new Map();
+    return {count:rows.reduce((count,row) => {
+      if (!row.target) return count + row.count;
+      if (!targets.has(row.target)) targets.set(row.target,taskVisible(task(row.target),user));
+      return count + (targets.get(row.target) ? row.count : 0);
+    },0)};
   }
   function preferences(user) {
     access(user);
@@ -212,6 +227,6 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   }
   function flush() { if (!working && !stopped) running = deliver(); return running; }
   async function close() { stopped = true; await running; }
-  return {sync, list, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
+  return {sync, list, summary, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
 }
 module.exports = {createNotifications};

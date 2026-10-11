@@ -9,6 +9,7 @@ const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cj
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
+const {createStatisticsReads} = require('./statistics.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
@@ -21,6 +22,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const auth = accounts(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const statistics = createStatisticsReads(store);
   tasks.maintain();
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
@@ -174,6 +176,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         if (pathname.startsWith('/api/notifications')) {
           const user = authorized('canViewNotifications');
+          if (pathname === '/api/notifications/summary') {
+            if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+            syncNotifications(); return json(response, 200, notifications.summary(user));
+          }
           if (pathname === '/api/notifications' && request.method === 'GET') { syncNotifications(); return json(response, 200, notifications.list(user, url.searchParams.get('before'))); }
           if (pathname === '/api/notifications/preferences' && request.method === 'GET') return json(response, 200, notifications.preferences(user));
           const methods = {'/api/notifications/preferences': 'PATCH', '/api/notifications/read': 'POST', '/api/notifications/device': 'POST', '/api/notifications/subscriptions': 'POST', '/api/notifications/unsubscribe': 'POST', '/api/notifications/test': 'POST'};
@@ -221,6 +227,13 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           const current = store.get('personnel');
           const data = pathname === '/api/pair-roster' ? {employees: pairRoster(current.data.employees)} : {counts: workforceCounts(current.data.employees)};
           return json(response, 200, {data, revision: current.revision});
+        }
+        const statisticsPeriod = pathname.match(/^\/api\/statistics\/period\/(production-log|line-downtime|pair-targets)$/);
+        if (statisticsPeriod) {
+          if (!canViewModule(session.user, 'statistics')) throw problem(403, 'FORBIDDEN');
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          if ([...url.searchParams.keys()].some(key => !['month','scope'].includes(key)) || url.searchParams.getAll('month').length !== 1 || url.searchParams.getAll('scope').length > 1) throw problem(400,'INVALID_PERIOD');
+          return json(response,200,statistics.read(statisticsPeriod[1],url.searchParams.get('month'),url.searchParams.get('scope') ?? 'year'));
         }
         const statisticsData = pathname.match(/^\/api\/statistics\/data\/(production-log|line-downtime|pair-targets)$/);
         if (statisticsData) {
