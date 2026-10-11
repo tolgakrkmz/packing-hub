@@ -204,6 +204,7 @@ body{ padding:24px 16px 60px; }
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/brand.css">
 <link rel="stylesheet" href="css/brand-shell.css">
+<link rel="stylesheet" href="css/instruction-controls.css">
 </head>
 <body>
 <div class="wrap">
@@ -219,10 +220,10 @@ body{ padding:24px 16px 60px; }
     <div class="conn-row">
       <div class="conn-dot" id="connDot"></div>
       <div class="conn-text" id="connText">Проверява се връзка…</div>
-      <button class="conn-btn" id="openFileBtn">Избери основна папка</button>
-      <button class="conn-btn" id="createFileBtn" style="display:none;"></button>
-      <button class="conn-btn primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
-      <button class="conn-btn" id="refreshBtn" style="display:none;">Опресни</button>
+      <button class="conn-btn instruction-btn" id="openFileBtn">Избери основна папка</button>
+      <button class="conn-btn instruction-btn" id="createFileBtn" style="display:none;"></button>
+      <button class="conn-btn instruction-btn instruction-btn--primary" id="reconnectBtn" style="display:none;">Свържи отново</button>
+      <button class="conn-btn instruction-btn" id="refreshBtn" style="display:none;">Опресни</button>
     </div>
     <div class="conn-note" id="connNote">
       Изберете главната папка на проекта. Данните и снимките ще се запазват в подпапки вътре в нея.
@@ -233,8 +234,8 @@ body{ padding:24px 16px 60px; }
     <h2>Търсене</h2>
     <div class="search-row">
       <input type="text" id="searchInput" placeholder="Клиент, профил или файл…" autocomplete="off">
-      <button class="add-btn" id="addBtn">+ Нов профил</button>
-      <button class="add-btn" id="bulkBtn" style="background:var(--teal);">⬆ Bulk импорт</button>
+      <button class="add-btn instruction-btn instruction-btn--primary" id="addBtn">Нов профил</button>
+      <button class="add-btn instruction-btn instruction-btn--import" id="bulkBtn">Bulk импорт</button>
     </div>
     <div class="filter-chips">
       <button class="chip active" data-cat="">Всички</button>
@@ -277,7 +278,7 @@ body{ padding:24px 16px 60px; }
       <div class="form-field">
         <label>Снимки / чертежи</label>
         <div class="upload-row">
-          <label class="upload-btn" for="imageFileInput">+ Добави файл (снимка / PDF / друго)</label>
+          <button type="button" class="upload-btn instruction-btn" id="addAttachmentBtn">Добави файл (снимка / PDF / друго)</button>
           <input type="file" id="imageFileInput" multiple style="display:none;">
         </div>
         <div class="upload-hint">Файловете се копират директно в папката на профила.</div>
@@ -285,8 +286,8 @@ body{ padding:24px 16px 60px; }
       </div>
       <div class="form-msg" id="formMsg"></div>
       <div class="form-actions">
-        <button class="save-btn" id="saveBtn">Запази</button>
-        <button class="cancel-btn" id="cancelBtn">Отказ</button>
+        <button class="save-btn instruction-btn instruction-btn--primary" id="saveBtn">Запази</button>
+        <button class="cancel-btn instruction-btn instruction-btn--quiet" id="cancelBtn">Отказ</button>
       </div>
     </div>
   </div>
@@ -304,8 +305,8 @@ body{ padding:24px 16px 60px; }
       <p class="conn-note">При избор на един профил попълни клиента, за да се запази отделно от другите клиенти.</p>
     </div>
     <div class="upload-row" style="margin-bottom:14px;">
-      <button class="conn-btn" id="scanLocalBtn">Сканирай data/profiles</button>
-      <button class="conn-btn" id="scanExternalBtn">Импортирай от друга папка</button>
+      <button class="conn-btn instruction-btn" id="scanLocalBtn">Сканирай data/profiles</button>
+      <button class="conn-btn instruction-btn instruction-btn--import" id="scanExternalBtn">Импортирай от друга папка</button>
     </div>
     <div class="conn-note" style="margin-bottom:10px;">
       Първият бутон намира папки в текущия проект, които още не са в индекса.
@@ -319,15 +320,15 @@ body{ padding:24px 16px 60px; }
     </div>
     <div id="bulkResults"></div>
     <div class="form-actions" style="margin-top:14px;">
-      <button class="save-btn" id="bulkImportBtn">Импортирай избраните</button>
-      <button class="cancel-btn" id="bulkCancelBtn">Затвори</button>
+      <button class="save-btn instruction-btn instruction-btn--primary" id="bulkImportBtn">Импортирай избраните</button>
+      <button class="cancel-btn instruction-btn instruction-btn--quiet" id="bulkCancelBtn">Затвори</button>
     </div>
   </div>
 
 </div>
 
 <div class="lightbox" id="lightbox">
-  <span class="lightbox-close" id="lightboxClose">✕</span>
+  <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Затвори">✕</button>
   <img id="lightboxImg" alt="">
   <div class="lightbox-cap" id="lightboxCap" translate="no"></div>
 </div>

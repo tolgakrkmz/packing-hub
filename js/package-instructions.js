@@ -190,6 +190,8 @@ el.cancelBtn.addEventListener('click', () => {
   el.formPanel.style.display = 'none';
 });
 
+document.getElementById('addAttachmentBtn').addEventListener('click', () => el.imageFileInput.click());
+
 el.imageFileInput.addEventListener('change', (e) => {
   const files = Array.from(e.target.files);
   selectedImageFiles = selectedImageFiles.concat(files);
@@ -218,7 +220,9 @@ function renderThumbs() {
 
     const delBtn = document.createElement('button');
     delBtn.className = 'thumb-remove';
+    delBtn.type = 'button';
     delBtn.textContent = '✕';
+    delBtn.setAttribute('aria-label', 'Премахни файл');
     delBtn.onclick = () => {
       selectedImageFiles.splice(index, 1);
       renderThumbs();

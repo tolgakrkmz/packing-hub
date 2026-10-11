@@ -1,0 +1,172 @@
+/* Instruction controls use the shared Package Hub amber/teal palette. */
+.wrap .instruction-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 46px;
+  max-width: 100%;
+  padding: 11px 17px;
+  border: 1px solid #3b404a;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2a2e36, var(--panel-2));
+  color: var(--text);
+  box-shadow: inset 0 1px 0 #ffffff06, 0 3px 8px #00000012;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+  text-align: center;
+  white-space: normal;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.wrap .instruction-btn::before {
+  content: '';
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask: var(--instruction-icon) center / contain no-repeat;
+}
+.wrap .instruction-btn--primary {
+  border-color: #f5a623cc;
+  background: linear-gradient(135deg, #ffc366, var(--amber));
+  color: #281b08;
+  box-shadow: inset 0 1px 0 #ffffff30, 0 4px 14px #f5a6231a;
+  font-weight: 750;
+}
+.wrap .instruction-btn--import {
+  border-color: #3fbfa054;
+  background: linear-gradient(135deg, #3fbfa024, #3fbfa00c);
+  color: #71dfc0;
+  box-shadow: inset 0 1px 0 #3fbfa012;
+}
+.wrap .instruction-btn--quiet {
+  border-color: var(--border);
+  background: #ffffff03;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+.wrap .instruction-btn:focus-visible,
+.wrap .chip:focus-visible,
+.wrap .conn-panel-toggle:focus-visible,
+.thumb-remove:focus-visible,
+.lightbox-close:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 4px;
+}
+.wrap .instruction-btn:active:not(:disabled) { transform: translateY(1px); opacity: 1; }
+.wrap .instruction-btn:disabled {
+  border-color: var(--border);
+  background: var(--panel-2);
+  color: var(--text-muted);
+  opacity: .55;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* The connection disclosure is created by file-sync after the page loads. */
+.wrap .conn-panel-head h2 { margin: 0; }
+.wrap .conn-panel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff03;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.wrap .conn-panel-toggle > span:first-child { flex: 1; min-width: 0; }
+.wrap .conn-panel-status { padding: 4px 8px; border-radius: 7px; color: var(--amber); background: #f5a62312; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.wrap .conn-panel-status.ready { color: var(--teal); background: #3fbfa012; }
+.wrap .conn-panel-toggle::after { content: ''; flex-shrink: 0; width: 7px; height: 7px; border-right: 1.5px solid var(--text-muted); border-bottom: 1.5px solid var(--text-muted); transform: rotate(45deg); }
+.wrap .conn-panel-toggle[aria-expanded=true]::after { transform: rotate(225deg); }
+.wrap .conn-panel-toggle:disabled { cursor: default; }
+.wrap .conn-panel-body { margin-top: 16px; }
+
+/* CSS icons survive translated labels and temporary saving/status text. */
+#addBtn, #createFileBtn, #addAttachmentBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+}
+#bulkBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V3m-4 4 4-4 4 4M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5'/%3E%3C/svg%3E");
+}
+#openFileBtn, #scanExternalBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v2M3 10h18l-3 10H3z'/%3E%3C/svg%3E");
+}
+#scanLocalBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='6'/%3E%3Cpath d='m15 15 5 5'/%3E%3C/svg%3E");
+}
+#refreshBtn, #reconnectBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M18 18a8 8 0 0 1-14-6'/%3E%3C/svg%3E");
+}
+#saveBtn, #bulkImportBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
+}
+#cancelBtn, #bulkCancelBtn {
+  --instruction-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m6 6 12 12M6 18 18 6'/%3E%3C/svg%3E");
+}
+
+.wrap .filter-chips { gap: 8px; margin-top: 14px; }
+.wrap .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff03;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+.wrap .chip::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: currentColor; opacity: .5; }
+.wrap .chip.active { border-color: #f5a62355; background: #f5a62312; color: var(--amber); }
+.wrap .chip.active::before { opacity: 1; }
+.wrap .search-row input[type=text] { border-radius: 12px; }
+.wrap .search-row input[type=text]:focus { border-color: var(--amber); }
+.thumb-remove, .lightbox-close {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #ffffff24;
+  border-radius: 12px;
+  background: #15171be6;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.thumb-remove { top: 6px; right: 6px; font-size: 14px; }
+.lightbox-close { font-size: 20px; }
+@media (hover: hover) and (pointer: fine) {
+  .wrap .instruction-btn:not(:disabled):hover { filter: none; transform: translateY(-1px); border-color: #59606e; box-shadow: 0 5px 16px #0002; }
+  .wrap .instruction-btn--primary:not(:disabled):hover { border-color: #ffd085; box-shadow: 0 5px 18px #f5a62326; }
+  .wrap .instruction-btn--import:not(:disabled):hover { border-color: var(--teal); background: #3fbfa024; }
+  .wrap .instruction-btn--quiet:not(:disabled):hover { color: var(--text); }
+  .wrap .chip:hover { filter: none; color: var(--text); border-color: #59606e; }
+  .wrap .chip.active:hover { color: var(--amber); border-color: var(--amber); }
+  .thumb-remove:hover { background: var(--red); }
+  .lightbox-close:hover { border-color: var(--amber); color: var(--amber); }
+}
+@media (max-width: 600px) {
+  .wrap .instruction-btn { padding: 11px 14px; }
+  .wrap .upload-row .instruction-btn { flex: 1 1 180px; }
+  .wrap .form-actions .instruction-btn { flex: 1 1 130px; }
+  .wrap .chip { flex: 1 1 auto; padding: 9px 12px; }
+}
