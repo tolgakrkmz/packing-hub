@@ -151,13 +151,15 @@
     const wrap = el('div', '', 'task-history');
     const controls = el('div', '', 'task-tabs task-history-tabs');
     controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
-    wrap.append(controls, el('p', 'Най-новите задачи са най-отгоре във всеки раздел.', 'task-muted'));
-    const newestFirst = [...items].sort((a, b) => b.due - a.due || b.createdAt - a.createdAt);
-    for (const [key, label, reported, description, noResults] of [
-      ['reported', 'Отчетени', true, 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
-      ['unreported', 'Неотчетени', false, 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.']
+    wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
+    const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
+    const historyGroup = item => item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
+    for (const [key, label, description, noResults] of [
+      ['reported', 'Отчетени', 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
+      ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.'],
+      ['cancelled', 'Отменени', 'Задачи с отменено възлагане.', 'Няма отменени задачи по тези критерии.']
     ]) {
-      const values = newestFirst.filter(item => !!item.report === reported);
+      const values = newestFirst.filter(item => historyGroup(item) === key);
       const control = button('', () => {
         historyView = key; listPage = 1; render();
         $('taskContent').querySelector(`[data-history-view="${key}"]`).focus();

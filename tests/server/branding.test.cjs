@@ -25,7 +25,7 @@ test('reviewed SVG and install/notification PNG icons are public for GET and HEA
       assert.equal(response.status, 200);
       assert.equal(response.headers.get('content-type'), 'image/png');
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('cache-control'), 'public, no-cache');
       assert.deepEqual(Buffer.from(await response.arrayBuffer()), method === 'GET' ? expected : Buffer.alloc(0));
     }
   }
@@ -33,7 +33,7 @@ test('reviewed SVG and install/notification PNG icons are public for GET and HEA
   assert.equal((await fetch(base + '/', {redirect: 'manual'})).status, 302);
   for (const route of ['/api/data/personnel', '/api/accounts', '/server-session.js']) assert.equal((await fetch(base + route)).status, 401);
   const assertInstallLinks = html => {
-    assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="assets\/package-hub-icon-180\.png">/);
+    assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/package-hub-icon-180\.png\?v=[a-f0-9]{12}">/);
     assert.equal((html.match(/rel="manifest"/g) || []).length, 1);
   };
   const loginPage = await fetch(base + '/login');
