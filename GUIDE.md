@@ -279,8 +279,10 @@ or write, including after an outage, so no browser needs to remain open.
 The task dashboard separates active shift tasks, global tasks, history, recurring
 plans and statistics. History has Reported and Unreported buttons with counts;
 only the selected group's tasks are displayed. The selection survives filtering,
-refresh and switching task views within the page. Each group shows the newest
-deadline first (newest assignment first when deadlines match). Not-done and
+refresh and switching task views within the page. Each group shows the most
+recently assigned task first, regardless of its deadline or report time. Tasks
+assigned at the same instant use the newest deadline first, including recurring
+shifts from the same schedule. Not-done and
 not-applicable reports remain in Reported;
 returned or reopened tasks move to Unreported until a new report is submitted.
 Owner, search and period filters apply to both groups. Period statistics count

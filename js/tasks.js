@@ -148,8 +148,8 @@
     const wrap = el('div', '', 'task-history');
     const controls = el('div', '', 'task-tabs task-history-tabs');
     controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
-    wrap.append(controls, el('p', 'Най-новите задачи са най-отгоре във всеки раздел.', 'task-muted'));
-    const newestFirst = [...items].sort((a, b) => b.due - a.due || b.createdAt - a.createdAt);
+    wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
+    const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
     for (const [key, label, reported, description, noResults] of [
       ['reported', 'Отчетени', true, 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
       ['unreported', 'Неотчетени', false, 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.']

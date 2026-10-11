@@ -10,7 +10,9 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   const owner = await hub.auth.create('demo-history-chief', 'Fictional-password-123', 'operator', manager, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
   const other = await hub.auth.create('demo-history-other', 'Fictional-password-123', 'operator', manager, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
   const ids = {};
+  let creationMinute = 0;
   function create(key, extra) {
+    setTime(`2026-12-01T10:${String(creationMinute++).padStart(2, '0')}:00+02:00`);
     ids[key] = hub.tasks.create({requestId: randomUUID(), title: 'Fictional history ' + key, description: 'Fictional history detail', priority: 'normal', requiresPhotos: false,
       assigneeId: owner.id, participantIds: [], kind: 'global', dueDate: '2026-12-03', dueTime: '17:00', ...extra}, manager).id;
   }
@@ -20,7 +22,6 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   }
   create('approved', {dueDate: '2026-12-01', dueTime: '11:00'});
   create('completed', {kind: 'shift', repeat: 'once', from: '2026-12-01'});
-  setTime('2026-12-01T10:01:00+02:00');
   create('not-applicable', {kind: 'shift', repeat: 'once', from: '2026-12-01'});
   create('not-done', {kind: 'shift', repeat: 'once', from: '2026-12-02'});
   create('blocked', {});
@@ -55,16 +56,21 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await expect(toggle(admin, 'reported')).toHaveAttribute('aria-pressed', 'true');
   await expect(toggle(admin, 'unreported')).toHaveAttribute('aria-pressed', 'false');
   await expect(group(admin, 'unreported')).toHaveCount(0);
-  await expect(titles(admin, 'reported')).toHaveText(['blocked', 'review', 'not-done', 'not-applicable', 'completed', 'approved'].map(key => 'Fictional history ' + key));
+  // Assignment order differs from both deadline order and the last report time.
+  const reportedTitles = ['review', 'blocked', 'not-done', 'not-applicable', 'completed', 'approved'].map(key => 'Fictional history ' + key);
+  const unreportedTitles = ['cancelled', 'pending-shift', 'pending-global'].map(key => 'Fictional history ' + key);
+  await expect(titles(admin, 'reported')).toHaveText(reportedTitles);
   await toggle(admin, 'reported').focus(); await admin.keyboard.press('Tab');
   await expect(toggle(admin, 'unreported')).toBeFocused(); await admin.keyboard.press('Enter');
   await expect(toggle(admin, 'unreported')).toBeFocused();
   await expect(group(admin, 'reported')).toHaveCount(0);
-  await expect(titles(admin, 'unreported')).toHaveText(['pending-global', 'cancelled', 'pending-shift'].map(key => 'Fictional history ' + key));
+  await expect(titles(admin, 'unreported')).toHaveText(unreportedTitles);
   await expect(count(admin, 'reported')).toHaveText('6'); await expect(count(admin, 'unreported')).toHaveText('3');
   await expect(group(admin, 'unreported')).toContainText('Неотчетена'); await expect(group(admin, 'unreported')).toContainText('Отменена');
   const chief = await device(owner.username, true); await open(chief);
   await expect(count(chief, 'reported')).toHaveText('6'); await expect(count(chief, 'unreported')).toHaveText('3');
+  await expect(titles(chief, 'reported')).toHaveText(reportedTitles);
+  await choose(chief, 'unreported'); await expect(titles(chief, 'unreported')).toHaveText(unreportedTitles);
   await expect(chief.locator('#taskContent')).not.toContainText('Fictional history other-owner');
 
   for (const width of [320, 390, 1440]) {
@@ -105,7 +111,7 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await admin.locator('#statsFrom').fill('2026-12-01'); await admin.locator('#statsUntil').fill('2026-12-03');
   await choose(admin, 'unreported'); await admin.locator('#refreshTasks').click();
   await expect(toggle(admin, 'unreported')).toHaveAttribute('aria-pressed', 'true');
-  await expect(titles(admin, 'unreported')).toHaveText(['pending-global', 'cancelled', 'pending-shift'].map(key => 'Fictional history ' + key));
+  await expect(titles(admin, 'unreported')).toHaveText(unreportedTitles);
   await admin.locator('[data-view=global]').click(); await expect(toggle(admin, 'unreported')).toHaveCount(0);
   await admin.locator('[data-view=history]').click();
   await expect(toggle(admin, 'unreported')).toHaveAttribute('aria-pressed', 'true');
