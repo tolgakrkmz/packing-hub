@@ -4,7 +4,7 @@
   if (typeof HubServer === 'undefined') { $('taskMessage').textContent = 'Задачите са достъпни в сървърната версия след вход с личен акаунт.'; $('taskContent').hidden = true; return; }
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
-  let state, view = 'shift', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
+  let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
   const requiresPhotos = item => item?.requiresPhotos !== false;
@@ -145,14 +145,26 @@
     return wrap;
   }
   function renderHistory(items) {
-    const wrap = el('div', '', 'task-history-groups');
+    const wrap = el('div', '', 'task-history');
+    const controls = el('div', '', 'task-tabs task-history-tabs');
+    controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
+    wrap.append(controls, el('p', 'Най-новите задачи са най-отгоре във всеки раздел.', 'task-muted'));
     const newestFirst = [...items].sort((a, b) => b.due - a.due || b.createdAt - a.createdAt);
     for (const [key, label, reported, description, noResults] of [
       ['reported', 'Отчетени', true, 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
       ['unreported', 'Неотчетени', false, 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.']
     ]) {
       const values = newestFirst.filter(item => !!item.report === reported);
+      const control = button('', () => {
+        historyView = key; render();
+        $('taskContent').querySelector(`[data-history-view="${key}"]`).focus();
+      });
+      control.dataset.historyView = key; control.setAttribute('aria-pressed', String(historyView === key));
+      control.setAttribute('aria-controls', 'taskHistoryResults');
+      control.append(el('span', label), el('span', String(values.length), 'task-badge', true)); controls.append(control);
+      if (historyView !== key) continue;
       const section = el('section', '', 'task-history-group'); section.dataset.historyGroup = key;
+      section.id = 'taskHistoryResults';
       const heading = el('h2', '', 'task-history-heading'); heading.id = 'taskHistoryHeading-' + key;
       heading.append(el('span', label), el('span', String(values.length), 'task-badge', true));
       section.setAttribute('aria-labelledby', heading.id);
@@ -210,7 +222,7 @@
     const content = $('taskContent'); content.replaceChildren();
     if (['stats', 'history'].includes(view) && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
     if (view === 'stats') { content.append(renderStats(items)); return; }
-    if (view === 'history') { content.append(el('p', 'Най-новите задачи са най-отгоре във всеки раздел.', 'task-muted'), renderHistory(items.filter(period))); return; }
+    if (view === 'history') { content.append(renderHistory(items.filter(period))); return; }
     const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item));
     values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
     if (!values.length) content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.'));

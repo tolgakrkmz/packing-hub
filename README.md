@@ -232,9 +232,11 @@ and a late flag. Missed recurring shifts are materialized at the next server rea
 or write, including after an outage, so no browser needs to remain open.
 
 The task dashboard separates active shift tasks, global tasks, history, recurring
-plans and statistics. History groups tasks by whether they have a current report,
-with counts and the newest deadline first in each group (newest assignment first
-when deadlines match). Not-done and not-applicable reports remain in Reported;
+plans and statistics. History has Reported and Unreported buttons with counts;
+only the selected group's tasks are displayed. The selection survives filtering,
+refresh and switching task views within the page. Each group shows the newest
+deadline first (newest assignment first when deadlines match). Not-done and
+not-applicable reports remain in Reported;
 returned or reopened tasks move to Unreported until a new report is submitted.
 Owner, search and period filters apply to both groups. Period statistics count
 ended applicable shift tasks, completed/not-done/unreported results, distinct shifts with missing reports and
