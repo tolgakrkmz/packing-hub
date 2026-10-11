@@ -10,6 +10,7 @@ const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
+const {exerciseTaskHistory} = require('../tests/browser/task-history.cjs');
 const {exerciseTaskPhotos} = require('../tests/browser/task-photos.cjs');
 const {exerciseTaskPhotoOptions} = require('../tests/browser/task-photo-options.cjs');
 const {exerciseTaskMultiplePhotos} = require('../tests/browser/task-multiple-photos.cjs');
@@ -156,11 +157,16 @@ async function main() {
       await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); return;
     }
+    if (process.argv.includes('--task-history-only')) {
+      await exerciseTaskHistory({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--tasks-only')) {
       await exerciseTaskPhotos({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskMultiplePhotos({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      await exerciseTaskHistory({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;
     }
