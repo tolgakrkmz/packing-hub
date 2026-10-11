@@ -1,7 +1,7 @@
 /* Server-only inbox, device opt-in and a spaced invitation in the shared design. */
 window.HubNotifications = (() => {
   const endpoint = '/api/notifications';
-  let preferences, subscription, registration, subscribed = false, busy = false, deviceUnavailable = false;
+  let preferences, subscription, registration, subscribed = false, busy = false, deviceUnavailable = false, checkingDevice = false;
   const el = (tag, text, className) => { const node = document.createElement(tag); if (text) node.textContent = text; if (className) node.className = className; return node; };
   const safeStorage = name => ({getItem: key => window[name].getItem(key), setItem: (key, value) => window[name].setItem(key, value)});
   const prompt = HubNotificationPrompt.create({storage: safeStorage('localStorage'), sessionStorage: safeStorage('sessionStorage'), accountId: HubServer.user.id});
@@ -24,13 +24,13 @@ window.HubNotifications = (() => {
   function refreshDeviceUI() {
     const state = document.getElementById('notificationDeviceState');
     if (!state) return;
-    state.textContent = subscribed ? 'Известията на това устройство са включени.' : 'Известията на това устройство са изключени.';
+    state.textContent = deviceUnavailable ? 'Не успяхме да проверим известията на това устройство. Ще опитаме отново.' : subscribed ? 'Известията на това устройство са включени.' : 'Известията на това устройство са изключени.';
     document.getElementById('notificationDeviceHint').textContent = hint();
     const enable = document.getElementById('notificationEnable');
     enable.hidden = subscribed || installFirst || permission() === 'denied';
-    enable.disabled = busy || !supported || !preferences?.publicKey || !preferences.types.some(type => type.enabled);
-    const disable = document.getElementById('notificationDisable'); disable.hidden = !subscribed; disable.disabled = busy;
-    const test = document.getElementById('notificationTest'); test.hidden = !subscribed; test.disabled = busy || !preferences.types.some(type => type.enabled);
+    enable.disabled = busy || checkingDevice || deviceUnavailable || !supported || !preferences?.publicKey || !preferences.types.some(type => type.enabled);
+    const disable = document.getElementById('notificationDisable'); disable.hidden = !subscribed; disable.disabled = busy || checkingDevice;
+    const test = document.getElementById('notificationTest'); test.hidden = !subscribed; test.disabled = busy || checkingDevice || deviceUnavailable || !preferences.types.some(type => type.enabled);
     document.getElementById('notificationNever').checked = prompt.muted();
   }
   async function inspectDevice() {
@@ -39,8 +39,15 @@ window.HubNotifications = (() => {
     subscription = await registration?.pushManager.getSubscription();
     subscribed = !!subscription && permission() === 'granted' && (await send('/device', 'POST', {endpoint: subscription.endpoint})).subscribed;
   }
+  async function checkDevice() {
+    if (!preferences || checkingDevice || busy) return;
+    checkingDevice = true; refreshDeviceUI();
+    try { await inspectDevice(); deviceUnavailable = false; }
+    catch { deviceUnavailable = true; }
+    finally { checkingDevice = false; refreshDeviceUI(); }
+  }
   async function enable() {
-    if (busy || installFirst || !supported || permission() === 'denied' || !preferences?.publicKey) return;
+    if (busy || checkingDevice || deviceUnavailable || installFirst || !supported || permission() === 'denied' || !preferences?.publicKey) return;
     busy = true; deviceUnavailable = false; refreshDeviceUI();
     try {
       // The native permission request must stay directly in the user's click handler.
@@ -119,7 +126,7 @@ window.HubNotifications = (() => {
   function occupied() {
     const active = document.activeElement;
     const unfinished = [...editedFields].some(([field, initial]) => field.isConnected && field.checkVisibility() && fieldValue(field) !== initial);
-    return busy || unfinished || active && (active.matches('input,textarea,select,[contenteditable=true]') || active.closest('form')) ||
+    return busy || checkingDevice || unfinished || active && (active.matches('input,textarea,select,[contenteditable=true]') || active.closest('form')) ||
       [...document.querySelectorAll('dialog[open], [role=dialog]:not([hidden]), .modal.open, .modal-overlay.open, .modal-backdrop.open, #lightbox.open')].some(dialog => dialog.checkVisibility()) ||
       [...document.querySelectorAll('button:disabled, [data-photo-loading=true]')].some(control => control.checkVisibility() && !control.closest('.notification-page'));
   }
@@ -173,7 +180,7 @@ window.HubNotifications = (() => {
     document.getElementById('notificationEnable').addEventListener('click', () => enable().catch(() => { message.textContent = 'Включването не успя. Опитай по-късно от „Настройки“.'; }));
     document.getElementById('notificationDisable').addEventListener('click', () => stopDevice().catch(showError));
     document.getElementById('notificationTest').addEventListener('click', async () => {
-      if (busy || !subscribed || !subscription) return;
+      if (busy || checkingDevice || deviceUnavailable || !subscribed || !subscription) return;
       busy = true; refreshDeviceUI();
       try { await send('/test', 'POST', {endpoint: subscription.endpoint}); message.textContent = 'Тестовото известие е изпратено. Провери дали се появи на устройството.'; }
       catch { message.textContent = 'Тестът не беше изпратен. Изчакай малко и провери дали известията са включени.'; }
@@ -191,9 +198,9 @@ window.HubNotifications = (() => {
     badge = el('span', '', 'notification-count'); badge.hidden = true; link.append(badge); document.querySelector('.server-links')?.append(link);
     HubServer.watch('notifications', refreshCount); HubServer.watch('tasks', refreshCount);
     for (const module of ['production-log', 'line-downtime', 'pair-targets', 'package-instructions']) HubServer.watch(module, refreshCount);
-    setInterval(() => { if (!document.hidden) refreshCount(); }, 30000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCount(); }); refreshCount();
-    try { preferences = await HubServer.json(endpoint + '/preferences'); try { await inspectDevice(); } catch { deviceUnavailable = true; } await inbox(); }
+    setInterval(() => { if (!document.hidden) { refreshCount(); if (deviceUnavailable) checkDevice(); } }, 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshCount(); checkDevice(); } }); refreshCount();
+    try { preferences = await HubServer.json(endpoint + '/preferences'); await checkDevice(); await inbox(); }
     catch (error) { const message = document.getElementById('notificationMessage'); if (message) message.textContent = error.message; return; }
     const invite = invitation(); let visibleTime = 0;
     const timer = setInterval(() => {

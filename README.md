@@ -177,9 +177,16 @@ HTTPS address must have a certificate trusted by the phone. The server needs
 outbound HTTPS to supported browser push hosts; opening the inbox also requires
 access to the application. Requests accept only known browser push domains,
 reject redirects, and time out after ten seconds. No inbound public port or
-cloud copy of the database is required. Session expiration alone does not remove
-a device subscription; explicit logout removes devices registered to that
-session, and account changes/deactivation/deletion remove all its subscriptions.
+cloud copy of the database is required. Device opt-in and category choices survive
+page reload, reopening, ordinary session expiration and server restart with the
+same database and signing keys. An automatic sign-in redirect keeps the browser
+subscription; the next login to the same account binds it to the new session
+without another enable click or native permission request. A failed device check
+shows an unavailable state and retries while visible or on returning to the app;
+it never treats a connection error as opting out or replaces the subscription.
+Explicit logout removes
+devices registered to that session, and account changes/deactivation/deletion
+remove all its subscriptions.
 An already queued provider notice can still arrive after logout; its text is
 always generic and access to the inbox remains authenticated.
 
