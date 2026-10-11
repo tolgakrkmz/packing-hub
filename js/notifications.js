@@ -77,16 +77,23 @@ window.HubNotifications = (() => {
     if (!localOnly && current) prompt.defer();
     refreshDeviceUI();
   }
-  let countSequence = 0, badge;
-  async function refreshCount() {
-    if (!badge) return;
+  let countSequence = 0, badge, countRead = null;
+  function refreshCount() {
+    if (!badge || document.hidden) return Promise.resolve();
+    if (countRead) return countRead;
     const sequence = ++countSequence;
-    try {
+    const operation = (async () => { try {
       const data = await HubServer.json(endpoint);
       if (sequence !== countSequence) return;
-      badge.textContent = String(data.count); badge.hidden = data.count === 0;
-      badge.parentElement.setAttribute('aria-label', 'Известия: ' + data.count);
+      if (badge.textContent !== String(data.count)) badge.textContent = String(data.count);
+      if (badge.hidden !== (data.count === 0)) badge.hidden = data.count === 0;
+      const label = 'Известия: ' + data.count;
+      if (badge.parentElement.getAttribute('aria-label') !== label) badge.parentElement.setAttribute('aria-label', label);
     } catch { if (sequence === countSequence) badge.hidden = true; }
+    })();
+    countRead = operation;
+    operation.finally(() => { if (countRead === operation) countRead = null; }).catch(() => {});
+    return operation;
   }
   function invitation() {
     const dialog = el('dialog', '', 'notification-invite'); dialog.id = 'notificationInvite';

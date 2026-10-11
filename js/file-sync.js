@@ -65,6 +65,7 @@ function registerConnectionPanel(connDot){
   group.states.set(connDot, false);
   group.update();
   return connected=>{
+    if(group.states.get(connDot) === connected) return;
     group.states.set(connDot, connected);
     group.update();
   };
@@ -83,12 +84,15 @@ function createFileSync(cfg){
   let fileHandle = null;
   let pollTimer = null;
   let readRevision = 0;
+  let pendingRead = null, acceptedText = null, renderedDay = null, connectionState = '';
   const supportsFS = 'showOpenFilePicker' in window;
   const accessMode = cfg.readOnly ? 'read' : 'readwrite';
   if(cfg.readOnly && el.createFileBtn) el.createFileBtn.hidden = true;
   const updatePanel = registerConnectionPanel(el.connDot);
 
   function setConn(state, text){
+    if(connectionState === state + text) return;
+    connectionState = state + text;
     el.connDot.className = 'conn-dot ' + state;
     el.connText.textContent = text;
     updatePanel(state === 'on' && supportsFS && !!fileHandle);
@@ -118,7 +122,8 @@ function createFileSync(cfg){
 
   async function readFileData(handle = fileHandle){
     const file = await handle.getFile();
-    return validate(HubDataValidation.parse('',await file.text()));
+    const text = await file.text();
+    return {text, data: validate(HubDataValidation.parse('',text))};
   }
 
   async function writeFileData(handle = fileHandle, data = getData()){
@@ -133,34 +138,53 @@ function createFileSync(cfg){
     }
   }
 
-  async function refreshFromDisk(){
-    if(!fileHandle) return;
+  function refreshFromDisk({fresh = false} = {}){
+    if(!fileHandle) return Promise.resolve(false);
+    // Saving must read a new snapshot, independently of an older background read.
+    if(!fresh && pendingRead) return pendingRead;
     const revision = ++readRevision;
-    try{
-      const data = await readFileData();
-      if(revision !== readRevision) return;
-      await onRefresh(data);
+    const handle = fileHandle;
+    const operation = (async()=>{ try{
+      const file = await handle.getFile();
+      const text = await file.text();
+      if(revision !== readRevision || !fresh && (document.hidden || cfg.isBusy?.())) return false;
+      // Compare actual bytes; timestamps and sizes can miss same-size edits.
+      const changed = fresh || text !== acceptedText;
+      if(changed) await onRefresh(validate(HubDataValidation.parse('',text)));
+      if(revision !== readRevision) return false;
+      acceptedText = text;
       readyForWrites = true;
       setConn('on', 'Свързан с: ' + (fileHandle.name || 'мрежов файл'));
       el.openFileBtn.style.display = 'none';
       if(el.createFileBtn) el.createFileBtn.style.display = 'none';
       el.reconnectBtn.style.display = 'none';
+      const day = new Date().toDateString();
+      if(!fresh && (changed || day !== renderedDay)) { render(); renderedDay = day; }
+      return changed;
     }catch(e){
-      if(revision !== readRevision) return;
+      if(revision !== readRevision) return false;
       connectionLost(e);
       throw e;
-    }
+    }})();
+    pendingRead = operation;
+    operation.finally(()=>{ if(pendingRead === operation) pendingRead = null; }).catch(()=>{});
+    return operation;
   }
 
   async function connectAndLoad(handle){
-    ++readRevision;
+    const revision = ++readRevision;
+    pendingRead = null;
     setConn('off', 'Свързване с файла…');
-    const data = await readFileData(handle);
+    const {text, data} = await readFileData(handle);
+    if(revision !== readRevision) return;
     await onConnect(data);
+    if(revision !== readRevision) return;
     fileHandle = handle;
+    acceptedText = text;
     readyForWrites = true;
     await idbSet('mainFile', handle);
     render();
+    renderedDay = new Date().toDateString();
     setConn('on', 'Свързан с: ' + (handle.name || 'мрежов файл'));
     el.openFileBtn.style.display = 'none';
     el.createFileBtn.style.display = 'none';
@@ -174,20 +198,26 @@ function createFileSync(cfg){
 
   function startPolling(){
     if(pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(async ()=>{
-      if(cfg.isBusy && cfg.isBusy()) return;
-      try{ await refreshFromDisk(); render(); }catch(e){}
-    }, 20000);
+    pollTimer = setInterval(refreshVisible, 20000);
   }
+  async function refreshVisible(){
+    if(document.hidden || cfg.isBusy?.()) return;
+    try{ await refreshFromDisk(); }catch(e){}
+  }
+  document.addEventListener?.('visibilitychange',()=>{ if(!document.hidden) refreshVisible(); });
 
   async function commitData(){
     if(cfg.readOnly) throw new Error('Файлът се използва само за четене.');
     ++readRevision;
+    pendingRead = null;
+    acceptedText = null;
     if(!readyForWrites) throw HubDataValidation.error('Първо свържете валиден файл. Записът не е направен.');
     if(fileHandle){
       try{
         await readFileData();
         await writeFileData();
+        ++readRevision;
+        pendingRead = null;
       } catch(e){ connectionLost(e); throw e; }
     } else if(!supportsFS){
       validate(getData());
@@ -244,7 +274,7 @@ function createFileSync(cfg){
   });
 
   el.refreshBtn.addEventListener('click', async ()=>{
-    try{ await refreshFromDisk(); render(); }catch(e){}
+    try{ await refreshFromDisk(); }catch(e){}
   });
 
   function setupFallback(){
@@ -335,10 +365,13 @@ function createDirectorySync(cfg){
   } = cfg;
 
   let dirHandle = null;
+  let readRevision = 0, pendingRead = null, acceptedText = null, connectionState = '';
   const supportsFS = 'showDirectoryPicker' in window;
   const updatePanel = registerConnectionPanel(el.connDot);
 
   function setConn(state, text){
+    if(connectionState === state + text) return;
+    connectionState = state + text;
     el.connDot.className = 'conn-dot ' + state;
     el.connText.textContent = text;
     updatePanel(state === 'on' && supportsFS && !!dirHandle);
@@ -369,28 +402,47 @@ function createDirectorySync(cfg){
     const dataDir = await handle.getDirectoryHandle('data', { create: false });
     const fileHandle = await dataDir.getFileHandle('package-instructions.json', { create: false });
     const file = await fileHandle.getFile();
-    return HubDataValidation.parse('package-instructions',await file.text());
+    const text = await file.text();
+    return {text, data: HubDataValidation.parse('package-instructions',text)};
   }
 
-  async function refreshFromDisk(){
-    if(!dirHandle) return;
-    try{
-      const data = await readIndexData();
-      await onRefresh(data);
+  function refreshFromDisk({reloadAssets = false} = {}){
+    if(!dirHandle) return Promise.resolve(false);
+    if(pendingRead) { pendingRead.reloadAssets ||= reloadAssets; return pendingRead.promise; }
+    const revision = ++readRevision, handle = dirHandle;
+    const pending = {reloadAssets};
+    const operation = (async()=>{ try{
+      const {text, data} = await readIndexData(handle);
+      if(revision !== readRevision || cfg.isBusy?.()) return false;
+      const changed = text !== acceptedText || pending.reloadAssets;
+      if(changed) await onRefresh(data);
+      if(revision !== readRevision) return false;
+      acceptedText = text;
       setConn('on', 'Свързан с папка: ' + dirHandle.name);
       el.openFileBtn.style.display = 'none';
       el.reconnectBtn.style.display = 'none';
+      if(changed) render();
+      return changed;
     }catch(e){
+      if(revision !== readRevision) return false;
       connectionLost(e);
       throw e;
-    }
+    }})();
+    pending.promise = operation; pendingRead = pending;
+    operation.finally(()=>{ if(pendingRead === pending) pendingRead = null; }).catch(()=>{});
+    return operation;
   }
 
   async function connectAndLoad(handle){
+    const revision = ++readRevision;
+    pendingRead = null;
     setConn('off', 'Свързване с папката…');
-    const data = await readIndexData(handle);
+    const {text, data} = await readIndexData(handle);
+    if(revision !== readRevision) return;
     await onConnect(data, handle);
+    if(revision !== readRevision) return;
     dirHandle = handle;
+    acceptedText = text;
     await idbSet('mainDir', handle);
     render();
 
@@ -445,7 +497,8 @@ function createDirectorySync(cfg){
   });
 
   el.refreshBtn.addEventListener('click', async ()=>{
-    try{ await refreshFromDisk(); render(); }catch(e){}
+    // An attachment may change without a change to the JSON index.
+    try{ await refreshFromDisk({reloadAssets:true}); }catch(e){}
   });
 
   async function init(){

@@ -1455,6 +1455,51 @@ DOM nodes in unaffected regions. Existing offline workflows also cover file
 connections, fallback import/export and responsive statistics.
 Further work is tracked in [the performance card](https://trello.com/c/U3DEltWF).
 
+Step 4 compares the actual local file text, preserving the accepted snapshot when
+its bytes are unchanged. Same-size edits are still detected. Server refreshes
+compare the returned data while updating record versions and checking access on
+every request. Ordinary overlapping refreshes share one pending read, one
+acceptance and one render. Local files are still read, and the server still sends
+the full response; this is not a network-payload reduction.
+
+Polling pauses while the browser page is hidden. Returning visible requests the
+latest data. Server change notifications share a queue across modules using the
+same callback; a change arriving during a read schedules a follow-up read. Busy
+saves and task dialogs defer background updates, and closing a task dialog
+refreshes the list. Existing EventSource authentication/revocation remains active.
+Fresh checks before a save or explicit conflict review bypass an older pending
+read. Local writes retain their independent disk validation and invalidation of
+stale reads. No new persistent cache is introduced.
+
+Unchanged task cards and counters retain their DOM. Local-day changes still
+update statistics, and task start/due/grace boundaries still update available
+actions and overdue totals. Instruction refresh and server file-change events
+reload attachment caches even when the index itself is unchanged. Instruction
+refresh renders once instead of twice.
+
+A fresh control at `6afdbc185df202d89de99d42937a1a06ade48b19` and the
+step 4 repeat used 2000 fictional records, CPU rate 4 and five-sample medians:
+
+| Unchanged production file refresh | Before BG / EN (ms) | Step 4 BG / EN (ms) |
+| --- | ---: | ---: |
+| Invoked action (`scriptMs`) | 58.5 / 52.8 | 6.8 / 6.2 |
+| Action plus two frames (`settledMs`) | 72.3 / 85.7 | 31.2 / 30.6 |
+| Mutation callback time (`observerMs`) | 6.5 / 19.0 | 0 / 0 |
+
+The benchmark invokes the same explicit refresh plus `renderAll()` in both runs.
+Preserved source identities allow the latter to reuse the existing displayed
+results. The two-frame timing retains its presentation floor; these figures are
+not a whole-site or live-installation speedup.
+
+Validation includes 108 related unit tests, full offline workflows and focused
+server statistics/lists, task/photo/history/permission, report-operation conflict
+and retry, instruction-import and notification scenarios. Browser regressions
+verify one read for three concurrent refreshes, retained DOM and source identity,
+no periodic reads during simulated hidden visibility, fresh results on resume,
+unchanged-data day rollover, BG/EN and protected task drafts. Unit regressions
+also cover same-size edits, invalid-data recovery, reconnection, stale errors,
+busy writes, attachment reloads and change notifications during slow reads.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license

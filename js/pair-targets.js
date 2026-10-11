@@ -190,8 +190,8 @@
     let previous = null;
     try {
       if(!pairsLoaded || !rosterLoaded) throw new Error('Първо свържете двата файла.');
-      await rosterSync.refreshFromDisk();
-      await sync.refreshFromDisk();
+      await rosterSync.refreshFromDisk({fresh:true});
+      await sync.refreshFromDisk({fresh:true});
       previous = JSON.parse(JSON.stringify(data));
       const next = makeChange();
       data = PairTargets.validateData(next);
@@ -221,7 +221,7 @@
           const error = new Error('Черновата е променена след непотвърден опит. Прегледай актуалния запис.'); error.code = 'REPORT_CONFLICT'; error.status = 409; throw error;
         }
         if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
-        await rosterSync.refreshFromDisk();
+        await rosterSync.refreshFromDisk({fresh:true});
         const entry = edit.original ? JSON.parse(edit.original) : null;
         const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId});
         editing.attempt = {key,operation:{operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
@@ -322,8 +322,11 @@
   $('pairDialog').addEventListener('cancel',event => { event.preventDefault(); closeDialog(); });
   selectLive(); render();
   Promise.allSettled([sync.init(),rosterSync.init()]).then(render);
-  setInterval(() => {
+  function refreshLive(){
+    if(document.hidden) return;
     if(followLive && !editing && !busy) { selectLive(); }
     render();
-  },30000);
+  }
+  setInterval(refreshLive,30000);
+  document.addEventListener('visibilitychange',refreshLive);
 })();

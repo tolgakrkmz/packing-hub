@@ -59,6 +59,7 @@ async function main() {
     const admin = await device('demo-admin');
     if (process.argv.includes('--lists-only')) {
       await require('../tests/browser/paged-lists.cjs').exerciseServerPagedLists({admin, hub, base, expect});
+      await require('../tests/browser/refresh-sync.cjs').exerciseTaskRefresh({page:admin,base,expect});
       assert.deepEqual(errors, []); return;
     }
     if (process.argv.includes('--report-operations-only')) {
@@ -155,6 +156,8 @@ async function main() {
           await admin.locator('#statsFilesBtn').click(); await admin.locator('#' + button).click(); await admin.locator('#statsFilesBtn').click();
         }
       });
+      await require('../tests/browser/refresh-sync.cjs').exerciseRefreshSync({page:admin,expect,online:true,
+        replace:data => hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data),'production-log')});
       assert.deepEqual(errors, []); return;
     }
     if (status) {

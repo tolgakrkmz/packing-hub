@@ -136,6 +136,8 @@ async function main() {
           await page.locator('#statsFilesBtn').click(); await page.locator('#' + button).click(); await page.locator('#statsFilesBtn').click();
         }
       });
+      await require('../tests/browser/refresh-sync.cjs').exerciseRefreshSync({page, expect, online:false,
+        replace:data => write({'production-log':data})});
       require('node:assert/strict').deepEqual(errors, []);
       await context.close(); return;
     }

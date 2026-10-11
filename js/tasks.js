@@ -7,6 +7,7 @@
   let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const pageSize = 50;
   let listPage = 1, searchTimer;
+  let pendingRead = null, displayedSnapshot = null;
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
   const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
   const requiresPhotos = item => item?.requiresPhotos !== false;
@@ -239,19 +240,31 @@
     content.append(list, HubListPagination.create({id: 'taskPagination', page: listPage, total: values.length, size: pageSize,
       onChange: page => { listPage = page; render(); }}));
   }
-  async function refresh() {
-    if (draftOpen()) return;
+  function refresh({fresh = false} = {}) {
+    if (draftOpen() || document.hidden) return Promise.resolve();
+    if (!fresh && pendingRead) return pendingRead;
     const current = ++sequence;
-    try {
-      const result = await HubServer.json('/api/tasks'); if (current !== sequence) return;
+    const operation = (async () => { try {
+      const result = await HubServer.json('/api/tasks'); if (current !== sequence || draftOpen() || document.hidden) return;
       state = result; $('taskMessage').textContent = '';
+      // Clock ticks alone do not change cards, but crossing a start/due/grace
+      // boundary changes actions and overdue totals even with the same records.
+      const snapshot = JSON.stringify({...result, now:undefined, timeBoundaries:result.items.map(item => [
+        result.now >= item.shift?.start, result.now < item.due, item.due + result.graceMinutes * 60000 < result.now
+      ])});
+      if (snapshot === displayedSnapshot) return;
+      displayedSnapshot = snapshot;
       renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
       if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
       $('taskSubtitle').textContent = reviewer ? assigner ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : 'Следи отчетите и потвърждавай решените проблеми.' : admin ? 'Редактирай задачи и проследявай изпълнението им.' : assigner ? 'Възлагай сменни и глобални задачи и проследявай изпълнението им.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
       render();
-    } catch (error) { $('taskMessage').textContent = error.message; }
+    } catch (error) { if (current === sequence && !draftOpen()) $('taskMessage').textContent = error.message; }
+    })();
+    pendingRead = operation;
+    operation.finally(() => { if (pendingRead === operation) pendingRead = null; }).catch(() => {});
+    return operation;
   }
   function editorFields() {
     const global = $('taskKind').value === 'global', recurring = $('taskRepeat').value === 'every-shift';
@@ -301,7 +314,8 @@
     if (busy) return;
     busy = true; const submit = form.querySelector('button[type=submit]'); submit.disabled = true; feedback.textContent = '';
     const controls = [...form.querySelectorAll('input,select,textarea,button')].filter(control => !control.disabled); for (const control of controls) control.disabled = true;
-    try { await fn(); form.closest('dialog').close(); busy = false; await refresh(); $('taskMessage').textContent = 'Промяната е записана.'; }
+    ++sequence; pendingRead = null;
+    try { await fn(); ++sequence; pendingRead = null; form.closest('dialog').close(); busy = false; await refresh({fresh:true}); $('taskMessage').textContent = 'Промяната е записана.'; }
     catch (error) { feedback.textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; if (error.status === 409) feedback.textContent += ' Затвори прозореца и натисни „Опресни“. Въведеното е запазено до затваряне.'; }
     finally { busy = false; for (const control of controls) control.disabled = false; submit.disabled = false; }
   }
@@ -331,6 +345,7 @@
   $('reportStatus').addEventListener('change', () => { $('actionNote').required = $('reportStatus').value !== 'completed'; });
   for (const control of document.querySelectorAll('[data-close]')) control.addEventListener('click', () => { if (!busy) $(control.dataset.close).close(); });
   for (const id of dialogs) $(id).addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+  for (const id of dialogs) $(id).addEventListener('close', () => { if (!draftOpen()) refresh(); });
   $('taskEditor').addEventListener('close', () => problemPicker.reset()); $('taskAction').addEventListener('close', () => solutionPicker.reset());
   $('taskPhotoViewer').addEventListener('close', () => $('photoViewerImage').removeAttribute('src'));
   $('photoViewerImage').addEventListener('error', () => { if ($('taskPhotoViewer').open) $('photoViewerFeedback').textContent = 'Снимката не е достъпна. Опресни задачите.'; });
@@ -345,5 +360,5 @@
   $('taskTabs').addEventListener('click', event => { const tab = event.target.closest('[data-view]'); if (!tab) return; view = tab.dataset.view; listPage = 1; for (const control of $('taskTabs').querySelectorAll('button')) control.setAttribute('aria-pressed', String(control === tab)); render(); });
   document.addEventListener('click', event => { if (event.target.closest('[data-hub-language]')) { renderPhotoPolicy(); problemPicker.render(); solutionPicker.render(); if (!draftOpen()) render(); } });
   HubServer.watch('tasks', refresh, draftOpen); HubServer.watch('accounts', refresh, draftOpen);
-  setInterval(() => { if (!draftOpen()) refresh(); }, 30000); refresh();
+  setInterval(() => refresh(), 30000); refresh();
 })();

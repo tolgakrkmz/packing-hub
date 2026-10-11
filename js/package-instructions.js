@@ -95,7 +95,6 @@ const sync = createDirectorySync({
   onRefresh: (data) => {
     dbIndex = data || {};
     clearDetailsCache();
-    renderSearch();
   },
   render: () => {
     renderSearch();

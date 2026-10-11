@@ -9,6 +9,7 @@ const HubServer = (() => {
   };
   const canViewModule = name => HubPermissions.canViewModule(boot.user, name);
   const listeners = new Map();
+  const watchers = new WeakMap(), idle = () => false;
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
   messages.LAST_ACCOUNT_MANAGER = 'Трябва да остане поне един активен акаунт с право за управление на акаунти.';
@@ -41,22 +42,37 @@ const HubServer = (() => {
   }
   const json = async (url, options) => (await request(url, options)).json();
   const send = (url, method, data, headers = {}) => json(url, {method, headers: {'Content-Type': 'application/json', ...headers}, body: JSON.stringify(data)});
-  function watch(module, refresh, busy = () => false) {
-    let running = false, pending = false;
+  function watch(module, refresh, busy = idle) {
+    let shared = watchers.get(refresh);
+    if (!shared) { shared = new Map(); watchers.set(refresh, shared); }
+    if (shared.has(busy)) {
+      if (!listeners.has(module)) listeners.set(module, []);
+      if (!listeners.get(module).includes(shared.get(busy))) listeners.get(module).push(shared.get(busy));
+      return;
+    }
+    let running = false, pending = false, retry = null;
     const update = async () => {
       pending = true;
-      if (running) return;
+      if (running || document.hidden) return;
+      if (busy()) {
+        if (!retry) retry = setTimeout(() => { retry = null; update(); }, 200);
+        return;
+      }
       running = true;
       try {
-        while (pending) {
+        while (pending && !document.hidden && !busy()) {
           pending = false;
-          while (busy()) await new Promise(resolve => setTimeout(resolve, 200));
           await refresh();
         }
-      } catch {} finally { running = false; }
+      } catch {} finally {
+        running = false;
+        if (pending && !document.hidden) update();
+      }
     };
     if (!listeners.has(module)) listeners.set(module, []);
     listeners.get(module).push(update);
+    shared.set(busy, update);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) update(); });
   }
   function fileSync(cfg) {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
@@ -64,23 +80,39 @@ const HubServer = (() => {
     const readURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
       : kind === 'personnel' && page === 'statistics' ? '/api/statistics/workforce' : page === 'statistics' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
     let ready = false, initialized = false, revision = 0, sequence = 0, versions = {};
+    let pendingRead = null, acceptedText = null, renderedDay = null, connectionState = '';
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
     const panel = registerConnectionPanel(el.connDot);
     for (const control of [el.openFileBtn, el.createFileBtn, el.reconnectBtn, el.importFallback]) if (control) control.hidden = true;
     if (el.refreshBtn) { el.refreshBtn.style.display = ''; el.refreshBtn.textContent = 'Опресни'; }
     if (el.connNote) el.connNote.textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
-    function status(ok, message) { el.connDot.className = 'conn-dot ' + (ok ? 'on' : 'off'); el.connText.textContent = message; panel(ok); }
-    async function refresh() {
+    function status(ok, message) {
+      if (connectionState === ok + message) return;
+      connectionState = ok + message;
+      el.connDot.className = 'conn-dot ' + (ok ? 'on' : 'off'); el.connText.textContent = message; panel(ok);
+    }
+    function refresh({fresh = false} = {}) {
+      if (!fresh && pendingRead) return pendingRead;
       const current = ++sequence;
-      try {
+      const operation = (async () => { try {
         const result = await json(readURL);
+        if (current !== sequence || !fresh && (document.hidden || cfg.isBusy?.())) return result;
+        const text = JSON.stringify(result.data), changed = fresh || text !== acceptedText;
+        if (!initialized) await cfg.onConnect(result.data);
+        else if (changed) await cfg.onRefresh(result.data);
         if (current !== sequence) return result;
-        if (initialized) await cfg.onRefresh(result.data); else await cfg.onConnect(result.data);
+        acceptedText = text;
         initialized = true; revision = result.revision; versions = result.versions || {}; ready = true;
-        status(true, 'Свързан с общата база'); cfg.render();
+        status(true, 'Свързан с общата база');
+        const day = new Date().toDateString();
+        if (changed || day !== renderedDay) { cfg.render(); renderedDay = day; }
         return result;
-      } catch (error) { ready = false; status(false, error.message); throw error; }
+      } catch (error) { if (current === sequence) { ready = false; status(false, error.message); } throw error; }
+      })();
+      pendingRead = operation;
+      operation.finally(() => { if (pendingRead === operation) pendingRead = null; }).catch(() => {});
+      return operation;
     }
     el.refreshBtn?.addEventListener('click', () => refresh().catch(() => {}));
     watch(kind, refresh, cfg.isBusy);
@@ -89,26 +121,32 @@ const HubServer = (() => {
       recordVersion: id => versions[id],
       async commitOperation(operation) {
         ++sequence;
+        pendingRead = null; acceptedText = null;
         const {version, ...input} = operation;
         const result = await send('/api/reports/' + kind + '/operations', 'POST', input, version ? {'If-Match': '"' + version + '"'} : {});
         ++sequence;
+        pendingRead = null;
         if (result.receipt?.operationId !== operation.operationId || result.receipt.status !== 'confirmed' || !receiptMessages[result.receipt.message]) throw new Error('Сървърът не потвърди резултата. Опитай отново.');
         revision = result.revision; versions = result.versions; ready = true;
         await cfg.onRefresh(result.data);
+        acceptedText = JSON.stringify(result.data);
         return {...result, message: receiptMessages[result.receipt.message]};
       },
       async commitData() {
         if (cfg.readOnly || ['production-log', 'line-downtime', 'pair-targets'].includes(kind) && !can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[kind].settings)) throw new Error('Само за преглед.');
         if (!ready) throw new Error('Опресни връзката със сървъра.');
         ++sequence;
+        pendingRead = null; acceptedText = null;
         const result = await send('/api/data/' + kind, 'PUT', cfg.getData(), {'If-Match': '"' + revision + '"'});
+        ++sequence;
+        pendingRead = null;
         revision = result.revision;
       },
       get isReady() { return ready; }, get fileHandle() { return initialized ? handle : null; }
     };
   }
   async function reviewRecord(sync, id, restoreDraft = () => {}) {
-    const result = await sync.refreshFromDisk();
+    const result = await sync.refreshFromDisk({fresh:true});
     restoreDraft();
     const entry = result.data.entries.find(item => item.id === id);
     const dialog = document.createElement('dialog');
@@ -192,21 +230,39 @@ const HubServer = (() => {
   }
   function directorySync(cfg) {
     const handle = serverDirectory();
-    let initialized = false;
+    let initialized = false, pendingRead = null, acceptedText = null, connectionState = '';
     const el = cfg.elements;
     const panel = registerConnectionPanel(el.connDot);
     for (const control of [el.openFileBtn, el.createFileBtn, el.reconnectBtn]) if (control) control.hidden = true;
-    async function refresh() {
-      try {
+    function status(ok, message) {
+      if (connectionState === ok + message) return;
+      connectionState = ok + message;
+      el.connDot.className = 'conn-dot ' + (ok ? 'on' : 'off'); el.connText.textContent = message; panel(ok);
+    }
+    function refresh({reloadAssets = false} = {}) {
+      if (pendingRead) { pendingRead.reloadAssets ||= reloadAssets; return pendingRead.promise; }
+      const pending = {reloadAssets};
+      const operation = (async () => { try {
         const result = await json('/api/data/package-instructions');
-        if (initialized) await cfg.onRefresh(result.data); else await cfg.onConnect(result.data, handle);
+        if (document.hidden || cfg.isBusy?.()) return result;
+        const text = JSON.stringify(result.data), changed = pending.reloadAssets || text !== acceptedText;
+        if (!initialized) await cfg.onConnect(result.data, handle);
+        else if (changed) await cfg.onRefresh(result.data);
+        acceptedText = text;
         initialized = true;
-        el.connDot.className = 'conn-dot on'; el.connText.textContent = 'Свързан с общата база'; panel(true); cfg.render();
-      } catch (error) { el.connDot.className = 'conn-dot off'; el.connText.textContent = error.message; panel(false); throw error; }
+        status(true, 'Свързан с общата база');
+        if (changed) cfg.render();
+        return result;
+      } catch (error) { status(false, error.message); throw error; }
+      })();
+      pending.promise = operation; pendingRead = pending;
+      operation.finally(() => { if (pendingRead === pending) pendingRead = null; }).catch(() => {});
+      return operation;
     }
     el.connNote.textContent = 'Инструкциите и приложенията се пазят в общата база.';
-    el.refreshBtn.style.display = ''; el.refreshBtn.addEventListener('click', () => refresh().catch(() => {}));
-    watch('package-instructions', refresh, cfg.isBusy);
+    el.refreshBtn.style.display = ''; el.refreshBtn.addEventListener('click', () => refresh({reloadAssets:true}).catch(() => {}));
+    // File changes can leave the index unchanged; invalidate attachment caches.
+    watch('package-instructions', () => refresh({reloadAssets:true}), cfg.isBusy);
     return {init: () => refresh().catch(() => {}), refreshFromDisk: refresh, get dirHandle() { return initialized ? handle : null; }};
   }
   const roleLabels = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
@@ -301,6 +357,7 @@ const HubServer = (() => {
     }
     const taskBadges = [];
     let taskCountSequence = 0;
+    let taskCountRead = null;
     if (can('canViewTasks')) {
       for (const link of document.querySelectorAll('a[href="/tasks"],a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
         const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
@@ -311,20 +368,25 @@ const HubServer = (() => {
       document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTaskCount(); });
       refreshTaskCount();
     }
-    async function refreshTaskCount() {
-      if (!taskBadges.length) return;
+    function refreshTaskCount() {
+      if (!taskBadges.length || document.hidden) return Promise.resolve();
+      if (taskCountRead) return taskCountRead;
       const sequence = ++taskCountSequence;
-      try {
+      const operation = (async () => { try {
         const {count} = await json('/api/tasks/summary');
         if (sequence !== taskCountSequence) return;
         for (const badge of taskBadges) {
-          badge.textContent = String(count); badge.hidden = count === 0;
+          if (badge.textContent !== String(count)) badge.textContent = String(count);
+          if (badge.hidden !== (count === 0)) badge.hidden = count === 0;
           const label = (can('canReviewTasks') && !can('canReportTasks') ? 'Задачи за проверка:' : 'Чакащи задачи:') + ' ' + count;
-          badge.setAttribute('aria-label', label); badge.title = label;
+          if (badge.title !== label) { badge.setAttribute('aria-label', label); badge.title = label; }
         }
       } catch {
         if (sequence === taskCountSequence) for (const badge of taskBadges) badge.hidden = true;
-      }
+      } })();
+      taskCountRead = operation;
+      operation.finally(() => { if (taskCountRead === operation) taskCountRead = null; }).catch(() => {});
+      return operation;
     }
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});

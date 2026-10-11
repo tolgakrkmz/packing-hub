@@ -351,7 +351,7 @@ async function saveWithFreshData(mutator){
   personnelSaving = true;
   let before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
   try {
-    if(sync.fileHandle) await sync.refreshFromDisk();
+    if(sync.fileHandle) await sync.refreshFromDisk({fresh:true});
     before = deepClone({schemaVersion:SCHEMA_VERSION,employees,settings,moveLog});
     await mutator();
     await sync.commitData();

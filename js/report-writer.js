@@ -64,7 +64,7 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
         const result = await connection.commitOperation(operation);
         setData(result.data); confirmation = result.message;
       } else {
-        if(connection.fileHandle) await connection.refreshFromDisk();
+        if(connection.fileHandle) await connection.refreshFromDisk({fresh:true});
         before = clone(getData());
         const next = change(clone(before));
         if(next) {

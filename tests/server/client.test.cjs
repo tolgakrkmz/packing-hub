@@ -5,13 +5,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function client() {
-  let loaded, events, fetchData = async () => response(1);
+  let events, fetchData = async () => response(1), renders = 0;
+  const callbacks = new Map();
   const element = () => ({append() {}, setAttribute() {}, addEventListener() {}, hidden: false});
   const context = vm.createContext({
     HubPermissions: require('../../js/permission-model.js'),
     window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}},
     location: {pathname: '/production-log'},
-    document: {addEventListener: (_, callback) => { loaded = callback; }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
+    document: {hidden:false, addEventListener: (name, callback) => { if (!callbacks.has(name)) callbacks.set(name,[]); callbacks.get(name).push(callback); }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },
     EventSource: class { constructor() { events = new Map(); } addEventListener(name, callback) { events.set(name, callback); } },
     registerConnectionPanel: () => () => {},
@@ -21,9 +22,9 @@ function client() {
   const hub = vm.runInContext('HubServer', context);
   const accepted = [];
   let busy = false;
-  const sync = hub.fileSync({suggestedFileName: 'production-log.json', elements: {connDot: element(), connText: element()}, render() {}, onConnect: value => accepted.push(value.value), onRefresh: value => accepted.push(value.value), isBusy: () => busy});
-  loaded();
-  return {sync, accepted, fetching: callback => { fetchData = callback; }, busy: value => { busy = value; }, emit: () => events.get('change')({data: JSON.stringify({module: 'production-log'})})};
+  const sync = hub.fileSync({suggestedFileName: 'production-log.json', elements: {connDot: element(), connText: element()}, render() { renders++; }, onConnect: value => accepted.push(value.value), onRefresh: value => accepted.push(value.value), isBusy: () => busy});
+  for (const callback of callbacks.get('DOMContentLoaded')) callback();
+  return {sync, hub, accepted, get renders() { return renders; }, fetching: callback => { fetchData = callback; }, busy: value => { busy = value; }, visibility: hidden => { context.document.hidden = hidden; for (const callback of callbacks.get('visibilitychange') || []) callback(); }, emit: (module = 'production-log') => events.get('change')({data: JSON.stringify({module})})};
 }
 function response(value) { return {ok: true, json: async () => ({revision: value, data: {value}})}; }
 test('a change received during a slow refresh triggers another read instead of leaving older data on screen', async () => {
@@ -48,7 +49,38 @@ test('an overlapping live read does not discard the explicit review snapshot or 
   let release, reads = 0;
   c.fetching(() => ++reads === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response(3)));
   const review = c.sync.refreshFromDisk();
-  await c.sync.refreshFromDisk(); release(response(2));
+  await c.sync.refreshFromDisk({fresh:true}); release(response(2));
   assert.equal((await review).revision,2);
   assert.deepEqual(c.accepted,[1,3]);
+});
+test('concurrent refreshes share one request and unchanged snapshots skip acceptance and render', async () => {
+  const c = client(); await c.sync.init();
+  let release, reads = 0;
+  c.fetching(() => { reads++; return new Promise(resolve => { release = resolve; }); });
+  const first = c.sync.refreshFromDisk(), second = c.sync.refreshFromDisk();
+  assert.equal(first,second); release(response(1)); await Promise.all([first,second]);
+  assert.equal(reads,1); assert.deepEqual(c.accepted,[1]); assert.equal(c.renders,1);
+  c.fetching(async () => response(2)); await c.sync.refreshFromDisk();
+  assert.deepEqual(c.accepted,[1,2]); assert.equal(c.renders,2);
+});
+test('hidden-page events make no reads and visible resume accepts the latest snapshot', async () => {
+  const c = client(); await c.sync.init(); let reads = 0;
+  c.fetching(async () => { reads++; return response(3); });
+  c.visibility(true); c.emit(); c.emit(); await tick(); assert.equal(reads,0);
+  c.visibility(false); await tick(); assert.equal(reads,1); assert.deepEqual(c.accepted,[1,3]);
+});
+test('a stale failed request cannot turn a newer connection off', async () => {
+  const c = client(); await c.sync.init(); let reject;
+  c.fetching(() => new Promise((_, fail) => { reject = fail; }));
+  const stale = c.sync.refreshFromDisk();
+  c.fetching(async () => response(2)); await c.sync.refreshFromDisk({fresh:true});
+  reject(new Error('Fictional connection failure')); await assert.rejects(stale);
+  assert.equal(c.sync.isReady,true); assert.deepEqual(c.accepted,[1,2]);
+});
+test('one callback watching multiple modules shares its queue and retains a change during reading', async () => {
+  const c = client(); let reads = 0, release;
+  const refresh = () => { reads++; return reads === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve(); };
+  c.hub.watch('demo-first',refresh); c.hub.watch('demo-second',refresh); c.hub.watch('demo-first',refresh);
+  c.emit('demo-first'); c.emit('demo-second'); c.emit('demo-first');
+  assert.equal(reads,1); release(); await tick(); assert.equal(reads,2);
 });
