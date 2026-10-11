@@ -94,27 +94,27 @@ test('export permission gates every supported download, retains viewing and reco
 });
 test('the transfer screen requires import or export rights; the legacy production URL keeps import authorization', async t => {
   const {base, login, request, change} = await setup(t);
-  assert.equal((await fetch(base + '/data-import.html', {redirect:'manual'})).status, 302);
+  assert.equal((await fetch(base + '/data-import', {redirect:'manual'})).status, 302);
   for (const role of ['admin','operator','observer']) {
     const user = await login(role);
-    for (const method of ['GET','HEAD']) assert.equal((await request('/data-import.html', user, method)).status, 200);
-    const legacy = await request('/production-import.html', user);
+    for (const method of ['GET','HEAD']) assert.equal((await request('/data-import', user, method)).status, 200);
+    const legacy = await request('/production-import', user);
     assert.equal(legacy.status, role === 'admin' ? 302 : 403);
-    if (role === 'admin') assert.equal(legacy.headers.get('location'), '/data-import.html#production');
+    if (role === 'admin') assert.equal(legacy.headers.get('location'), '/data-import#production');
   }
   const admin = await login(), operator = await login('operator');
   await change(admin, operator, {canExportReports:false});
   const denied = await login('operator');
-  assert.equal((await request('/data-import.html', denied)).status, 403);
-  assert.equal((await request('/data-import.html', denied, 'HEAD')).status, 403);
+  assert.equal((await request('/data-import', denied)).status, 403);
+  assert.equal((await request('/data-import', denied, 'HEAD')).status, 403);
   await change(admin, admin, {canExportReports:false});
   const importOnly = await login();
-  assert.equal((await request('/data-import.html', importOnly)).status, 200);
+  assert.equal((await request('/data-import', importOnly)).status, 200);
   assert.equal((await request('/api/export/production-log', importOnly)).status, 403);
-  assert.equal((await request('/production-import.html', importOnly)).status, 302);
+  assert.equal((await request('/production-import', importOnly)).status, 302);
   await change(importOnly, importOnly, {canImportData:false, canExportReports:false});
   const neither = await login();
-  assert.equal((await request('/data-import.html', neither)).status, 403);
+  assert.equal((await request('/data-import', neither)).status, 403);
 });
 test('report creation and correction rights are independent and cannot grant operator settings or personnel access', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), original = await login('operator');
@@ -138,8 +138,8 @@ test('restricted administrators retain export access while every import stage st
   const source = {documents: {'production-log': {entries: [entry('demo-import')]}}, files: [], includeSettings: false};
   const id = (await (await request('/api/import/batches', admin, 'POST', source)).json()).id;
   await change(admin, admin, {canImportData: false}); const restricted = await login();
-  assert.equal((await request('/data-import.html', restricted)).status, 200);
-  assert.equal((await request('/production-import.html', restricted)).status, 403);
+  assert.equal((await request('/data-import', restricted)).status, 200);
+  assert.equal((await request('/production-import', restricted)).status, 403);
   for (const [route, method, data] of [
     ['/api/import/batches', 'POST', source], ['/api/import/batches/' + id + '/preview', 'POST', {}],
     ['/api/import/batches/' + id + '/apply', 'POST', {token: 'fictional'}], ['/api/import/batches/' + id + '/files/0', 'PUT', {}],
@@ -182,20 +182,20 @@ test('personnel is administrator-only and statistics is administrator/observer-o
   const {login, request} = await setup(t);
   const admin = await login(), operator = await login('operator'), observer = await login('observer');
   for (const user of [operator, observer]) {
-    for (const route of ['/personnel.html', '/personnel.html?role=admin', '/api/data/personnel', '/api/files?path=data%2Fpersonnel.json', '/api/files?path=personnel.json']) {
+    for (const route of ['/personnel', '/personnel?role=admin', '/api/data/personnel', '/api/files?path=data%2Fpersonnel.json', '/api/files?path=personnel.json']) {
       assert.equal((await request(route, user)).status, 403);
     }
-    assert.equal((await request('/personnel.html', user, 'HEAD')).status, 403);
+    assert.equal((await request('/personnel', user, 'HEAD')).status, 403);
     assert.equal((await request('/api/data/personnel', user, 'PUT', {employees: []}, {'If-Match': '"1"'})).status, 403);
   }
   for (const user of [admin, observer]) {
-    assert.equal((await request('/statistics.html', user)).status, 200);
+    assert.equal((await request('/statistics', user)).status, 200);
     assert.equal((await request('/api/statistics/workforce', user)).status, 200);
     assert.equal((await request('/api/statistics/workforce', user, 'POST', {})).status, 405);
   }
-  for (const route of ['/statistics.html', '/statistics.html?role=observer', '/api/statistics/workforce']) assert.equal((await request(route, operator)).status, 403);
-  assert.equal((await request('/statistics.html', operator, 'HEAD')).status, 403);
-  assert.equal((await request('/personnel.html', admin)).status, 200);
+  for (const route of ['/statistics', '/statistics?role=observer', '/api/statistics/workforce']) assert.equal((await request(route, operator)).status, 403);
+  assert.equal((await request('/statistics', operator, 'HEAD')).status, 403);
+  assert.equal((await request('/personnel', admin)).status, 200);
   assert.equal((await request('/api/data/personnel', admin)).status, 200);
 });
 test('pair selection uses a minimal active-packer roster and workforce counts disclose no personnel records', async t => {

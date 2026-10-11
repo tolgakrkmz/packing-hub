@@ -10,7 +10,7 @@ async function exerciseTaskMultiplePhotos({admin, hub, base, device, expect, set
   setTime('2026-12-01T15:00:00+02:00');
   const owner = await hub.auth.create('demo-multi-photo-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
   const chief = await device(owner.username, true);
-  await admin.goto(base + '/tasks.html'); await admin.locator('[data-hub-language=bg]').click(); await admin.locator('#newTask').click();
+  await admin.goto(base + '/tasks'); await admin.locator('[data-hub-language=bg]').click(); await admin.locator('#newTask').click();
   await admin.locator('#taskTitle').fill('Fictional three-photo task'); await admin.locator('#taskOwner').selectOption(String(owner.id));
   await admin.locator('#taskKind').selectOption('global'); await admin.locator('#taskDueDate').fill('2026-12-03'); await admin.locator('#taskDueTime').fill('17:00');
   await admin.locator('#problemPhoto').setInputFiles([image(1), image(2)]); await expect(admin.locator('#problemPhotoInfo')).toHaveText('Снимките са готови за запис.');
@@ -31,7 +31,7 @@ async function exerciseTaskMultiplePhotos({admin, hub, base, device, expect, set
   await admin.locator('#problemPhoto').setInputFiles(image(5)); await expect(admin.locator('#problemPhotoInfo')).toHaveText('Снимките са готови за запис.');
   await admin.locator('#editReason').fill('Fictional revised three-photo set'); await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   assert.equal(task().problemPhotos.length, 3); assert.equal(task().events.at(-1).snapshot.problemPhotos.length, 3);
-  await chief.goto(base + '/tasks.html'); await chief.locator('[data-view=global]').click();
+  await chief.goto(base + '/tasks'); await chief.locator('[data-view=global]').click();
   const card = chief.locator('.task-card').filter({hasText: 'Fictional three-photo task'});
   await expect(card.locator('.task-photo')).toHaveCount(3);
   await card.getByRole('button', {name: 'Отвори снимката'}).nth(2).click(); await expect(chief.locator('#photoViewerTitle')).toHaveText('Проблем 3');

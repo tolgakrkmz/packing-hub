@@ -104,7 +104,7 @@ window.HubNotifications = (() => {
     dialog.addEventListener('cancel', () => { prompt.defer(); refreshDeviceUI(); });
     never.addEventListener('click', () => { prompt.never(); dialog.close(); refreshDeviceUI(); });
     accept.addEventListener('click', async () => {
-      if (installFirst || permission() === 'denied') { dialog.close(); location.assign('/notifications.html#settings'); return; }
+      if (installFirst || permission() === 'denied') { dialog.close(); location.assign('/notifications#settings'); return; }
       accept.disabled = true;
       try { await enable(); if (subscribed) dialog.close(); else { copy.textContent = hint(); status.textContent = 'Можеш да включиш известията по-късно от „Настройки“.'; accept.hidden = true; } }
       catch { status.textContent = 'Включването не успя. Опитай по-късно от „Настройки“.'; prompt.defer(); }
@@ -192,7 +192,7 @@ window.HubNotifications = (() => {
   }
   document.addEventListener('DOMContentLoaded', async () => {
     if (!HubServer.can('canViewNotifications')) return;
-    const link = el('a', '', 'notification-bell'); link.href = '/notifications.html'; link.setAttribute('aria-label', 'Известия'); link.title = 'Известия';
+    const link = el('a', '', 'notification-bell'); link.href = '/notifications'; link.setAttribute('aria-label', 'Известия'); link.title = 'Известия';
     // Local bell vector uses no external assets.
     link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/></svg>';
     badge = el('span', '', 'notification-count'); badge.hidden = true; link.append(badge); document.querySelector('.server-links')?.append(link);

@@ -7,7 +7,7 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
   setTime('2026-12-01T15:00:00+02:00');
   const owner = await hub.auth.create('demo-photo-browser-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
   const chief = await device(owner.username, true);
-  await admin.goto(base + '/tasks.html'); await admin.locator('#newTask').click();
+  await admin.goto(base + '/tasks'); await admin.locator('#newTask').click();
   await admin.locator('#taskTitle').fill('Fictional photo browser problem'); await admin.locator('#taskOwner').selectOption(String(owner.id));
   await admin.locator('#taskKind').selectOption('global'); await admin.locator('#taskDueDate').fill('2026-12-03'); await admin.locator('#taskDueTime').fill('17:00');
   await admin.locator('#saveTask').click(); await expect(admin.locator('#editorFeedback')).toHaveText('Добави снимка преди запис.');
@@ -28,7 +28,7 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
   await admin.unroute('**/api/tasks'); await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   const items = hub.tasks.list(owner).items; assert.equal(items.length, 1);
   const item = items[0]; assert.equal(item.problemPhoto.width, 1280); assert.ok(item.problemPhoto.bytes <= 300 * 1024);
-  await chief.goto(base + '/tasks.html'); await chief.locator('[data-view=global]').click();
+  await chief.goto(base + '/tasks'); await chief.locator('[data-view=global]').click();
   const card = chief.locator('.task-card').filter({hasText: 'Fictional photo browser problem'});
   await card.getByRole('button', {name: 'Отвори снимката'}).click();
   await expect(chief.locator('#taskPhotoViewer')).toBeVisible();

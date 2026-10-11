@@ -29,6 +29,26 @@ targets module opens directly without a role login.
 
 ## Shared server mode
 
+### Page addresses
+
+The server home page uses `/`; screens use paths such as `/production-log`,
+`/statistics`, `/tasks`, `/admin-panel` and `/login`. Direct navigation and reload
+work on every approved screen. Old `.html` bookmarks redirect to the clean path
+with their query strings and browser fragments retained. A trailing slash on a
+known screen also redirects to its canonical path. The former production-import
+screen continues to open `/data-import#production`.
+
+Page permissions and sign-in checks apply to both URL forms. Redirects do not
+create duplicate activity visits. Static assets and APIs keep their existing
+paths, and unknown routes return 404. The server rewrites page links when serving
+HTML; offline HTML files retain their working local links. Deploy the updated
+server and client together; no database migration or data-file changes are needed.
+
+```sh
+node --test tests/server/routes.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --routes-only
+```
+
 ### Tasks for shift supervisors
 
 The **Tasks** tile is controlled by the account's **View Tasks** permission in

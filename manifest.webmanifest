@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Package Hub",
   "short_name": "Package Hub",
-  "start_url": "/notifications.html",
+  "start_url": "/notifications",
   "scope": "/",
   "display": "standalone",
   "background_color": "#15171b",

@@ -7,13 +7,13 @@ async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
   const unused = await hub.auth.create('demo-activity-unused','Fictional-password-123','observer');
   const user = hub.auth.list().find(user => user.username === 'demo-admin');
   const page = await device(operator.username,true);
-  await expect(page.locator('.server-links a[href="/activity-log.html"]')).toHaveCount(0);
-  await page.goto(base+'/production-log.html');
+  await expect(page.locator('.server-links a[href="/activity-log"]')).toHaveCount(0);
+  await page.goto(base+'/production-log');
   await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);
-  await page.goto(base+'/pair-targets.html');
+  await page.goto(base+'/pair-targets');
   await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
   const lastVisit = hub.store.db.prepare("SELECT at FROM audit WHERE user_id=? AND action='visit' ORDER BY id DESC LIMIT 1").get(operator.id).at;
-  await page.locator('.server-logout').click(); await expect(page).toHaveURL(base+'/login.html');
+  await page.locator('.server-logout').click(); await expect(page).toHaveURL(base+'/login');
   // Known fictional metadata lets the UI exercise more than one page and an old period.
   for (let i=0;i<58;i++) hub.store.audit(operator,'export','production-log');
   const old = Date.now()-100*86400000;
@@ -76,7 +76,7 @@ async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
     const username = 'demo-activity-denied-'+role;
     await hub.auth.create(username,'Fictional-password-123',role);
     const denied = await device(username);
-    const response = await denied.goto(base+'/activity-log.html'); assert.equal(response.status(),403);
+    const response = await denied.goto(base+'/activity-log'); assert.equal(response.status(),403);
     const status = await denied.context().request.get(base+'/api/admin/activity'); assert.equal(status.status(),403);
     await denied.context().close();
   }

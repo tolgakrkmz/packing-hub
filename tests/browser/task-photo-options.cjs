@@ -9,7 +9,7 @@ async function exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTi
   setTime('2026-12-01T15:00:00+02:00');
   const owner = await hub.auth.create('demo-photo-option-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
   const chief = await device(owner.username, true);
-  await admin.goto(base + '/tasks.html'); await admin.locator('[data-hub-language=bg]').click();
+  await admin.goto(base + '/tasks'); await admin.locator('[data-hub-language=bg]').click();
   await admin.locator('#newTask').click();
   const check = admin.getByRole('checkbox', {name: 'Изисква снимки', exact: true});
   await expect(check).toBeChecked(); await expect(admin.locator('#problemPhotoFields')).toBeVisible();
@@ -47,7 +47,7 @@ async function exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTi
   await uploadPhoto(admin, 'problem', expect);
   await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   assert.equal(task().requiresPhotos, true);
-  await chief.goto(base + '/tasks.html'); await chief.locator('[data-view=global]').click();
+  await chief.goto(base + '/tasks'); await chief.locator('[data-view=global]').click();
   const card = chief.locator('.task-card').filter({hasText: 'Fictional optional-photo global'});
   await expect(card).toContainText('Изисква снимки');
   await card.getByRole('button', {name: 'Отчети', exact: true}).click();

@@ -10,7 +10,7 @@ function client() {
   const context = vm.createContext({
     HubPermissions: require('../../js/permission-model.js'),
     window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}},
-    location: {pathname: '/production-log.html'},
+    location: {pathname: '/production-log'},
     document: {addEventListener: (_, callback) => { loaded = callback; }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },
     EventSource: class { constructor() { events = new Map(); } addEventListener(name, callback) { events.set(name, callback); } },

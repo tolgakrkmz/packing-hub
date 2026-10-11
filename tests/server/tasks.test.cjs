@@ -70,7 +70,7 @@ test('task badges count only work awaiting the account, and expose no task conte
 test('task viewing defaults to admin and supervisors; only admin assigns by default; supervisors see their assignments', async t => {
   const s = await setup(t), operator = await s.login('demo-operator'), observer = await s.login('demo-observer');
   for (const user of [operator, observer]) {
-    for (const route of ['/tasks.html', '/api/tasks']) assert.equal((await s.request(route, user)).status, 403);
+    for (const route of ['/tasks', '/api/tasks']) assert.equal((await s.request(route, user)).status, 403);
     assert.equal((await s.request('/api/tasks', user, 'POST', s.payload())).status, 403);
   }
   const id = await s.create();
@@ -91,7 +91,7 @@ test('explicit assignment grants shift, global and recurring creation and previe
     const user = await s.login('demo-' + role);
     assert.equal(user.user.role, role); assert.equal(user.user.taskSupervisor, false);
     assert.equal(user.user.permissions.canAssignTasks, true); assert.equal(user.user.permissions.canViewTasks, true);
-    assert.equal((await s.request('/tasks.html', user)).status, 200);
+    assert.equal((await s.request('/tasks', user)).status, 200);
     const roster = (await s.list(user)).supervisors;
     assert.ok(roster.some(person => person.id === s.chief.user.id));
     for (const person of roster) assert.deepEqual(Object.keys(person).sort(), ['id', 'team', 'username']);
@@ -109,7 +109,7 @@ test('explicit assignment grants shift, global and recurring creation and previe
     assert.equal(created.events[0].actor.id, user.user.id);
     for (const action of ['approve', 'return', 'edit', 'cancel', 'reopen', 'report', 'progress']) assert.equal((await s.change(ids[1], user, {action, note: 'Fictional forbidden action', status: 'completed'})).status, 403);
     assert.equal((await s.change(ids[2], user, {action: 'stop', note: 'Fictional forbidden stop'}, 1, true)).status, 403);
-    for (const route of ['/api/accounts', '/accounts.html', '/api/data/personnel']) assert.equal((await s.request(route, user)).status, 403);
+    for (const route of ['/api/accounts', '/accounts', '/api/data/personnel']) assert.equal((await s.request(route, user)).status, 403);
     assert.equal((await s.request('/api/accounts/' + user.user.id, user, 'PATCH', {role: 'admin', permissions: {canAssignTasks: true}})).status, 403);
     assert.equal((await s.request('/api/tasks', user, 'POST', s.payload({assigneeId: s.admin.user.id}))).status, 400);
     assert.equal((await s.request('/api/tasks', user, 'POST', s.payload(), {'X-CSRF-Token': 'fictional-wrong'})).status, 403);
@@ -162,7 +162,7 @@ test('assignment restrictions and revocation block new and in-flight creation wh
   assert.deepEqual((await s.list(restricted)).items.map(item => item.id), [id]);
   await s.hub.auth.update(user.user.id, {permissions: {canAssignTasks: true, canViewTasks: false}}, s.admin.user);
   const blocked = await s.login('demo-operator'); assert.equal(blocked.user.permissions.canAssignTasks, false);
-  for (const route of ['/tasks.html', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, blocked)).status, 403);
+  for (const route of ['/tasks', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, blocked)).status, 403);
   assert.equal((await s.request('/api/tasks', blocked, 'POST', s.payload())).status, 403);
   await s.hub.auth.update(s.admin.user.id, {permissions: {canAssignTasks: false}}, s.admin.user);
   const admin = await s.login();
@@ -180,7 +180,7 @@ test('explicit viewing grants a read-only overview without supervisor, assignmen
     assert.equal((await s.request('/api/accounts/' + original.user.id, s.admin, 'PATCH', {permissions: {canViewTasks: true}})).status, 200);
     const reader = await s.login('demo-' + role);
     assert.equal(reader.user.taskSupervisor, false);
-    for (const method of ['GET', 'HEAD']) assert.equal((await s.request('/tasks.html', reader, method)).status, 200);
+    for (const method of ['GET', 'HEAD']) assert.equal((await s.request('/tasks', reader, method)).status, 200);
     const view = await s.list(reader);
     assert.deepEqual(view.items, before.items); assert.deepEqual(view.schedules, before.schedules); assert.deepEqual(view.supervisors, []);
     assert.equal((await s.request('/api/tasks', reader, 'POST', s.payload())).status, 403);
@@ -202,8 +202,8 @@ test('disabling task viewing revokes sessions and blocks supervisor reads, repor
   assert.equal((await s.request('/api/tasks', s.chief)).status, 401);
   const denied = await s.login('demo-chief-a');
   assert.equal(denied.user.taskSupervisor, true); assert.equal(denied.user.taskTeam, 'А');
-  for (const route of ['/tasks.html', '/tasks.html?role=admin', '/api/tasks']) assert.equal((await s.request(route, denied)).status, 403);
-  assert.equal((await s.request('/tasks.html', denied, 'HEAD')).status, 403);
+  for (const route of ['/tasks', '/tasks?role=admin', '/api/tasks']) assert.equal((await s.request(route, denied)).status, 403);
+  assert.equal((await s.request('/tasks', denied, 'HEAD')).status, 403);
   assert.equal((await s.change(id, denied, {action: 'report', status: 'completed', note: ''})).status, 403);
   assert.ok(!(await s.list()).supervisors.some(person => person.id === denied.user.id));
   assert.equal((await s.request('/api/tasks', s.admin, 'POST', s.payload())).status, 400);
@@ -224,7 +224,7 @@ test('an explicit restriction also gates admin task creation and previews while 
   const s = await setup(t);
   await s.hub.auth.update(s.admin.user.id, {permissions: {canViewTasks: false}}, s.admin.user);
   const denied = await s.login();
-  for (const route of ['/tasks.html', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, denied)).status, 403);
+  for (const route of ['/tasks', '/api/tasks', '/api/tasks/preview?date=2026-12-01&assigneeId=' + s.chief.user.id]) assert.equal((await s.request(route, denied)).status, 403);
   assert.equal((await s.request('/api/tasks', denied, 'POST', s.payload())).status, 403);
   assert.equal((await s.request('/api/accounts', denied)).status, 200);
   assert.throws(() => s.hub.tasks.create(s.payload(), denied.user), error => error.status === 403);

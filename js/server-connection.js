@@ -1,7 +1,7 @@
 /* Loaded only by the authenticated server. The offline file-based application remains independent. */
 const HubServer = (() => {
   const boot = window.HUB_SERVER_BOOT;
-  const currentModule = location.pathname.split('/').pop().replace(/\.html$/, '');
+  const currentModule = location.pathname.split('/').pop().replace(/\.html$/, '') || 'index';
   const can = key => {
     const report = HubPermissions.reports[currentModule];
     const resolved = report && ['canCreateReports', 'canEditReports'].includes(key) ? report[key === 'canCreateReports' ? 'create' : 'edit'] : key;
@@ -24,7 +24,7 @@ const HubServer = (() => {
     const response = await fetch(url, {...options, headers, credentials: 'same-origin', cache: 'no-store'});
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      if (response.status === 401) location.assign('/login.html');
+      if (response.status === 401) location.assign('/login');
       const error = new Error(messages[data.error] || 'Връзката със сървъра е прекъсната. Опитай отново.');
       error.code = response.status === 409 && data.error === 'CONFLICT' ? 'REPORT_CONFLICT' : data.error;
       error.status = response.status;
@@ -53,9 +53,9 @@ const HubServer = (() => {
   }
   function fileSync(cfg) {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
-    const page = location.pathname.split('/').pop();
-    const readURL = kind === 'personnel' && page === 'pair-targets.html' ? '/api/pair-roster'
-      : kind === 'personnel' && page === 'statistics.html' ? '/api/statistics/workforce' : page === 'statistics.html' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
+    const page = currentModule;
+    const readURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
+      : kind === 'personnel' && page === 'statistics' ? '/api/statistics/workforce' : page === 'statistics' && HubPermissions.reports[kind] ? '/api/statistics/data/' + kind : '/api/data/' + kind;
     let ready = false, initialized = false, revision = 0, sequence = 0;
     const handle = {name: 'Обща база'};
     const el = cfg.elements;
@@ -156,14 +156,14 @@ const HubServer = (() => {
   }
   const roleLabels = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
   function applyPermissions() {
-    const module = location.pathname.split('/').pop();
+    const module = currentModule;
     let selector = '';
     for (const group of HubPermissions.groups.filter(group => group.module)) {
-      if (!canViewModule(group.module)) selector += ',a[href="' + group.module + '.html"],a[href="/' + group.module + '.html"]';
+      if (!canViewModule(group.module)) selector += ',a[href="' + group.module + '.html"],a[href="/' + group.module + '.html"],a[href="/' + group.module + '"]';
     }
-    if (!can('canManagePersonnel') && module === 'personnel.html') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
-    if (!can('canManageInstructions') && module === 'package-instructions.html') selector += ',#addBtn,#bulkBtn,.cat-select';
-    if (['production-log.html', 'line-downtime.html'].includes(module)) {
+    if (!can('canManagePersonnel') && module === 'personnel') selector += ',#addPersonBtn,#settingsBtn,[data-edit-person]';
+    if (!can('canManageInstructions') && module === 'package-instructions') selector += ',#addBtn,#bulkBtn,.cat-select';
+    if (['production-log', 'line-downtime'].includes(module)) {
       if (!can('canCreateReports')) selector += ',#saveBtn';
       if (!can('canCreateReports') && !can('canEditReports') && !can(HubPermissions.reports[currentModule].settings)) selector += ',#retrySaveBtn';
       if (!can('canEditReports')) selector += ',.del-btn';
@@ -172,14 +172,14 @@ const HubServer = (() => {
         selector += ',#reasonsAdminPanel';
       }
     }
-    if (module === 'production-log.html' && !can('canCreateReports')) {
+    if (module === 'production-log' && !can('canCreateReports')) {
       selector += ',#reportEntryPanel';
       const dateRow = document.getElementById('reportDateRow'), filter = document.getElementById('dayFilter');
       if (dateRow && filter && dateRow.parentElement !== filter) {
         filter.append(dateRow); filter.hidden = false;
       }
     }
-    if (module === 'pair-targets.html') {
+    if (module === 'pair-targets') {
       if (!can('canCreateReports')) selector += ',#addPairBtn,[data-action=edit],[data-action=cancel]';
       document.querySelectorAll('[data-action=report]').forEach(control => {
         if (!(control.dataset.reported === 'true' ? can('canEditReports') : can('canCreateReports')) && !control.hidden) control.hidden = true;
@@ -193,7 +193,7 @@ const HubServer = (() => {
     document.body.classList.add('server-mode');
     const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
     const top = document.createElement('div'); top.className = 'server-top';
-    const brand = document.createElement('a'); brand.className = 'hub-brand'; brand.href = '/index.html'; brand.setAttribute('translate', 'no');
+    const brand = document.createElement('a'); brand.className = 'hub-brand'; brand.href = '/'; brand.setAttribute('translate', 'no');
     const mark = document.createElement('img'); mark.src = '/assets/package-hub-mark.svg'; mark.alt = ''; mark.width = 44; mark.height = 44;
     const wordmark = document.createElement('span'); wordmark.className = 'hub-wordmark'; wordmark.textContent = 'Package ';
     const hubName = document.createElement('span'); hubName.className = 'brand-hub'; hubName.textContent = 'Hub'; wordmark.append(hubName); brand.append(mark, wordmark);
@@ -210,17 +210,17 @@ const HubServer = (() => {
       links.append(link);
       return link;
     };
-    const current = location.pathname.split('/').pop().replace(/\.html$/, '');
+    const current = currentModule;
     const reports = ['production-log', 'line-downtime', 'pair-targets'];
     const module = reports.includes(current) ? current : new URLSearchParams(location.search).get('module');
     const query = reports.includes(module) ? '?module=' + module : '';
     if (canViewModule('admin-panel')) {
-      const link = addLink('/admin-panel.html' + query, 'Админ панел');
+      const link = addLink('/admin-panel' + query, 'Админ панел');
       if (['system-status','accounts','activity-log','data-import','production-import'].includes(current)) link.setAttribute('aria-current', 'location');
     }
     tools.append(links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
-    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login.html'); };
+    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login'); };
     session.append(identity, state, logout); bar.append(top, tools);
     document.body.prepend(bar);
     // The language switch is initialized by i18n after the injected server script.
@@ -231,15 +231,15 @@ const HubServer = (() => {
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
     // The server emits this for normal session expiry too. Keep the phone's
     // opt-in; account revocation already removes its subscriptions server-side.
-    eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login.html'); });
+    eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login'); });
     eventSource.addEventListener('version', event => {
       if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
         const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
       }
       for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
     });
-    if (location.pathname === '/' || location.pathname.endsWith('/index.html')) {
-      const tasksLink = document.querySelector('a[href="tasks.html"]');
+    if (currentModule === 'index') {
+      const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
       if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
       document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
@@ -247,7 +247,7 @@ const HubServer = (() => {
     const taskBadges = [];
     let taskCountSequence = 0;
     if (can('canViewTasks')) {
-      for (const link of document.querySelectorAll('a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
+      for (const link of document.querySelectorAll('a[href="/tasks"],a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
         const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
         badge.setAttribute('role', 'status'); (link.querySelector('h2') || link).append(badge); taskBadges.push(badge);
       }
