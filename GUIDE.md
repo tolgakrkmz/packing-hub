@@ -62,7 +62,7 @@ a rejected change and a conflict. Drafts remain in the open page; closing or
 reloading the page does not provide durable offline draft storage.
 
 Deploy the reviewed server and HTML/CSS/JS together. Startup adds private SQLite
-version and receipt tables and initializes versions for existing reports; it
+version, receipt and report-history tables and initializes versions for existing reports; it
 preserves report data and accepts older backups through additive migration.
 Imports and legacy whole-module writes update the same record versions. Exported
 JSON and offline files keep their existing format. Keep live data files local.
@@ -1166,22 +1166,58 @@ node scripts/run-server-browser-tests.cjs --headless --activity-only
 
 ## Administrator panel
 
-Accounts with access to any administration module have one **Admin panel** link in the shared header. The panel
-contains cards for Accounts, User activity, System status, and Import / export.
-Additional administration modules belong here. Any role can open the panel when
-its effective permissions allow at least one card, including direct GET and HEAD
-requests. Individual module URLs require their corresponding viewing flag. The header highlights
-the panel while visiting one of its modules.
+Accounts with administrative viewing rights, import rights, report-correction
+rights, or an explicitly delegated export grant have one **Admin panel** link.
+The panel contains Accounts, User activity, System status, Import / export and
+Report history. Each card and its API enforce their own permissions.
+Default operators and observers retain a direct **Export reports** entry;
+their normal export permission does not grant access to the admin panel.
+A denied admin-panel GET/HEAD returns HTTP 403 and a friendly BG/EN page in the
+application design, including clean, legacy and trailing-slash addresses.
+Unauthenticated requests still redirect to login.
 
-The transfer card appears only when the account has import or export
-permission. Its description reflects those permissions. Opening it from a
-report module via the panel keeps that module selected for export. Operators
-and observers also use this single panel entry when permitted.
+The transfer card appears only when the account has import or export permission.
+Opening the transfer or history card from a report module keeps that module
+selected. The shared header highlights the admin panel while visiting its modules.
 
-Focused browser verification:
+### Private report history and recoverable deletion
+
+In server mode, **Admin panel → Report history** shows the versions of one
+production, downtime or pair record. Access requires that module's viewing and
+correction permissions. Operators and observers without an explicit correction
+grant cannot read history through either the screen or API. Editing an existing
+production/downtime report or pair plan, correcting a completed pair report, deleting and
+restoring require a nonblank reason of at most 1000 characters. Ordinary first
+pair reporting and plan cancellation keep their existing permissions and reason
+rules. The dialog preserves the reason and operation ID across interrupted retries.
+
+SQLite commits the report, its previous/new snapshots, version, account, time,
+reason, technical audit metadata and receipt in the same transaction. Snapshots
+and correction reasons never enter the general activity log, report exports or
+SSE messages. Existing records begin with their current version; past corrections
+before installation cannot be reconstructed. The first new correction retains
+the prior content. History is included in private database backups.
+
+Deleted IDs are reserved. Create, whole-document PUT and imports cannot silently
+reuse them. Restore checks the deleted record's version and correction rights,
+uses a protected snapshot and adds the record once. A newer live record or a
+stale version returns a conflict; refresh and review are required before a new
+attempt. Pair restores preserve historical members and cancelled plans without
+replanning against today's roster; active membership conflicts in the same shift
+are rejected. Statistics read only the live document, so historical snapshots and
+repeated receipts do not double-count results. Bulk imports append new records
+and preserve existing report content; conflicting IDs remain refused.
+
+Deploy the reviewed server and HTML/CSS/JS together and preserve local live data.
+Offline JSON mode keeps its existing format and does not provide protected server
+history. Period locking and approval workflows are outside this feature.
+
+Verification with fictional fixtures:
 
 ```sh
 node scripts/run-server-browser-tests.cjs --headless --admin-panel-only
+node --test tests/server/report-history.test.cjs tests/server/imports.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --report-history-only
 node scripts/run-server-browser-tests.cjs --headless --permissions-only
 ```
 
