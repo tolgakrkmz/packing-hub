@@ -15,9 +15,12 @@ const fixtures = {
   'data/profiles/demo-profile-001/instruction.txt':'098345f15b33c99a28ac61eaf91c0dea8b809a4008602dc948c8cfa9dc4232fd',
   'js/employees-seed.js':'3d94d043f1918159e8e7fc4b39cdb93515c1531ebe16bfb9d80c30dad9ea71da'
 };
-// Only this exact, reviewed static SVG source is approved; no general image allowance.
+// Exact reviewed logo source and opaque PNG exports only; no general image allowance.
 const approvedAssets = {
-  'assets/package-hub-mark.svg':'9820e0a8deccf0562f38808c1a1a6599c3cba3147dc773fb368624049a5368b6'
+  'assets/package-hub-mark.svg':'9820e0a8deccf0562f38808c1a1a6599c3cba3147dc773fb368624049a5368b6',
+  'assets/package-hub-icon-180.png':'fdcf72603402137747a8076504c30af102a29ce21e9af1e86f78c041c2591025',
+  'assets/package-hub-icon-192.png':'782f72e465dc23f10f4cf81fd5e7dadabfac357f6ae66b0fd36bd9ef651d9915',
+  'assets/package-hub-icon-512.png':'2374da93159431bba2ce0bc63037603dd6f7e98abce13681b5be1f78cd600b32'
 };
 const git = (args,cwd=root) => execFileSync('git',args,{cwd,maxBuffer:32*1024*1024});
 function privateTokens(sourceRoot) {
@@ -63,6 +66,11 @@ function inspect(file,buffer,tokens=[],mode='100644') {
     if(crypto.createHash('sha256').update(buffer).digest('hex') !== fixtures[file]) throw new Error('Approved demo fixture has changed: '+file);
   }
   if(Object.hasOwn(approvedAssets,file) && crypto.createHash('sha256').update(buffer).digest('hex') !== approvedAssets[file]) throw new Error('Approved static asset has changed: '+file);
+  // Binary logos are accepted only after the exact path, file mode and hash checks.
+  if(Object.hasOwn(approvedAssets,file) && file.endsWith('.png')) {
+    if(tokens.some(token => file.toLowerCase().includes(token))) throw new Error('Private source content detected in: '+file);
+    return;
+  }
   const text = buffer.toString('utf8');
   if(buffer.includes(0) || !Buffer.from(text,'utf8').equals(buffer)) throw new Error('Binary content is not approved: '+file);
   const lower = (file+'\n'+text).toLowerCase();

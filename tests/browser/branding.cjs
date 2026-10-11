@@ -5,7 +5,7 @@ const path = require('node:path');
 const {assertResponsive} = require('./responsive.cjs');
 const {openAdminModule} = require('./admin-panel.cjs');
 const password = 'Fictional-password-123';
-const pages = ['index', 'tasks', 'admin-panel', 'accounts', 'activity-log', 'system-status', 'data-import', 'production-import', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics'];
+const pages = ['index', 'tasks', 'admin-panel', 'accounts', 'activity-log', 'system-status', 'data-import', 'production-import', 'production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions', 'statistics', 'notifications'];
 
 async function exerciseBranding({admin, hub, base, device, expect, screenshotDir}) {
   console.log('RUN branded login, error feedback and logout');
@@ -41,11 +41,25 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     const icon = admin.locator('link[rel=icon]');
     await expect(icon).toHaveAttribute('type', 'image/svg+xml');
     await expect(icon).toHaveAttribute('href', /assets\/package-hub-mark\.svg$/);
+    await expect(admin.locator('link[rel=apple-touch-icon]')).toHaveAttribute('sizes', '180x180');
+    await expect(admin.locator('link[rel=apple-touch-icon]')).toHaveAttribute('href', 'assets/package-hub-icon-180.png');
+    await expect(admin.locator('link[rel=manifest]')).toHaveCount(1);
+    await expect(admin.locator('link[rel=manifest]')).toHaveAttribute('href', 'manifest.webmanifest');
   };
   await assertMark();
   const iconResponse = await admin.request.get(base + '/assets/package-hub-mark.svg');
   assert.equal(iconResponse.status(), 200);
   assert.match(iconResponse.headers()['content-type'], /^image\/svg\+xml/);
+  // Installation fetches run without an authenticated account on this login page.
+  const decoded = await admin.evaluate(async () => {
+    const manifest = await (await fetch(document.querySelector('link[rel=manifest]').href)).json();
+    const sources = [document.querySelector('link[rel=apple-touch-icon]').href, ...manifest.icons.map(icon => icon.src)];
+    return Promise.all(sources.map(async src => {
+      const image = new Image(); image.src = src; await image.decode();
+      return [image.naturalWidth, image.naturalHeight];
+    }));
+  });
+  assert.deepEqual(decoded, [[180, 180], [192, 192], [512, 512]]);
 
   console.log('RUN login and authenticated modules in BG/EN at 320–1440 px');
   for (const width of [320, 390, 768, 1440]) {

@@ -122,6 +122,15 @@ unconfigured, off and on states. Native permission is requested only after a
 button click. An already granted browser permission still needs explicit device
 opt-in after account revocation or a key change.
 
+Home Screen installation uses the same reviewed logo as an opaque 180 px PNG
+`apple-touch-icon` on every page, including login, plus 192/512 px PNG manifest
+icons. The notification worker also uses the public 192 px PNG. Ship `assets/`,
+the manifest, HTML and server changes together. After updating an existing iPhone
+installation that still shows the letter icon, remove that Home Screen app,
+add it again from Safari, open the new icon, sign in and enable notifications
+for that installation. Check the logo in both the Home Screen and a test notice
+on the actual phone; desktop browser tests cannot confirm iOS installation UI.
+
 After enabling a device, **Test notifications** sends a payload-free notice only
 to that owned device, at most once per 30 seconds. It does not create tasks,
 production reports or inbox rows. Provider acceptance is not proof of delivery;
