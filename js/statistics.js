@@ -78,7 +78,6 @@ const el = {
 
   dashboardActual: document.getElementById('dashboardActual'),
   dashboardBrak: document.getElementById('dashboardBrak'),
-  dashboardBrakKg: document.getElementById('dashboardBrakKg'),
   dashboardGoal: document.getElementById('dashboardGoal'),
   dashboardRemaining: document.getElementById('dashboardRemaining'),
 
@@ -147,12 +146,7 @@ function fmt(n) {
 }
 
 function fmtTons(kg) {
-  return (
-    (Number(kg) || 0) / 1000
-  ).toLocaleString('bg-BG', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
-  });
+  return StatisticsUnits.formatKg(kg);
 }
 
 function fmtHoursDecimal(h) {
@@ -1017,7 +1011,6 @@ function renderMonthlyDashboard() {
     )} т`;
 
   el.dashboardBrak.textContent = `${fmtTons(d.totalBrakKg)} т`;
-  el.dashboardBrakKg.textContent = `${fmt(d.totalBrakKg)} кг`;
 
   el.dashboardGoal.textContent =
     d.goalKg > 0
@@ -1082,7 +1075,7 @@ function renderMonthlyDashboard() {
     d.goalKg
   ) {
     el.dashboardRequired.textContent =
-      '0.0 т';
+      '0 т';
 
     el.dashboardRequiredSub.textContent =
       'целта вече е постигната';
@@ -1272,7 +1265,7 @@ function renderMonthlyTrendChart(
   const W = 920;
   const H = 235;
 
-  const pL = 52;
+  const pL = 80;
   const pR = 16;
   const pT = 14;
   const pB = 30;
@@ -2231,7 +2224,7 @@ function renderStackedBarChart(
 
   const H = 260;
 
-  const padLeft = 50;
+  const padLeft = 80;
   const padBottom = 34;
   const padTop = 14;
   const padRight = 10;
@@ -2467,16 +2460,16 @@ function renderTable(
 
     `<th>${escapeHtml(periodLabel)}</th>` +
 
-    '<th style="text-align:right">Тонаж</th>' +
+    '<th style="text-align:right">Тонаж (т)</th>' +
 
-    '<th style="text-align:right">Брак</th>' +
+    '<th style="text-align:right">Брак (т)</th>' +
 
     '<th style="text-align:right">% брак</th>' +
 
     SHIFT_ORDER
       .map(
         s =>
-          `<th style="text-align:right">${escapeHtml(s)}</th>`
+          `<th style="text-align:right">${escapeHtml(s)} (т)</th>`
       )
       .join('') +
 
@@ -2520,11 +2513,11 @@ function renderTable(
         </td>
 
         <td class="num">
-          ${fmt(row.tonnage)} кг
+          ${fmtTons(row.tonnage)} т
         </td>
 
         <td class="num">
-          ${fmt(row.brak)} кг
+          ${fmtTons(row.brak)} т
         </td>
 
         <td class="num">
@@ -2537,9 +2530,7 @@ function renderTable(
               s =>
                 `<td class="num">${
                   row.byShift[s]
-                    ? fmt(
-                        row.byShift[s]
-                      )
+                    ? fmtTons(row.byShift[s])
                     : '—'
                 }</td>`
             )
@@ -2565,11 +2556,11 @@ function renderTable(
       </td>
 
       <td class="num">
-        ${fmt(totalTonnage)} кг
+        ${fmtTons(totalTonnage)} т
       </td>
 
       <td class="num">
-        ${fmt(totalBrak)} кг
+        ${fmtTons(totalBrak)} т
       </td>
 
       <td class="num">
@@ -2582,9 +2573,7 @@ function renderTable(
             s =>
               `<td class="num">${
                 shiftTotals[s]
-                  ? fmt(
-                      shiftTotals[s]
-                    )
+                  ? fmtTons(shiftTotals[s])
                   : '—'
               }</td>`
           )
@@ -2661,7 +2650,7 @@ function renderKpis(
       </div>
 
       <div class="val">
-        ${fmt(brak)} кг
+        ${fmtTons(brak)} т
       </div>
 
     </div>
@@ -2932,7 +2921,7 @@ function renderWorkforceCapacityChart(monthData, counts, scenario) {
   const yMax = Math.max(scenario.target * 1.18, scenario.productivity * monthData.daysTotal * maxStaff);
 
   const W = 760, H = 285;
-  const L = 56, R = 24, T = 24, B = 42;
+  const L = 80, R = 24, T = 24, B = 42;
   const PW = W - L - R, PH = H - T - B;
   const x = n => L + (n / maxStaff) * PW;
   const y = tons => T + PH - (tons / yMax) * PH;
@@ -2943,7 +2932,7 @@ function renderWorkforceCapacityChart(monthData, counts, scenario) {
     const tons = yMax * i / 4;
     const yy = y(tons);
     grid += `<line x1="${L}" y1="${yy}" x2="${W-R}" y2="${yy}" stroke="rgba(255,255,255,.055)" stroke-width="1"/>`;
-    grid += `<text x="${L-9}" y="${yy+4}" fill="#8b929e" font-size="9" text-anchor="end">${Math.round(tons)} т</text>`;
+    grid += `<text x="${L-9}" y="${yy+4}" fill="#8b929e" font-size="9" text-anchor="end">${StatisticsUnits.formatTons(tons)} т</text>`;
   }
   for (let i = 0; i <= 4; i++) {
     const staff = maxStaff * i / 4;
@@ -2967,7 +2956,7 @@ function renderWorkforceCapacityChart(monthData, counts, scenario) {
       </defs>
       ${grid}
       <line x1="${L}" y1="${targetY}" x2="${W-R}" y2="${targetY}" stroke="#f5a623" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>
-      <text x="${W-R}" y="${Math.max(T+10,targetY-7)}" fill="#f5a623" font-size="10" text-anchor="end" font-weight="700">Цел ${Math.round(scenario.target)} т</text>
+      <text x="${W-R}" y="${Math.max(T+10,targetY-7)}" fill="#f5a623" font-size="10" text-anchor="end" font-weight="700">Цел ${StatisticsUnits.formatTons(scenario.target)} т</text>
       <path d="M ${x(0)} ${y(0)} L ${x(maxStaff)} ${lineEndY} L ${x(maxStaff)} ${y(0)} Z" fill="url(#wfAreaGradient)"/>
       <line x1="${x(0)}" y1="${y(0)}" x2="${x(maxStaff)}" y2="${lineEndY}" stroke="${capColor}" stroke-width="3" stroke-linecap="round"/>
       <line x1="${currentX}" y1="${T}" x2="${currentX}" y2="${H-B}" stroke="rgba(255,255,255,.13)" stroke-width="1" stroke-dasharray="3 5"/>
@@ -3018,23 +3007,23 @@ function renderWorkforceDashboard() {
   const scenario = workforceScenario(monthData, counts);
   const monthName = MONTH_FULL_LABELS[monthData.month - 1];
   el.wfStaffSource.textContent = `${counts.productionTotal} производствени + ${counts.additional} допълнителни`;
-  el.wfSubtitle.textContent = `${monthName} ${monthData.year}: цел ${wfFmt(goalTons,0)} т от „Тонаж и брак“, производителност от реалния тонаж и текущия активен състав, резерв от ${counts.additional} души в „Допълнителни“. Историческият щат по дата не се пази.`;
+  el.wfSubtitle.textContent = `${monthName} ${monthData.year}: цел ${StatisticsUnits.formatTons(goalTons)} т от „Тонаж и брак“, производителност от реалния тонаж и текущия активен състав, резерв от ${counts.additional} души в „Допълнителни“. Историческият щат по дата не се пази.`;
 
   el.wfCurrentStaff.textContent = `${counts.productionTotal}`;
   el.wfCurrentStaffSub.textContent = `Автоматична ${counts.autoTotal} + Ръчна ${counts.manualTotal}`;
-  el.wfMeasuredProductivity.textContent = `${wfFmt(monthData.rosterProductivityTonsPerDay, 2)} т`;
+  el.wfMeasuredProductivity.textContent = `${StatisticsUnits.formatTons(monthData.rosterProductivityTonsPerDay)} т`;
   el.wfMeasuredProductivitySub.textContent = `${fmtTons(monthData.productionKg)} т / (${counts.productionTotal} души × ${monthData.measurementDays} дни)`;
-  el.wfAutoProd.textContent = monthData.autoProductivityTons > 0 ? `${wfFmt(monthData.autoProductivityTons,2)} т / човек-смяна` : 'няма breakdown';
-  el.wfManualProd.textContent = monthData.manualProductivityTons > 0 ? `${wfFmt(monthData.manualProductivityTons,2)} т / човек-смяна` : 'няма breakdown';
+  el.wfAutoProd.textContent = monthData.autoProductivityTons > 0 ? `${StatisticsUnits.formatTons(monthData.autoProductivityTons)} т / човек-смяна` : 'няма breakdown';
+  el.wfManualProd.textContent = monthData.manualProductivityTons > 0 ? `${StatisticsUnits.formatTons(monthData.manualProductivityTons)} т / човек-смяна` : 'няма breakdown';
   el.wfStickersCount.textContent = `${counts.stickers} души`;
 
-  if (el.wfCalcTarget) el.wfCalcTarget.textContent = `${wfFmt(goalTons,0)} т`;
+  if (el.wfCalcTarget) el.wfCalcTarget.textContent = `${StatisticsUnits.formatTons(goalTons)} т`;
   if (el.wfCalcReserve) el.wfCalcReserve.textContent = `${counts.additional} души`;
   if (el.wfCalcReserveSub) {
     const reserveEq = counts.productionTotal > 0 ? counts.additional / counts.productionTotal * 100 : 0;
     el.wfCalcReserveSub.textContent = `от „Допълнителни“ · ${wfFmt(reserveEq,1)}% спрямо производствения щат`;
   }
-  if (el.wfCalcProductivity) el.wfCalcProductivity.textContent = `${wfFmt(monthData.rosterProductivityTonsPerDay,2)} т`;
+  if (el.wfCalcProductivity) el.wfCalcProductivity.textContent = `${StatisticsUnits.formatTons(monthData.rosterProductivityTonsPerDay)} т`;
 
   if (!scenario || !scenario.valid) {
     el.wfRequiredProductivity.textContent = '—';
@@ -3064,10 +3053,10 @@ function renderWorkforceDashboard() {
   el.wfStatus.className = `status-chip ${statusCls}`;
   el.wfStatus.textContent = statusText;
 
-  el.wfRequiredProductivity.textContent = `${wfFmt(scenario.avgRosterTonsPerCalendarDay,2)} т`;
-  el.wfTargetPerShift.textContent = `${wfFmt(scenario.targetPerShift,1)} т`;
-  el.wfCurrentCapacity.textContent = `${wfFmt(scenario.capacity,0)} т`;
-  el.wfCurrentCapacitySub.textContent = `${wfFmt(coverage*100,0)}% от целта ${wfFmt(scenario.target,0)} т`;
+  el.wfRequiredProductivity.textContent = `${StatisticsUnits.formatTons(scenario.avgRosterTonsPerCalendarDay)} т`;
+  el.wfTargetPerShift.textContent = `${StatisticsUnits.formatTons(scenario.targetPerShift)} т`;
+  el.wfCurrentCapacity.textContent = `${StatisticsUnits.formatTons(scenario.capacity)} т`;
+  el.wfCurrentCapacitySub.textContent = `${wfFmt(coverage*100,0)}% от целта ${StatisticsUnits.formatTons(scenario.target)} т`;
   el.wfGap.textContent = scenario.gap > 0 ? `+${scenario.gap}` : String(scenario.gap);
   el.wfGapSub.textContent = `база ${scenario.baseRequired} + ${scenario.reservePeople} допълнителни → ${scenario.reserveRequired}`;
 
@@ -3082,7 +3071,7 @@ function renderWorkforceDashboard() {
   el.wfRequiredPerShift.textContent = `${wfFmt(scenario.requiredPerShift,1)} души`;
   el.wfResultGapRow.className = `wf-result ${scenario.gap <= 0 ? 'good' : (scenario.gap <= 5 ? 'warn' : 'bad')}`;
 
-  el.wfCalcNote.innerHTML = `Всичко се смята автоматично: целта <strong>${wfFmt(scenario.target,0)} т</strong> идва от „Тонаж и брак“; измерената производителност е <strong>${wfFmt(scenario.productivity,2)} т / щатен човек / ден</strong> за ${monthData.measurementDays} дни; резервът е <strong>${scenario.reservePeople} души</strong> — текущият брой в „Допълнителни“ (${wfFmt(scenario.reservePct,1)}% спрямо активния производствен щат). За целта са нужни средно <strong>${wfFmt(scenario.targetPerShift,1)} т на работна смяна</strong>. Базов необходим щат: <strong>${scenario.baseRequired}</strong>; с текущия резерв: <strong>${scenario.reserveRequired}</strong>.`;
+  el.wfCalcNote.innerHTML = `Всичко се смята автоматично: целта <strong>${StatisticsUnits.formatTons(scenario.target)} т</strong> идва от „Тонаж и брак“; измерената производителност е <strong>${StatisticsUnits.formatTons(scenario.productivity)} т / щатен човек / ден</strong> за ${monthData.measurementDays} дни; резервът е <strong>${scenario.reservePeople} души</strong> — текущият брой в „Допълнителни“ (${wfFmt(scenario.reservePct,1)}% спрямо активния производствен щат). За целта са нужни средно <strong>${StatisticsUnits.formatTons(scenario.targetPerShift)} т на работна смяна</strong>. Базов необходим щат: <strong>${scenario.baseRequired}</strong>; с текущия резерв: <strong>${scenario.reserveRequired}</strong>.`;
 
   renderWorkforceCapacityChart(monthData, counts, scenario);
 }
@@ -3202,9 +3191,9 @@ function renderLineShiftTable(
 
     '<th>Смяна</th>' +
 
-    '<th style="text-align:right">Автоматична</th>' +
+    '<th style="text-align:right">Автоматична (т)</th>' +
 
-    '<th style="text-align:right">Ръчна</th>' +
+    '<th style="text-align:right">Ръчна (т)</th>' +
 
     '<th style="text-align:right">Авт. каси</th>' +
 
@@ -3239,8 +3228,8 @@ function renderLineShiftTable(
         <td class="num">
           ${
             r.autoKg
-              ? fmt(r.autoKg) +
-                ' кг'
+              ? fmtTons(r.autoKg) +
+                ' т'
               : '—'
           }
         </td>
@@ -3248,8 +3237,8 @@ function renderLineShiftTable(
         <td class="num">
           ${
             r.manKg
-              ? fmt(r.manKg) +
-                ' кг'
+              ? fmtTons(r.manKg) +
+                ' т'
               : '—'
           }
         </td>
@@ -3288,8 +3277,8 @@ function renderLineShiftTable(
       <td class="num">
         ${
           t.autoKg
-            ? fmt(t.autoKg) +
-              ' кг'
+            ? fmtTons(t.autoKg) +
+              ' т'
             : '—'
         }
       </td>
@@ -3297,8 +3286,8 @@ function renderLineShiftTable(
       <td class="num">
         ${
           t.manKg
-            ? fmt(t.manKg) +
-              ' кг'
+            ? fmtTons(t.manKg) +
+              ' т'
             : '—'
         }
       </td>

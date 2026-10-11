@@ -1015,6 +1015,15 @@ clear the old retry action; changed records are refused before deletion.
 
 ## Statistics navigation
 
+All mass quantities in Statistics are displayed in tonnes (`t`), rounded to one
+decimal place with no trailing zeroes: 1250 kg is shown as 1.3 t and 1 kg of scrap
+as 0 t. Calculations retain the full stored kilogram values. This includes
+production and pair tables, charts, totals, targets, deficits and workforce
+productivity. Counts, percentages and durations retain their units. All report
+entry fields remain in kilograms; stored reports and JSON import/export formats
+remain compatible. No data migration is needed.
+
+
 The monthly result stays above every statistics section. Switch between Overview,
 Production, Pair Targets, Downtime, and Workforce Capacity; only one section is
 shown at a time. The last section is remembered separately in demo browser storage.
