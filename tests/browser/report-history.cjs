@@ -27,6 +27,33 @@ async function exerciseReportHistory({admin,hub,base,device,expect,screenshotDir
     await expect(admin.locator('#historyDetail')).toContainText(row.id);
   }
   operate('create',{entry:row});
+  const requests = [], recordRequest = request => {
+    const url=new URL(request.url());
+    if(url.pathname.startsWith('/api/') && new URL(request.frame().url()).pathname === '/report-history') requests.push(url);
+  };
+  admin.on('request',recordRequest);
+  await admin.goto(base+'/report-history');
+  await expect(admin.locator('#historyKind')).toHaveValue('production-log');
+  await admin.clock.runFor(65000);
+  await admin.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  assert.deepEqual(requests,[]); // No history, SSE, badges, notification polling or preferences.
+  await admin.locator('#historyKind').selectOption('line-downtime');
+  await admin.locator('#historyKind').selectOption('production-log');
+  await admin.locator('#historyDate').fill('2026-10-05');
+  assert.equal(requests.length,0);
+  await admin.locator('#historyRefresh').click();
+  await expect(admin.locator('#historyRecords button')).toHaveCount(1);
+  assert.equal(requests.length,1); assert.equal(requests[0].searchParams.get('date'),'2026-10-05');
+  await admin.locator('[data-entry-id="'+row.id+'"]').click();
+  await expect(admin.locator('#historyDetail .history-event')).toHaveCount(1);
+  assert.equal(requests.length,2);assert.equal(requests[1].searchParams.get('metadata'),'1');
+  await expect(admin.locator('.history-snapshot')).toHaveCount(0);
+  const fold=admin.locator('.history-event details').nth(1);
+  await fold.locator('summary').click();await expect(fold).toContainText('1000');
+  assert.equal(requests.length,3);assert.ok(requests[2].searchParams.has('version'));
+  await fold.locator('summary').click();await fold.locator('summary').click();
+  await expect(fold).toContainText('1000');assert.equal(requests.length,3);
+  admin.off('request',recordRequest);
   await admin.goto(base+'/production-log');
   await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
   await admin.locator('.edit-report-btn').first().click();
@@ -126,6 +153,24 @@ async function exerciseReportHistory({admin,hub,base,device,expect,screenshotDir
     }
   }
   await observer.context().close();
+  const latest=current();
+  hub.store.put('production-log',{...latest.data,entries:[...latest.data.entries,...Array.from({length:30},(_,i)=>({...row,id:'demo-demand-page-'+String(i).padStart(2,'0')}))]},latest.revision,actor);
+  await admin.goto(base+'/report-history');await admin.locator('#historyRefresh').click();
+  await expect(admin.locator('#historyRecords button')).toHaveCount(25);
+  await admin.locator('#historyRecords button').first().click();
+  await expect(admin.locator('#historyDetail')).toContainText('demo-demand-page-00');
+  await admin.locator('#historyMore').click();await expect(admin.locator('#historyRecords button')).toHaveCount(31);
+  await expect(admin.locator('#historyMore')).toBeHidden();
+  const retained=admin.locator('.history-event details').nth(1);
+  await retained.locator('summary').click();await expect(retained).toContainText('1000');
+  for(const language of ['bg','en']) {
+    await admin.locator('[data-hub-language='+language+']').click();
+    for(const width of [320,390,768,1440]) {
+      await admin.setViewportSize({width,height:1000});await assertResponsive(admin,'Demand history '+language+' '+width);
+      if(screenshotDir && language==='bg' && [390,1440].includes(width)) await admin.screenshot({path:path.join(screenshotDir,'history-demand-'+width+'.png'),fullPage:true});
+    }
+  }
+  console.log('PASS zero idle API requests, manual filters, lazy cached snapshots, bounded list pages and retained selection');
   console.log('PASS reason cancel/required/retry, history edit/delete/restore, interrupted restore, newer-version conflict, delegated access, BG/EN responsive layouts and friendly admin denial');
 }
 module.exports = {exerciseReportHistory};
