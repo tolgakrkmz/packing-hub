@@ -3,6 +3,7 @@ let selectedShift = null;
 let entries = [];
 let addedHistoryMonth = null;
 let goalTons = 3000;
+let goalDraft = false;
 let editingReport = null;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
@@ -71,11 +72,13 @@ const writer = createReportWriter({
 });
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
+goalInput.addEventListener('input', () => { goalDraft = true; });
 goalInput.addEventListener('change', async ()=>{
   if(writer.busy || typeof HubServer !== 'undefined' && !HubServer.can('canManageProductionSettings')) return;
+  goalDraft = true;
   const v = readQuantity(goalInput);
   if(v === null) { quantityError(); return; }
-  await writer.run(current => ({...current,goalTons:v}), () => { goalInput.value = v; }, 'Целта е записана.');
+  await writer.run(current => ({...current,goalTons:v}), () => { goalDraft = false; goalInput.value = v; }, 'Целта е записана.');
 });
 
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
@@ -154,13 +157,13 @@ const sync = createFileSync({
     entries = data.entries || [];
     globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    if(!writer.busy) goalInput.value = goalTons;
+    if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
     globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    if(!writer.busy) goalInput.value = goalTons;
+    if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   },
   elements: {
     connDot: document.getElementById('connDot'),
@@ -195,7 +198,7 @@ function renderDayTotal(){
 }
 
 function renderGoal(){
-  if(!writer.busy) goalInput.value = goalTons;
+  if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();

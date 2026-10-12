@@ -70,7 +70,10 @@ async function main() {
     const admin = await device('demo-admin');
     if (process.argv.includes('--quantities-only')) {
       await admin.goto(base + '/production-log'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
-      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page:admin, expect, read:async () => hub.store.get('production-log').data});
+      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page:admin, expect,
+        read:async () => hub.store.get('production-log').data,
+        replaceGoal:async goal => { const data = hub.store.get('production-log'); hub.store.put('production-log', {...data.data, goalTons:goal}, data.revision, hub.auth.list()[0]); }
+      });
       assert.deepEqual(errors, []); return;
     }
     if (process.argv.includes('--reconnect-only')) {

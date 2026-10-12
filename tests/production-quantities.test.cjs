@@ -71,3 +71,19 @@ test('monthly goal accepts exact scientific notation and rejects invalid numbers
     assert.equal(env.controls.goalInput.value, value);
   }
 });
+
+test('a rejected or actively typed monthly goal survives background refresh until a confirmed save', async () => {
+  for (const rejected of [true, false]) {
+    const env = await environment('production-log');
+    env.controls.goalInput.value = rejected ? '1.5' : '1e3';
+    if (rejected) await env.controls.goalInput.dispatch('change');
+    else await env.controls.goalInput.dispatch('input');
+    env.handle.text = JSON.stringify({...env.data, goalTons:4000}); await env.poll();
+    assert.equal(env.data.goalTons, 4000);
+    assert.equal(env.controls.goalInput.value, rejected ? '1.5' : '1e3');
+    env.controls.goalInput.value = '5000'; await env.controls.goalInput.dispatch('change');
+    assert.equal(env.data.goalTons, 5000);
+    env.handle.text = JSON.stringify({...env.data, goalTons:6000}); await env.poll();
+    assert.equal(Number(env.controls.goalInput.value), 6000);
+  }
+});

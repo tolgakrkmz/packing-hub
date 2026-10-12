@@ -1,6 +1,6 @@
 /* Shared offline/server flow using only fictional, temporary reports. */
 const assert = require('node:assert/strict');
-async function exerciseProductionQuantities({page, expect, read}) {
+async function exerciseProductionQuantities({page, expect, read, replaceGoal}) {
   const before = (await read()).entries.length;
   await page.locator('[data-shift="СТИКЕРИ"]').click();
   await page.locator('#tonInput').fill('1e3');
@@ -36,6 +36,16 @@ async function exerciseProductionQuantities({page, expect, read}) {
   await expect(page.locator('#msg')).toHaveAttribute('data-state', 'success');
   await expect.poll(async () => (await read()).entries.length).toBe(before + 2);
   assert.equal((await read()).entries.at(-1).tonnage, 3000);
+
+  await page.locator('#goalInput').fill('1.5'); await page.locator('#goalInput').dispatchEvent('change');
+  await expect(page.locator('#msg')).toHaveAttribute('data-state', 'error');
+  await replaceGoal(7000); await page.evaluate(() => sync.refreshFromDisk({fresh:true}));
+  await expect(page.locator('#goalInput')).toHaveValue('1.5');
+  await page.locator('#goalInput').fill('8000'); await page.locator('#goalInput').dispatchEvent('change');
+  await expect(page.locator('#msg')).toHaveAttribute('data-state', 'success');
+  await expect.poll(async () => (await read()).goalTons).toBe(8000);
+  await replaceGoal(9000); await page.evaluate(() => sync.refreshFromDisk({fresh:true}));
+  await expect(page.locator('#goalInput')).toHaveValue('9000');
   console.log('PASS exact production quantities, invalid drafts, stepper, breakdown and BG/EN');
 }
 module.exports = {exerciseProductionQuantities};

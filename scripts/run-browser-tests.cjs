@@ -56,7 +56,10 @@ async function main() {
       await page.goto(base + '/production-log.html'); await page.evaluate(() => window.__browserTest.ready);
       await page.evaluate(() => { window.__browserTest.nextFile = 'production-log.json'; });
       await page.locator('#openFileBtn').click(); await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);
-      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page, expect, read:() => page.evaluate(() => window.__browserTest.read('production-log.json'))});
+      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page, expect,
+        read:() => page.evaluate(() => window.__browserTest.read('production-log.json')),
+        replaceGoal:goal => page.evaluate(async goal => { const data = await window.__browserTest.read('production-log.json'); await window.__browserTest.write('production-log.json', {...data, goalTons:goal}); }, goal)
+      });
       require('node:assert/strict').deepEqual(errors, []); await context.close(); return;
     }
     if (process.argv.includes('--responsive-only')) {

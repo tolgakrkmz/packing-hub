@@ -83,6 +83,8 @@ crates and the monthly goal. Scientific notation such as `1e3` means `1000`;
 fractions, negative values, incomplete input and unsafe totals stop the write
 and retain the draft. Empty quantity fields keep their existing zero default.
 The breakdown preview and increment buttons use the same numeric rules.
+An edited or rejected monthly goal stays in the field across refreshes until
+its write is confirmed; background updates still update the saved goal.
 Stored legacy reports are not rewritten by this form validation.
 
 Run the shared quantity flow in both modes:
