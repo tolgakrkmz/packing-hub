@@ -23,9 +23,20 @@ function safePath(value) {
   if (typeof value !== 'string' || value.length > 1000 || value.includes('\\') || value.includes('\0') || value.startsWith('/') || value.split('/').some(part => !part || part === '.' || part === '..' || part.length > 200)) throw problem(400, 'INVALID_PATH');
   return value;
 }
+// Bound recursion before schema checks, canonical signatures and JSON persistence.
+function validateJSONDepth(value) {
+  const pending = [{value, depth: 0}];
+  while (pending.length) {
+    const {value, depth} = pending.pop();
+    if (!value || typeof value !== 'object') continue;
+    if (depth > 64) throw new Error('JSON_DEPTH');
+    for (const child of Object.values(value)) if (child && typeof child === 'object') pending.push({value: child, depth: depth + 1});
+  }
+}
 function validateData(kind, data) {
   if (!Object.hasOwn(defaults, kind)) throw problem(404, 'NOT_FOUND');
   try {
+    validateJSONDepth(data);
     validate(kind, data);
     if (kind === 'package-instructions' && Object.keys(data).some(key => ['__proto__', 'constructor', 'prototype'].includes(key))) throw new Error();
   } catch { throw problem(400, 'INVALID_DATA'); }
@@ -193,6 +204,7 @@ function openStore(filename) {
     const report = reports[kind];
     if (!report) throw problem(404, 'NOT_FOUND');
     if (!canViewModule(user, kind)) throw problem(403, 'FORBIDDEN');
+    try { validateJSONDepth(input); } catch { throw problem(400, 'INVALID_OPERATION'); }
     if (!input || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.operationId) ||
       !['create','update','delete','restore'].includes(input.action) || typeof input.entryId !== 'string' || !input.entryId.trim() || input.entryId.length > 200 ||
       Object.keys(input).some(key => !['operationId','action','entryId','entry','reason','sourceVersion'].includes(key)) ||
