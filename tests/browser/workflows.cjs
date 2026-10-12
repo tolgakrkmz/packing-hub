@@ -90,6 +90,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     const {page, go, connect, read, saved} = t;
     await go('index');
     await page.locator('a[href="production-log.html"]').click();
+    await expect(page.locator('.conn-panel-toggle')).toContainText('Споделен файл (мрежова папка)');
     await connect('#openFileBtn', 'production-log.json');
     await production(t, '2026-10-04', 'А', 0, 20, {autoKgInput: 2400, autoCrateInput: 96, manKgInput: 600, manCrateInput: 24});
     await production(t, '2026-10-05', 'Б', 2000, 30);

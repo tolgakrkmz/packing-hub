@@ -68,6 +68,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--connection-copy-only')) {
+      await require('../tests/browser/connection-copy.cjs').exerciseConnectionCopy({admin,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--login-only')) {
       await require('../tests/browser/login-usability.cjs').exerciseLoginUsability({admin,base,expect});
       assert.deepEqual(errors,[]); return;

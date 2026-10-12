@@ -8,6 +8,9 @@ const HubServer = (() => {
     return boot.user.permissions[resolved] === true;
   };
   const canViewModule = name => HubPermissions.canViewModule(boot.user, name);
+  function applyServerText() {
+    document.querySelectorAll('[data-server-text]').forEach(element => { element.textContent = element.dataset.serverText; });
+  }
   const listeners = new Map();
   const watchers = new WeakMap(), idle = () => false;
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
@@ -91,6 +94,7 @@ const HubServer = (() => {
     return Promise.allSettled(Array.from(refreshers, refresh => refresh())).then(() => {});
   }
   function fileSync(cfg) {
+    applyServerText();
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
     const page = currentModule;
     const defaultURL = kind === 'personnel' && page === 'pair-targets' ? '/api/pair-roster'
@@ -256,6 +260,7 @@ const HubServer = (() => {
     };
   }
   function directorySync(cfg) {
+    applyServerText();
     const handle = serverDirectory();
     let initialized = false, pendingRead = null, acceptedText = null, connectionState = '';
     const el = cfg.elements;
@@ -328,6 +333,7 @@ const HubServer = (() => {
     if (selector) document.querySelectorAll(selector).forEach(control => { if (!control.hidden) control.hidden = true; });
   }
   document.addEventListener('DOMContentLoaded', () => {
+    applyServerText();
     document.body.classList.add('server-mode');
     const bar = document.createElement('nav'); bar.className = 'server-bar'; bar.setAttribute('aria-label', 'Package Hub');
     const top = document.createElement('div'); top.className = 'server-top';

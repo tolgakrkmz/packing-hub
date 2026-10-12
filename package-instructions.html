@@ -217,7 +217,7 @@ body{ padding:24px 16px 60px; }
   </header>
 
   <div class="panel" id="connPanel">
-    <h2>Споделена мрежова папка</h2>
+    <h2 data-server-text="Връзка с общата база">Споделена мрежова папка</h2>
     <div class="conn-row">
       <div class="conn-dot" id="connDot"></div>
       <div class="conn-text" id="connText">Проверява се връзка…</div>
@@ -282,7 +282,7 @@ body{ padding:24px 16px 60px; }
           <button type="button" class="upload-btn instruction-btn" id="addAttachmentBtn">Добави файл (снимка / PDF / друго)</button>
           <input type="file" id="imageFileInput" multiple style="display:none;">
         </div>
-        <div class="upload-hint">Файловете се копират директно в папката на профила.</div>
+        <div class="upload-hint" data-server-text="Приложенията се пазят към профила в общата база.">Файловете се копират директно в папката на профила.</div>
         <div class="thumb-grid" id="thumbGrid"></div>
       </div>
       <div class="form-msg" id="formMsg"></div>
