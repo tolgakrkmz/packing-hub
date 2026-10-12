@@ -46,6 +46,9 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    if (process.argv.includes('--responsive-only')) {
+      await require('../tests/browser/responsive-layout.cjs').exerciseOfflineResponsiveLayouts(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
+    }
     if (process.argv.includes('--lists-only')) {
       await require('../tests/browser/paged-lists.cjs').exerciseOfflinePagedLists(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
     }
