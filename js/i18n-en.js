@@ -1483,5 +1483,6 @@ Object.assign(HUB_EN_MESSAGES, {
   "Обнови този запис": "Refresh this record",
   "Съдържание на записа": "Record content",
   "Ръчно обновяване": "Manual refresh",
-  "Провери датата и зареди записите отново.": "Check the date and load the records again."
+  "Провери датата и зареди записите отново.": "Check the date and load the records again.",
+  "Въведи неотрицателни цели числа в допустимия диапазон за количествата и целта.": "Enter non-negative whole numbers within the supported range for quantities and the goal."
 });

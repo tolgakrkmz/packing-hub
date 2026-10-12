@@ -74,6 +74,21 @@ node --test tests/server/report-operations.test.cjs tests/server/client.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --report-operations-only
 ```
 
+The production form accepts non-negative safe whole numbers for kilograms,
+crates and the monthly goal. Scientific notation such as `1e3` means `1000`;
+fractions, negative values, incomplete input and unsafe totals stop the write
+and retain the draft. Empty quantity fields keep their existing zero default.
+The breakdown preview and increment buttons use the same numeric rules.
+Stored legacy reports are not rewritten by this form validation.
+
+Run the shared quantity flow in both modes:
+
+```sh
+node --test tests/production-quantities.test.cjs tests/report-save-recovery.test.cjs
+node scripts/run-browser-tests.cjs --headless --quantities-only
+node scripts/run-server-browser-tests.cjs --headless --quantities-only
+```
+
 ### Page addresses
 
 The server home page uses `/`; screens use paths such as `/production-log`,

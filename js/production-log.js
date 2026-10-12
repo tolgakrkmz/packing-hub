@@ -21,6 +21,15 @@ const manKgInput = document.getElementById('manKgInput');
 const manCrateInput = document.getElementById('manCrateInput');
 const totalReadout = document.getElementById('totalReadout');
 
+function readQuantity(control){
+  const value = Number(control.value || '0');
+  return !control.validity?.badInput && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+function quantityError(){
+  msg.textContent = 'Въведи неотрицателни цели числа в допустимия диапазон за количествата и целта.';
+  msg.dataset.state = 'error';
+}
+
 breakdownToggle.addEventListener('change', ()=>{
   const on = breakdownToggle.checked;
   simpleTonRow.style.display = on ? 'none' : 'flex';
@@ -29,8 +38,9 @@ breakdownToggle.addEventListener('change', ()=>{
 });
 
 function updateTotalReadout(){
-  const total = (parseInt(autoKgInput.value||'0',10)) + (parseInt(manKgInput.value||'0',10));
-  totalReadout.textContent = fmt(total)+' кг';
+  const auto = readQuantity(autoKgInput), manual = readQuantity(manKgInput);
+  const total = auto === null || manual === null ? null : auto + manual;
+  totalReadout.textContent = Number.isSafeInteger(total) ? fmt(total)+' кг' : '—';
 }
 [autoKgInput, manKgInput].forEach(inp=>{
   inp.addEventListener('input', updateTotalReadout);
@@ -63,8 +73,8 @@ document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRe
 
 goalInput.addEventListener('change', async ()=>{
   if(writer.busy || typeof HubServer !== 'undefined' && !HubServer.can('canManageProductionSettings')) return;
-  let v = parseInt(goalInput.value || '0', 10);
-  if(v < 0) v = 0;
+  const v = readQuantity(goalInput);
+  if(v === null) { quantityError(); return; }
   await writer.run(current => ({...current,goalTons:v}), () => { goalInput.value = v; }, 'Целта е записана.');
 });
 
@@ -117,9 +127,12 @@ document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
       updateTotalReadout();
       return;
     }
-    const step = parseInt(btn.dataset.step,10);
-    let v = parseInt(target.value || '0', 10) + step;
+    const current = readQuantity(target);
+    if(current === null) { quantityError(); return; }
+    const step = Number(btn.dataset.step);
+    let v = current + step;
     if(v < 0) v = 0;
+    if(!Number.isSafeInteger(v)) { quantityError(); return; }
     target.value = v;
     updateTotalReadout();
   });
@@ -239,20 +252,23 @@ saveBtn.addEventListener('click', async ()=>{
   const useBreakdown = breakdownToggle.checked;
   let tonnage, breakdown = null;
   if(useBreakdown){
-    const autoKg = parseInt(autoKgInput.value||'0',10);
-    const autoCrates = parseInt(autoCrateInput.value||'0',10);
-    const manKg = parseInt(manKgInput.value||'0',10);
-    const manCrates = parseInt(manCrateInput.value||'0',10);
+    const autoKg = readQuantity(autoKgInput);
+    const autoCrates = readQuantity(autoCrateInput);
+    const manKg = readQuantity(manKgInput);
+    const manCrates = readQuantity(manCrateInput);
+    if([autoKg,autoCrates,manKg,manCrates].includes(null)) { quantityError(); return; }
     tonnage = autoKg + manKg;
     breakdown = { autoKg, autoCrates, manKg, manCrates };
   } else {
-    tonnage = parseInt(tonInput.value||'0',10);
+    tonnage = readQuantity(tonInput);
   }
+  const brak = readQuantity(brakInput);
+  if(!Number.isSafeInteger(tonnage) || brak === null) { quantityError(); return; }
   const draft = {
     date: dateInput.value,
     shift: selectedShift,
     tonnage: tonnage,
-    brak: parseInt(brakInput.value||'0',10),
+    brak: brak,
     breakdown: breakdown
   };
   const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);

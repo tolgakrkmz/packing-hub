@@ -68,6 +68,11 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--quantities-only')) {
+      await admin.goto(base + '/production-log'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
+      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page:admin, expect, read:async () => hub.store.get('production-log').data});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--reconnect-only')) {
       await require('../tests/browser/reconnect-overlay.cjs').exerciseReconnectOverlay({admin,hub,base,expect,screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors,[]); return;
