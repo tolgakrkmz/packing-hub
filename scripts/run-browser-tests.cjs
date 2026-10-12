@@ -33,7 +33,8 @@ async function main() {
   // The pinned fictional seed fingerprint also prevents accidentally serving the production checkout.
   inspect('js/employees-seed.js', fs.readFileSync(path.join(root, 'js/employees-seed.js')), tokens);
   const server = http.createServer((request, response) => {
-    const name = request.url === '/' ? '/index.html' : request.url;
+    const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
+    const name = pathname === '/' ? '/index.html' : pathname;
     const body = assets.get(name);
     response.writeHead(body ? 200 : 404, {
       'Content-Type': name.endsWith('.js') ? 'text/javascript; charset=utf-8' : name.endsWith('.css') ? 'text/css; charset=utf-8' : name === '/assets/package-hub-mark.svg' ? 'image/svg+xml; charset=utf-8' : 'text/html; charset=utf-8',
@@ -46,7 +47,10 @@ async function main() {
   try {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0,
-      ...(process.argv.includes('--security-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+      ...(process.argv.includes('--security-only') || process.argv.includes('--security-client-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+    if (process.argv.includes('--security-client-only')) {
+      await require('../tests/browser/security-client.cjs').exerciseOfflineClientSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
+    }
     if (process.argv.includes('--security-only')) {
       await require('../tests/browser/security-personnel.cjs').exerciseOfflineSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
     }
