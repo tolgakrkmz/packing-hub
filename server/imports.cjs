@@ -1,4 +1,4 @@
-const {reportChanges} = require('./store.cjs');
+const {reportChanges, notificationTargets} = require('./store.cjs');
 /* Private staging and atomic migration of reviewed legacy module formats. */
 const fs = require('node:fs');
 const os = require('node:os');
@@ -202,16 +202,19 @@ function createImports(store, filename) {
     const result = store.transaction(() => {
       const value = checked(), revisions = {};
       for (const [kind, data] of Object.entries(value.updates)) {
-        const detail = reportChanges(store.get(kind).data, data);
+        const previous = store.get(kind).data, detail = reportChanges(previous, data), targets = notificationTargets(previous, data);
         store.updateDocument(kind, data, user);
-        store.audit(user, 'import', kind, detail); revisions[kind] = store.get(kind).revision;
+        store.audit(user, 'import', kind, detail, targets); revisions[kind] = store.get(kind).revision;
       }
       for (const name of [...value.directories].sort((a, b) => a.split('/').length - b.split('/').length)) store.db.prepare("INSERT INTO files(path,kind) VALUES(?,'directory')").run(name);
       for (const file of value.fileUpdates) {
         const content = fs.readFileSync(path.join(directory, id, String(file.index)));
         store.db.prepare("INSERT INTO files(path,kind,content,mime) VALUES(?,'file',?,?)").run(file.path, content, file.mime);
       }
-      if (value.fileUpdates.length || value.directories.size) { store.audit(user, 'attachments-import', 'package-instructions'); revisions['package-instructions'] = store.get('package-instructions').revision; }
+      if (value.fileUpdates.length || value.directories.size) {
+        const profiles = Object.values(store.get('package-instructions').data).filter(profile => value.fileUpdates.some(file => file.path.startsWith('data/profiles/' + profile.folderName + '/'))).map(profile => profile.folderName);
+        store.audit(user, 'attachments-import', 'package-instructions', {}, {profiles}); revisions['package-instructions'] = store.get('package-instructions').revision;
+      }
       return {...value.result, revisions, backup};
     });
     try { discard(id, user); } catch { /* Completed staging expires privately; a committed import remains successful. */ }

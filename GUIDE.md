@@ -266,8 +266,28 @@ do not establish physical-device delivery.
 ```sh
 node --test tests/notification-prompt.test.cjs tests/server/notifications.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --notifications-only
+node scripts/run-server-browser-tests.cjs --headless --notification-targets-only
 ```
 
+The inbox's **Open** link uses the shared teal button design. New notifications
+carry a local link to the affected report, downtime record, pair, instruction
+profile or task. Opening it selects the matching period, list page and history
+group, expands instruction content and highlights the record in amber with
+keyboard focus. System notifications highlight their corresponding status card.
+The selection runs once after authorized data loads; subsequent refreshes retain
+the highlight without repeatedly scrolling or changing the user's filters.
+
+Report and instruction identifiers are delivered through a private SQLite
+`notification_targets` table and removed from that table after inbox generation
+in the same transaction. They never enter the administrative audit's detail
+field, Web Push payloads or browser persistence. Existing module and task access
+checks still apply. Deleted or unavailable records show a translated message
+with a link back to the inbox. Older report/instruction notifications which were
+created without a record identifier continue to open their module; a precise
+record cannot be recovered reliably from those older events.
+
+Deploy the updated server and client sources together. The new SQLite table is
+created additively; preserve the live database volume and production data files.
 
 Task clocks use **Europe/Sofia** on the server, including daylight-saving changes.
 Night shifts retain their start date. An unreported shift task becomes

@@ -49,6 +49,10 @@
     else if (data.manual.state === 'failed') $('manualMessage').textContent = warnings.MANUAL_BACKUP_FAILED;
     else if (data.manual.state === 'unknown') $('manualMessage').textContent = warnings.MANUAL_BACKUP_STATUS_UNKNOWN;
     else $('manualMessage').textContent = '';
+    const targets = ['databaseCard', 'diskCard', 'backupCard', 'updateCard', 'systemSummary'].map($);
+    globalThis.HubNotificationTarget?.select(targets, node => node.id, () => {});
+    for (const node of targets) node.dataset.notificationTarget = node.id;
+    globalThis.HubNotificationTarget?.reveal($('systemContent'));
   }
   async function refresh() {
     if (refreshController || destroyed) return;

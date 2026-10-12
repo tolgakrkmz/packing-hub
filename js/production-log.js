@@ -139,11 +139,13 @@ const sync = createFileSync({
   render: render,
   onConnect: (data)=>{
     entries = data.entries || [];
+    globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
     if(!writer.busy) goalInput.value = goalTons;
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
+    globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
     if(!writer.busy) goalInput.value = goalTons;
   },
@@ -297,7 +299,7 @@ function historyTable(rows) {
       const delCell = canEditReports
         ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeReportId(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeReportId(e.id)+'" title="Изтрий">✕</button></td>'
         : '<td></td>';
-      html += '<tr>'
+      html += '<tr data-notification-target="'+escapeReportId(e.id)+'">'
         + '<td>'+e.date+'</td>'
         + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
         + '<td class="num">'+fmt(e.tonnage)+' кг</td>'
@@ -380,6 +382,7 @@ grid.innerHTML = SHIFTS.map(s=>{
   });
   wrap.innerHTML = html;
   addedHistoryMonth = null;
+  globalThis.HubNotificationTarget?.reveal(wrap);
 }
 function escapeReportId(value) { return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 

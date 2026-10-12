@@ -1362,6 +1362,8 @@ Object.assign(HUB_EN_MESSAGES, {
   "Отчет за престой е коригиран или изтрит.": "A downtime report was corrected or deleted.",
   "Има нов или променен запис за двойки.": "A pair record was added or changed.",
   "Инструкциите са обновени.": "The instructions were updated.",
+  "Записът от известието е изтрит или вече не е достъпен.": "The record from this notification was deleted or is no longer available.",
+  "Към известията": "Back to notifications",
   "Работната база изисква проверка.": "The working database needs attention.",
   "Свободното място изисква проверка.": "Disk space needs attention.",
   "Архивите изискват проверка.": "The backups need attention.",

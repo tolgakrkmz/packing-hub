@@ -32,9 +32,23 @@ function validateData(kind, data) {
 }
 function validReason(value) { return typeof value === 'string' && value.trim().length > 0 && value.length <= 1000; }
 function reportChanges(before, after) {
+  const {addedIds, changedIds} = notificationTargets(before, after);
+  return {added: addedIds.length > 0, changed: changedIds.length > 0, content: !isDeepStrictEqual(before, after)};
+}
+function notificationTargets(before, after) {
   const prior = new Map((before.entries || []).map(entry => [entry.id, entry]));
   const next = new Map((after.entries || []).map(entry => [entry.id, entry]));
-  return {added: [...next.keys()].some(id => !prior.has(id)), changed: [...prior].some(([id, entry]) => !isDeepStrictEqual(entry, next.get(id))), content: !isDeepStrictEqual(before, after)};
+  const addedIds = [...next.keys()].filter(id => !prior.has(id));
+  const changedIds = [...prior].filter(([id, entry]) => !isDeepStrictEqual(entry, next.get(id))).map(([id]) => id);
+  // Identifiers stay in a private delivery table, outside the administrative audit.
+  const profiles = new Set();
+  if (!Array.isArray(before.entries) && !Array.isArray(after.entries)) {
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (isDeepStrictEqual(before[key], after[key])) continue;
+      for (const profile of [before[key], after[key]]) if (profile?.folderName) profiles.add(profile.folderName);
+    }
+  }
+  return {addedIds, changedIds, profiles: [...profiles]};
 }
 function openStore(filename) {
   if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), {recursive: true, mode: 0o700});
@@ -48,7 +62,8 @@ function openStore(filename) {
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator','observer')), active INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('file','directory')), content BLOB, mime TEXT, revision INTEGER NOT NULL DEFAULT 1);
-    CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at INTEGER NOT NULL, user_id INTEGER, action TEXT NOT NULL, module TEXT NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at INTEGER NOT NULL, user_id INTEGER, action TEXT NOT NULL, module TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS notification_targets(audit_id INTEGER PRIMARY KEY REFERENCES audit(id) ON DELETE CASCADE, data TEXT NOT NULL);`);
   if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'permissions')) {
     db.exec("ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
   }
@@ -78,7 +93,11 @@ function openStore(filename) {
     const versions = ids ? Object.fromEntries([...ids].map(id => [id,savedVersions.get(id) ?? row.revision])) : null;
     return {data, revision: row.revision, ...(versions ? {versions} : {})};
   };
-  const audit = (user, action, module, detail = {}) => db.prepare('INSERT INTO audit(at,user_id,action,module,detail) VALUES(?,?,?,?,?)').run(Date.now(), user?.id || null, action, module, JSON.stringify(detail));
+  function audit(user, action, module, detail = {}, targets) {
+    const result = db.prepare('INSERT INTO audit(at,user_id,action,module,detail) VALUES(?,?,?,?,?)').run(Date.now(), user?.id || null, action, module, JSON.stringify(detail));
+    if (targets) db.prepare('INSERT INTO notification_targets(audit_id,data) VALUES(?,?)').run(result.lastInsertRowid, JSON.stringify(targets));
+    return result;
+  }
   const transaction = work => {
     db.exec('BEGIN IMMEDIATE');
     try { const result = work(); db.exec('COMMIT'); return result; }
@@ -165,7 +184,7 @@ function openStore(filename) {
         } catch { throw problem(400, 'INVALID_PAIR_CHANGE'); }
       }
       updateDocument(kind, data, user, context);
-      audit(user, 'write', kind, reportChanges(current.data, data));
+      audit(user, 'write', kind, reportChanges(current.data, data), notificationTargets(current.data, data));
       return get(kind);
     };
     return withinTransaction ? work() : transaction(work);
@@ -301,7 +320,8 @@ function openStore(filename) {
       if (current.kind !== 'file') throw problem(400, 'WRONG_KIND');
       if (current.revision !== revision) throw problem(409, 'CONFLICT');
       db.prepare('UPDATE files SET content=?,mime=?,revision=revision+1 WHERE path=?').run(content, mime, name);
-      audit(user, 'attachment-write', 'package-instructions');
+      const profiles = Object.values(get('package-instructions').data).filter(profile => name.startsWith('data/profiles/' + profile.folderName + '/')).map(profile => profile.folderName);
+      audit(user, 'attachment-write', 'package-instructions', {}, {profiles});
       return {revision: current.revision + 1};
     });
   }
@@ -314,4 +334,4 @@ function openStore(filename) {
   }
   return {db, get, put, updateDocument, reportOperation, reportHistory, reportHistoryList, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
-module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges};
+module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges, notificationTargets};

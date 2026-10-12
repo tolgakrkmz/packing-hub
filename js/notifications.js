@@ -155,10 +155,10 @@ window.HubNotifications = (() => {
         for (const item of data.items) {
           const row = el('article', '', 'notification-row'); row.dataset.read = String(item.read);
           const heading = el('h2', item.text), time = el('time', new Date(item.at).toLocaleString(document.documentElement.lang, {timeZone: 'Europe/Sofia'})); time.dateTime = new Date(item.at).toISOString(); time.setAttribute('translate', 'no');
-          const link = el('a', 'Отвори'), read = el('button', 'Прочети'); link.href = item.href; read.type = 'button'; read.hidden = item.read;
+          const link = el('a', 'Отвори', 'notification-open'), read = el('button', 'Прочети'); link.href = item.href; read.type = 'button'; read.hidden = item.read;
           const mark = async () => { await send('/read', 'POST', {id: item.id}); row.dataset.read = 'true'; read.hidden = true; refreshCount(); };
           read.addEventListener('click', () => mark().then(() => load()).catch(showError));
-          link.addEventListener('click', async event => { event.preventDefault(); try { await mark(); } catch {} location.assign(item.href); });
+          link.addEventListener('click', async event => { if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); try { await mark(); } catch {} location.assign(item.href); });
           const actions = el('div', '', 'notification-actions'); actions.append(time, link, read); row.append(heading, actions); list.append(row);
         }
         message.textContent = '';
