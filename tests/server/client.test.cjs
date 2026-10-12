@@ -11,13 +11,13 @@ function client({module = 'production-log', period} = {}) {
   const context = vm.createContext({
     URLSearchParams,
     HubPermissions: require('../../js/permission-model.js'),
-    window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}},
+    window: {HUB_SERVER_BOOT: {user: {username: 'demo-observer', role: 'observer', permissions: require('../../server/permissions.cjs').defaults.observer}, csrf: 'fictional-csrf', version: 'demo-version'}, addEventListener() {}},
     location: {pathname: '/' + module},
-    document: {hidden:false, addEventListener: (name, callback) => { if (!callbacks.has(name)) callbacks.set(name,[]); callbacks.get(name).push(callback); }, createElement: element, body: {prepend() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
+    document: {hidden:false, addEventListener: (name, callback) => { if (!callbacks.has(name)) callbacks.set(name,[]); callbacks.get(name).push(callback); }, createElement: element, body: {prepend() {}, append() {}, classList: {add() {}}}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null},
     MutationObserver: class { observe() {} },
     EventSource: class { constructor() { events = new Map(); } addEventListener(name, callback) { events.set(name, callback); } },
     registerConnectionPanel: () => () => {},
-    fetch: (...args) => fetchData(...args), setTimeout
+    fetch: (...args) => fetchData(...args), setTimeout:(callback,ms) => { const timer = setTimeout(callback,ms); if ([150,8000].includes(ms)) timer.unref(); return timer; }, clearTimeout
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../js/server-connection.js'), 'utf8'), context);
   const hub = vm.runInContext('HubServer', context);
