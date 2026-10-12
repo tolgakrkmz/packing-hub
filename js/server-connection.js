@@ -53,29 +53,42 @@ const HubServer = (() => {
       if (!listeners.get(module).includes(shared.get(busy))) listeners.get(module).push(shared.get(busy));
       return;
     }
-    let running = false, pending = false, retry = null;
-    const update = async () => {
+    let running = null, pending = false, retry = null;
+    const update = () => {
       pending = true;
-      if (running || document.hidden) return;
+      if (running) return running;
+      if (document.hidden) return;
       if (busy()) {
         if (!retry) retry = setTimeout(() => { retry = null; update(); }, 200);
         return;
       }
-      running = true;
-      try {
-        while (pending && !document.hidden && !busy()) {
-          pending = false;
-          await refresh();
+      // Assign the drain promise before starting: refresh can throw or emit
+      // another change synchronously, and callers still join this same work.
+      let finish;
+      const work = running = new Promise(resolve => { finish = resolve; });
+      (async () => {
+        try {
+          while (pending && !document.hidden && !busy()) {
+            pending = false;
+            await refresh();
+          }
+        } catch {} finally {
+          running = null;
+          const next = pending && !document.hidden ? update() : null;
+          if (next) next.then(finish);
+          else finish();
         }
-      } catch {} finally {
-        running = false;
-        if (pending && !document.hidden) update();
-      }
+      })();
+      return work;
     };
     if (!listeners.has(module)) listeners.set(module, []);
     listeners.get(module).push(update);
     shared.set(busy, update);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) update(); });
+  }
+  function refreshVisibleWatchers() {
+    if (document.hidden) return Promise.resolve();
+    const refreshers = new Set(Array.from(listeners.values()).flat());
+    return Promise.allSettled(Array.from(refreshers, refresh => refresh())).then(() => {});
   }
   function fileSync(cfg) {
     const kind = cfg.suggestedFileName.replace(/\.json$/, '');
@@ -354,19 +367,64 @@ const HubServer = (() => {
     if (currentModule === 'report-history') {
       state.setAttribute('data-connection', 'ready'); state.textContent = 'Ръчно обновяване';
     } else {
+      const overlay = document.createElement('div'); overlay.id = 'serverReconnectOverlay'; overlay.className = 'server-reconnect-overlay'; overlay.hidden = true;
+      const card = document.createElement('div'); card.className = 'server-reconnect-card';
+      const ring = document.createElement('span'); ring.className = 'server-reconnect-ring'; ring.setAttribute('aria-hidden', 'true');
+      const brand = document.createElement('span'); brand.className = 'server-reconnect-brand'; brand.textContent = 'Package Hub'; brand.setAttribute('translate', 'no');
+      const message = document.createElement('p'); message.className = 'server-reconnect-message'; message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
+      const note = document.createElement('p'); note.className = 'server-reconnect-note'; note.textContent = 'Проверяваме връзката и актуалните данни.';
+      card.append(ring, brand, message, note); overlay.append(card); document.body.append(overlay);
+      let recovery = null, attempt = 0, transportReady = false, resumeWork = null;
+      let transportEpoch = 0, synchronizedEpoch = -1;
+      function finishRecovery(id) {
+        if (!recovery || recovery.id !== id) return;
+        recovery.finished = true;
+        clearTimeout(recovery.reveal); clearTimeout(recovery.deadline);
+        overlay.hidden = true;
+      }
+      function beginRecovery(text, {restart = false} = {}) {
+        // Retain a finished attempt while transport is down: repeated errors
+        // must not restart or prolong the bounded decorative visual.
+        if (recovery && !restart) return recovery.id;
+        if (recovery) { clearTimeout(recovery.reveal); clearTimeout(recovery.deadline); }
+        const current = recovery = {id: ++attempt, finished: false};
+        message.textContent = text;
+        current.reveal = setTimeout(() => { if (recovery === current && !current.finished) overlay.hidden = false; }, 150);
+        current.deadline = setTimeout(() => finishRecovery(current.id), 8000);
+        return current.id;
+      }
+      beginRecovery('Възстановяване на връзката…');
       const eventSource = new EventSource('/api/events');
-      eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
-      eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
+      eventSource.onopen = () => { transportReady = true; transportEpoch++; state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
+      eventSource.onerror = () => {
+        beginRecovery('Възстановяване на връзката…', {restart: transportReady}); transportReady = false;
+        state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…';
+      };
       eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
       // The server emits this for normal session expiry too. Keep the phone's
       // opt-in; account revocation already removes its subscriptions server-side.
-      eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login'); });
+      eventSource.addEventListener('logout', () => { finishRecovery(recovery.id); eventSource.close(); location.assign('/login'); });
       eventSource.addEventListener('version', event => {
         if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
           const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
         }
-        for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
+        const current = recovery.id, connection = transportEpoch;
+        refreshVisibleWatchers().then(() => {
+          if (transportReady && connection === transportEpoch) {
+            synchronizedEpoch = connection;
+            finishRecovery(current);
+          }
+        });
       });
+      function resume() {
+        if (document.hidden || resumeWork) return;
+        const current = beginRecovery('Възстановяване на връзката…', {restart: true});
+        const work = resumeWork = refreshVisibleWatchers();
+        work.then(() => { if (transportReady && eventSource.readyState === 1 && synchronizedEpoch === transportEpoch) finishRecovery(current); })
+          .finally(() => { if (resumeWork === work) resumeWork = null; });
+      }
+      document.addEventListener('visibilitychange', () => { if (document.hidden) resumeWork = null; else resume(); });
+      window.addEventListener('pageshow', event => { if (event.persisted) resume(); });
     }
     if (currentModule === 'index') {
       const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');

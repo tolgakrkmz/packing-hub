@@ -307,7 +307,11 @@ not-applicable reports remain in Reported;
 returned or reopened tasks move to Unreported until a new report is submitted.
 Cancelled tasks appear only in Cancelled, including those that retain an earlier
 report. Reopening a cancelled task moves it to Unreported.
-Owner, search and period filters apply to all three groups. Period statistics count
+Owner and search filters apply to all three groups. Unreported includes all dates
+so older tasks without a report remain trackable; its date controls are hidden.
+Reported, Cancelled and statistics use the selected period, which defaults to
+today and the two preceding calendar days and can be expanded manually.
+Period statistics count
 ended applicable shift tasks, completed/not-done/unreported results, distinct shifts with missing reports and
 late reports per owner. Several missing tasks in one shift count as one missing
 shift. Cancelled and inapplicable tasks are excluded from the completion rate.

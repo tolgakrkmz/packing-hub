@@ -133,6 +133,10 @@
   }
   const problemPicker = photoPicker('problem'), solutionPicker = photoPicker('solution');
   function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
+  function historyIncludes(item, group) {
+    const kind = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
+    return kind === group && (group === 'unreported' || period(item));
+  }
   function summarize(items) {
     const shifts = items.filter(item => item.kind === 'shift' && item.due + state.graceMinutes * 60000 < state.now && !['cancelled', 'not-applicable'].includes(item.status));
     return {total: shifts.length, done: shifts.filter(item => item.status === 'completed').length, failed: shifts.filter(item => item.status === 'not-done').length, missing: shifts.filter(item => item.displayStatus === 'unreported').length,
@@ -168,13 +172,12 @@
     controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
     wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
     const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
-    const historyGroup = item => item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
     for (const [key, label, description, noResults] of [
       ['reported', 'Отчетени', 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
-      ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние.', 'Няма неотчетени задачи по тези критерии.'],
+      ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние. Показани са всички дати.', 'Няма неотчетени задачи по тези критерии.'],
       ['cancelled', 'Отменени', 'Задачи с отменено възлагане.', 'Няма отменени задачи по тези критерии.']
     ]) {
-      const values = newestFirst.filter(item => historyGroup(item) === key);
+      const values = newestFirst.filter(item => historyIncludes(item, key));
       const control = button('', () => {
         historyView = key; listPage = 1; render();
         $('taskContent').querySelector(`[data-history-view="${key}"]`).focus();
@@ -242,13 +245,14 @@
     const selected = item => (!owner || String(item.owner.id) === owner) && (item.title + ' ' + item.description).toLowerCase().includes(search);
     const items = state.items.filter(selected), overview = $('taskOverview'); overview.replaceChildren();
     for (const [label, count] of [['Активни задачи', items.filter(item => !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)).length], ['Неотчетени', items.filter(item => item.displayStatus === 'unreported').length], ['Готови за проверка', items.filter(item => item.status === 'review').length], ['Просрочени глобални', items.filter(item => item.overdue).length]]) { const metric = el('div', '', 'task-metric'); metric.append(el('strong', String(count)), el('span', label)); overview.append(metric); }
-    $('taskPeriod').hidden = !['stats', 'history'].includes(view);
+    const usesPeriod = view === 'stats' || view === 'history' && historyView !== 'unreported';
+    $('taskPeriod').hidden = !usesPeriod;
     const content = $('taskContent'), retainedFocus = content.contains(document.activeElement) ? document.activeElement : null;
     forgetPhotos(content); content.replaceChildren();
     try {
-    if (['stats', 'history'].includes(view) && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
+    if (usesPeriod && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
     if (view === 'stats') { content.append(renderStats(items)); return; }
-    if (view === 'history') { content.append(renderHistory(items.filter(period))); return; }
+    if (view === 'history') { content.append(renderHistory(items)); return; }
     const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item));
     values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
     if (!values.length) { listPage = 1; content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.')); }
@@ -291,7 +295,11 @@
       renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
-      if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
+      if (!$('statsUntil').value) {
+        const today = date(state.now);
+        $('statsUntil').value = today;
+        $('statsFrom').value = new Date(Date.parse(today) - 2 * 86400000).toISOString().slice(0, 10);
+      }
       globalThis.HubNotificationTarget?.select([...state.items, ...state.schedules], item => item.id, item => {
         $('ownerFilter').value = ''; $('taskSearch').value = '';
         let values;
@@ -301,7 +309,7 @@
           view = 'history'; historyView = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
           const day = item.kind === 'shift' ? item.shift.date : date(item.due);
           $('statsFrom').value = day; $('statsUntil').value = day;
-          values = state.items.filter(value => period(value) && (value.status === 'cancelled' ? 'cancelled' : value.report ? 'reported' : 'unreported') === historyView).sort((a,b) => b.createdAt-a.createdAt || b.due-a.due);
+          values = state.items.filter(value => historyIncludes(value, historyView)).sort((a,b) => b.createdAt-a.createdAt || b.due-a.due);
         }
         listPage = Math.floor(values.indexOf(item) / pageSize) + 1;
         for (const tab of $('taskTabs').querySelectorAll('button')) tab.setAttribute('aria-pressed', String(tab.dataset.view === view));

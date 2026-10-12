@@ -103,12 +103,12 @@ header h1{letter-spacing:.2px;}
 
 .reason-chip{
   display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);
-  border:1px solid var(--border);border-radius:999px;padding:5px 6px 5px 12px;
-  font-size:12px;margin:0 6px 6px 0;
+  border:1px solid var(--border);border-radius:12px;padding:5px 6px 5px 12px;
+  font-size:12px;margin:0 6px 6px 0;max-width:calc(100% - 6px);overflow-wrap:anywhere;
 }
 .reason-chip button{
   background:none;border:none;color:var(--text-muted);cursor:pointer;
-  font-size:14px;line-height:1;padding:2px 6px;
+  font-size:14px;line-height:1;padding:2px 6px;flex-shrink:0;
 }
 .reason-chip button:hover{color:var(--red);}
 
@@ -121,7 +121,7 @@ header h1{letter-spacing:.2px;}
 #historyWrap{overflow-x:auto;}
 #historyWrap table{min-width:520px;}
 .history-note{font-size:11px;color:var(--text-muted);margin-top:12px;line-height:1.5;}
-.history-note a{color:var(--amber);}
+.history-note a{color:var(--amber);display:inline-flex;align-items:center;min-height:44px;padding:0 6px;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 thead th{
   text-align:left;color:var(--text-muted);font-weight:700;

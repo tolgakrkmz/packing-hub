@@ -81,7 +81,7 @@ recovery check is coverage evidence and is not recorded as a vulnerability.
 - **Independent check:** the coordinator reran the regression against the
   original renderer: five cases failed and the normal-date case passed. After
   applying the escaping fix, all six cases passed.
-- **Status:** fixed and independently verified; awaiting batch merge.
+- **Status:** fixed and independently verified.
 
 ### SEC-INPUT-01 — P2 — empty JPEG tables accepted as task evidence
 
@@ -346,6 +346,25 @@ Verified expanded source commits:
 - `0573254`: instruction attribute escaping and client/browser regressions.
 - `2f7dff1`: bounded authorization race waits and connection cleanup.
 
-Publication targets the dedicated feature branch. The batch awaits the user's
-explicit merge request; its Trello card must remain unfinished until merge and
-push to `main` succeed. Production deployment and real data remain local.
+The user explicitly authorized the batch merge on 2026-10-13. Integration is
+prepared and verified on this chat's dedicated feature branch. Its Trello card
+must remain unfinished until merge and push to `main` succeed. Production
+deployment and real data remain local.
+
+## Authorized merge validation
+
+The security branch at `1ee737c` was combined with main at `d443f24`, preserving
+both sets of focused runner modes. Conflicts were limited to the three browser
+and aggregate test runners; all security, responsive and reconnect modes remain.
+
+- `node scripts/run-critical-tests.cjs --browser`: **32 suite runs passed,
+  zero failed**, exit 0: **616/616 Node tests** (285 client/source and 331 server;
+  zero failures, skips or cancellations) and **30 browser suite runs** (9 offline
+  and 21 server).
+- Publication check with the local private-reference check: **PASS**, 246
+  reviewed files. Active hooks: `.githooks`.
+- Runner syntax checks, resolved index and staged diff whitespace: **PASS**.
+
+Main subsequently advanced to `802fd98`, changing the reconnect reveal delay
+from 150 ms to 2300 ms with matching unit regressions. That additional change
+requires integration and fresh validation before the final main push.
