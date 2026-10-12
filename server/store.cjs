@@ -208,24 +208,65 @@ function openStore(filename) {
       return {...saved, receipt, replayed: false};
     });
   }
-  function reportHistory(kind, entryId, user) {
+  function historyAccess(kind, user) {
     if (!Object.hasOwn(reports,kind)) throw problem(404,'NOT_FOUND');
     if (!canViewModule(user,kind) || !can(user,reports[kind].edit)) throw problem(403,'FORBIDDEN');
-    const current = get(kind), live = current.data.entries.find(item => item.id === entryId);
-    const version = db.prepare('SELECT version FROM report_versions WHERE kind=? AND entry_id=?').get(kind,entryId)?.version ?? current.versions[entryId];
-    if (!version) throw problem(404,'NOT_FOUND');
-    const events = db.prepare('SELECT version,action,at,user_id,account,reason,before_data,after_data FROM report_history WHERE kind=? AND entry_id=? ORDER BY version DESC').all(kind,entryId).map(({user_id,before_data,after_data,...event}) => ({...event,accountId:user_id,before:JSON.parse(before_data),after:JSON.parse(after_data)}));
-    return {entryId,version,deleted:!live,current:live || null,events};
   }
-  function reportHistoryList(kind, user) {
-    if (!Object.hasOwn(reports,kind)) throw problem(404,'NOT_FOUND');
-    if (!canViewModule(user,kind) || !can(user,reports[kind].edit)) throw problem(403,'FORBIDDEN');
-    const current = get(kind), live = new Map(current.data.entries.map(item => [item.id,item]));
-    const rows = db.prepare('SELECT v.entry_id,v.version,h.before_data,h.after_data FROM report_versions v LEFT JOIN report_history h ON h.kind=v.kind AND h.entry_id=v.entry_id AND h.version=v.version WHERE v.kind=?').all(kind);
-    const versions = new Map(rows.map(row => [row.entry_id,row.version]));
-    const snapshots = new Map(rows.map(row => [row.entry_id,JSON.parse(row.after_data || row.before_data || 'null')]));
-    for (const [id,version] of Object.entries(current.versions)) versions.set(id,version);
-    return {entries:[...versions].sort(([a,av],[b,bv]) => bv-av || a.localeCompare(b)).map(([id,version]) => ({entryId:id,version,deleted:!live.has(id),date:(live.get(id) || snapshots.get(id))?.date || null,shift:(live.get(id) || snapshots.get(id))?.shift || (live.get(id) || snapshots.get(id))?.team || null}))};
+  function historyNumber(value, fallback) {
+    if (value === undefined || value === null) return fallback;
+    if (!/^\d+$/.test(String(value)) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) throw problem(400,'INVALID_HISTORY_FILTER');
+    return Number(value);
+  }
+  function historyEvent(row) {
+    const {user_id,before_data,after_data,...event} = row;
+    return {...event,accountId:user_id,...(before_data !== undefined ? {before:JSON.parse(before_data),after:JSON.parse(after_data)} : {})};
+  }
+  function reportHistorySnapshot(kind, entryId, version, user) {
+    historyAccess(kind,user);
+    const row = db.prepare('SELECT version,action,at,user_id,account,reason,before_data,after_data FROM report_history WHERE kind=? AND entry_id=? AND version=?').get(kind,entryId,historyNumber(version));
+    if (!row) throw problem(404,'NOT_FOUND');
+    return historyEvent(row);
+  }
+  function reportHistory(kind, entryId, user, options = {}) {
+    historyAccess(kind,user);
+    // Read one live record, without constructing every report and its version map.
+    const current = db.prepare("SELECT revision,(SELECT value FROM json_each(documents.data,'$.entries') WHERE json_extract(value,'$.id')=? LIMIT 1) AS entry FROM documents WHERE kind=?").get(entryId,kind);
+    const live = current.entry ? JSON.parse(current.entry) : null;
+    const version = db.prepare('SELECT version FROM report_versions WHERE kind=? AND entry_id=?').get(kind,entryId)?.version ?? (live ? current.revision : undefined);
+    if (!version) throw problem(404,'NOT_FOUND');
+    const limit = Math.min(historyNumber(options.limit,20),50), before = historyNumber(options.beforeVersion,Number.MAX_SAFE_INTEGER);
+    const fields = 'version,action,at,user_id,account,reason' + (options.metadataOnly ? '' : ',before_data,after_data');
+    const rows = db.prepare('SELECT '+fields+' FROM report_history WHERE kind=? AND entry_id=? AND version<? ORDER BY version DESC LIMIT ?').all(kind,entryId,before,limit+1);
+    const events = rows.slice(0,limit).map(historyEvent);
+    return {entryId,version,deleted:!live,current:live,events,nextVersion:rows.length > limit ? events.at(-1).version : null};
+  }
+  function reportHistoryList(kind, user, options = {}) {
+    historyAccess(kind,user);
+    const limit = Math.min(historyNumber(options.limit,25),50), date = options.date || '';
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0,10) !== date)) throw problem(400,'INVALID_HISTORY_FILTER');
+    let cursor = {version:Number.MAX_SAFE_INTEGER,id:''};
+    if (options.cursor) {
+      try { if (typeof options.cursor !== 'string' || options.cursor.length > 16384) throw new Error(); cursor = JSON.parse(Buffer.from(options.cursor,'base64url').toString()); if (!cursor || !Number.isSafeInteger(cursor.version) || cursor.version < 1 || typeof cursor.id !== 'string' || !cursor.id) throw new Error(); }
+      catch { throw problem(400,'INVALID_HISTORY_FILTER'); }
+    }
+    // Project only list metadata in SQLite, including legacy and deleted records.
+    const rows = db.prepare(`WITH live AS (
+      SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.date') AS date,
+        coalesce(json_extract(value,'$.shift'),json_extract(value,'$.team')) AS shift
+      FROM documents,json_each(documents.data,'$.entries') WHERE kind=?
+    ), records AS (
+      SELECT v.entry_id AS entryId,v.version,l.id IS NULL AS deleted,
+        coalesce(l.date,json_extract(coalesce(h.after_data,h.before_data),'$.date')) AS date,
+        coalesce(l.shift,json_extract(coalesce(h.after_data,h.before_data),'$.shift'),json_extract(coalesce(h.after_data,h.before_data),'$.team')) AS shift
+      FROM report_versions v LEFT JOIN live l ON l.id=v.entry_id
+      LEFT JOIN report_history h ON h.kind=v.kind AND h.entry_id=v.entry_id AND h.version=v.version WHERE v.kind=?
+      UNION ALL SELECT l.id,d.revision,0,l.date,l.shift FROM live l JOIN documents d ON d.kind=?
+      WHERE NOT EXISTS(SELECT 1 FROM report_versions v WHERE v.kind=d.kind AND v.entry_id=l.id)
+    ) SELECT * FROM records WHERE (?='' OR date=?) AND (version<? OR (version=? AND entryId>?))
+      ORDER BY version DESC,entryId COLLATE BINARY LIMIT ?`).all(kind,kind,kind,date,date,cursor.version,cursor.version,cursor.id,limit+1);
+    const entries = rows.slice(0,limit).map(row => ({...row,deleted:!!row.deleted}));
+    const last = entries.at(-1);
+    return {entries,nextCursor:rows.length > limit ? Buffer.from(JSON.stringify({version:last.version,id:last.entryId})).toString('base64url') : null};
   }
   function productionImport(input, user) {
     if (!can(user, 'canImportData') || !canViewModule(user, 'production-log')) throw problem(403, 'FORBIDDEN');
@@ -312,6 +353,6 @@ function openStore(filename) {
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  return {db, get, put, updateDocument, reportOperation, reportHistory, reportHistoryList, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  return {db, get, put, updateDocument, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges};

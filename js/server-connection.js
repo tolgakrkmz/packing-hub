@@ -17,6 +17,7 @@ const HubServer = (() => {
   messages.SELF_DELETE = 'Не можеш да изтриеш акаунта, с който си влязъл.';
   messages.NOT_FOUND = 'Записът вече не е наличен. Опресни страницата.';
   messages.INVALID_PERIOD = 'Избери валиден месец и година.';
+  messages.INVALID_HISTORY_FILTER = 'Провери датата и зареди записите отново.';
   Object.assign(messages, {
     REPORT_CONFLICT: 'Записът е променен или изтрит от друг потребител. Черновата остава във формата. Прегледай актуалния запис преди нов опит.',
     OPERATION_REUSED: 'Този опит вече е използван за друга промяна. Прегледай актуалния запис.',
@@ -350,19 +351,23 @@ const HubServer = (() => {
     document.body.prepend(bar);
     // The language switch is initialized by i18n after the injected server script.
     setTimeout(() => { const language = document.querySelector('.hub-language'); if (language) tools.append(language); }, 0);
-    const eventSource = new EventSource('/api/events');
-    eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
-    eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
-    eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
-    // The server emits this for normal session expiry too. Keep the phone's
-    // opt-in; account revocation already removes its subscriptions server-side.
-    eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login'); });
-    eventSource.addEventListener('version', event => {
-      if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
-        const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
-      }
-      for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
-    });
+    if (currentModule === 'report-history') {
+      state.setAttribute('data-connection', 'ready'); state.textContent = 'Ръчно обновяване';
+    } else {
+      const eventSource = new EventSource('/api/events');
+      eventSource.onopen = () => { state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
+      eventSource.onerror = () => { state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…'; };
+      eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
+      // The server emits this for normal session expiry too. Keep the phone's
+      // opt-in; account revocation already removes its subscriptions server-side.
+      eventSource.addEventListener('logout', () => { eventSource.close(); location.assign('/login'); });
+      eventSource.addEventListener('version', event => {
+        if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
+          const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
+        }
+        for (const refreshers of listeners.values()) for (const refresh of refreshers) refresh();
+      });
+    }
     if (currentModule === 'index') {
       const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
       if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
@@ -372,7 +377,7 @@ const HubServer = (() => {
     const taskBadges = [];
     let taskCountSequence = 0;
     let taskCountRead = null;
-    if (can('canViewTasks')) {
+    if (can('canViewTasks') && currentModule !== 'report-history') {
       for (const link of document.querySelectorAll('a[href="/tasks"],a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
         const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
         badge.setAttribute('role', 'status'); (link.querySelector('h2') || link).append(badge); taskBadges.push(badge);

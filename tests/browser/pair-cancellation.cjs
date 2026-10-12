@@ -95,10 +95,18 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
   await expect(page.locator('#dialogError')).toContainText('Двойката е променена');
   await expect(page.locator('#cancellationText')).toHaveValue('Fictional reassignment note');
   assert.equal((await read()).entries[1].cancellation,undefined);
-  await page.locator('#cancelDialogBtn').click();
-  await page.locator('#pairsList [data-action=cancel]').click();
-  await page.locator('#cancellationReason').selectOption('other');
-  await page.locator('#cancellationText').fill('Fictional reassignment note');
+  if (await page.locator('#reviewPairBtn').isVisible()) {
+    await page.locator('#reviewPairBtn').click();
+    await expect(page.locator('.report-review')).toContainText('1200');
+    await page.locator('.report-review button').first().click();
+    await expect(page.locator('#dialogError')).toContainText('Версията е прегледана');
+    await expect(page.locator('#cancellationText')).toHaveValue('Fictional reassignment note');
+  } else {
+    await page.locator('#cancelDialogBtn').click();
+    await page.locator('#pairsList [data-action=cancel]').click();
+    await page.locator('#cancellationReason').selectOption('other');
+    await page.locator('#cancellationText').fill('Fictional reassignment note');
+  }
   await page.locator('#savePairBtn').click();
   await saved(data => data.entries[1].cancellation?.reasonKey === 'other');
   await expect(page.locator('#pairDialog')).not.toBeVisible();

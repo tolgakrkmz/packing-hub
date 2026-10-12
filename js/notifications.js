@@ -203,6 +203,8 @@ window.HubNotifications = (() => {
     // Local bell vector uses no external assets.
     link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/></svg>';
     badge = el('span', '', 'notification-count'); badge.hidden = true; link.append(badge); document.querySelector('.server-links')?.append(link);
+    // Incident review stays idle; notification checks resume on their own page.
+    if (/^\/report-history(?:\.html)?\/?$/.test(location.pathname)) return;
     HubServer.watch('notifications', refreshCount); HubServer.watch('tasks', refreshCount);
     for (const module of ['production-log', 'line-downtime', 'pair-targets', 'package-instructions']) HubServer.watch(module, refreshCount);
     setInterval(() => { if (!document.hidden) { refreshCount(); if (deviceUnavailable) checkDevice(); } }, 30000);

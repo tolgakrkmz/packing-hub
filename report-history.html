@@ -9,14 +9,23 @@
   <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css">
   <link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/admin-panel.css">
   <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+  <link rel="stylesheet" href="css/report-history.css">
   <script src="js/report-history.js" defer></script>
-<link rel="stylesheet" href="css/report-history.css">
 </head>
 <body>
 <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
-<main class="account-wrap admin-panel-page">
+<main class="account-wrap admin-panel-page history-page">
 <a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
-<header class="admin-panel-heading"><p class="admin-panel-eyebrow">Проследяване</p><h1>История на отчетите</h1><p>Предишните версии се пазят в защитената база.</p></header>
-<label for="historyKind">Модул</label><select id="historyKind"></select><button id="historyRefresh" type="button">Опресни</button>
-<p id="historyMessage" role="status"></p><div class="history-layout"><nav id="historyRecords" aria-label="Записи"></nav><section id="historyDetail" aria-label="Версии" aria-live="polite"></section></div>
+<header class="admin-panel-heading"><p class="admin-panel-eyebrow">Проследяване</p><h1>История на отчетите</h1><p>За справка при инцидент. Избери модул и дата, за да прегледаш записите.</p></header>
+<form id="historyFilters" class="history-filters">
+  <label for="historyKind">Модул<select id="historyKind"></select></label>
+  <label for="historyDate">Дата на отчета<input id="historyDate" type="date"><small>Без дата: всички дати</small></label>
+  <button id="historyRefresh" type="submit">Покажи записи</button>
+</form>
+<p class="history-hint">Данните се зареждат само при преглед. Няма автоматично обновяване.</p>
+<p id="historyMessage" role="status" aria-live="polite"></p>
+<div class="history-layout">
+  <aside class="history-list-panel" aria-labelledby="historyRecordsTitle"><h2 id="historyRecordsTitle">Записи</h2><p id="historyListEmpty" class="history-empty">Натисни „Покажи записи“, за да започнеш.</p><nav id="historyRecords" aria-label="Записи"></nav><button id="historyMore" class="history-secondary" type="button" hidden>Още записи</button></aside>
+  <section id="historyDetail" class="history-detail" aria-label="Версии" aria-live="polite"><div class="history-placeholder"><h2>Преглед на запис</h2><p>Избери запис, за да видиш версиите.</p></div></section>
+</div>
 <a class="admin-panel-back" href="admin-panel.html">← Админ панел</a></main></body></html>

@@ -252,7 +252,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (history) {
           if (request.method !== 'GET') throw problem(405,'METHOD_REJECTED');
           const id = url.searchParams.get('entryId');
-          return json(response,200,id === null ? store.reportHistoryList(history[1],currentUser()) : store.reportHistory(history[1],id,currentUser()));
+          const options = Object.fromEntries(url.searchParams);
+          const result = id === null ? store.reportHistoryList(history[1],currentUser(),options)
+            : options.version !== undefined ? store.reportHistorySnapshot(history[1],id,options.version,currentUser())
+            : store.reportHistory(history[1],id,currentUser(),{...options,metadataOnly:options.metadata === '1'});
+          return json(response,200,result);
         }
         const operation = pathname.match(/^\/api\/reports\/(production-log|line-downtime|pair-targets)\/operations$/);
         if (operation) {
