@@ -125,8 +125,23 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     const code = Number(p.hour) < 6 || Number(p.hour) >= 22 ? 3 : Number(p.hour) < 14 ? 1 : 2;
     return {date, code};
   }
-  function clean(at) { photos.cleanup(all('task_items'), all('task_schedules'), at, date => instant(nextDate(date), '12:00')); }
-  function maintain() { store.transaction(() => { const at = now(); materialize(at); clean(at); }); }
+  function clean(at) { return photos.cleanup(all('task_items'), all('task_schedules'), at, date => instant(nextDate(date), '12:00')); }
+  const changes = db.prepare('SELECT total_changes() AS count');
+  const dataVersion = db.prepare('PRAGMA data_version');
+  let cleanedChanges = -1, cleanedVersion = -1, cleanedAt = -Infinity, nextCleanupAt = -Infinity;
+  function maintain() {
+    const at = now();
+    const decision = store.transaction(() => {
+      materialize(at);
+      // Only reuse the cleanup decision. Photo authorization and bytes are read
+      // afresh, and exact retention deadlines or any database write invalidate it.
+      const unchanged = at >= cleanedAt && at < nextCleanupAt && changes.get().count === cleanedChanges && dataVersion.get().data_version === cleanedVersion;
+      const next = unchanged ? nextCleanupAt : clean(at);
+      return {next, changes: changes.get().count, version: dataVersion.get().data_version};
+    });
+    // Publish the decision after commit, so rolled-back cleanup cannot be reused.
+    cleanedAt = at; nextCleanupAt = decision.next; cleanedChanges = decision.changes; cleanedVersion = decision.version;
+  }
   function photo(table, id, photoId, user) {
     access(user); maintain();
     const item = row(table === 'schedules' ? 'task_schedules' : 'task_items', id);

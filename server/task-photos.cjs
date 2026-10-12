@@ -98,17 +98,21 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
   // Call inside the task transaction, after recurring shifts have materialized.
   function cleanup(items, schedules, at, scheduleEnd) {
     const keep = new Set();
+    let nextCleanupAt = Infinity;
     for (const item of items) {
       const closedAt = item.closedAt ?? item.events?.at(-1)?.at ?? item.createdAt;
-      if (!FINAL.includes(item.status) || afterMonths(closedAt, retentionMonths) > at) for (const photo of references(item)) keep.add(photo.id);
+      const evidence = references(item), expires = FINAL.includes(item.status) ? afterMonths(closedAt, retentionMonths) : Infinity;
+      if (evidence.length && expires > at) { nextCleanupAt = Math.min(nextCleanupAt, expires); for (const photo of evidence) keep.add(photo.id); }
     }
     for (const schedule of schedules) {
-      if (!references(schedule).length) continue;
+      const evidence = references(schedule); if (!evidence.length) continue;
       const endedAt = schedule.stoppedAt || scheduleEnd(schedule.until);
-      if (afterMonths(endedAt, retentionMonths) > at) for (const photo of references(schedule)) keep.add(photo.id);
+      const expires = afterMonths(endedAt, retentionMonths);
+      if (expires > at) { nextCleanupAt = Math.min(nextCleanupAt, expires); for (const photo of evidence) keep.add(photo.id); }
     }
     const remove = db.prepare('DELETE FROM task_photos WHERE id=?');
     for (const photo of db.prepare('SELECT id FROM task_photos').all()) if (!keep.has(photo.id)) remove.run(photo.id);
+    return nextCleanupAt;
   }
   function decorate(item, available = new Set(db.prepare('SELECT id FROM task_photos').all().map(row => row.id))) {
     const mark = photo => ({...photo, available: available.has(photo.id)});
