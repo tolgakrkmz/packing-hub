@@ -205,12 +205,14 @@ const sync = createFileSync({
   render: render,
   onConnect: (data)=>{
     entries = data.entries || [];
+    globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { historyMonthInput.value = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     reasons = (data.reasons && data.reasons.length) ? data.reasons : defaultReasons();
     if(!reasons.includes('Друго')) reasons.push('Друго');
     if(!writer.busy) renderReasonSelect();
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
+    globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { historyMonthInput.value = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     reasons = (data.reasons && data.reasons.length) ? data.reasons : defaultReasons();
     if(!reasons.includes('Друго')) reasons.push('Друго');
     if(!writer.busy) renderReasonSelect();
@@ -351,7 +353,7 @@ function renderHistory(){
     const delCell = canEditReports
       ? '<td style="text-align:right">'+(typeof HubServer !== 'undefined' ? '<button class="edit-report-btn" data-id="'+escapeDowntimeText(e.id)+'">Редактирай</button>' : '')+'<button class="del-btn" data-id="'+escapeDowntimeText(e.id)+'" title="Изтрий">✕</button></td>'
       : '<td></td>';
-    html += '<tr>'
+    html += '<tr data-notification-target="'+escapeDowntimeText(e.id)+'">'
       + '<td>'+e.date+'</td>'
       + '<td><span class="tag tag-'+e.shift+'">'+e.shift+'</span></td>'
       + '<td>'+e.start+'–'+e.end+'</td>'
@@ -362,6 +364,7 @@ function renderHistory(){
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+  globalThis.HubNotificationTarget?.reveal(wrap);
 
   if(canEditReports){
     wrap.querySelectorAll('.edit-report-btn').forEach(button => button.addEventListener('click', () => editEntry(button.dataset.id)));

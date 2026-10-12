@@ -3,7 +3,7 @@ const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const permissions = require('./permissions.cjs');
 const {can} = permissions;
-const {types, available} = require('../js/notification-model.js');
+const {types, available, href} = require('../js/notification-model.js');
 const {createWebPush, validateSubscription} = require('./web-push.cjs');
 function createNotifications(store, {now = Date.now, push = {}, taskNow = now} = {}) {
   const {db} = store, transport = createWebPush({...push, now});
@@ -29,10 +29,11 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   function taskVisible(item, user) {
     return item && (!user.taskSupervisor || can(user, 'canManageTasks') || can(user, 'canReviewTasks') || item.owner.id === user.id || item.participants.some(p => p.id === user.id) || can(user, 'canAssignTasks') && item.events.some(e => e.action === 'created' && e.actor.id === user.id));
   }
-  const visible = (item, user) => allowed(user, item.type) && (!item.target || taskVisible(task(item.target), user));
+  const targetVisible = (type, target, user) => types[type]?.module !== 'tasks' || !target || taskVisible(task(target), user);
+  const visible = (item, user) => allowed(user, item.type) && targetVisible(item.type, item.target, user);
   function emit(type, eventKey, targets, target = null, at = now()) {
     for (const user of targets) {
-      if (!enabled(user, type) || target && !taskVisible(task(target), user)) continue;
+      if (!enabled(user, type) || !targetVisible(type, target, user)) continue;
       const result = db.prepare('INSERT OR IGNORE INTO notifications(id,user_id,type,target,at,event_key) VALUES(?,?,?,?,?,?)').run(randomUUID(), user.id, type, target, at, eventKey + ':' + type);
       if (!result.changes) continue;
       for (const subscription of db.prepare('SELECT id FROM push_subscriptions WHERE user_id=?').all(user.id)) {
@@ -44,24 +45,30 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   if (state('audit') === undefined) {
     // First installation starts with future events, rather than replaying private history.
     saveState('audit', db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n);
+    db.prepare('DELETE FROM notification_targets WHERE audit_id<=?').run(Number(state('audit')));
     for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) saveState('task:' + item.id, item.events?.length || 0);
   }
   function sync() {
     store.transaction(() => {
       const roster = users();
-      const changes = db.prepare('SELECT id,at,action,module,detail FROM audit WHERE id>? ORDER BY id LIMIT 1000').all(Number(state('audit')));
+      const changes = db.prepare('SELECT a.id,a.at,a.action,a.module,a.detail,t.data AS targets FROM audit a LEFT JOIN notification_targets t ON t.audit_id=a.id WHERE a.id>? ORDER BY a.id LIMIT 1000').all(Number(state('audit')));
       for (const change of changes) {
-        const detail = JSON.parse(change.detail), key = 'audit:' + change.id;
+        const detail = JSON.parse(change.detail), targets = JSON.parse(change.targets || '{}'), key = 'audit:' + change.id;
+        const records = (type, ids) => {
+          if (Array.isArray(ids) && ids.length) for (const id of new Set(ids)) emit(type, key + ':target:' + id, roster, id, change.at);
+          else emit(type, key, roster, null, change.at);
+        };
         if (['write', 'import'].includes(change.action)) {
           const prefix = {'production-log': 'production', 'line-downtime': 'downtime'}[change.module];
           if (prefix) {
-            if (detail.added) emit(prefix + 'Added', key, roster, null, change.at);
-            if (detail.changed) emit(prefix + 'Changed', key, roster, null, change.at);
-          } else if (detail.content && change.module === 'pair-targets') emit('pairs', key, roster, null, change.at);
-          else if (detail.content && change.module === 'package-instructions') emit('instructions', key, roster, null, change.at);
+            if (detail.added) records(prefix + 'Added', targets.addedIds);
+            if (detail.changed) records(prefix + 'Changed', targets.changedIds);
+          } else if (detail.content && change.module === 'pair-targets') records('pairs', [...(targets.addedIds || []), ...(targets.changedIds || [])]);
+          else if (detail.content && change.module === 'package-instructions') records('instructions', targets.profiles);
         }
-        if (['attachment-write', 'attachments-import'].includes(change.action) && change.module === 'package-instructions') emit('instructions', key, roster, null, change.at);
+        if (['attachment-write', 'attachments-import'].includes(change.action) && change.module === 'package-instructions') records('instructions', targets.profiles);
         saveState('audit', change.id);
+        db.prepare('DELETE FROM notification_targets WHERE audit_id=?').run(change.id);
       }
       const at = taskNow();
       for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) {
@@ -105,7 +112,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     const page = rows.filter(item => !before || item.sequence < Number(before));
     const pageSize = 3, items = page.slice(0, pageSize);
     return {count: rows.filter(item => item.read_at === null).length, nextBefore: page.length > pageSize ? String(items.at(-1).sequence) : null,
-      items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: '/' + types[item.type].module}))};
+      items: items.map(item => ({id: item.id, type: item.type, text: types[item.type].text, at: item.at, read: item.read_at !== null, href: href(item.type, item.target)}))};
   }
   function summary(user) {
     access(user);
@@ -116,7 +123,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
       WHERE user_id=? AND read_at IS NULL AND type IN (${permitted.map(() => '?').join(',')}) GROUP BY type,target`).all(user.id,...permitted);
     const targets = new Map();
     return {count:rows.reduce((count,row) => {
-      if (!row.target) return count + row.count;
+      if (types[row.type]?.module !== 'tasks' || !row.target) return count + row.count;
       if (!targets.has(row.target)) targets.set(row.target,taskVisible(task(row.target),user));
       return count + (targets.get(row.target) ? row.count : 0);
     },0)};

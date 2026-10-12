@@ -11,7 +11,13 @@
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
   const elements = prefix => Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key,$(prefix+key[0].toUpperCase()+key.slice(1))]));
-  const acceptPairs = value => { data = PairTargets.validateData(value); pairsLoaded = true; };
+  const acceptPairs = value => {
+    data = PairTargets.validateData(value); pairsLoaded = true;
+    globalThis.HubNotificationTarget?.select(data.entries, entry => entry.id, entry => {
+      context = {date: entry.date, team: entry.team, shiftCode: entry.shiftCode}; followLive = false;
+      $('historyMonth').value = entry.date.slice(0,7); updateControls();
+    });
+  };
   const acceptRoster = value => {
     if(!value || !Array.isArray(value.employees) || value.employees.some(person => !person || typeof person.id !== 'string' || !person.id || typeof person.name !== 'string' || !person.name.trim()) || new Set(value.employees.map(person => person.id)).size !== value.employees.length) {
       throw new Error('Изберете файла personnel.json със състава от „Смени и хора“.');
@@ -52,7 +58,7 @@
     const explanation = entry.cancellation || entry.result;
     const reason = (entry.cancellation ? PairTargets.CANCELLATION_REASONS : PairTargets.REASONS).find(item => item.key === explanation?.reasonKey);
     const cause = [reason ? escape(reason.label) : '', explanation?.reasonText ? `<span translate="no">${escape(explanation.reasonText)}</span>` : ''].filter(Boolean).join(' · ');
-    return `<article class="pair-card">
+    return `<article class="pair-card" data-notification-target="${escape(entry.id)}">
       <div class="card-top"><h3 translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</h3><span class="badge ${state}">${statusLabels[state]}</span></div>
       <div class="area-tags">${entry.areas.map(area => `<span class="badge">${areaLabels[area]} опаковка</span>`).join('')}</div>
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
@@ -94,6 +100,7 @@
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2;
     $('pairsList').innerHTML = selected.map(entry => pairCard(entry,true)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
+    globalThis.HubNotificationTarget?.reveal($('pairsList'));
   }
   function renderHistory() {
     const open = new Set(Array.from($('historyList').querySelectorAll('details[open]'),item => item.dataset.scope));

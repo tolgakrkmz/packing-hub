@@ -375,6 +375,11 @@ function renderSearch() {
     return;
   }
 
+  globalThis.HubNotificationTarget?.select(Object.values(dbIndex), profile => profile.folderName, profile => {
+    el.searchInput.value = ''; activeCategoryFilter = '';
+    categoryChips.forEach(chip => chip.classList.toggle('active', !chip.dataset.cat));
+    profilePage = Math.floor(getFilteredProfiles().indexOf(profile) / profilePageSize) + 1;
+  });
   const profiles = getFilteredProfiles();
   profilePage = HubListPagination.clamp(profilePage, profiles.length, profilePageSize);
 
@@ -392,6 +397,12 @@ function renderSearch() {
     el.resultsWrap.appendChild(createResultCard(profile));
   });
   el.resultsWrap.appendChild(profilePagination(profiles.length));
+  const target = globalThis.HubNotificationTarget;
+  if (target?.id) {
+    const profile = profiles.find(value => value.folderName === target.id);
+    const card = [...el.resultsWrap.querySelectorAll('.result-card')].find(value => value.dataset.folder === target.id);
+    if (profile && card) { toggleCard(card, profile); target.reveal(el.resultsWrap); }
+  }
 }
 
 function profilePagination(total) {
@@ -408,6 +419,7 @@ function createResultCard(profile) {
   card.className = 'result-card';
   card.dataset.number = profile.number;
   card.dataset.folder = profile.folderName;
+  card.dataset.notificationTarget = profile.folderName;
 
   const imageCount = (profile.images || []).length;
   const metaText = imageCount ? `${imageCount} файл${imageCount === 1 ? '' : 'а'}` : 'без файлове';

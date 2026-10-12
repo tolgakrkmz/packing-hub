@@ -187,7 +187,7 @@
   }
   function card(item, recurring = false) {
     const alert = item.displayStatus === 'unreported' || item.overdue || item.status === 'not-done';
-    const node = el('article', '', 'task-card' + (alert ? ' is-alert' : '')); node.dataset.taskId = item.id;
+    const node = el('article', '', 'task-card' + (alert ? ' is-alert' : '')); node.dataset.taskId = item.id; node.dataset.notificationTarget = item.id;
     const head = el('div', '', 'task-card-head'); head.append(el('h2', item.title, '', true), el('span', item.owner.username, 'task-meta', true)); node.append(head);
     const badges = el('div', '', 'task-badges');
     const status = recurring ? item.stoppedAt ? 'Повторението е спряно' : 'Активно повторение' : statusLabels[item.displayStatus];
@@ -241,6 +241,7 @@
     for (const item of values.slice((listPage - 1) * pageSize, listPage * pageSize)) list.append(card(item, recurring));
     content.append(list, HubListPagination.create({id: 'taskPagination', page: listPage, total: values.length, size: pageSize,
       onChange: page => { listPage = page; render(); }}));
+    globalThis.HubNotificationTarget?.reveal(list);
   }
   function refresh({fresh = false} = {}) {
     if (draftOpen() || document.hidden) return Promise.resolve();
@@ -260,6 +261,20 @@
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
       if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
+      globalThis.HubNotificationTarget?.select([...state.items, ...state.schedules], item => item.id, item => {
+        $('ownerFilter').value = ''; $('taskSearch').value = '';
+        let values;
+        if (state.schedules.includes(item)) {
+          view = 'schedules'; values = [...state.schedules].sort((a,b) => Date.parse(a.from) - Date.parse(b.from));
+        } else {
+          view = 'history'; historyView = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
+          const day = item.kind === 'shift' ? item.shift.date : date(item.due);
+          $('statsFrom').value = day; $('statsUntil').value = day;
+          values = state.items.filter(value => period(value) && (value.status === 'cancelled' ? 'cancelled' : value.report ? 'reported' : 'unreported') === historyView).sort((a,b) => b.createdAt-a.createdAt || b.due-a.due);
+        }
+        listPage = Math.floor(values.indexOf(item) / pageSize) + 1;
+        for (const tab of $('taskTabs').querySelectorAll('button')) tab.setAttribute('aria-pressed', String(tab.dataset.view === view));
+      });
       $('taskSubtitle').textContent = reviewer ? assigner ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : 'Следи отчетите и потвърждавай решените проблеми.' : admin ? 'Редактирай задачи и проследявай изпълнението им.' : assigner ? 'Възлагай сменни и глобални задачи и проследявай изпълнението им.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
       render();
     } catch (error) { if (current === sequence && !draftOpen()) $('taskMessage').textContent = error.message; }
