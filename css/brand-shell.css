@@ -94,6 +94,9 @@
 @media (prefers-reduced-motion: reduce) { .server-reconnect-overlay, .server-reconnect-ring { animation: none; transition: none; } }
 .server-bar .server-logout { background: transparent; color: var(--text-muted); border-color: var(--border); }
 .server-tools { gap: 12px 16px; padding: 14px 0; border-top: 1px solid var(--border); }
+.server-module-nav { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.server-module-nav label { color: var(--text-muted); font-size: 12px; }
+.server-module-nav select { width: 220px; min-width: 0; }
 .server-links { gap: 6px; }
 .server-links:empty { display: none; }
 .server-links a {
@@ -169,9 +172,11 @@ body.login-page {
   .server-bar #serverState { max-width: 145px; font-size: 11px; }
   .server-bar .server-logout { padding: 8px 12px; }
   .server-tools { gap: 12px; }
-  .server-links { width: 100%; gap: 6px; }
+  .server-module-nav { flex-basis: 100%; }
+  .server-module-nav select { flex: 1; width: 0; }
+  .server-links { flex: 1 1 auto; gap: 6px; }
   .server-links a { padding: 9px 11px; }
-  .server-bar .hub-language { margin-left: 0; }
+  .server-bar .hub-language { margin-left: auto; }
   body.login-page { padding: 20px 12px; }
   .login-page .login-wrap { padding: 24px 22px; border-radius: 20px; }
   .login-page .login-brand { gap: 12px; font-size: 25px; }

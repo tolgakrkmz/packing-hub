@@ -68,6 +68,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--navigation-only')) {
+      await require('../tests/browser/module-navigation.cjs').exerciseModuleNavigation({admin,hub,base,device,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--reconnect-only')) {
       await require('../tests/browser/reconnect-overlay.cjs').exerciseReconnectOverlay({admin,hub,base,expect,screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors,[]); return;

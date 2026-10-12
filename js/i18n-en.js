@@ -116,6 +116,8 @@ const HUB_EN_MESSAGES = {
   "Провери избраните данни": "Check selected data",
   "Качване на приложения": "Uploading attachments",
   "Модул": "Module",
+  "Избери модул": "Choose a module",
+  "Начална страница": "Home",
   "Файл": "File",
   "Нови": "New",
   "Конфликти": "Conflicts",

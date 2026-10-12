@@ -357,7 +357,20 @@ const HubServer = (() => {
       if (['system-status','accounts','activity-log','data-import','production-import','report-history'].includes(current)) link.setAttribute('aria-current', 'location');
     }
     if (!canViewModule('admin-panel') && canViewModule('data-import')) addLink('/data-import'+query,'Експорт на отчети');
-    tools.append(links);
+    const moduleNav = document.createElement('div'); moduleNav.className = 'server-module-nav';
+    const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
+    const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';
+    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.disabled = true; placeholder.textContent = 'Избери модул'; moduleSelect.append(placeholder);
+    const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики']];
+    for (const [name, title] of modules) {
+      if (name !== 'index' && !canViewModule(name)) continue;
+      const option = document.createElement('option'); option.value = name === 'index' ? '/' : '/' + name; option.textContent = title;
+      moduleSelect.append(option);
+    }
+    const currentRoute = currentModule === 'index' ? '/' : '/' + currentModule;
+    moduleSelect.value = modules.some(([name]) => name === currentModule) ? currentRoute : '';
+    moduleSelect.addEventListener('change', () => { if (moduleSelect.value && moduleSelect.value !== currentRoute) location.assign(moduleSelect.value); });
+    moduleNav.append(moduleLabel, moduleSelect); tools.append(moduleNav, links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
     const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login'); };
     session.append(identity, state, logout); bar.append(top, tools);
