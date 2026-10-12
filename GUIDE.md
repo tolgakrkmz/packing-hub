@@ -1187,6 +1187,58 @@ node scripts/run-server-browser-tests.cjs --headless --permissions-only
 
 ## Tests
 
+### Critical-function coverage and repeatable audit
+
+Run from the reviewed **demo repository**, using Node.js 24+ (including child
+processes and Git hooks). Browser checks additionally need Chrome and
+Playwright 1.62.1. Use an installed dependency through `NODE_PATH`, or the local
+installation described below. Every browser run uses a separate profile and
+every server run uses fictional data in a temporary SQLite database.
+
+```sh
+node scripts/run-critical-tests.cjs                # all unit and server tests
+node scripts/run-critical-tests.cjs --browser     # also all distinct browser suites
+node scripts/run-critical-tests.cjs --browser-only
+node scripts/check-publication.cjs --staged
+```
+
+The runner uses the same Node executable for child processes, prints a result
+for each suite and returns nonzero if any suite fails. Browser totals are
+**suite invocations**, not assertion counts: six offline and fifteen server
+invocations. When `tests/browser/report-history.cjs` is present after integration
+of that feature, its `--report-history-only` server flow is included too (one
+additional invocation). Default browser flows and focused flows are
+complementary; a successful default run alone does not cover report-operation recovery,
+statistics cache behavior, transfer permissions or task history in full.
+
+The audit completed on 12 October 2026 started from `main` baseline `d91bb63`
+(508 existing Node tests). With the eleven lifecycle/boundary additions, the
+final runner passed **273 unit + 246 server = 519 Node tests**, with no failures,
+skips or cancellations, and **6 offline + 15 server browser invocations**.
+The combined command reported **23 suite runs passed; 0 failed**. Validation
+used Node.js 24.19.0, Chrome 154.0.8037.99 and Playwright 1.62.1 with allowed
+loopback sockets. Browser corrections cover pending search results, the
+correction-only account form, toolbar readiness/navigation and versioned icons.
+
+| Important behavior | Existing behavioral coverage | Audit additions / remaining boundary |
+| --- | --- | --- |
+| Authentication, module permissions, CSRF, origin, active sessions | `server/api`, `permissions`, `module-permissions`, `routes`, browser permissions/account revocation | `server/session-lifecycle`: exact expiry, independent logout, login racing disable/delete, stale password update, all-session password revocation |
+| Durable reports, conflicts, retries and atomic rollback | `server/report-operations`, `client`, `report-save-recovery`, `file-sync`, browser report operations | Existing coverage retained; lost responses, competing edits and receipt persistence already tested |
+| Import/export validation and isolation | `data-validation`, `server/imports`, `api`, `permissions`, browser data transfer | `server/import-lifecycle`: newest approval only, complete upload replacement, owner quota/expiry, changed create retry; browser import card selection survives a pending search and authorized transfer navigation uses the admin panel or direct export entry |
+| Backup/restore and refusal of unsafe recovery | `server/backups`, `restore`, host/install/CLI tests; `BACKUP-RECOVERY-SCENARIOS.md` | Existing failure injection and complete recovery coverage retained; physical target-host recovery remains a separate deployment check |
+| Production/downtime totals and statistics freshness | `server/statistics`, `statistics-cache`, browser statistics period/cache/request counts | `server/statistics-boundaries`: leap day, year/month partition, fractional kg, zero report, all five shifts |
+| Pair targets, shift rotation, pending/cancelled plans and weighted deficits | `pair-targets`, `pair-targets-statistics`, browser cancellation and statistics | Existing coverage retained; includes daylight saving, roster changes and missed-result reasons |
+| Tasks, recurring shifts, deadline/grace, review, photos and permissions | `server/tasks`, `task-photos`, browser tasks/assignment/history/photo variants | Default plus focused history suite; uses server clock and isolated fictional evidence |
+| Instructions, translations, navigation and responsive layouts | `instruction-folders`, `i18n`, browser packing/routes/branding/lists/static assets | Specific imported-card selector replaces a transient multi-result selector; branding checks versioned favicon/install-icon URLs |
+| System health, host maintenance, notifications, audit and publication | maintenance/host/notification/activity/publication tests and focused browser suites | Host-service installation, real push delivery, Docker restart and independent physical backup media need target-host verification |
+
+This is a behavioral coverage matrix, not a statement of line/branch coverage
+or a substitute for target-host acceptance. A blocked port (`EPERM` on local
+HTTP/Unix sockets), missing Chrome/Playwright or Node older than 24 is an
+environment limitation; rerun with the required environment before claiming
+server/browser success. Never point tests or publication diagnostics at
+production data, save private fixture values, or use a personal browser profile.
+
 With Node.js 20 or newer:
 
 ```sh
@@ -1207,7 +1259,7 @@ node scripts/run-server-browser-tests.cjs --branding-only
 ```
 
 The second command needs the same Chrome and Playwright installation as the
-offline browser runner below and defaults to a **visible Chrome**. Eight flows
+offline browser runner below and defaults to a **visible Chrome**. Fourteen workflows
 cover account creation/login, mobile operator reports and live observer
 statistics, personnel and pair reports, shared instructions/attachments,
 observer controls and revoked access. Each run uses an isolated temporary SQLite

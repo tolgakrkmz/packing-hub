@@ -40,9 +40,9 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     await expect(image).toHaveAttribute('alt', '');
     const icon = admin.locator('link[rel=icon]');
     await expect(icon).toHaveAttribute('type', 'image/svg+xml');
-    await expect(icon).toHaveAttribute('href', /assets\/package-hub-mark\.svg$/);
+    await expect(icon).toHaveAttribute('href', /^\/assets\/package-hub-mark\.svg\?v=[a-f0-9]{12}$/);
     await expect(admin.locator('link[rel=apple-touch-icon]')).toHaveAttribute('sizes', '180x180');
-    await expect(admin.locator('link[rel=apple-touch-icon]')).toHaveAttribute('href', 'assets/package-hub-icon-180.png');
+    await expect(admin.locator('link[rel=apple-touch-icon]')).toHaveAttribute('href', /^\/assets\/package-hub-icon-180\.png\?v=[a-f0-9]{12}$/);
     await expect(admin.locator('link[rel=manifest]')).toHaveCount(1);
     await expect(admin.locator('link[rel=manifest]')).toHaveAttribute('href', 'manifest.webmanifest');
   };
