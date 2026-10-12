@@ -9,7 +9,7 @@ const password = 'Fictional-authz-matrix-password-123';
 async function setup(t) {
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true,
     taskNow: () => Date.parse('2026-12-01T07:00:00+02:00')});
-  t.after(() => hub.close());
+  t.after(() => { hub.server.closeAllConnections(); return hub.close(); });
   const admin = await hub.auth.create('demo-matrix-admin', password, 'admin');
   await new Promise((resolve, reject) => { hub.server.once('error', reject); hub.server.listen(0, '127.0.0.1', resolve); });
   const base = 'http://127.0.0.1:' + hub.server.address().port;
@@ -20,7 +20,7 @@ async function setup(t) {
   const request = (route, session, method = 'GET', input, extra = {}) => {
     const headers = {Origin: base, 'Content-Type': 'application/json', ...(session ? {Cookie: session.cookie, 'X-CSRF-Token': session.csrf} : {}), ...extra};
     for (const key of Object.keys(headers)) if (headers[key] === undefined) delete headers[key];
-    return fetch(base + route, {method, redirect: 'manual', headers, ...(input === undefined ? {} : {body: JSON.stringify(input)})});
+    return fetch(base + route, {method, redirect: 'manual', signal: AbortSignal.timeout(10000), headers, ...(input === undefined ? {} : {body: JSON.stringify(input)})});
   };
   const account = (name, role = 'observer', permissions = {}, profile = {}) => hub.auth.create('demo-matrix-' + name, password, role, admin, permissions, () => {}, profile);
   return {hub, base, admin, login, request, account};
@@ -115,7 +115,7 @@ test('bootstrap and events require a real server session and never trust supplie
   assert.equal(source.includes(stored), false);
 });
 
-for (const mutation of ['create', 'update']) test('account ' + mutation + ' rechecks the manager after password hashing', async t => {
+for (const mutation of ['create', 'update']) test('account ' + mutation + ' rechecks the manager after password hashing', {timeout: 30000}, async t => {
   const s = await setup(t), manager = await s.account('hash-manager-' + mutation, 'operator', {canManageAccounts: true});
   const target = await s.account('hash-target-' + mutation), session = await s.login(manager.username);
   let began;
@@ -139,7 +139,7 @@ for (const mutation of ['create', 'update']) test('account ' + mutation + ' rech
   assert.ok(await s.hub.auth.login(target.username, password));
 });
 
-for (const mutation of ['create', 'update']) test('account ' + mutation + ' rechecks the manager after a partial HTTP body', async t => {
+for (const mutation of ['create', 'update']) test('account ' + mutation + ' rechecks the manager after a partial HTTP body', {timeout: 30000}, async t => {
   const s = await setup(t), manager = await s.account('body-manager-' + mutation, 'observer', {canManageAccounts: true});
   const target = await s.account('body-target-' + mutation), session = await s.login(manager.username);
   const input = mutation === 'create' ? {username: 'demo-matrix-body-new', password, role: 'observer'} : {active: false};
