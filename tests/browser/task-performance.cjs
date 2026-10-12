@@ -18,13 +18,28 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
         problemPhotos: [{id: photoId, at: now, bytes: content.length, width: 8, height: 8}], events: []};
       insert.run(id, JSON.stringify(item));
     }
+    for (const day of ['2026-10-09', '2026-10-10', '2026-10-12']) {
+      const due = Date.parse(day + 'T08:00:00+03:00');
+      const item = {id: randomUUID(), kind: 'shift', title: 'Fictional review date ' + day, description: '', priority: 'normal', requiresPhotos: false,
+        owner: {id: manager.id, username: manager.username, team: 'А'}, participants: [], status: 'cancelled', due, createdAt: due,
+        shift: {date: day, code: 1, team: 'А', start: due - 8 * 3600000, due}, problemPhotos: [], events: []};
+      insert.run(item.id, JSON.stringify(item));
+    }
   });
   const requests = [];
   const track = request => { if (/\/api\/tasks\/items\/[^/]+\/photos\//.test(request.url())) requests.push(request.url()); };
   page.on('request', track);
   try {
     await page.setViewportSize({width: 1440, height: 900});
-    await page.goto(base + '/tasks'); await page.locator('[data-hub-language=bg]').click(); await page.locator('[data-view=global]').click();
+    await page.goto(base + '/tasks'); await page.locator('[data-hub-language=bg]').click();
+    await page.locator('[data-view=history]').click(); await page.locator('[data-history-view=cancelled]').click();
+    await expect(page.locator('.task-card h2')).toHaveText(['Fictional review date 2026-10-12', 'Fictional review date 2026-10-10']);
+    await page.locator('#statsFrom').fill('2026-10-09'); await expect(page.locator('.task-card')).toHaveCount(3);
+    await page.locator('#refreshTasks').click(); await expect(page.locator('#statsFrom')).toHaveValue('2026-10-09');
+    // Calendar dates still span two days when daylight saving starts.
+    setTime('2026-03-30T00:30:00+03:00'); await page.goto(base + '/tasks');
+    await expect(page.locator('#statsFrom')).toHaveValue('2026-03-28'); await expect(page.locator('#statsUntil')).toHaveValue('2026-03-30');
+    setTime('2026-10-12T10:00:00+03:00'); await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click();
     const cards = page.locator('.task-card'), firstImage = cards.first().locator('img'), lastImage = cards.last().locator('img');
     await expect(cards).toHaveCount(50);
     await expect.poll(() => firstImage.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -80,7 +95,7 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
     await page.context().addInitScript(() => { window.IntersectionObserver = undefined; });
     await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click(); await expect(cards).toHaveCount(50);
     await expect(cards.last().locator('img')).toHaveAttribute('src', /\/api\/tasks\//);
-    console.log('PASS viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, linked focus, fallback and BG/EN mobile layout');
+    console.log('PASS two-day review dates, manual history range, DST boundary, viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, linked focus, fallback and BG/EN mobile layout');
   } finally { page.off('request', track); }
 }
 module.exports = {exerciseTaskPerformance};

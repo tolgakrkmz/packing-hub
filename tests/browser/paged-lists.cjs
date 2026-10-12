@@ -165,6 +165,7 @@ async function exerciseServerPagedLists({admin, hub, base, expect}) {
   await admin.locator('#taskSearch').fill('Fictional paged task');
   await expect(cards).toHaveCount(50); await expect(pager).toContainText('Page 1 of 3');
   await admin.locator('[data-view=history]').click();
+  await admin.locator('#statsFrom').fill('2026-10-05'); await admin.locator('#statsUntil').fill('2026-10-05');
   await admin.locator('[data-history-view=unreported]').click();
   await expect(admin.locator('[data-history-view=unreported] .task-badge')).toHaveText('105');
   await expect(cards).toHaveCount(50); await next().click();

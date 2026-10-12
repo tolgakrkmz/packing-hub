@@ -291,7 +291,11 @@
       renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
-      if (!$('statsUntil').value) { $('statsUntil').value = date(state.now); $('statsFrom').value = date(state.now - 30 * 86400000); }
+      if (!$('statsUntil').value) {
+        const today = date(state.now);
+        $('statsUntil').value = today;
+        $('statsFrom').value = new Date(Date.parse(today) - 2 * 86400000).toISOString().slice(0, 10);
+      }
       globalThis.HubNotificationTarget?.select([...state.items, ...state.schedules], item => item.id, item => {
         $('ownerFilter').value = ''; $('taskSearch').value = '';
         let values;
