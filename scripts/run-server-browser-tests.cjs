@@ -61,13 +61,17 @@ async function main() {
       await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
       await page.goto(base + '/'); await expect(page).toHaveURL(base + '/login');
       await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
-      await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#loginForm button')).toHaveText('Sign in'); await expect(page.locator('#username')).toHaveValue(username); await expect(page.locator('#password')).toHaveValue(demoPassword);
-      await page.locator('[data-hub-language=bg]').click(); await page.locator('#loginForm button').click();
+      await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#loginForm button[type=submit]')).toHaveText('Sign in'); await expect(page.locator('#username')).toHaveValue(username); await expect(page.locator('#password')).toHaveValue(demoPassword);
+      await page.locator('[data-hub-language=bg]').click(); await page.locator('#loginForm button[type=submit]').click();
       await expect(page).toHaveURL(base + '/');
       return page;
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--login-only')) {
+      await require('../tests/browser/login-usability.cjs').exerciseLoginUsability({admin,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--navigation-only')) {
       await require('../tests/browser/module-navigation.cjs').exerciseModuleNavigation({admin,hub,base,device,expect});
       assert.deepEqual(errors,[]); return;
@@ -318,7 +322,7 @@ async function main() {
     // The draft checks revoke the demo users' sessions; sign in again for subsequent flows.
     for (const [page, username] of [[operator, 'demo-operator'], [observer, 'demo-observer']]) {
       await page.goto(base + '/login'); await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
-      await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/');
+      await page.locator('#loginForm button[type=submit]').click(); await expect(page).toHaveURL(base + '/');
     }
     console.log('PASS compact account search, role defaults, reset and independent drafts');
     console.log('RUN operator entry → shared SQLite → observer report updates without reload');
@@ -499,7 +503,7 @@ async function main() {
     await limitedForm.locator('[data-permission=canExportReports]').check(); await limitedForm.locator('[data-permission=canCreateReports]').check();
     await limitedForm.locator('[data-permission=canEditReports]').uncheck(); await limitedForm.locator('button[type=submit]').click();
     await expect(limited).toHaveURL(base + '/login');
-    await limited.locator('#username').fill('demo-permissions'); await limited.locator('#password').fill(demoPassword); await limited.locator('#loginForm button').click();
+    await limited.locator('#username').fill('demo-permissions'); await limited.locator('#password').fill(demoPassword); await limited.locator('#loginForm button[type=submit]').click();
     await expect(limited).toHaveURL(base + '/');
     await limited.goto(base + '/production-log'); await expect(limited.locator('#saveBtn')).toBeVisible(); await expect(limited.locator('.del-btn')).toHaveCount(0);
     await expect(limited.locator('#reportEntryPanel')).toBeVisible(); await expect(limited.locator('#dayFilter')).toBeHidden();
@@ -514,7 +518,7 @@ async function main() {
     const own = hub.auth.list().find(user => user.username === 'demo-admin'), ownForm = admin.locator(`.account-card[data-id="${own.id}"]`);
     await ownForm.locator('..').locator('summary').first().click();
     await ownForm.locator('[data-permission=canImportData]').uncheck(); await ownForm.locator('button[type=submit]').click(); await expect(admin).toHaveURL(base + '/login');
-    await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button').click();
+    await admin.locator('#username').fill('demo-admin'); await admin.locator('#password').fill(demoPassword); await admin.locator('#loginForm button[type=submit]').click();
     await expect(admin).toHaveURL(base + '/');
     await openAdminModule(admin,'data-import');
     await expect(admin.locator('[data-transfer-tab=production]')).toBeHidden();

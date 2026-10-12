@@ -80,7 +80,7 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
   await edit.locator('[data-permission=canViewTasks]').uncheck(); await edit.locator('[data-permission=canViewTasks]').check();
   await edit.locator('[data-permission=canAssignTasks]').uncheck(); await edit.locator('button[type=submit]').click();
   await expect(assigner).toHaveURL(base + '/login');
-  await assigner.locator('#username').fill(user.username); await assigner.locator('#password').fill(password); await assigner.locator('#loginForm button').click();
+  await assigner.locator('#username').fill(user.username); await assigner.locator('#password').fill(password); await assigner.locator('#loginForm button[type=submit]').click();
   await expect(assigner).toHaveURL(base + '/'); await assigner.goto(base + '/tasks');
   await expect(assigner.locator('#newTask')).toBeHidden();
   assert.equal((await assigner.request.get(base + '/api/tasks/preview?date=2026-12-01&assigneeId=' + owner.id)).status(), 403);

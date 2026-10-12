@@ -128,7 +128,7 @@ async function exercisePersistence({hub, base, device, expect}) {
   const enabled = () => expect(page.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са включени.');
   const browserState = () => page.evaluate(() => ({permission: Notification.permission, subscribed: !!localStorage.getItem('demo-notice-subscribed'), permissions: Number(localStorage.getItem('demo-notice-permissions')), subscribes: Number(localStorage.getItem('demo-notice-subscribes')), unsubscribes: Number(localStorage.getItem('demo-notice-unsubscribes'))}));
   const savedState = {permission: 'granted', subscribed: true, permissions: 1, subscribes: 1, unsubscribes: 0};
-  const login = async () => { await page.locator('#username').fill(user.username); await page.locator('#password').fill(password); await page.locator('#loginForm button').click(); await expect(page).toHaveURL(base + '/'); };
+  const login = async () => { await page.locator('#username').fill(user.username); await page.locator('#password').fill(password); await page.locator('#loginForm button[type=submit]').click(); await expect(page).toHaveURL(base + '/'); };
   await settings(); await page.locator('#notificationEnable').click(); await enabled();
   await page.locator('[data-type=productionAdded]').uncheck(); await page.locator('#notificationPreferences button').click(); await expect(page.locator('#notificationMessage')).toHaveText('Настройките са запазени.');
   await page.reload(); await enabled(); await expect(page.locator('[data-type=productionAdded]')).not.toBeChecked();

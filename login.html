@@ -32,9 +32,13 @@
       <label for="username">Потребителско име
         <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="32">
       </label>
-      <label for="password">Парола
-        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
-      </label>
+      <div class="login-password">
+        <label for="password">Парола</label>
+        <div class="password-field">
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+          <button id="togglePassword" type="button" aria-controls="password" aria-pressed="false" aria-label="Покажи паролата">Покажи</button>
+        </div>
+      </div>
       <button type="submit">Вход</button>
       <p id="loginMessage" role="status" aria-live="polite"></p>
     </form>

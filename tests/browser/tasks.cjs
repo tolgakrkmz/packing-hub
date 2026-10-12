@@ -110,7 +110,7 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await admin.locator('[data-hub-language=bg]').click();
   await readerForm.locator('[data-permission=canViewTasks]').uncheck(); await readerForm.locator('button[type=submit]').click();
   await expect(reader).toHaveURL(base + '/login');
-  await reader.locator('#username').fill(readerUser.username); await reader.locator('#password').fill('Fictional-password-123'); await reader.locator('#loginForm button').click();
+  await reader.locator('#username').fill(readerUser.username); await reader.locator('#password').fill('Fictional-password-123'); await reader.locator('#loginForm button[type=submit]').click();
   await expect(reader).toHaveURL(base + '/'); await expect(reader.locator('a[href="/tasks"]')).toBeHidden();
   assert.equal(await reader.evaluate(async () => (await fetch('/tasks')).status), 403);
   const chiefForm = admin.locator(`.account-card[data-id="${chiefUser.id}"]`);

@@ -18,16 +18,16 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   await expect(admin.locator('#loginMessage')).toHaveAttribute('aria-live', 'polite');
   await admin.locator('#username').fill('demo-admin');
   await admin.locator('#password').fill('Fictional-wrong-password');
-  await admin.locator('#loginForm button').click();
+  await admin.locator('#loginForm button[type=submit]').click();
   await expect(admin.locator('#loginMessage')).toHaveText('Невалидно потребителско име или парола.');
   await expect(admin).toHaveURL(base + '/login');
   await expect(admin.locator('#username')).toHaveValue('demo-admin');
-  await expect(admin.locator('#loginForm button')).toBeEnabled();
+  await expect(admin.locator('#loginForm button[type=submit]')).toBeEnabled();
   await admin.locator('[data-hub-language=en]').click();
   await expect(admin.locator('#loginMessage')).toHaveText('Invalid username or password.');
   await expect(admin.locator('#username')).toHaveValue('demo-admin');
   await admin.locator('#password').fill(password);
-  await admin.locator('#loginForm button').click();
+  await admin.locator('#loginForm button[type=submit]').click();
   await expect(admin).toHaveURL(base + '/');
   await admin.locator('.server-logout').click();
   await expect(admin).toHaveURL(base + '/login');
@@ -76,7 +76,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   }
   await admin.locator('#username').fill('demo-admin');
   await admin.locator('#password').fill(password);
-  await admin.locator('#loginForm button').click();
+  await admin.locator('#loginForm button[type=submit]').click();
   await expect(admin).toHaveURL(base + '/');
 
   for (const width of [320, 390, 768, 1440]) {
