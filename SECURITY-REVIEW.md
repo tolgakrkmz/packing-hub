@@ -353,9 +353,10 @@ deployment and real data remain local.
 
 ## Authorized merge validation
 
-The security branch at `1ee737c` was combined with main at `d443f24`, preserving
-both sets of focused runner modes. Conflicts were limited to the three browser
-and aggregate test runners; all security, responsive and reconnect modes remain.
+The final source combines the security branch at `1ee737c` with main at
+`802fd98`, preserving both sets of focused runner modes. Conflicts were limited
+to the three browser and aggregate test runners; all security, responsive and
+reconnect modes remain.
 
 - `node scripts/run-critical-tests.cjs --browser`: **32 suite runs passed,
   zero failed**, exit 0: **616/616 Node tests** (285 client/source and 331 server;
@@ -365,6 +366,9 @@ and aggregate test runners; all security, responsive and reconnect modes remain.
   reviewed files. Active hooks: `.githooks`.
 - Runner syntax checks, resolved index and staged diff whitespace: **PASS**.
 
-Main subsequently advanced to `802fd98`, changing the reconnect reveal delay
-from 150 ms to 2300 ms with matching unit regressions. That additional change
-requires integration and fresh validation before the final main push.
+The latest main change increases the reconnect reveal delay from 150 ms to
+2300 ms with matching unit regressions. It was integrated without conflicts;
+the entire Node/browser aggregate above was rerun afterward and passed on the
+final combined source. The subsequent documentation update changes only this
+report. Final main push confirmation and the commit link are recorded on the
+Trello card after publication succeeds.
