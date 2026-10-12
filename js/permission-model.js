@@ -61,7 +61,8 @@
   function canViewModule(user, name) {
     const rights = permissionsFor(user);
     if (name === 'data-import') return rights.canImportData || rights.canExportReports;
-    if (name === 'admin-panel') return ['canViewAccounts', 'canViewActivity', 'canViewSystemStatus', 'canImportData', 'canExportReports'].some(key => rights[key]);
+    if (name === 'report-history') return Object.values(reports).some(report => rights[report.view] && rights[report.edit]);
+    if (name === 'admin-panel') return ['canViewAccounts', 'canViewActivity', 'canViewSystemStatus', 'canImportData', ...Object.values(reports).map(report => report.edit)].some(key => rights[key]) || rights.canExportReports && (user?.role === 'admin' || (user?.permissionOverrides || user?.permissions || {}).canExportReports === true);
     const group = groups.find(group => group.module === name);
     return !!group?.view && rights[group.view];
   }

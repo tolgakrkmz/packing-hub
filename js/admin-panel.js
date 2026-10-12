@@ -8,7 +8,10 @@
   const transfer = document.getElementById('adminTransfer');
   transfer.hidden = !canImport && !canExport;
   const module = new URLSearchParams(location.search).get('module');
-  if (['production-log','line-downtime','pair-targets'].includes(module)) transfer.href = '/data-import?module=' + module;
+  if (['production-log','line-downtime','pair-targets'].includes(module)) {
+    transfer.href = '/data-import?module=' + module;
+    document.querySelector('[data-module=report-history]').href = '/report-history?module=' + module;
+  }
   if (!canImport || !canExport) document.getElementById('adminTransferDescription').textContent = canImport ? 'Добавяне и проверка на данни.' : 'Сваляне на текущите отчети.';
   document.getElementById('adminModules').hidden = false;
 })();

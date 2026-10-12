@@ -118,7 +118,7 @@ test('the transfer screen requires import or export rights; the legacy productio
 });
 test('report creation and correction rights are independent and cannot grant operator settings or personnel access', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), original = await login('operator');
-  const put = (kind, user, data, revision) => request('/api/data/' + kind, user, 'PUT', data, {'If-Match': '"' + revision + '"'});
+  const put = (kind, user, data, revision) => request('/api/data/' + kind, user, 'PUT', {data,reason:'Fictional correction'}, {'If-Match': '"' + revision + '"'});
   const report = {entries: [entry('demo-record')], goalTons: 3000};
   assert.equal((await put('production-log', original, report, 1)).status, 200);
   assert.equal((await put('production-log', original, {...report, entries: []}, 2)).status, 403);

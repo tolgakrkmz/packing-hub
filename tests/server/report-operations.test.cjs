@@ -22,8 +22,8 @@ function entry(kind, id, group = 0) {
   return PairTargets.plan({data:PairTargets.emptyData(),employees,context:scope,memberIds:employees.slice(group*2,group*2+2).map(person => person.id),targetKg:1000,targetCrates:40,workAreas:['manual'],id,now:'2026-10-05T06:00:00.000Z'});
 }
 const create = value => ({operationId:randomUUID(),action:'create',entryId:value.id,entry:value});
-const update = value => ({...create(value),action:'update'});
-const remove = id => ({operationId:randomUUID(),action:'delete',entryId:id});
+const update = value => ({...create(value),action:'update',reason:'Fictional correction'});
+const remove = id => ({operationId:randomUUID(),action:'delete',entryId:id,reason:'Fictional deletion'});
 async function setup(t) {
   const hub = createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true});
   const admin = await hub.auth.create('demo-reports-admin',password,'admin');
@@ -153,7 +153,7 @@ test('record versions and receipts survive restart, legacy replacement and addit
   store.put('production-log',{...receipt.data,goalTons:10},receipt.revision,user);
   assert.equal(store.get('production-log').versions[input.entryId],first.versions[input.entryId]);
   const current = store.get('production-log');
-  store.put('production-log',{...current.data,entries:[{...input.entry,tonnage:1200}]},current.revision,user);
+  store.put('production-log',{...current.data,entries:[{...input.entry,tonnage:1200}]},current.revision,user,'report',false,{reason:'Fictional legacy correction'});
   assert.throws(() => store.reportOperation('production-log',update(input.entry),first.versions[input.entryId],user),{code:'REPORT_CONFLICT'});
   const legacyVersion = store.get('production-log').revision;
   store.db.exec('DROP TABLE report_versions; DROP TABLE report_operations'); store.close();

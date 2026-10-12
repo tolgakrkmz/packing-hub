@@ -21,9 +21,10 @@ const HubServer = (() => {
     REPORT_CONFLICT: 'Записът е променен или изтрит от друг потребител. Черновата остава във формата. Прегледай актуалния запис преди нов опит.',
     OPERATION_REUSED: 'Този опит вече е използван за друга промяна. Прегледай актуалния запис.',
     INVALID_OPERATION: 'Провери данните за записа.',
-    REVISION_REQUIRED: 'Прегледай актуалната версия на записа преди промяна.'
+    REVISION_REQUIRED: 'Прегледай актуалната версия на записа преди промяна.',
+    CORRECTION_REASON_REQUIRED: 'Добави причина за корекцията.'
   });
-  const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.'};
+  const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.', REPORT_RESTORED: 'Сървърът потвърди възстановяването.'};
   Object.assign(messages, {TASK_PHOTO_REQUIRED: 'Добави снимка преди запис.', TASK_PHOTO_INVALID: 'Снимката не е валидна. Избери я отново.', TASK_PHOTO_STORAGE: 'Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.', TASK_PHOTO_EXPIRED: 'Снимката е изтрита след срока за съхранение.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
@@ -339,8 +340,9 @@ const HubServer = (() => {
     const query = reports.includes(module) ? '?module=' + module : '';
     if (canViewModule('admin-panel')) {
       const link = addLink('/admin-panel' + query, 'Админ панел');
-      if (['system-status','accounts','activity-log','data-import','production-import'].includes(current)) link.setAttribute('aria-current', 'location');
+      if (['system-status','accounts','activity-log','data-import','production-import','report-history'].includes(current)) link.setAttribute('aria-current', 'location');
     }
+    if (!canViewModule('admin-panel') && canViewModule('data-import')) addLink('/data-import'+query,'Експорт на отчети');
     tools.append(links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
     const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login'); };
@@ -403,5 +405,18 @@ const HubServer = (() => {
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });
-  return {user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
+  function correctionReason() {
+    return new Promise(resolve => {
+      const dialog = document.createElement('dialog'); dialog.id = 'reportCorrectionDialog'; dialog.className = 'report-reason'; dialog.setAttribute('aria-labelledby','reportCorrectionTitle');
+      dialog.innerHTML = '<form><h2 id="reportCorrectionTitle">Причина за промяната</h2><label for="reportCorrectionReason">Опиши защо променяш записа</label><textarea id="reportCorrectionReason" required maxlength="1000"></textarea><button id="reportCorrectionConfirm" type="submit">Потвърди</button><button type="button" id="reportCorrectionCancel">Отказ</button></form>';
+      const previousFocus = document.activeElement;
+      document.body.append(dialog);
+      const finish = value => { dialog.close(); dialog.remove(); previousFocus?.focus(); resolve(value); };
+      dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const value=dialog.querySelector('textarea').value.trim(); if(value) finish(value); });
+      dialog.querySelector('#reportCorrectionCancel').addEventListener('click', () => finish(null));
+      dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+      dialog.showModal(); dialog.querySelector('textarea').focus();
+    });
+  }
+  return {correctionReason, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
 })();

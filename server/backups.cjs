@@ -48,7 +48,7 @@ function verifyDatabase(filename) {
     for (const table of TABLES) db.prepare(`SELECT count(*) FROM ${table}`).get();
     // Photos are additive: older archives can still be restored and migrated.
     if (tables.has('task_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM task_photos').get();
-    for (const table of ['report_versions', 'report_operations']) if (tables.has(table)) db.prepare(`SELECT count(*) FROM ${table}`).get();
+    for (const table of ['report_versions', 'report_operations', 'report_history']) if (tables.has(table)) db.prepare(`SELECT count(*) FROM ${table}`).get();
     const modules = db.prepare('SELECT kind,data FROM documents').all();
     for (const kind of ['production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions']) {
       const row = modules.find(item => item.kind === kind);

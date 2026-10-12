@@ -47,6 +47,16 @@ async function main() {
       const context = await browser.newContext({timezoneId: 'Europe/Sofia', ...(mobile ? {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true} : {})});
       await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
       await context.addInitScript(() => { window.showOpenFilePicker = () => { throw new Error('Online mode must not ask for a local JSON file'); }; });
+      // Existing workflow suites supply a fictional correction reason. The
+      // history suite exercises the visible mandatory-reason dialog itself.
+      if (!process.argv.includes('--report-history-only')) await context.addInitScript(() => {
+        new MutationObserver(() => {
+          const dialog = document.getElementById('reportCorrectionDialog');
+          if (!dialog?.open) return;
+          dialog.querySelector('textarea').value = 'Fictional regression correction';
+          dialog.querySelector('form').requestSubmit();
+        }).observe(document,{subtree:true,childList:true});
+      });
       const page = await context.newPage(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message));
       await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
       await page.goto(base + '/'); await expect(page).toHaveURL(base + '/login');
@@ -66,6 +76,10 @@ async function main() {
       await require('../tests/browser/paged-lists.cjs').exerciseServerPagedLists({admin, hub, base, expect});
       await require('../tests/browser/refresh-sync.cjs').exerciseTaskRefresh({page:admin,base,expect});
       assert.deepEqual(errors, []); return;
+    }
+    if (process.argv.includes('--report-history-only')) {
+      await require('../tests/browser/report-history.cjs').exerciseReportHistory({admin,hub,base,device,expect,screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors,[]); return;
     }
     if (process.argv.includes('--report-operations-only')) {
       await require('../tests/browser/report-operations.cjs').exerciseReportOperations({admin,hub,base,device,expect});
@@ -110,7 +124,7 @@ async function main() {
         failureText:'Промяната не е потвърдена',
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
         read:async () => hub.store.get('pair-targets').data,
-        replace:async data => hub.store.put('pair-targets',data,hub.store.get('pair-targets').revision,user),
+        replace:async data => hub.store.put('pair-targets',data,hub.store.get('pair-targets').revision,user,'report',false,{reason:'Fictional concurrent plan correction'}),
         checkReadOnly:async () => {
           for(const [username,permissions] of [['demo-cancel-reader',{canCreateReports:false,canEditReports:true}],['demo-cancel-observer',{}]]) {
             await hub.auth.create(username,demoPassword,username.endsWith('observer') ? 'observer' : 'operator',user,permissions);

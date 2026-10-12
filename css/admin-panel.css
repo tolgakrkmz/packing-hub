@@ -12,3 +12,5 @@
 .admin-panel-page a:focus-visible{outline:2px solid var(--amber);outline-offset:4px}
 @media(hover:hover){.admin-card:hover{border-color:var(--admin-accent);background:var(--panel-2)}.admin-panel-back:hover{color:var(--text)}}
 @media(max-width:600px){.admin-modules{grid-template-columns:minmax(0,1fr);gap:14px}.admin-card{padding:22px}.admin-panel-heading{margin-bottom:24px}.admin-panel-heading h1{font-size:28px}.admin-card h2{font-size:19px}.admin-card-icon{margin-bottom:18px}}
+
+.admin-denied{max-width:680px}.denied-icon{font-size:52px;margin-top:32px}

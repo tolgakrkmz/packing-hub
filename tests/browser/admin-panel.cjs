@@ -9,7 +9,7 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
   await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveText('Админ панел');
   await admin.locator('.server-links a[href^="/admin-panel"]').click();
   await expect(admin.locator('h1')).toHaveText('Админ панел');
-  await expect(admin.locator('.admin-card:visible')).toHaveCount(4);
+  await expect(admin.locator('.admin-card:visible')).toHaveCount(5);
   await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveAttribute('aria-current','page');
   await admin.locator('[data-module=accounts]').focus();
   await admin.keyboard.press('Enter');
@@ -47,12 +47,18 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     const username='demo-panel-'+role;
     await hub.auth.create(username,'Fictional-password-123',role);
     const page=await device(username,true);
-    await expect(page.locator('.server-links a[href^="/admin-panel"]')).toHaveCount(1);
-    await expect(page.locator('.server-links a[href^="/admin-panel"]')).toHaveText('Админ панел');
-    for (const method of ['GET','HEAD']) assert.equal((await page.request.fetch(base+'/admin-panel',{method})).status(),200);
-    await page.locator('.server-links a[href^="/admin-panel"]').click();
-    await expect(page.locator('.admin-card:visible')).toHaveCount(1);
-    await page.locator('#adminTransfer').click();
+    await expect(page.locator('.server-links a[href^="/admin-panel"]')).toHaveCount(0);
+    for (const method of ['GET','HEAD']) assert.equal((await page.request.fetch(base+'/admin-panel',{method})).status(),403);
+    await page.goto(base+'/admin-panel');
+    await expect(page.locator('h1')).toHaveText('Тази зона е за администратори');
+    await expect(page.locator('#adminModules')).toHaveCount(0);
+    for (const language of ['bg','en']) {
+      await page.locator('[data-hub-language='+language+']').click();
+      await expect(page.locator('h1')).toHaveText(language === 'en' ? 'This area is for administrators' : 'Тази зона е за администратори');
+      for (const width of [320,390,768,1440]) { await page.setViewportSize({width,height:1000}); await assertResponsive(page,'Admin denial '+language+' '+width); }
+    }
+    await page.locator('[data-hub-language=bg]').click();
+    await page.locator('.server-links a[href^="/data-import"]').click();
     await expect(page.locator('#reportExport')).toBeVisible();
     await page.context().close();
   }
@@ -65,7 +71,7 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     await hub.auth.create(username,'Fictional-password-123','admin',undefined,permissions);
     const page=await device(username,true);
     await page.locator('.server-links a[href^="/admin-panel"]').click();
-    await expect(page.locator('.admin-card:visible')).toHaveCount(description ? 4 : 3);
+    await expect(page.locator('.admin-card:visible')).toHaveCount(description ? 5 : 4);
     if (description) {
       await expect(page.locator('#adminTransferDescription')).toHaveText(description);
       await page.locator('#adminTransfer').click();

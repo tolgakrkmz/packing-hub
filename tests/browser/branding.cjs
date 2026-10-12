@@ -139,11 +139,11 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     await hub.auth.create(username, password, role);
     const page = await device(username, true);
     await expect(page.locator('.server-links a[href="/accounts"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/data-import"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/admin-panel"]')).toBeVisible();
+    await expect(page.locator('.server-links a[href="/data-import"]')).toBeVisible();
+    await expect(page.locator('.server-links a[href="/admin-panel"]')).toHaveCount(0);
     await expect(page.locator('.server-links a[href="/tasks"]')).toHaveCount(0);
     await expect(page.locator('.server-bar #reportExportKind')).toHaveCount(0);
-    await openAdminModule(page,'data-import');
+    await page.locator('.server-links a[href^="/data-import"]').click();
     await expect(page.locator('#reportExportKind')).toBeVisible();
     await expect(page.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(page.locator('.server-user')).toHaveText(username);

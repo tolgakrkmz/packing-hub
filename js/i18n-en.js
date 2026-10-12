@@ -1418,3 +1418,51 @@ Object.assign(HUB_EN_MESSAGES, {
   "Настройките за известия на браузъра не са достъпни. Получените известия остават тук.": "Browser notification settings are unavailable. Your inbox remains available.",
   "Не успяхме да проверим известията на това устройство. Ще опитаме отново.": "We could not check notifications on this device. We will try again."
 });
+
+Object.assign(HUB_EN_MESSAGES, {
+  "История на отчетите": "Report history",
+  "Версии, причини за корекции и възстановяване на изтрити записи.": "Versions, correction reasons and recovery of deleted records.",
+  "Предишните версии се пазят в защитената база.": "Previous versions are kept in the protected database.",
+  "Достъпът е ограничен": "Access is restricted",
+  "Тази зона е за администратори": "This area is for administrators",
+  "Ключът за тази врата още не е в твоя комплект. 🙂": "The key to this door is not in your set yet. 🙂",
+  "Акаунтът ти няма право за админ панела. Можеш да продължиш към работните модули. Ако ти е нужен достъп, обърни се към администратор.": "Your account does not have access to the admin panel. You can continue to the working modules. If you need access, contact an administrator.",
+  "Причина за промяната": "Reason for the change",
+  "Опиши защо променяш записа": "Describe why you are changing the record",
+  "Добави причина за корекцията.": "Add a reason for the correction.",
+  "Избери запис, за да видиш версиите.": "Select a record to see its versions.",
+  "Активен запис": "Active record",
+  "Изтрит запис": "Deleted record",
+  "Изтрит": "Deleted",
+  "Възстанови изтрития запис": "Restore the deleted record",
+  "Няма запазени корекции за този запис.": "There are no saved corrections for this record.",
+  "Няма активен запис": "No active record",
+  "Преди промяната": "Before the change",
+  "След промяната": "After the change",
+  "Възстановяване": "Restoration",
+  "Изтриване": "Deletion",
+  "Редакция": "Edit",
+  "Създаване": "Creation",
+  "Сървърът потвърди възстановяването.": "The server confirmed the restoration.",
+  "Идентификатор": "Identifier",
+  "Автоматично (кг)": "Automatic (kg)",
+  "Автоматично (касетки)": "Automatic (crates)",
+  "Ръчно (кг)": "Manual (kg)",
+  "Ръчно (касетки)": "Manual (crates)",
+  "Минути": "Minutes",
+  "Причина за престоя": "Downtime reason",
+  "Участници": "Participants",
+  "Цел (кг)": "Target (kg)",
+  "Цел (касетки)": "Target (crates)",
+  "Работни зони": "Work areas",
+  "Обновено": "Updated",
+  "Отчетено": "Reported",
+  "Отменено": "Cancelled",
+  "Обяснение": "Explanation",
+  "Експорт на отчети": "Export reports"
+});
+Object.assign(HUB_EN_MESSAGES, {
+  "Историята е достъпна при работа със сървъра.": "History is available when connected to the server.",
+  "Възстановяването не е потвърдено. Опитай отново със същата причина.": "The restoration is unconfirmed. Try again with the same reason."
+});
+Object.assign(HUB_EN_MESSAGES, {"Потвърди": "Confirm"});

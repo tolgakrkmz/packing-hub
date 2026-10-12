@@ -47,7 +47,7 @@ function createStaticAssets(sources,{transformHTML = (name,html) => html} = {}) 
     prepared.set(name,{html,variants,contentType:contentType+(contentType === 'image/png' ? '' : '; charset=utf-8'),
       etags:new Map([...variants].map(([encoding,value]) => [encoding,'"'+createHash('sha256').update(value).digest('hex')+'"']))});
   }
-  function send(name,request,response) {
+  function send(name,request,response,status = 200) {
     const asset = prepared.get(name); if (!asset) throw problem(404,'NOT_FOUND');
     const encoding = selectEncoding(request.headers['accept-encoding'],asset.variants);
     if (!encoding) throw problem(406,'ENCODING_REJECTED');
@@ -62,7 +62,7 @@ function createStaticAssets(sources,{transformHTML = (name,html) => html} = {}) 
       response.writeHead(304,headers); response.end(); return 304;
     }
     const body = asset.variants.get(encoding); headers['Content-Length'] = body.length;
-    response.writeHead(200,headers); response.end(request.method === 'HEAD' ? undefined : body); return 200;
+    response.writeHead(status,headers); response.end(request.method === 'HEAD' ? undefined : body); return status;
   }
   return {version,assetURL,send};
 }
