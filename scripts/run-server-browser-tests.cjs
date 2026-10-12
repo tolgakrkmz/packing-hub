@@ -72,6 +72,10 @@ async function main() {
       await require('../tests/browser/task-performance.cjs').exerciseTaskPerformance({admin, hub, base, expect, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); return;
     }
+    if (process.argv.includes('--notification-targets-only')) {
+      await require('../tests/browser/notification-targets.cjs').exerciseNotificationTargets({admin,hub,base,device,expect,setTime:value=>{taskTime=Date.parse(value);},screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--static-only')) {
       await require('../tests/browser/static-assets.cjs').exerciseStaticAssets({browser,base,hub,expect});
       assert.deepEqual(errors,[]); return;

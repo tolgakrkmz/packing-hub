@@ -28,5 +28,11 @@
     const value = types[type], rights = model.permissionsFor(user);
     return !!value && rights.canViewNotifications && rights[value.flag] && model.canViewModule(user, value.module) && (!value.needs || value.needs.some(key => rights[key]));
   };
-  return {types, available};
+  const systemTargets = {systemDatabase: 'databaseCard', systemDisk: 'diskCard', systemBackup: 'backupCard', systemUpdate: 'updateCard', systemRecovery: 'systemSummary'};
+  function href(type, target) {
+    if (!types[type]) return '/notifications';
+    const id = systemTargets[type] || target;
+    return '/' + types[type].module + (typeof id === 'string' && id.length > 0 && id.length <= 1000 ? '?' + new URLSearchParams({target: id}) : '');
+  }
+  return {types, available, href};
 });

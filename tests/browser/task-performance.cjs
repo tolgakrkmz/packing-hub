@@ -66,11 +66,21 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
     await expect(cards).toHaveCount(1); await expect(cards.getByRole('button', {name: 'Промени', exact: true})).toBeVisible();
     setTime('2026-10-12T10:01:00+03:00'); await page.locator('#refreshTasks').click();
     await expect(cards.getByRole('button', {name: 'Промени', exact: true})).toHaveCount(0);
+    // A live update must preserve focus on a reused card opened by an exact link.
+    await page.goto(base + '/tasks?target=' + ids[0]);
+    const target = page.locator('.notification-target');
+    await expect(target).toHaveAttribute('data-task-id', ids[0]); await expect(target).toBeFocused();
+    const other = JSON.parse(hub.store.db.prepare('SELECT data FROM task_items WHERE id=?').get(ids[1]).data);
+    other.title = 'Fictional updated neighbor';
+    hub.store.db.prepare('UPDATE task_items SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(other), ids[1]);
+    await page.evaluate(() => document.getElementById('refreshTasks').click());
+    await expect(cards.filter({hasText: other.title})).toHaveCount(1); await expect(target).toBeFocused();
+    await expect.poll(() => target.locator('img').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
     // Browsers without IntersectionObserver retain the native lazy-image fallback.
     await page.context().addInitScript(() => { window.IntersectionObserver = undefined; });
     await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click(); await expect(cards).toHaveCount(50);
     await expect(cards.last().locator('img')).toHaveAttribute('src', /\/api\/tasks\//);
-    console.log('PASS viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, fallback and BG/EN mobile layout');
+    console.log('PASS viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, linked focus, fallback and BG/EN mobile layout');
   } finally { page.off('request', track); }
 }
 module.exports = {exerciseTaskPerformance};
