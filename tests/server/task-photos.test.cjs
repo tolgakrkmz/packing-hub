@@ -26,6 +26,31 @@ async function fixture(t, options = {}) {
   const report = (id, status = 'review', extra = {}, revision = item(id).revision) => tasks.change(id, {action: 'report', status, note: 'Fictional report', solutionPhoto: photo, ...extra}, revision, owner);
   return {dir, filename, store, auth, admin, owner, tasks, input, item, count, report, time: value => { at = Date.parse(value); }};
 }
+test('photo batches skip repeated task scans, invalidate on writes and expire at the exact deadline', async t => {
+  const f = await fixture(t), {id} = f.tasks.create(f.input(), f.admin);
+  f.report(id); f.tasks.change(id, {action: 'approve'}, 2, f.admin);
+  const photoId = f.item(id).problemPhoto.id;
+  const prepare = f.store.db.prepare.bind(f.store.db);
+  let scans = 0;
+  f.store.db.prepare = sql => { if (sql === 'SELECT * FROM task_items') scans++; return prepare(sql); };
+  t.after(() => { f.store.db.prepare = prepare; });
+  for (let i = 0; i < 20; i++) assert.deepEqual(f.tasks.photo('items', id, photoId, f.owner), Buffer.from(photo, 'base64'));
+  assert.equal(scans, 0, 'The unchanged batch reuses the cleanup decision, not task content');
+  const orphan = randomUUID();
+  prepare('INSERT INTO task_photos(id,content,created_at) VALUES(?,?,?)').run(orphan, Buffer.from(photo, 'base64'), 0);
+  f.tasks.photo('items', id, photoId, f.owner);
+  assert.equal(scans, 1); assert.equal(prepare('SELECT 1 FROM task_photos WHERE id=?').get(orphan), undefined);
+  const {DatabaseSync} = require('node:sqlite'), external = new DatabaseSync(f.filename);
+  try { external.prepare('INSERT INTO task_photos(id,content,created_at) VALUES(?,?,?)').run(orphan, Buffer.from(photo, 'base64'), 0); }
+  finally { external.close(); }
+  f.tasks.photo('items', id, photoId, f.owner);
+  assert.equal(scans, 2); assert.equal(prepare('SELECT 1 FROM task_photos WHERE id=?').get(orphan), undefined);
+  f.time('2027-06-01T22:59:59+02:00');
+  f.tasks.photo('items', id, photoId, f.owner); assert.equal(scans, 2);
+  f.time('2027-06-01T23:00:00+02:00');
+  assert.throws(() => f.tasks.photo('items', id, photoId, f.owner), {code: 'TASK_PHOTO_EXPIRED'});
+  assert.equal(scans, 3); assert.equal(f.count(), 0);
+});
 test('creation and every report require an image; rejection rolls back task, history, audit and blobs', async t => {
   const f = await fixture(t);
   assert.throws(() => f.tasks.create(f.input({problemPhoto: null}), f.admin), {code: 'TASK_PHOTO_REQUIRED'});

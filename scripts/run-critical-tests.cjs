@@ -22,7 +22,7 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
   // assignment and photo options. Focused suites below add distinct scenarios.
   for (const [script, modes] of [
     ['run-browser-tests.cjs', ['', 'statistics', 'transfer', 'pair-cancellation', 'lists', 'i18n']],
-    ['run-server-browser-tests.cjs', ['', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'lists', 'static', 'admin-panel', 'task-history']]
+    ['run-server-browser-tests.cjs', ['', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'lists', 'static', 'admin-panel', 'task-history', 'task-performance']]
   ]) {
     // The report-history feature has its own focused flow. Include it once
     // that reviewed feature is integrated, without requiring its branch here.

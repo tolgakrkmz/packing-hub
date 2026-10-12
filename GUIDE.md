@@ -1823,6 +1823,85 @@ These measurements were recorded on the dedicated feature branch before the
 user-requested integration into main. Trello completion follows the verified
 merge and push to main.
 
+### Task performance (12 October 2026)
+
+Task cards now retain their DOM nodes and decoded photos when another task
+changes. The cache holds at most the current page's 50 cards and checks the full
+item, language, timezone and start/due boundaries before reusing a card. Date
+formatters are reused per timezone; search reads the filter controls once per
+render. Search still has the existing 150 ms debounce.
+
+Photo previews load when they approach the viewport (150 px margin), with
+asynchronous decoding and fixed display space. Scrolling, pagination, editor
+previews and history dialogs all activate their images; the full viewer opens
+the original evidence. Browsers without IntersectionObserver retain native lazy
+loading. This reduces early downloads, without changing photo quality or adding
+stored thumbnails.
+
+Previously every authorized photo request scanned all task records for retention
+cleanup. The server now reuses the cleanup decision until the earliest exact
+retention deadline or a database write. Local writes, rolled-back writes, writes
+from another connection and backwards clock changes invalidate that decision.
+The decision is recorded only after a successful transaction. Task visibility,
+photo association and photo bytes are read for each request; authenticated photo
+responses still use `Cache-Control: no-store`.
+
+Repeat the comparison from this demo repository with Node.js 24+, Chrome and the
+Playwright dependency described above:
+
+```sh
+node scripts/run-task-performance-benchmarks.cjs --baseline=2d6dab3
+node scripts/run-task-performance-benchmarks.cjs
+node scripts/run-server-browser-tests.cjs --headless --task-performance-only
+```
+
+The baseline option extracts the selected local commit to a temporary directory;
+both versions use the same measurement script and generated fixture. No checkout
+is modified. Each run uses an isolated Chrome context and in-memory SQLite,
+2,000 fictional global tasks with 10 events each, and four generated noise JPEGs
+on each of the first 50 cards (200 photos, 241,278 bytes each). No production data,
+personal browser profiles, screenshots or traces are used. External browser
+requests are blocked. Node was 24.19.0, Chrome 154.0.8037.99; viewport 1440 × 900.
+
+Values below are medians of seven samples after a warm-up. Browser timings use
+CPU rate 4; server method timings use the host CPU without throttling. The two
+comparison series ran before/after sequentially. The first-viewport request count
+is sampled 800 ms after the 50 cards appear, before scrolling; payload estimates
+exclude HTTP headers. Results time ends when the DOM update is observed; settled
+time additionally waits for two animation frames and includes translation work.
+
+| Measurement | Before A | After A | Before B | After B |
+| --- | ---: | ---: | ---: | ---: |
+| 20 authorized photo method calls, ms | 595.3 | 10.0 | 1845.7 | 12.9 |
+| First-viewport photo requests | 12 | 4 | 12 | 4 |
+| First-viewport photo payload, KiB | 2827.5 | 942.5 | 2827.5 | 942.5 |
+| Repeat current list, BG results / settled, ms | 97.9 / 187.0 | 32.9 / 151.6 | 365.3 / 589.1 | 41.5 / 179.1 |
+| Repeat current list, EN results / settled, ms | 114.6 / 179.4 | 55.4 / 154.0 | 164.0 / 258.2 | 68.7 / 183.6 |
+| Search, BG results / settled, ms | 223.4 / 279.6 | 183.4 / 242.6 | 314.0 / 480.9 | 189.8 / 258.8 |
+| Search, EN results / settled, ms | 261.7 / 315.3 | 200.5 / 251.1 | 246.9 / 300.9 | 216.2 / 283.1 |
+
+Machine load varied substantially. An extra standalone after-run recorded a
+35.3 ms photo batch and BG search at 388.6 / 714.6 ms, so these timings are not a
+latency guarantee. The consistent result is fewer initial photo requests and
+less repeated task scanning/card construction. CPU rate 4 is a simulation, not
+a physical phone. This measures loopback, not a live server, slow network,
+recurring-schedule load or concurrent-client capacity. The task API still sends
+all accessible task records and events; this change does not add API pagination
+or history-on-demand.
+
+Validation: 531 unit/server tests passed. Browser suites `--tasks-only`,
+`--lists-only` and `--task-performance-only` passed, covering evidence upload,
+compression, multiple photos, viewers, reports, history, assignment and permissions,
+retention, paging, search, refresh, drafts, BG/EN and widths 320/390/1440. New
+regressions verify deferred scrolling, unchanged-card reuse after another card
+changes, current history/action handlers, exact due boundaries, native fallback,
+cleanup invalidation across database connections and exact photo expiration.
+
+Integration with exact notification links restores focus and reveals the linked
+task after the complete view is attached, including history sections assembled
+off-DOM. A regression refreshes a neighboring task and verifies that the reused
+linked card retains focus and loads its photo after automatic scrolling.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license
