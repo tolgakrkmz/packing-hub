@@ -42,7 +42,7 @@ async function main() {
     await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
     const base = `http://127.0.0.1:${hub.server.address().port}`;
     browser = await chromium.launch({channel: 'chrome', headless: process.argv.includes('--headless'), slowMo: process.argv.includes('--headless') ? 0 : 250,
-      ...(process.argv.includes('--static-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+      ...(process.argv.includes('--static-only') || process.argv.includes('--security-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
     async function device(username, mobile = false) {
       const context = await browser.newContext({timezoneId: 'Europe/Sofia', ...(mobile ? {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true} : {})});
       await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
@@ -68,6 +68,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--security-only')) {
+      await require('../tests/browser/security-personnel.cjs').exerciseServerSecurity({admin, hub, base, expect});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--task-performance-only')) {
       await require('../tests/browser/task-performance.cjs').exerciseTaskPerformance({admin, hub, base, expect, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); return;

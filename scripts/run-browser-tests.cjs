@@ -45,7 +45,11 @@ async function main() {
   let browser;
   try {
     const headed = !process.argv.includes('--headless');
-    browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0,
+      ...(process.argv.includes('--security-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+    if (process.argv.includes('--security-only')) {
+      await require('../tests/browser/security-personnel.cjs').exerciseOfflineSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
+    }
     if (process.argv.includes('--lists-only')) {
       await require('../tests/browser/paged-lists.cjs').exerciseOfflinePagedLists(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
     }
