@@ -126,7 +126,7 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await choose(admin, 'reported');
   await expect(group(admin, 'reported')).toContainText('Няма отчетени задачи по тези критерии.');
   await admin.locator('#ownerFilter').selectOption(String(owner.id)); await admin.locator('#statsUntil').fill('2026-12-02');
-  await expect(count(admin, 'reported')).toHaveText('5'); await expect(count(admin, 'unreported')).toHaveText('1');
+  await expect(count(admin, 'reported')).toHaveText('5'); await expect(count(admin, 'unreported')).toHaveText('2');
   await expect(count(admin, 'cancelled')).toHaveText('1');
   await admin.locator('#statsFrom').fill('2026-12-03'); await expect(admin.locator('#taskContent')).toHaveText('Избери валиден период.');
   await admin.locator('#statsFrom').fill('2026-12-01'); await admin.locator('#statsUntil').fill('2026-12-03');
@@ -174,7 +174,19 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await expect(count(admin, 'cancelled')).toHaveText('2'); await expect(count(admin, 'unreported')).toHaveText('3');
   await expect(group(admin, 'cancelled')).not.toContainText('Fictional history cancelled-with-report');
   await choose(admin, 'unreported'); await expect(titles(admin, 'unreported').first()).toHaveText('Fictional history cancelled-with-report');
+  // Old shift and global tasks without a report remain trackable in a new month.
+  setTime('2027-02-01T10:00:00+02:00'); await admin.goto(base + '/tasks');
+  await admin.locator('[data-view=history]').click();
+  await expect(count(admin, 'reported')).toHaveText('0'); await expect(count(admin, 'cancelled')).toHaveText('0');
+  await expect(count(admin, 'unreported')).toHaveText('4'); await choose(admin, 'unreported');
+  await expect(admin.locator('#taskPeriod')).toBeHidden();
+  await expect(titles(admin, 'unreported')).toHaveText(['other-owner', 'cancelled-with-report', 'pending-shift', 'review'].map(key => 'Fictional history ' + key));
+  await admin.locator('#taskSearch').fill('Fictional history pending-shift'); await expect(count(admin, 'unreported')).toHaveText('1');
+  await admin.locator('#taskSearch').fill(''); await admin.locator('#ownerFilter').selectOption(String(other.id));
+  await expect(titles(admin, 'unreported')).toHaveText(['Fictional history other-owner']);
+  await choose(admin, 'reported'); await expect(admin.locator('#taskPeriod')).toBeVisible();
+  await expect(admin.locator('#statsFrom')).toHaveValue('2027-01-30'); await expect(admin.locator('#statsUntil')).toHaveValue('2027-02-01');
   await chief.context().close();
-  console.log('PASS task history buttons, selected group, keyboard focus, newest order, filters, report transitions and BG/EN layouts');
+  console.log('PASS all-date unreported backlog, dated reported/cancelled history, selected group, keyboard focus, newest order, filters, report transitions and BG/EN layouts');
 }
 module.exports = {exerciseTaskHistory};

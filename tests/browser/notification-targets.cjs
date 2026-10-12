@@ -46,7 +46,7 @@ async function exerciseNotificationTargets({admin, hub, base, device, expect, se
   const chief = await hub.auth.create('demo-link-chief', password, 'operator', actor, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   const payload = title => ({requestId: crypto.randomUUID(), title, description: '', priority: 'normal', requiresPhotos: false, assigneeId: chief.id, participantIds: [], kind: 'global', dueDate: '2026-10-05', dueTime: '17:00'});
   const task = hub.tasks.create(payload('Fictional oldest linked task'), actor);
-  for (let i = 0; i < 52; i++) { setTime(new Date(Date.parse('2026-10-05T08:31:00+03:00')+i*1000).toISOString()); hub.tasks.create(payload('Fictional later task ' + i), actor); }
+  for (let i = 0; i < 52; i++) { setTime(new Date(Date.parse('2026-10-05T08:31:00+03:00')+i*1000).toISOString()); hub.tasks.create({...payload('Fictional later task ' + i), dueDate: '2026-10-06'}, actor); }
   await opened(admin, 'taskDue', task.id);
   await expect(admin.locator('[data-view=history]')).toHaveAttribute('aria-pressed', 'true');
   await expect(admin.locator('#taskPagination')).toContainText('2');

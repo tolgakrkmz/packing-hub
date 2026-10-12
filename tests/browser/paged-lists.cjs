@@ -165,12 +165,12 @@ async function exerciseServerPagedLists({admin, hub, base, expect}) {
   await admin.locator('#taskSearch').fill('Fictional paged task');
   await expect(cards).toHaveCount(50); await expect(pager).toContainText('Page 1 of 3');
   await admin.locator('[data-view=history]').click();
-  await admin.locator('#statsFrom').fill('2026-10-05'); await admin.locator('#statsUntil').fill('2026-10-05');
   await admin.locator('[data-history-view=unreported]').click();
+  await expect(admin.locator('#taskPeriod')).toBeHidden();
   await expect(admin.locator('[data-history-view=unreported] .task-badge')).toHaveText('105');
   await expect(cards).toHaveCount(50); await next().click();
   await expect(pager).toContainText('Page 2 of 3');
-  await admin.locator('#statsFrom').fill('2026-10-01'); await expect(pager).toContainText('Page 1 of 3');
+  await admin.locator('#ownerFilter').selectOption(String(manager.id)); await expect(pager).toContainText('Page 1 of 3');
   await admin.locator('[data-view=global]').click(); await next().click(); await next().click();
   hub.store.db.prepare("DELETE FROM task_items WHERE id LIKE 'demo-page-task-%' AND id NOT IN ('demo-page-task-0','demo-page-task-1','demo-page-task-2')").run();
   await admin.locator('#refreshTasks').click(); await expect(cards).toHaveCount(3); await expect(pager).toContainText('Page 1 of 1');
