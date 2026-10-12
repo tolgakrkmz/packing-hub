@@ -35,6 +35,17 @@ regressions, including private-token, binary, symlink and unapproved-path refusa
 
 ## Finding register
 
+### Additional checks without a reproduced defect
+
+`tests/server/security-http.test.cjs`: **9/9 passed**. Checks real HTTP behavior:
+oversized JSON returns `413` without mutation; malformed/non-object JSON and
+unsupported media are refused; SQL-like usernames return the same generic login
+failure; missing/null/hostile/prefix Origins and cross-session CSRF are rejected;
+encoded traversal and malformed paths disclose no file content; notification
+JSON accepts exactly 4096 bytes and refuses 4097; internal failures return only
+`SERVER_ERROR`; case aliases share account throttling; spoofed forwarding headers
+cannot evade the connection IP limit. These are coverage additions, not findings.
+
 No finding is marked fixed without a failing regression followed by a passing
 run. Each entry records SEC-ID, priority, file/line, expected/actual behavior,
 demo reproduction, risk, minimal fix, regression result and status.
