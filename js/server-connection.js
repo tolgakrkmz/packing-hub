@@ -389,7 +389,7 @@ const HubServer = (() => {
         if (recovery) { clearTimeout(recovery.reveal); clearTimeout(recovery.deadline); }
         const current = recovery = {id: ++attempt, finished: false};
         message.textContent = text;
-        current.reveal = setTimeout(() => { if (recovery === current && !current.finished) overlay.hidden = false; }, 150);
+        current.reveal = setTimeout(() => { if (recovery === current && !current.finished) overlay.hidden = false; }, 2300);
         current.deadline = setTimeout(() => finishRecovery(current.id), 8000);
         return current.id;
       }

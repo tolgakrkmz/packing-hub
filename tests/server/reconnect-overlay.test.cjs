@@ -45,26 +45,29 @@ function client(module = 'production-log') {
     }};
 }
 async function connected(c) { c.open(); c.version(); await tick(); }
-test('initial connection reveals its visual only after 150ms', async () => {
+test('initial connection reveals its visual only after 2300ms', async () => {
   const c = client(); assert.equal(c.visible(),false);
-  await c.advance(149); assert.equal(c.visible(),false);
+  await c.advance(2299); assert.equal(c.visible(),false);
   await c.advance(1); assert.equal(c.visible(),true);
 });
 test('a quick connection cancels the reveal without flashing', async () => {
-  const c = client(); await connected(c); await c.advance(150);
-  assert.equal(c.visible(),false); assert.equal(c.state().getAttribute('data-connection'),'ready');
+  const c = client(); await c.advance(2000); assert.equal(c.visible(),false);
+  await connected(c); await c.advance(500); assert.equal(c.visible(),false);
+  c.error(); await c.advance(2000); assert.equal(c.visible(),false);
+  await connected(c); await c.advance(500); assert.equal(c.visible(),false);
+  assert.equal(c.state().getAttribute('data-connection'),'ready');
 });
 test('transport open waits for the version snapshot cohort before clearing blur', async () => {
   const c = client(); let release;
   c.hub.watch('demo-data', () => new Promise(resolve => { release = resolve; }));
-  await c.advance(150); c.open(); await tick(); assert.equal(c.visible(),true);
+  await c.advance(2300); c.open(); await tick(); assert.equal(c.visible(),true);
   c.version(); await tick(); assert.equal(c.visible(),true);
   release(); await tick(); assert.equal(c.visible(),false);
 });
 test('recovery waits for an active read and the change queued behind it', async () => {
   const c = client(); await connected(c); const releases = []; let reading = 0, maxReading = 0;
   c.hub.watch('demo-data', async () => { maxReading = Math.max(maxReading, ++reading); await new Promise(resolve => releases.push(resolve)); reading--; });
-  c.change('demo-data'); c.error(); await c.advance(150); c.open(); c.version(); await tick();
+  c.change('demo-data'); c.error(); await c.advance(2300); c.open(); c.version(); await tick();
   assert.equal(c.visible(),true); assert.equal(maxReading,1);
   releases.shift()(); await tick(); assert.equal(c.visible(),true);
   releases.shift()(); await tick(); assert.equal(c.visible(),false); assert.equal(maxReading,1);
@@ -74,7 +77,7 @@ test('repeated transport errors cannot extend the eight-second visual deadline',
   c.error(); await c.advance(3999); assert.equal(c.visible(),true);
   await c.advance(1); assert.equal(c.visible(),false); assert.equal(c.state().getAttribute('data-connection'),'pending');
   c.error(); await c.advance(200); assert.equal(c.visible(),false);
-  await connected(c); c.error(); await c.advance(150); assert.equal(c.visible(),true);
+  await connected(c); c.error(); await c.advance(2300); assert.equal(c.visible(),true);
 });
 test('a snapshot that never settles does not hold the visual beyond eight seconds', async () => {
   const c = client(); c.hub.watch('demo-data', () => new Promise(() => {})); c.open(); c.version();
@@ -84,13 +87,13 @@ test('a snapshot that never settles does not hold the visual beyond eight second
 test('an old snapshot completion cannot dismiss a newer reconnect attempt', async () => {
   const c = client(); let release;
   c.hub.watch('demo-data', () => new Promise(resolve => { release = resolve; }));
-  c.open(); c.version(); await c.advance(150); c.error(); await c.advance(150);
+  c.open(); c.version(); await c.advance(2300); c.error(); await c.advance(2300);
   release(); await tick(); assert.equal(c.visible(),true);
-  await c.advance(7850); assert.equal(c.visible(),false);
+  await c.advance(5700); assert.equal(c.visible(),false);
 });
 test('callbacks from cancelled timers cannot change a newer attempt', async () => {
-  const c = client(); const oldTimers = c.history.filter(timer => [150,8000].includes(timer.delay));
-  await connected(c); c.error(); await c.advance(150); assert.equal(c.visible(),true);
+  const c = client(); const oldTimers = c.history.filter(timer => [2300,8000].includes(timer.delay));
+  await connected(c); c.error(); await c.advance(2300); assert.equal(c.visible(),true);
   for (const timer of oldTimers) timer.callback(); await tick();
   assert.equal(c.visible(),true);
 });
@@ -98,22 +101,22 @@ test('foreground catch-up reads a callback shared across modules only once', asy
   const c = client(); await connected(c); let reads = 0, release;
   const refresh = () => { reads++; return new Promise(resolve => { release = resolve; }); };
   c.hub.watch('demo-one', refresh); c.hub.watch('demo-two', refresh);
-  c.visibility(true); c.change('demo-one'); c.change('demo-two'); await c.advance(150);
+  c.visibility(true); c.change('demo-one'); c.change('demo-two'); await c.advance(2300);
   assert.equal(reads,0);
-  c.visibility(false); await c.advance(150); assert.equal(reads,1); assert.equal(c.visible(),true);
+  c.visibility(false); await c.advance(2300); assert.equal(reads,1); assert.equal(c.visible(),true);
   release(); await tick(); assert.equal(c.visible(),false);
 });
 test('a busy draft defers reading without holding blur and refreshes after it closes', async () => {
   const c = client(); await connected(c); let busy = true, reads = 0;
   c.hub.watch('demo-data', async () => { reads++; }, () => busy);
-  c.visibility(true); c.visibility(false); await c.advance(150);
+  c.visibility(true); c.visibility(false); await c.advance(2300);
   assert.equal(c.visible(),false); assert.equal(reads,0);
-  busy = false; await c.advance(50); assert.equal(reads,1);
+  busy = false; await c.advance(100); assert.equal(reads,1);
 });
 test('failed refresh work clears the decorative visual', async () => {
   const c = client(); let reject;
   c.hub.watch('demo-data', () => new Promise((_, fail) => { reject = fail; }));
-  c.open(); c.version(); await c.advance(150); assert.equal(c.visible(),true);
+  c.open(); c.version(); await c.advance(2300); assert.equal(c.visible(),true);
   reject(new Error('Fictional connection failure')); await tick(); assert.equal(c.visible(),false);
 });
 test('a failed active read keeps recovery waiting for its queued retry', async () => {
@@ -121,7 +124,7 @@ test('a failed active read keeps recovery waiting for its queued retry', async (
   c.hub.watch('demo-data', () => ++reads === 1
     ? new Promise((_, fail) => { reject = fail; })
     : new Promise(resolve => { release = resolve; }));
-  c.change('demo-data'); c.error(); c.open(); c.version(); await c.advance(150);
+  c.change('demo-data'); c.error(); c.open(); c.version(); await c.advance(2300);
   reject(new Error('Fictional interrupted read')); await tick();
   assert.equal(reads,2); assert.equal(c.visible(),true);
   release(); await tick(); assert.equal(c.visible(),false);
@@ -129,7 +132,7 @@ test('a failed active read keeps recovery waiting for its queued retry', async (
 test('a disconnected foreground resume waits for the new version refresh barrier', async () => {
   const c = client(); await connected(c); const releases = [];
   c.hub.watch('demo-data', () => new Promise(resolve => releases.push(resolve)));
-  c.error(); c.visibility(true); c.visibility(false); c.open(); await c.advance(150);
+  c.error(); c.visibility(true); c.visibility(false); c.open(); await c.advance(2300);
   releases.shift()(); await tick(); assert.equal(c.visible(),true);
   c.version(); await tick(); assert.equal(c.visible(),true);
   releases.shift()(); await tick(); assert.equal(c.visible(),false);
@@ -137,7 +140,7 @@ test('a disconnected foreground resume waits for the new version refresh barrier
 test('persisted pageshow refreshes once after the same foreground transition', async () => {
   const c = client(); await connected(c); let reads = 0, release;
   c.hub.watch('demo-data', () => { reads++; return new Promise(resolve => { release = resolve; }); });
-  c.visibility(true); c.visibility(false); c.pageshow(); await c.advance(150);
+  c.visibility(true); c.visibility(false); c.pageshow(); await c.advance(2300);
   assert.equal(reads,1); assert.equal(c.visible(),true);
   release(); await tick(); assert.equal(reads,1); assert.equal(c.visible(),false);
 });
