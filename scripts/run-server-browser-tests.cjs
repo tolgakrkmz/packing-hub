@@ -68,6 +68,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--reconnect-only')) {
+      await require('../tests/browser/reconnect-overlay.cjs').exerciseReconnectOverlay({admin,hub,base,expect,screenshotDir:process.argv.find(value=>value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--task-performance-only')) {
       await require('../tests/browser/task-performance.cjs').exerciseTaskPerformance({admin, hub, base, expect, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); return;

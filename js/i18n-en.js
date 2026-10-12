@@ -222,6 +222,7 @@ const HUB_EN_MESSAGES = {
   "Свързване…": "Connecting…",
   "Свързан": "Connected",
   "Възстановяване на връзката…": "Reconnecting…",
+  "Проверяваме връзката и актуалните данни.": "Checking the connection and current data.",
   "Изход": "Sign out",
   "Нова версия — обнови": "New version — refresh",
   "Общи данни за всички устройства. Изберете модул.": "Shared data on all devices. Choose a module.",
