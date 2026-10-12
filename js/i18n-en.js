@@ -1466,3 +1466,19 @@ Object.assign(HUB_EN_MESSAGES, {
   "Възстановяването не е потвърдено. Опитай отново със същата причина.": "The restoration is unconfirmed. Try again with the same reason."
 });
 Object.assign(HUB_EN_MESSAGES, {"Потвърди": "Confirm"});
+Object.assign(HUB_EN_MESSAGES, {
+  "За справка при инцидент. Избери модул и дата, за да прегледаш записите.": "For incident review. Select a module and date to browse records.",
+  "Данните се зареждат само при преглед. Няма автоматично обновяване.": "Data loads only when requested. There is no automatic refresh.",
+  "Натисни „Покажи записи“, за да започнеш.": "Select Show records to begin.",
+  "Покажи записи": "Show records",
+  "Записи": "Records",
+  "Дата на отчета": "Report date",
+  "Без дата: всички дати": "No date: all dates",
+  "Преглед на запис": "Record review",
+  "Още записи": "More records",
+  "Още версии": "More versions",
+  "Обнови този запис": "Refresh this record",
+  "Съдържание на записа": "Record content",
+  "Ръчно обновяване": "Manual refresh",
+  "Провери датата и зареди записите отново.": "Check the date and load the records again."
+});

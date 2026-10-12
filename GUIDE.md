@@ -1191,6 +1191,18 @@ restoring require a nonblank reason of at most 1000 characters. Ordinary first
 pair reporting and plan cancellation keep their existing permissions and reason
 rules. The dialog preserves the reason and operation ID across interrupted retries.
 
+History is intended for occasional incident review. Opening the page or changing
+its filters makes no history request. **Show records** loads at most 25 list items,
+optionally for one report date; **More records** requests the next page. A direct
+record link loads only that record. Version summaries are paged in groups of 20;
+before/after snapshots load only when expanded, once per version during that review.
+The API caps requested pages at 50. Lists project metadata in SQLite rather than
+constructing all report snapshots in JavaScript. This page opens no SSE connection,
+notification polling, task polling or push invitation timer. Updates are manual;
+server authorization and session validity are checked on every request. Capturing
+history during report changes remains atomic, so an incident can be investigated
+afterwards. Desktop uses a record sidebar; phone layouts stack the list and review.
+
 SQLite commits the report, its previous/new snapshots, version, account, time,
 reason, technical audit metadata and receipt in the same transaction. Snapshots
 and correction reasons never enter the general activity log, report exports or
