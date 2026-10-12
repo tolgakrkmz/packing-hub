@@ -26,6 +26,7 @@ const HubServer = (() => {
     CORRECTION_REASON_REQUIRED: 'Добави причина за корекцията.'
   });
   const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.', REPORT_RESTORED: 'Сървърът потвърди възстановяването.'};
+  const receiptCodes = {create:'REPORT_SAVED', update:'REPORT_SAVED', delete:'REPORT_DELETED', restore:'REPORT_RESTORED'};
   Object.assign(messages, {TASK_PHOTO_REQUIRED: 'Добави снимка преди запис.', TASK_PHOTO_INVALID: 'Снимката не е валидна. Избери я отново.', TASK_PHOTO_STORAGE: 'Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.', TASK_PHOTO_EXPIRED: 'Снимката е изтрита след срока за съхранение.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
@@ -153,7 +154,12 @@ const HubServer = (() => {
         const result = await send('/api/reports/' + kind + '/operations', 'POST', input, version ? {'If-Match': '"' + version + '"'} : {});
         ++sequence;
         pendingRead = null;
-        if (result.receipt?.operationId !== operation.operationId || result.receipt.status !== 'confirmed' || !receiptMessages[result.receipt.message]) throw new Error('Сървърът не потвърди резултата. Опитай отново.');
+        const receipt = result.receipt;
+        if (!Object.hasOwn(receiptCodes, operation.action) || receipt?.operationId !== operation.operationId ||
+            receipt.entryId !== operation.entryId || receipt.action !== operation.action ||
+            receipt.status !== 'confirmed' || receipt.message !== receiptCodes[operation.action]) {
+          throw new Error('Сървърът не потвърди резултата. Опитай отново.');
+        }
         revision = result.revision; versions = result.versions; ready = true;
         await cfg.onRefresh(result.data);
         acceptedText = JSON.stringify(result.data);

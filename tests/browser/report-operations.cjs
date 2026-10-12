@@ -29,6 +29,16 @@ async function exerciseReportOperations({admin,hub,base,device,expect}) {
     };
     await page.route(url,handler);
   }
+  async function mismatchedReceipt(page, kind, patch) {
+    const url = '**/api/reports/' + kind + '/operations';
+    const handler = async route => {
+      const response = await route.fetch(); assert.equal(response.status(), 200);
+      const result = await response.json();
+      await route.fulfill({response, json:{...result, receipt:{...result.receipt, ...patch}}});
+      await page.unroute(url, handler);
+    };
+    await page.route(url, handler);
+  }
   async function draft(page,kind,amount) {
     await page.locator('[data-shift="СТИКЕРИ"]').click(); await page.locator('#dateInput').fill('2026-10-05');
     if(kind === 'production-log') {
@@ -118,6 +128,21 @@ async function exerciseReportOperations({admin,hub,base,device,expect}) {
     assert.equal(current(kind).data.entries.length,beforeChangedDraft+1);
     const revised = current(kind).data.entries.at(-1);
     assert.equal(kind === 'production-log' ? revised.tonnage : revised.note,kind === 'production-log' ? 4100 : 'Fictional revised unconfirmed draft');
+    // A committed write with an unrelated receipt must retain the form and
+    // replay the same operation, rather than announce success or duplicate it.
+    for (const patch of [{entryId:'demo-unrelated-entry'}, {action:'delete'}, {message:'REPORT_DELETED'}]) {
+      await draft(admin, kind, 5000); const kept = await admin.locator(control).inputValue();
+      const count = current(kind).data.entries.length;
+      await mismatchedReceipt(admin, kind, patch); await admin.locator('#saveBtn').click();
+      await expect(admin.locator('#msg')).toHaveAttribute('data-state', 'unconfirmed');
+      await expect(admin.locator(control)).toHaveValue(kept);
+      const revision = current(kind).revision;
+      assert.equal(current(kind).data.entries.length, count + 1);
+      await admin.locator('#retrySaveBtn').click();
+      await expect(admin.locator('#msg')).toHaveAttribute('data-state', 'success');
+      assert.equal(current(kind).revision, revision);
+      assert.equal(current(kind).data.entries.length, count + 1);
+    }
     console.log('PASS '+kind+' concurrent create/edit/delete, retained drafts, explicit review and idempotent retries');
   }
   console.log('RUN two browsers: pair planning, reporting, cancellation and interrupted responses');

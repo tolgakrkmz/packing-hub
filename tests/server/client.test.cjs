@@ -27,7 +27,7 @@ function client({module = 'production-log', period} = {}) {
   for (const callback of callbacks.get('DOMContentLoaded')) callback();
   return {sync, hub, accepted, get renders() { return renders; }, fetching: callback => { fetchData = callback; }, busy: value => { busy = value; }, visibility: hidden => { context.document.hidden = hidden; for (const callback of callbacks.get('visibilitychange') || []) callback(); }, emit: (module = 'production-log') => events.get('change')({data: JSON.stringify({module})})};
 }
-function response(value) { return {ok: true, json: async () => ({revision: value, data: {value}})}; }
+function response(value, extra = {}) { return {ok: true, json: async () => ({revision: value, data: {value}, ...extra})}; }
 test('a change received during a slow refresh triggers another read instead of leaving older data on screen', async () => {
   const c = client(); await c.sync.init();
   let release, reads = 0;
@@ -100,4 +100,48 @@ test('statistics projections cannot commit documents or report operations, even 
   c.fetching(() => { throw new Error('A projection must not write'); });
   await assert.rejects(c.sync.commitData(),/Само за преглед/);
   await assert.rejects(c.sync.commitOperation({}),/Само за преглед/);
+});
+
+const demoOperation = action => ({operationId:'demo-operation', entryId:'demo-entry', action, entry:{id:'demo-entry'}});
+const demoReceipt = action => ({operationId:'demo-operation', entryId:'demo-entry', action, status:'confirmed', version:2,
+  message:action === 'delete' ? 'REPORT_DELETED' : action === 'restore' ? 'REPORT_RESTORED' : 'REPORT_SAVED'});
+for (const [name, receipt] of [
+  ['missing receipt', undefined], ['null receipt', null],
+  ['other operation', {...demoReceipt('create'), operationId:'demo-other-operation'}],
+  ['other entry', {...demoReceipt('create'), entryId:'demo-other-entry'}],
+  ['missing entry', {...demoReceipt('create'), entryId:undefined}],
+  ['other action', {...demoReceipt('create'), action:'delete'}],
+  ['missing action', {...demoReceipt('create'), action:undefined}],
+  ['deletion message for create', {...demoReceipt('create'), message:'REPORT_DELETED'}],
+  ['restore message for create', {...demoReceipt('create'), message:'REPORT_RESTORED'}],
+  ['unconfirmed status', {...demoReceipt('create'), status:'pending'}]
+]) {
+  test('report confirmation rejects ' + name + ' without accepting data or versions', async () => {
+    const c = client(); c.fetching(async () => response(1, {versions:{'demo-entry':1}})); await c.sync.init();
+    c.fetching(async () => response(2, {receipt, versions:{'demo-entry':2}}));
+    await assert.rejects(c.sync.commitOperation(demoOperation('create')), /не потвърди/);
+    assert.deepEqual(c.accepted, [1]); assert.equal(c.sync.recordVersion('demo-entry'), 1);
+  });
+}
+for (const action of ['create','update','delete','restore']) {
+  test('matching ' + action + ' confirmation and replay accept current data with the original receipt', async () => {
+    const c = client(); await c.sync.init();
+    const receipt = demoReceipt(action), operation = demoOperation(action);
+    c.fetching(async () => response(2, {receipt, versions:{'demo-entry':2}}));
+    const result = await c.sync.commitOperation(operation);
+    assert.equal(result.receipt, receipt); assert.deepEqual(c.accepted, [1,2]);
+    c.fetching(async () => response(3, {receipt, replayed:true, versions:{'demo-entry':3}}));
+    const retry = await c.sync.commitOperation(operation);
+    assert.equal(retry.receipt, receipt); assert.deepEqual(c.accepted, [1,2,3]);
+  });
+}
+test('retrying a mismatched confirmation sends the same operation identity and accepts the valid receipt', async () => {
+  const c = client(); await c.sync.init(); const bodies = [], operation = demoOperation('create');
+  c.fetching(async (url, options) => {
+    bodies.push(JSON.parse(options.body));
+    return response(2, {receipt:bodies.length === 1 ? {...demoReceipt('create'), entryId:'demo-other-entry'} : demoReceipt('create')});
+  });
+  await assert.rejects(c.sync.commitOperation(operation), /не потвърди/);
+  await c.sync.commitOperation(operation);
+  assert.deepEqual(bodies, [operation,operation]); assert.deepEqual(c.accepted, [1,2]);
 });
