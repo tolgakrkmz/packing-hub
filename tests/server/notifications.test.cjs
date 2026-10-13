@@ -33,6 +33,13 @@ async function model(t, options = {}) {
   const payload = extra => ({requestId: crypto.randomUUID(), title: 'Fictional task', description: '', priority: 'normal', requiresPhotos: false, assigneeId: chief.id, participantIds: [], kind: 'global', dueDate: '2026-10-10', dueTime: '17:00', ...extra});
   return {store, auth, tasks, inbox, admin, chief, viewer, payload, time: value => { time = Date.parse(value); }};
 }
+test('direct admin completion notifies the owner as a task outcome once', async t => {
+  const s = await model(t), id = s.tasks.create(s.payload(), s.admin).id;
+  s.inbox.sync();
+  s.tasks.change(id, {action: 'complete'}, 1, s.admin); s.inbox.sync(); s.inbox.sync();
+  const outcomes = s.inbox.list(s.chief).items.filter(item => item.type === 'taskOutcome');
+  assert.equal(outcomes.length, 1); assert.equal(outcomes[0].href, '/tasks?target=' + encodeURIComponent(id));
+});
 test('every important event has an editable flag; notification flags never grant module access', () => {
   for (const type of Object.values(types)) assert.ok(permissions.keys.includes(type.flag));
   const user = {role: 'observer', permissionOverrides: {canReceiveProductionAdded: true, canViewProduction: false}};

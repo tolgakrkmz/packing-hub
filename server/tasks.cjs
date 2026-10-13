@@ -224,6 +224,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     access(user); const at = now();
     const required = ['approve', 'return'].includes(input.action) ? 'canReviewTasks' : ['report', 'progress'].includes(input.action) ? 'canReportTasks' : 'canManageTasks';
     if (!can(user, required)) throw problem(403, 'FORBIDDEN');
+    if (input.action === 'complete' && user.role !== 'admin') throw problem(403, 'FORBIDDEN');
     const work = () => {
       materialize(at);
       const table = isSchedule ? 'task_schedules' : 'task_items', item = row(table, id);
@@ -266,6 +267,11 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
           const inputs = photoInputs(input, 'solutionPhotos', 'solutionPhoto'); checkSolutionCount(item, inputs);
           const evidence = photos.addMany(inputs, at);
           item.status = input.status; item.report = {at, actor: {id: user.id, username: user.username}, status: input.status, note, photos: evidence, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
+        } else if (input.action === 'complete') {
+          if (item.kind === 'shift' && at < item.shift.start) throw problem(409, 'TASK_NOT_STARTED');
+          const evidence = photos.addMany(photoInputs(input, 'solutionPhotos', 'solutionPhoto'), at);
+          item.status = 'completed';
+          item.report = {at, actor: {id: user.id, username: user.username}, status: 'completed', note, photos: evidence, late: at > item.due + (item.kind === 'shift' ? GRACE : 0)};
         } else if (input.action === 'progress') {
           if (!assignedTo(item, user)) throw problem(403, 'FORBIDDEN');
           if (item.kind !== 'global' || !can(user, 'canReportTasks') || !note) throw problem(400, 'INVALID_TASK');
@@ -285,7 +291,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
         } else throw problem(400, 'INVALID_TASK');
       }
       if (!isSchedule) item.closedAt = ['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) ? at : null;
-      item.events.push({...event(user, input.action, note, at), status: item.status || null, photos: input.action === 'report' ? item.report.photos : undefined, late: input.action === 'report' ? at > item.due + (item.kind === 'shift' ? GRACE : 0) : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
+      item.events.push({...event(user, input.action, note, at), status: item.status || null, photos: ['report', 'complete'].includes(input.action) ? item.report.photos : undefined, late: ['report', 'complete'].includes(input.action) ? item.report.late : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
       store.audit(user, 'task-' + input.action, 'tasks');
       return {item: save(table, item)};
     };

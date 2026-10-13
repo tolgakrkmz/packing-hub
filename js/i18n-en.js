@@ -1373,6 +1373,9 @@ Object.assign(HUB_EN_MESSAGES, {"Двойки": "Pairs", "Инструкции":
 Object.assign(HUB_EN_MESSAGES, {
   "Проблем — снимка": "Problem — photo", "Решение — снимка": "Solution — photo", "Проблем": "Problem", "Решение": "Solution",
   "Изисква снимки": "Requires photos", "Снимки не се изискват": "Photos are not required",
+  "Завърши задача": "Complete task", "Завършена от администратор": "Completed by administrator",
+  "Завършена от администратор без снимки.": "Completed by administrator without photos.",
+  "Снимките са незадължителни при завършване от администратор. Можеш да завършиш със или без снимки.": "Photos are optional when an administrator completes a task. You can complete it with or without photos.",
   "Премахни снимката": "Remove photo", "Снимките са готови за запис.": "The photos are ready to save.",
   "Можеш да добавиш до 10 снимки.": "You can add up to 10 photos.",
   "Броят на снимките на решението трябва да е равен на броя на снимките на проблема.": "The number of solution photos must equal the number of problem photos.",

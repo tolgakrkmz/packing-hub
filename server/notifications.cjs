@@ -85,7 +85,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
             emit('taskReport', key, roster.filter(user => user.id === creator && user.id !== event.actor.id), item.id, event.at);
             if (event.status === 'review' && event.action === 'report') emit('taskReview', key, roster.filter(user => user.id !== event.actor.id && can(user, 'canReviewTasks')), item.id, event.at);
           } else {
-            const type = event.action === 'created' ? 'taskAssigned' : ['approve', 'cancel', 'stop'].includes(event.action) ? 'taskOutcome' : 'taskChanged';
+            const type = event.action === 'created' ? 'taskAssigned' : ['approve', 'complete', 'cancel', 'stop'].includes(event.action) ? 'taskOutcome' : 'taskChanged';
             // Recurring instances notify when their shift starts, independently of the initial plan.
             emit(type, key, recipients, item.id, item.scheduleId && i === 0 ? now() : event.at);
           }

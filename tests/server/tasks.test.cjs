@@ -29,6 +29,17 @@ async function setup(t, filename = ':memory:') {
   const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', {...(data.action === 'report' ? {solutionPhoto: photo} : {}), ...data}, {'If-Match': '"' + revision + '"'});
   return {hub, admin, chief, other, request, login, payload, create, list, change, time: value => { time = Date.parse(value); }};
 }
+test('HTTP completion uses authenticated admin rights, revision and idempotent requests', async t => {
+  const s = await setup(t), id = await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
+  const input = {action: 'complete', requestId: randomUUID(), note: ''};
+  assert.equal((await s.change(id, s.chief, {...input, role: 'admin', actor: s.admin.user})).status, 403);
+  assert.equal((await s.change(id, s.admin, input, 99)).status, 409);
+  const accepted = await s.change(id, s.admin, input); assert.equal(accepted.status, 200);
+  const result = await accepted.json(); assert.equal(result.item.status, 'completed');
+  const retry = await s.change(id, s.admin, input); assert.equal(retry.status, 200); assert.deepEqual(await retry.json(), result);
+  const item = (await s.list()).items.find(item => item.id === id);
+  assert.equal(item.revision, 2); assert.equal(item.report.actor.id, s.admin.user.id); assert.deepEqual(item.report.photos, []);
+});
 test('task badges count only work awaiting the account, and expose no task content', async t => {
   const s = await setup(t);
   const count = async user => {
