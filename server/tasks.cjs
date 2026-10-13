@@ -30,10 +30,10 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
   }
   function shift(date, team) {
     if (!dateKey(date) || !TEAMS.includes(team)) throw problem(400, 'INVALID_TASK_DATE');
-    if (team === 'СТИКЕРИ') return {date, team, code: 1, start: instant(date, '09:00'), due: instant(date, '17:00')};
     const [y, m, d] = date.split('-').map(Number);
     const code = schedule.shiftCodeFor(team, new Date(y, m - 1, d));
     if (code === 'Н') return null;
+    if (team === schedule.STICKERS.team) return {date, team, code, start: instant(date, schedule.STICKERS.start), due: instant(date, schedule.STICKERS.end)};
     return {date, team, code, start: instant(date, {1: '06:00', 2: '14:00', 3: '22:00'}[code]), due: instant(code === 3 ? nextDate(date) : date, {1: '14:00', 2: '22:00', 3: '06:00'}[code])};
   }
   const {db} = store;
@@ -41,6 +41,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
   db.exec("CREATE INDEX IF NOT EXISTS task_items_status ON task_items(json_extract(data,'$.status'))");
+  db.exec("CREATE INDEX IF NOT EXISTS task_items_open_stickers ON task_items(json_extract(data,'$.shift.date')) WHERE json_extract(data,'$.kind')='shift' AND json_extract(data,'$.status')='pending' AND json_extract(data,'$.shift.team')='СТИКЕРИ' AND json_extract(data,'$.report') IS NULL");
   const photos = createTaskPhotos(store, photoOptions);
   const access = user => { if (!can(user, 'canViewTasks')) throw problem(403, 'FORBIDDEN'); };
   const supervisor = user => user.taskSupervisor === true;
@@ -106,6 +107,14 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
   // Materialize missed shifts on the server, including after an outage. No browser needs to be open.
   function materialize(at = now()) {
     const today = localDate(at);
+    // Update open assignments made with earlier Stickers days/hours.
+    // Historical periods and recorded reports retain their original deadlines.
+    for (const stored of db.prepare("SELECT * FROM task_items WHERE json_extract(data,'$.kind')='shift' AND json_extract(data,'$.status')='pending' AND json_extract(data,'$.shift.team')='СТИКЕРИ' AND json_extract(data,'$.shift.date')>=? AND json_extract(data,'$.report') IS NULL").all(today)) {
+      const item={...JSON.parse(stored.data),id:stored.id,revision:stored.revision};
+      let date=item.shift.date, period=shift(date,'СТИКЕРИ');
+      while(!period) { date=nextDate(date); period=shift(date,'СТИКЕРИ'); }
+      if(item.due !== period.due || item.shift.start !== period.start || item.shift.due !== period.due) save('task_items',{...item,shift:period,due:period.due});
+    }
     for (const source of all('task_schedules')) {
       for (let date = source.from; date <= source.until && date <= today; date = nextDate(date)) {
         const period = shift(date, source.team);

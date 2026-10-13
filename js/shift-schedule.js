@@ -6,6 +6,7 @@ const ShiftSchedule = (() => {
   const EPOCH = Date.UTC(2026, 11, 1);
   const LABELS = {1:'1-ва смяна', 2:'2-ра смяна', 3:'Нощна смяна', 'Н':'Почивка'};
   const HOURS = {1:'06:00–14:00', 2:'14:00–22:00', 3:'22:00–06:00'};
+  const STICKERS = {team:'СТИКЕРИ', start:'09:00', end:'17:30', hours:'09:00–17:30'};
 
   function localDate(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
@@ -18,6 +19,7 @@ const ShiftSchedule = (() => {
     return date;
   }
   function shiftCodeFor(team, date) {
+    if(team === STICKERS.team) return [0,6].includes(date.getDay()) ? 'Н' : 1;
     if(!TEAMS.includes(team)) throw new Error('Невалиден екип.');
     const days = Math.round((Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-EPOCH)/86400000);
     return PATTERN[((days+OFFSETS[team])%16+16)%16];
@@ -33,8 +35,19 @@ const ShiftSchedule = (() => {
     return {date:localDate(date), shiftCode:code, team:teamFor(date,code)};
   }
   function isScheduled(context) {
-    if(context.team === 'СТИКЕРИ') return Number(context.shiftCode) === 1;
+    if(context.team === STICKERS.team) return Number(context.shiftCode) === 1 && shiftCodeFor(context.team,parseDate(context.date)) === 1;
     return TEAMS.includes(context.team) && shiftCodeFor(context.team,parseDate(context.date)) === Number(context.shiftCode);
   }
-  return {TEAMS, LABELS, HOURS, localDate, parseDate, shiftCodeFor, teamFor, current, isScheduled};
+  function hoursFor(context) {
+    return context.team === STICKERS.team ? STICKERS.hours : HOURS[context.shiftCode];
+  }
+  function isCurrent(context, at = new Date()) {
+    if(context.team !== STICKERS.team) {
+      const live = current(at);
+      return context.date === live.date && Number(context.shiftCode) === live.shiftCode && context.team === live.team;
+    }
+    const minutes = at.getHours()*60 + at.getMinutes();
+    return context.date === localDate(at) && isScheduled(context) && minutes >= 9*60 && minutes < 17*60+30;
+  }
+  return {TEAMS, LABELS, HOURS, STICKERS, localDate, parseDate, shiftCodeFor, teamFor, current, isScheduled, hoursFor, isCurrent};
 })();

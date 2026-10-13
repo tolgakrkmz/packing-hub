@@ -39,7 +39,8 @@ const HubDataValidation = (() => {
       (data.schemaVersion === undefined || [1,2,3].includes(data.schemaVersion)) &&
       records(data.employees,row => text(row.name) && (row.category === undefined || ['auto','manual','stickers'].includes(row.category)) &&
         optionalText(row.team) && optionalText(row.role) && optionalText(row.note) && (row.active === undefined || typeof row.active === 'boolean')) &&
-      (data.settings === undefined || object(data.settings) && ['stickersStage1','stickersStage2'].every(key => data.settings[key] === undefined || number(data.settings[key]))) &&
+      (data.settings === undefined || object(data.settings) && ['stickersStage1','stickersStage2'].every(key => data.settings[key] === undefined || number(data.settings[key])) &&
+        (data.settings.customRoles === undefined || Array.isArray(data.settings.customRoles) && data.settings.customRoles.every(role => text(role)))) &&
       (data.moveLog === undefined || Array.isArray(data.moveLog) && data.moveLog.every(object));
   }
   function instructions(data) {

@@ -119,7 +119,8 @@ function createImports(store, filename) {
           data.moveLog = mergeHistory(current.moveLog || [], input.moveLog || []);
           summary.historyAdded = data.moveLog.length - (current.moveLog || []).length;
           if (manifest.includeSettings && input.settings) {
-            const settings = clone(personnelModel.normalizeSettings({...current.settings, ...input.settings}));
+            const roleSettings = input.settings.customRoles === undefined ? {} : {customRoles:[...(current.settings?.customRoles||[]),...input.settings.customRoles]};
+            const settings = clone(personnelModel.normalizeSettings({...current.settings, ...input.settings, ...roleSettings},data.employees));
             if (!same(current.settings, settings)) summary.settingsChanges++;
             data.settings = settings;
           }

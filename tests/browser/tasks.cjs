@@ -148,14 +148,14 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
     await chief.setViewportSize({width: 390, height: 844}); await chief.locator('[data-view=shift]').click();
     await chief.screenshot({path: path.join(screenshotDir, 'tasks-supervisor-mobile.png'), fullPage: true});
   }
-  // Stickers follow regular 09:00–17:00 hours, rather than the rotating first shift.
+  // Stickers follow weekday 09:00–17:30 hours.
   setTime('2026-12-01T07:00:00+02:00');
   const stickersUser = await hub.auth.create('demo-stickers-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
   await admin.goto(base + '/tasks'); await admin.locator('[data-hub-language=bg]').click();
   await admin.locator('#newTask').click(); await admin.locator('#taskTitle').fill('Fictional Stickers shift check');
   await admin.locator('#taskOwner').selectOption(String(stickersUser.id));
   await expect(admin.locator('#shiftPreview')).toContainText('Редовна смяна');
-  await expect(admin.locator('#shiftPreview')).toContainText('9:00'); await expect(admin.locator('#shiftPreview')).toContainText('17:00');
+  await expect(admin.locator('#shiftPreview')).toContainText('9:00'); await expect(admin.locator('#shiftPreview')).toContainText('17:30');
   await uploadPhoto(admin, 'problem', expect); await admin.locator('#saveTask').click();
   await expect(admin.locator('#taskEditor')).not.toBeVisible();
   await admin.locator('[data-hub-language=en]').click();
@@ -164,7 +164,7 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   const stickers = await device(stickersUser.username, true); await stickers.goto(base + '/tasks');
   const stickersCard = stickers.locator('.task-card').filter({hasText: 'Fictional Stickers shift check'});
   await expect(stickersCard.locator('.task-meta').last()).toContainText('Редовна смяна');
-  await expect(stickersCard.locator('.task-meta').last()).toContainText('9:00'); await expect(stickersCard.locator('.task-meta').last()).toContainText('17:00');
+  await expect(stickersCard.locator('.task-meta').last()).toContainText('9:00'); await expect(stickersCard.locator('.task-meta').last()).toContainText('17:30');
   await expect(stickersCard.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
   await expect(stickers.locator('.tasks-heading .task-count')).toBeHidden();
   setTime('2026-12-01T09:00:00+02:00'); await stickers.reload();

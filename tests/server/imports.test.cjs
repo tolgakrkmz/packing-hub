@@ -18,6 +18,18 @@ function setup(t) {
   }
   return {directory, filename, store, imports, stage};
 }
+test('personnel imports preserve shared custom role catalogues and imported custom roles', t => {
+  const {store,imports,stage} = setup(t), value = fixture();
+  const current = store.get('personnel');
+  store.put('personnel',{...current.data,settings:{...current.data.settings,customRoles:['Demo Existing Role']}},current.revision,user);
+  value.payload.documents.personnel.settings.customRoles=['Demo Imported Role'];
+  value.payload.documents.personnel.employees[0].role='Demo Imported Role';
+  const id=stage(value), preview=imports.preview(id,user);
+  assert.equal(preview.canApply,true); imports.apply(id,preview.token,user);
+  const data=store.get('personnel').data;
+  assert.deepEqual(data.settings.customRoles,['Demo Existing Role','Demo Imported Role']);
+  assert.equal(data.employees[0].role,'Demo Imported Role');
+});
 test('all modules and nested instruction files commit together, preserve live records, normalize legacy personnel and retain retired pair history', t => {
   const {directory, store, imports, stage} = setup(t), data = fixture();
   store.put('production-log', {entries: [entry('demo-live-production')], goalTons: 3000}, 1, user);

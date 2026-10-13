@@ -74,8 +74,9 @@
     $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}`;
     $('stickersShiftBtn').setAttribute('aria-pressed',String(context.team === 'СТИКЕРИ'));
     $('stickersShiftBtn').disabled = busy;
+    $('contextShift').querySelector('option[value="1"]').textContent = context.team === 'СТИКЕРИ' ? `Редовна · ${ShiftSchedule.STICKERS.hours}` : `1-ва · ${ShiftSchedule.HOURS[1]}`;
     $('liveDate').textContent = `${fmtDate(live.date)} · ${ShiftSchedule.HOURS[live.shiftCode]}${new Date().getHours() < 6 ? ' · започнала вчера' : ''}`;
-    const isCurrent = PairTargets.inScope(context,live) || context.team === 'СТИКЕРИ' && context.date === live.date && context.shiftCode === live.shiftCode;
+    const isCurrent = ShiftSchedule.isCurrent(context);
     $('contextBadge').textContent = isCurrent ? 'Текуща смяна' : 'Друга работна смяна';
     $('contextBadge').className = 'badge '+(isCurrent ? 'achieved' : 'pending');
     $('contextNote').classList.toggle('historical',!isCurrent);
@@ -95,7 +96,7 @@
       ? globalThis.HUB_SERVER_BOOT
         ? 'Провери връзката с общата база и натисни „Опресни“ от панела за връзка.'
         : 'Свържете файла за двойките и файла за състава, за да започнете.'
-      : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.HOURS[context.shiftCode]}. Таргетът е постигнат при изпълнение и на двете цели.${context.team === 'СТИКЕРИ' ? ' 1 смяна, фиксиран състав, без автоматична ротация.' : ''}`;
+      : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.hoursFor(context)}. Таргетът е постигнат при изпълнение и на двете цели.${context.team === 'СТИКЕРИ' ? ' Понеделник–петък, фиксиран състав, без автоматична ротация.' : ''}`;
     $('shiftTotals').innerHTML = [
       [rosterLoaded ? people.length : '—','Хора в състава'],[rosterLoaded ? available.length : '—','Неразпределени'],
       [entries.length,`Двойки · ${done} отчетени · ${hit} постигнати`],[`${fmt(actualKg)} / ${fmt(totalKg)}`,`кг · ${fmt(actualCrates)} / ${fmt(totalCrates)} каси`]
@@ -118,7 +119,7 @@
     $('historyList').innerHTML = Array.from(groups,([key,entries]) => {
       const first = entries[0];
       const count = state => entries.filter(entry => PairTargets.status(entry) === state).length;
-      return `<details class="history-group" data-scope="${escape(key)}" ${open.has(key) ? 'open' : ''}><summary>${fmtDate(first.date)} · Екип ${escape(first.team)} · ${ShiftSchedule.HOURS[first.shiftCode]}<span class="history-counts">${entries.length} двойки · ${count('achieved')} постигнати · ${count('missed')} непостигнати · ${count('pending')} без отчет · ${count('cancelled')} отменени</span></summary><button class="jump" data-action="view" data-id="${escape(first.id)}">Отвори смяната</button><div class="pair-grid">${entries.map(entry => pairCard(entry)).join('')}</div></details>`;
+      return `<details class="history-group" data-scope="${escape(key)}" ${open.has(key) ? 'open' : ''}><summary>${fmtDate(first.date)} · Екип ${escape(first.team)} · ${ShiftSchedule.hoursFor(first)}<span class="history-counts">${entries.length} двойки · ${count('achieved')} постигнати · ${count('missed')} непостигнати · ${count('pending')} без отчет · ${count('cancelled')} отменени</span></summary><button class="jump" data-action="view" data-id="${escape(first.id)}">Отвори смяната</button><div class="pair-grid">${entries.map(entry => pairCard(entry)).join('')}</div></details>`;
     }).join('') || '<p class="empty">Няма записи за този месец.</p>';
   }
   function closeDialog() {
@@ -143,7 +144,7 @@
     $('reviewPairBtn').hidden = true;
     $('dialogTitle').textContent = mode === 'cancel' ? 'Отмяна на двойката' : mode === 'report' ? 'Отчет на двойката' : entry ? 'Промяна на двойката' : 'Нова двойка';
     $('savePairBtn').textContent = mode === 'cancel' ? 'Отмени двойката' : 'Запази';
-    $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.HOURS[scope.shiftCode]}${mode !== 'plan' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
+    $('dialogContext').innerHTML = `${fmtDate(scope.date)} · Екип ${escape(scope.team)} · ${ShiftSchedule.hoursFor(scope)}${mode !== 'plan' ? ' · <span translate="no">'+entry.members.map(person => escape(person.name)).join(' + ')+'</span>' : ''}`;
     $('planFields').hidden = mode !== 'plan';
     $('reportFields').hidden = mode !== 'report';
     $('cancellationFields').hidden = mode !== 'cancel';

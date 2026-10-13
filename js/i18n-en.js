@@ -1,5 +1,10 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "+ Добави нова роля…": "+ Add a new role…",
+  "Нова роля": "New role",
+  "Редовна": "Regular",
+  "понеделник–петък": "Monday–Friday",
+  "Понеделник–петък, фиксиран състав, без автоматична ротация.": "Monday–Friday, fixed roster, no automatic rotation.",
   "Редактирай": "Edit",
   "Откажи редакцията": "Cancel editing",
   "Запази корекцията": "Save correction",

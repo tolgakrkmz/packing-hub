@@ -132,6 +132,7 @@ body{padding:24px 16px 64px;}
 .icon-btn{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:20px;line-height:1;}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .field{display:grid;gap:6px;font-size:11px;color:var(--text-muted);font-weight:700;}
+.field[hidden]{display:none;}
 .field-wide{grid-column:1/-1;}
 .field input,.field select{width:100%;}
 .status-switch{display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;cursor:pointer;}

@@ -253,7 +253,7 @@ test('an explicit restriction also gates admin task creation and previews while 
   assert.throws(() => s.hub.tasks.create(s.payload(), denied.user), error => error.status === 403);
   assert.throws(() => s.hub.tasks.preview('2026-12-01', s.chief.user.id, denied.user), error => error.status === 403);
 });
-test('Stickers tasks use 09:00–17:00 local time for previews, reports, grace and badges', async t => {
+test('Stickers tasks use weekday 09:00–17:30 local time for previews, reports, grace and badges', async t => {
   const s = await setup(t);
   const account = await s.hub.auth.create('demo-stickers-chief', password, 'operator', s.admin.user, {}, () => {}, {taskSupervisor: true, taskTeam: 'СТИКЕРИ'});
   const chief = await s.login('demo-stickers-chief');
@@ -261,11 +261,17 @@ test('Stickers tasks use 09:00–17:00 local time for previews, reports, grace a
   assert.equal(response.status, 200);
   const {shift} = await response.json();
   assert.equal(shift.start, Date.parse('2026-12-01T09:00:00+02:00'));
-  assert.equal(shift.due, Date.parse('2026-12-01T17:00:00+02:00'));
-  for (const date of ['2026-03-29', '2026-10-25']) {
+  assert.equal(shift.due, Date.parse('2026-12-01T17:30:00+02:00'));
+  for (const date of ['2026-03-27','2026-03-30','2026-10-23','2026-10-26']) {
     const period = s.hub.tasks.shift(date, 'СТИКЕРИ');
     assert.equal(period.start, s.hub.tasks.instant(date, '09:00'));
-    assert.equal(period.due - period.start, 8 * 3600000);
+    assert.equal(period.due - period.start, 8.5 * 3600000);
+  }
+  for (const date of ['2026-03-29','2026-10-25','2026-12-05','2026-12-06']) {
+    assert.equal(s.hub.tasks.shift(date,'СТИКЕРИ'),null);
+    const preview = await s.request('/api/tasks/preview?date='+date+'&assigneeId='+account.id,s.admin);
+    assert.equal(preview.status,200); assert.equal((await preview.json()).shift,null);
+    assert.equal((await s.request('/api/tasks',s.admin,'POST',s.payload({assigneeId:account.id,from:date}))).status,400);
   }
   const id = await s.create(s.payload({assigneeId: account.id}));
   const item = () => s.hub.tasks.list(chief.user).items.find(item => item.id === id);
@@ -279,9 +285,49 @@ test('Stickers tasks use 09:00–17:00 local time for previews, reports, grace a
   assert.equal((await s.change(afternoon, chief, {action: 'report', status: 'completed', note: ''})).status, 200);
   assert.equal(s.hub.tasks.list(chief.user).items.find(item => item.id === afternoon).late, false);
   s.time('2026-12-01T17:30:00+02:00'); assert.equal(item().displayStatus, 'pending');
-  s.time('2026-12-01T17:31:00+02:00'); assert.equal(item().displayStatus, 'unreported'); assert.equal(count(), 1);
+  s.time('2026-12-01T17:31:00+02:00'); assert.equal(item().displayStatus, 'pending'); assert.equal(count(), 1);
+  s.time('2026-12-01T18:00:00+02:00'); assert.equal(item().displayStatus, 'pending');
+  s.time('2026-12-01T18:01:00+02:00'); assert.equal(item().displayStatus, 'unreported'); assert.equal(count(), 1);
   assert.equal((await s.change(id, chief, {action: 'report', status: 'completed', note: ''})).status, 200);
   assert.equal(item().late, true); assert.equal(count(), 0);
+});
+test('open current and future Stickers tasks adopt corrected hours while completed and past history stays intact', async t => {
+  const s=await setup(t);
+  const account=await s.hub.auth.create('demo-legacy-stickers-chief',password,'operator',s.admin.user,{},()=>{},{taskSupervisor:true,taskTeam:'СТИКЕРИ'});
+  const chief=await s.login('demo-legacy-stickers-chief');
+  const current=await s.create(s.payload({assigneeId:account.id}));
+  const future=await s.create(s.payload({assigneeId:account.id,from:'2026-12-02'}));
+  const closed=await s.create(s.payload({assigneeId:account.id}));
+  s.time('2026-12-01T10:00:00+02:00');
+  assert.equal((await s.change(closed,chief,{action:'report',status:'completed',note:''})).status,200);
+  const legacy=new Map();
+  for(const id of [current,future,closed]) {
+    const row=s.hub.store.db.prepare('SELECT * FROM task_items WHERE id=?').get(id), item=JSON.parse(row.data);
+    item.due=item.shift.due=s.hub.tasks.instant(item.shift.date,'17:00'); item.events[0].snapshot.due=item.due;
+    s.hub.store.db.prepare('UPDATE task_items SET data=? WHERE id=?').run(JSON.stringify(item),id); legacy.set(id,{...item,id,revision:row.revision});
+  }
+  const past={...legacy.get(current),id:'demo-past-stickers-task',shift:{...legacy.get(current).shift,date:'2026-11-30',start:s.hub.tasks.instant('2026-11-30','09:00'),due:s.hub.tasks.instant('2026-11-30','17:00')},due:s.hub.tasks.instant('2026-11-30','17:00')};
+  s.hub.store.db.prepare('INSERT INTO task_items(id,data) VALUES(?,?)').run(past.id,JSON.stringify(past));
+  const weekends=['2026-12-05','2026-12-06'].map((date,index)=>({...legacy.get(current),id:'demo-weekend-stickers-task-'+index,shift:{...legacy.get(current).shift,date,start:s.hub.tasks.instant(date,'09:00'),due:s.hub.tasks.instant(date,'17:00')},due:s.hub.tasks.instant(date,'17:00')}));
+  for(const item of weekends) s.hub.store.db.prepare('INSERT INTO task_items(id,data) VALUES(?,?)').run(item.id,JSON.stringify(item));
+  s.time('2026-12-01T17:31:00+02:00');
+  assert.equal(s.hub.tasks.summary(chief.user).count,2);
+  const items=s.hub.tasks.list(chief.user).items;
+  for(const id of [current,future]) {
+    const item=items.find(item=>item.id===id);
+    assert.equal(item.due,s.hub.tasks.instant(item.shift.date,'17:30')); assert.equal(item.shift.due,item.due);
+    assert.equal(item.displayStatus,'pending'); assert.equal(item.revision,legacy.get(id).revision+1);
+    assert.deepEqual(JSON.parse(s.hub.store.db.prepare('SELECT data FROM task_items WHERE id=?').get(id).data).events,legacy.get(id).events);
+  }
+  for(const id of [closed,past.id]) assert.equal(items.find(item=>item.id===id).due,id===closed ? legacy.get(id).due : past.due);
+  for(const original of weekends) {
+    const item=items.find(item=>item.id===original.id);
+    assert.equal(item.shift.date,'2026-12-07'); assert.equal(item.shift.start,s.hub.tasks.instant('2026-12-07','09:00'));
+    assert.equal(item.due,s.hub.tasks.instant('2026-12-07','17:30')); assert.equal(item.displayStatus,'pending');
+  }
+  assert.equal((await s.change(current,chief,{action:'report',status:'completed',note:''},2)).status,200);
+  assert.equal(s.hub.tasks.list(chief.user).items.find(item=>item.id===current).late,false);
+  assert.equal(s.hub.tasks.list(chief.user).items.find(item=>item.id===future).revision,2);
 });
 test('shift deadline and grace use server time; night shifts keep their start date; late reports retain their time and history', async t => {
   const s = await setup(t); const id = await s.create();
