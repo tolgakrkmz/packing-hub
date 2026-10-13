@@ -129,6 +129,10 @@ async function main() {
       await require('../tests/browser/report-operations.cjs').exerciseReportOperations({admin,hub,base,device,expect});
       assert.deepEqual(errors, []); return;
     }
+    if (process.argv.includes('--account-instructions-only')) {
+      await require('../tests/browser/account-instructions.cjs').exerciseAccountInstructions({admin, hub, base, device, expect, dir});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--packing-only')) {
       await require('../tests/browser/instruction-folders.cjs').exerciseInstructionFolders({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); return;

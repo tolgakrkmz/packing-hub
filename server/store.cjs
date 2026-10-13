@@ -85,6 +85,14 @@ function openStore(filename) {
     db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER');
   }
   if (!db.prepare('PRAGMA table_info(audit)').all().some(column => column.name === 'detail')) db.exec("ALTER TABLE audit ADD COLUMN detail TEXT NOT NULL DEFAULT '{}'");
+  db.exec(`CREATE TABLE IF NOT EXISTS account_instruction_sets(
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL, revision INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS account_instruction_files(
+      user_id INTEGER NOT NULL REFERENCES account_instruction_sets(user_id) ON DELETE CASCADE,
+      path TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('file','directory')), content BLOB, mime TEXT,
+      PRIMARY KEY(user_id,path));
+    CREATE TRIGGER IF NOT EXISTS remove_account_instructions AFTER UPDATE OF deleted_at ON users
+      WHEN NEW.deleted_at IS NOT NULL BEGIN DELETE FROM account_instruction_sets WHERE user_id=NEW.id; END;`);
   db.exec('PRAGMA user_version=4');
   for (const [kind, data] of Object.entries(defaults)) db.prepare('INSERT OR IGNORE INTO documents(kind,data) VALUES(?,?)').run(kind, JSON.stringify(data));
   // Additive migration: existing reports receive their current document revision.

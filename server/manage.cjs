@@ -2,6 +2,7 @@ const path = require('node:path');
 const readline = require('node:readline');
 const {openStore} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
+const {createAccountInstructions} = require('./account-instructions.cjs');
 async function password() {
   if (!process.stdin.isTTY) throw new Error('Use an interactive terminal.');
   process.stdout.write('Password (12–128 characters): ');
@@ -20,7 +21,7 @@ async function password() {
 }
 async function main() {
   process.umask(0o077);
-  const [command, value] = process.argv.slice(2);
+  const [command, value, sourceDirectory] = process.argv.slice(2);
   const store = openStore(process.env.HUB_DATABASE || '/var/lib/package-hub/hub.sqlite');
   try {
     if (command === 'create-admin') {
@@ -32,7 +33,10 @@ async function main() {
     } else if (command === 'backup' && value) {
       store.db.prepare('VACUUM INTO ?').run(path.resolve(value));
       console.log('Local database backup completed.');
-    } else throw new Error('Use create-admin <username> or backup <local-path>.');
+    } else if (command === 'install-account-instructions' && value && sourceDirectory) {
+      const result = createAccountInstructions(store).install(value, sourceDirectory);
+      console.log('Account instructions installed (' + result.profiles + ' profiles, ' + result.files + ' attachments).');
+    } else throw new Error('Use create-admin <username>, backup <local-path>, or install-account-instructions <username> <local-directory>.');
   } finally { store.close(); }
 }
-main().catch(() => { console.error('Account/backup operation failed. Check the command, password requirements and local paths.'); process.exitCode = 1; });
+main().catch(() => { console.error('Local management operation failed. Check the account, command, input files and local paths.'); process.exitCode = 1; });

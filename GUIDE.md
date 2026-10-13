@@ -572,6 +572,56 @@ unprivileged user, with a read-only application filesystem and a persistent
 `hub-data` volume. Expose only this app through Funnel. The Docker build context
 excludes demo data, databases, environment files, Git history and test artifacts.
 
+### Private account instructions
+
+A temporary demonstration can use its own instruction index and nested files,
+owned by one existing active account. Keep the entire input folder local and
+outside Git, including its customer names, company logos and PDF attachments.
+The folder contains `data/package-instructions.json` and the referenced files
+under `data/profiles/<folderName>/`. Each profile may also have `instruction.txt`.
+
+Use Node.js 24+ and explicitly select the existing server database:
+
+```sh
+HUB_DATABASE=/var/lib/package-hub/hub.sqlite node server/manage.cjs install-account-instructions demo-preview /private/local-bundle
+```
+
+The command imports only indexed attachments and optional instruction text,
+rejects missing files, escaped paths, symlinks and hard-linked files, and replaces this account's
+previous private bundle atomically. It does not create an account or change shared
+instruction records. Its output contains counts only. Reload the account's pages
+after installation; an open instruction page can also use **Refresh**.
+The source and its directories must be controlled by the executing user or root
+and must not be writable by other users. Sticky temporary ancestors are allowed.
+
+The owner uses the existing profile search, customer labels, text and download
+buttons. Other accounts retain the shared instruction index and cannot retrieve
+private files through direct URLs. Instruction-viewing permission and active
+sessions remain required. Private instruction accounts have read-only instructions
+and data imports disabled while the private bundle is installed; the configured
+account permissions remain unchanged in storage.
+
+For Docker Compose, copy the local bundle to the application's temporary directory,
+then import it with the same command inside the container. Remove the input copy
+after a successful import. Never add a bundle to the image or publishing checkout:
+
+```sh
+docker compose cp /private/local-bundle package-hub:/tmp/account-instructions
+docker compose exec package-hub node server/manage.cjs install-account-instructions demo-preview /tmp/account-instructions
+docker compose exec package-hub rm -rf /tmp/account-instructions
+```
+
+Deleting the account removes its private index, directories and file BLOBs in the
+same SQLite transaction that revokes access, while preserving shared instructions
+and the account's historical identity. Reopening the database does not recreate
+the bundle. Existing backups and already downloaded documents keep their copies;
+account deletion applies to the active server database.
+
+```sh
+node --test tests/server/account-instructions.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --account-instructions-only
+```
+
 ### Flexible packing instruction folders
 
 **Bulk import** accepts customer folders containing profile folders, flat profile

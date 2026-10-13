@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
+const {createAccountInstructions} = require('./account-instructions.cjs');
 const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
@@ -21,6 +22,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename);
   const auth = accounts(store);
+  const accountInstructions = createAccountInstructions(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
@@ -99,11 +101,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const pathname = url.pathname;
       const token = tokenFor(request);
       const session = auth.session(token);
+      if (session) session.user = accountInstructions.userView(session.user);
       // Request bodies and password hashing may outlive an account change.
       const currentUser = () => {
         const fresh = auth.session(token);
         if (!fresh) throw problem(401, 'LOGIN_REQUIRED');
-        return fresh.user;
+        return accountInstructions.userView(fresh.user);
       };
       const authorized = key => {
         const user = currentUser();
@@ -124,7 +127,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         attempts.delete(keys[1]);
         const ipAttempts = attempts.get(keys[0]);
         if (ipAttempts) ipAttempts.count = Math.max(0, ipAttempts.count - 1);
-        return json(response, 200, {user: loggedIn.user, csrf: loggedIn.csrf}, {'Set-Cookie': cookie(loggedIn.token, 12 * 3600)});
+        return json(response, 200, {user: accountInstructions.userView(loggedIn.user), csrf: loggedIn.csrf}, {'Set-Cookie': cookie(loggedIn.token, 12 * 3600)});
       }
       if (pathname.startsWith('/api/') || pathname === '/server-session.js') {
         if (!session) throw problem(401, 'LOGIN_REQUIRED');
@@ -300,21 +303,22 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return json(response, 200, result);
         }
         if (document) {
-          if (request.method === 'GET') { const current = store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
+          if (request.method === 'GET') { const current = document[1] === 'package-instructions' && accountInstructions.has(session.user) ? accountInstructions.get(session.user) : store.get(document[1]); return json(response, 200, current, {ETag: '"' + current.revision + '"'}); }
+          if (document[1] === 'package-instructions' && accountInstructions.has(currentUser())) throw problem(403, 'FORBIDDEN');
           if (request.method === 'PUT') { const input = await jsonBody(request, importLimits.jsonBytes); const result = store.put(document[1], input.data || input, revisionFor(request), currentUser(), 'report', false, {reason:input.data ? input.reason : undefined}); broadcast(document[1], result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/folders') {
           if (!canViewModule(session.user, 'package-instructions')) throw problem(403, 'FORBIDDEN');
           const name = url.searchParams.get('path') || '';
-          if (request.method === 'GET') return json(response, 200, {entries: store.children(name)});
+          if (request.method === 'GET') return json(response, 200, {entries: accountInstructions.has(session.user) ? accountInstructions.children(name, session.user) : store.children(name)});
           if (request.method === 'POST') { const input = await jsonBody(request); store.createNode(input.path, input.kind, currentUser()); return json(response, 201, {ok: true}); }
           throw problem(405, 'METHOD_REJECTED');
         }
         if (pathname === '/api/files') {
           const name = url.searchParams.get('path');
           if (!canViewModule(session.user, ['personnel.json', 'data/personnel.json'].includes(name) ? 'personnel' : 'package-instructions')) throw problem(403, 'FORBIDDEN');
-          if (request.method === 'GET') { const file = store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
+          if (request.method === 'GET') { const file = accountInstructions.has(session.user) ? accountInstructions.node(name, session.user) : store.node(name); if (file.kind !== 'file') throw problem(400, 'WRONG_KIND'); response.writeHead(200, {'Content-Type': file.mime || 'application/octet-stream', 'Content-Disposition': 'attachment', ETag: '"' + file.revision + '"'}); return response.end(Buffer.from(file.content)); }
           if (request.method === 'PUT') { const result = store.writeFile(name, await body(request, name === 'data/package-instructions.json' ? importLimits.jsonBytes : importLimits.fileBytes), request.headers['content-type'] || 'application/octet-stream', revisionFor(request), currentUser()); broadcast('package-instructions', result.revision); return json(response, 200, result); }
           throw problem(405, 'METHOD_REJECTED');
         }
