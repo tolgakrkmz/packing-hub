@@ -68,6 +68,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--version-update-only')) {
+      await require('../tests/browser/version-update.cjs').exerciseVersionUpdate({admin,hub,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--quantities-only')) {
       await admin.goto(base + '/production-log'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
       await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page:admin, expect,

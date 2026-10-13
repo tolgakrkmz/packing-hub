@@ -4,6 +4,7 @@ let entries = [];
 let addedHistoryMonth = null;
 let goalTons = 3000;
 let goalDraft = false;
+let reportDraft = false;
 let editingReport = null;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
@@ -70,6 +71,11 @@ const writer = createReportWriter({
   controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
   message: msg, retryButton: document.getElementById('retrySaveBtn')
 });
+for(const control of [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]) {
+  for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
+}
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
+  hasDraft:() => reportDraft || !!selectedShift || !!editingReport || goalDraft});
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
 goalInput.addEventListener('input', () => { goalDraft = true; });
@@ -127,6 +133,7 @@ document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
     const target = document.getElementById(btn.dataset.target);
     if(btn.dataset.set !== undefined){
       target.value = btn.dataset.set;
+      reportDraft = true;
       updateTotalReadout();
       return;
     }
@@ -137,6 +144,7 @@ document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
     if(v < 0) v = 0;
     if(!Number.isSafeInteger(v)) { quantityError(); return; }
     target.value = v;
+    reportDraft = true;
     updateTotalReadout();
   });
 });
@@ -278,6 +286,7 @@ saveBtn.addEventListener('click', async ()=>{
   const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    reportDraft = false;
     editingReport = null;
     addedHistoryMonth = entry.date.slice(0,7);
     tonInput.value = 0;

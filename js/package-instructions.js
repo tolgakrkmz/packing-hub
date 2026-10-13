@@ -40,6 +40,8 @@ let dbIndex = {};
 let rootDirHandle = null;
 let selectedImageFiles = [];
 let instructionsWriting = false;
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => instructionsWriting,
+  hasDraft:() => el.formPanel.style.display === 'block' || document.getElementById('bulkPanel').style.display === 'block'});
 const profilePageSize = 50;
 let profilePage = 1, profileSearchTimer;
 

@@ -62,8 +62,21 @@ and requires review if the original attempt already committed. All module view,
 creation and correction flags are checked again on the server, including retries.
 
 The status distinguishes a server-confirmed result, an unconfirmed response,
-a rejected change and a conflict. Drafts remain in the open page; closing or
-reloading the page does not provide durable offline draft storage.
+a rejected change and a conflict. Drafts remain in the open page; closing the
+page or using the browser's reload does not provide durable offline draft storage.
+
+The new-version notice shows the current and available versions. Its update
+button waits for active writes. Production, downtime, pairs, task editor/action,
+personnel/settings and instruction form/bulk drafts require an explicit choice
+to return to the form or discard unsaved fields and update. An unconfirmed report
+operation also requires that choice, even with an empty form. Confirmation checks
+for active writes again. This guard keeps drafts in memory only; discarding fields
+does not undo a change already accepted by the server.
+
+```sh
+node --test tests/server/version-update.test.cjs tests/report-save-recovery.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --version-update-only
+```
 
 Deploy the reviewed server and HTML/CSS/JS together. Startup adds private SQLite
 version, receipt and report-history tables and initializes versions for existing reports; it

@@ -26,6 +26,7 @@
   const photoRequirementLabel = item => requiresPhotos(item) ? 'Изисква снимки' : 'Снимки не се изискват';
   const dialogs = ['taskEditor', 'taskAction', 'taskHistory', 'taskPhotoViewer'];
   const draftOpen = () => busy || dialogs.some(id => $(id).open);
+  HubServer.guardUpdate({isBusy:() => busy, hasDraft:() => $('taskEditor').open || $('taskAction').open});
   function renderPhotoPolicy() {
     if (!state) return;
     $('photoPolicy').setAttribute('translate', 'no');

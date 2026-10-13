@@ -3,6 +3,7 @@ let selectedShift = null;
 let entries = [];
 let reasons = [];
 let editingReport = null;
+let reportDraft = false;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 const canManageReasons = typeof HubServer === 'undefined' || HubServer.can('canManageDowntimeSettings');
 
@@ -60,6 +61,11 @@ const writer = createReportWriter({
   controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
   message: msg, retryButton: document.getElementById('retrySaveBtn')
 });
+for(const control of [startInput,endInput,reasonSelect,otherReasonInput,noteInput]) {
+  for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
+}
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
+  hasDraft:() => reportDraft || !!selectedShift || !!editingReport || !!newReasonInput.value.trim()});
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
 function timeToMin(t){
@@ -257,6 +263,7 @@ saveBtn.addEventListener('click', async ()=>{
 
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    reportDraft = false;
     editingReport = null;
     startInput.value = '';
     endInput.value = '';

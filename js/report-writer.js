@@ -3,9 +3,12 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
   const clone = value => JSON.parse(JSON.stringify(value));
   const drafts = new Map();
   const operations = new Map();
+  const unconfirmedOperations = new Map();
   let busy = false, retry = null;
   let conflicting = null;
   let unconfirmedEntryId = null;
+  const hasPendingChange = () => !!retry || !!conflicting || !!unconfirmedEntryId || unconfirmedOperations.size > 0;
+  if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy, hasDraft:hasPendingChange});
   const reviewButton = typeof HubServer === 'undefined' ? null : document.createElement('button');
   if(reviewButton) {
     reviewButton.type = 'button'; reviewButton.className = 'conn-btn'; reviewButton.textContent = 'Прегледай актуалния запис'; reviewButton.hidden = true;
@@ -78,7 +81,9 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
         }
       }
       accepted = true;
+      if(operation) for(const [id,entryId] of unconfirmedOperations) if(entryId === operation.entryId) unconfirmedOperations.delete(id);
     } catch(error) {
+      if(operation) unconfirmedOperations.set(operation.operationId,operation.entryId);
       setData(before);
       if(operation?.action === 'create') unconfirmedEntryId = operation.entryId;
       message.textContent = (error.code === 'REPORT_CONFLICT' && operation ? 'Конфликт. ' : operation && error.status && error.status < 500 ? 'Записът не е направен. ' : 'Промяната не е потвърдена. ')+failureMessage(error);
@@ -106,6 +111,7 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
   return {
     run, clearRetry,
     get busy() { return busy; },
+    get hasPendingChange() { return hasPendingChange(); },
     operation(action, entry, version) {
       if(!sync().commitOperation) return null;
       const value = {action,entryId:entry.id,...(action === 'delete' ? {} : {entry}),...(action === 'create' ? {} : {version:version ?? sync().recordVersion(entry.id)})};
