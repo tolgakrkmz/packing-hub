@@ -23,7 +23,14 @@ const approvedAssets = {
   'assets/package-hub-icon-192.png':'782f72e465dc23f10f4cf81fd5e7dadabfac357f6ae66b0fd36bd9ef651d9915',
   'assets/package-hub-icon-512.png':'2374da93159431bba2ce0bc63037603dd6f7e98abce13681b5be1f78cd600b32'
 };
-const git = (args,cwd=root) => execFileSync('git',args,{cwd,maxBuffer:32*1024*1024});
+const MAX_BLOB_BYTES = 32*1024*1024;
+const BATCH_BYTES = 8*1024*1024;
+const BATCH_OBJECTS = 512;
+const MAX_CACHED_CHECKS = 50000;
+const git = (args,cwd=root,input,maxBuffer=MAX_BLOB_BYTES) => {
+  try { return execFileSync('git',args,{cwd,input,maxBuffer,stdio:['pipe','pipe','pipe']}); }
+  catch { throw new Error('Cannot safely read publication Git objects.'); }
+};
 function privateTokens(sourceRoot) {
   const tokens = new Set();
   const add = value => { if(typeof value === 'string' && value.trim().length >= 4) tokens.add(value.toLowerCase()); };
@@ -82,21 +89,89 @@ function inspect(file,buffer,tokens=[],mode='100644') {
   const shifts = text.match(/const SHIFT_PASSWORDS\s*=\s*\{(.*?)\};/s);
   if(shifts && shifts[1].trim()) throw new Error('Shift credentials are not allowed: '+file);
 }
-function checkSnapshot(ref,tokens,cwd=root) {
-  const entries = git(ref === '--staged' ? ['ls-files','--stage','-z'] : ['ls-tree','-r','-z',ref],cwd).toString('utf8').split('\0').filter(Boolean);
+function batchHeader(header,hash) {
+  const match = /^([0-9a-f]{40,64}) blob (0|[1-9][0-9]*)$/.exec(header);
+  if(!match || match[1] !== hash || !Number.isSafeInteger(Number(match[2])) || Number(match[2]) > MAX_BLOB_BYTES) throw new Error('Invalid or missing publication blob response.');
+  return Number(match[2]);
+}
+function parseBatchResponse(buffer,objects) {
+  let offset = 0;
+  const contents = [];
+  for(const {hash,size} of objects) {
+    const newline = buffer.indexOf(10,offset);
+    if(newline < offset || newline-offset > 100 || batchHeader(buffer.toString('utf8',offset,newline),hash) !== size) throw new Error('Incomplete or invalid publication blob response.');
+    const start = newline+1, end = start+size;
+    if(end >= buffer.length || buffer[end] !== 10) throw new Error('Incomplete publication blob content.');
+    contents.push(buffer.subarray(start,end));
+    offset = end+1;
+  }
+  if(offset !== buffer.length) throw new Error('Unexpected trailing publication blob response.');
+  return contents;
+}
+function inspectBatch(pending,tokens,cwd,checked) {
+  const hashes = [...pending.keys()];
+  if(!hashes.length) return;
+  const input = hashes.join('\n')+'\n';
+  const headers = git(['cat-file','--batch-check'],cwd,input,BATCH_OBJECTS*128).toString('utf8').split('\n');
+  if(headers.pop() !== '' || headers.length !== hashes.length) throw new Error('Incomplete publication blob metadata.');
+  const objects = hashes.map((hash,index) => ({hash,size:batchHeader(headers[index],hash)}));
+  let batch = [], bytes = 0;
+  const flush = () => {
+    if(!batch.length) return;
+    const buffers = parseBatchResponse(git(['cat-file','--batch'],cwd,batch.map(object => object.hash).join('\n')+'\n',bytes+128*batch.length),batch);
+    for(let index=0; index<batch.length; index++) for(const entry of pending.get(batch[index].hash)) {
+      inspect(entry.file,buffers[index],tokens,entry.mode);
+      // Keep only successful decisions, never blob content, and bound cache growth.
+      if(checked.size >= MAX_CACHED_CHECKS) checked.clear();
+      checked.add(entry.key);
+    }
+    batch = []; bytes = 0;
+  };
+  for(const object of objects) {
+    if(batch.length && bytes+object.size > BATCH_BYTES) flush();
+    batch.push(object); bytes += object.size;
+  }
+  flush();
+}
+function scanSnapshot(ref,tokens,cwd,checked) {
+  const listing = git(ref === '--staged' ? ['ls-files','--stage','-z'] : ['ls-tree','-r','-z',ref],cwd);
+  if(listing.length && listing[listing.length-1] !== 0) throw new Error('Incomplete publication snapshot listing.');
+  const text = listing.toString('utf8');
+  if(!Buffer.from(text,'utf8').equals(listing)) throw new Error('Invalid publication snapshot encoding.');
+  const entries = listing.length ? text.slice(0,-1).split('\0') : [];
   let count = 0;
+  const pending = new Map();
   for(const entry of entries) {
     const tab = entry.indexOf('\t');
-    const [mode,second,third] = entry.slice(0,tab).split(' ');
+    const metadata = entry.slice(0,tab);
+    const shape = ref === '--staged' ? /^([0-9]{6}) ([0-9a-f]{40}|[0-9a-f]{64}) ([0-3])$/ : /^([0-9]{6}) (blob) ([0-9a-f]{40}|[0-9a-f]{64})$/;
+    const fields = shape.exec(metadata);
+    if(tab < 0 || !fields) throw new Error('Invalid publication snapshot entry.');
+    const [,mode,second,third] = fields;
     const file = entry.slice(tab+1);
     if(ref === '--staged' && third !== '0') throw new Error('Resolve index conflicts before publishing.');
     const hash = ref === '--staged' ? second : third;
     // Validate the path before reading a potentially large, unapproved document.
-    if(!allowedFile(file)) throw new Error('Unapproved file type or path: '+file);
-    inspect(file,git(['cat-file','blob',hash],cwd),tokens,mode);
+    if(!allowedFile(file) || !['100644','100755'].includes(mode)) throw new Error('Unapproved file type or path: '+file);
+    if(!/^[0-9a-f]{40,64}$/.test(hash)) throw new Error('Invalid publication object reference.');
+    // Tokens and rules are fixed for this invocation; path and mode must also match.
+    const key = JSON.stringify([file,mode,hash]);
+    if(!checked.has(key)) {
+      if(!pending.has(hash)) pending.set(hash,[]);
+      pending.get(hash).push({file,mode,key});
+      if(pending.size >= BATCH_OBJECTS) { inspectBatch(pending,tokens,cwd,checked); pending.clear(); }
+    }
     count++;
   }
+  inspectBatch(pending,tokens,cwd,checked);
   return count;
+}
+function checkSnapshots(refs,tokens,cwd=root) {
+  const checked = new Set(), referenceTokens = [...tokens];
+  return refs.map(ref => scanSnapshot(ref,referenceTokens,cwd,checked));
+}
+function checkSnapshot(ref,tokens,cwd=root) {
+  return checkSnapshots([ref],tokens,cwd)[0];
 }
 function commitsForPush(input,cwd=root) {
   const commits = new Set();
@@ -118,13 +193,13 @@ function main() {
   const tokens = privateTokens(sourceRoot);
   if(process.argv[2] === '--push') {
     const commits = commitsForPush(fs.readFileSync(0,'utf8'));
-    for(const commit of commits) checkSnapshot(commit,tokens);
+    checkSnapshots(commits,tokens);
     console.log('Publication check passed for '+commits.length+' outgoing commits.');
   } else {
     console.log('Publication check passed for '+checkSnapshot('--staged',tokens)+' staged files.');
   }
 }
-module.exports = {fixtures,approvedAssets,inspect,privateTokens,checkSnapshot,commitsForPush};
+module.exports = {fixtures,approvedAssets,inspect,privateTokens,checkSnapshot,checkSnapshots,parseBatchResponse,commitsForPush};
 if(require.main === module) {
   try { main(); } catch(error) {
     console.error('PUBLICATION BLOCKED: '+error.message);
