@@ -27,8 +27,34 @@ function jpeg(input) {
     const length = content.readUInt16BE(offset), end = offset + length;
     if (length < 2 || end > content.length) invalid();
     if (marker === 0xe0 && (length !== 16 || content.toString('ascii', offset + 2, offset + 7) !== 'JFIF\0')) invalid();
-    if (marker === 0xdb) quantization = true;
-    if (marker === 0xc4) huffman = true;
+    if (marker === 0xdb) {
+      let cursor = offset + 2;
+      if (cursor === end) invalid();
+      while (cursor < end) {
+        const table = content[cursor++], precision = table >> 4;
+        if (precision > 1 || (table & 15) > 3) invalid();
+        cursor += 64 * (precision + 1);
+        if (cursor > end) invalid();
+      }
+      quantization = true;
+    }
+    if (marker === 0xc4) {
+      let cursor = offset + 2;
+      if (cursor === end) invalid();
+      while (cursor < end) {
+        const table = content[cursor++];
+        if ((table >> 4) > 1 || (table & 15) > 3 || cursor + 16 > end) invalid();
+        let symbols = 0, available = 1;
+        for (let bits = 0; bits < 16; bits++) {
+          const count = content[cursor++];
+          symbols += count; available = available * 2 - count;
+          if (available < 0) invalid();
+        }
+        if (!symbols || symbols > 256 || cursor + symbols > end) invalid();
+        cursor += symbols;
+      }
+      huffman = true;
+    }
     if (marker === 0xc0 || marker === 0xc2) {
       if (width || length < 11 || content[offset + 2] !== 8) invalid();
       height = content.readUInt16BE(offset + 3); width = content.readUInt16BE(offset + 5);

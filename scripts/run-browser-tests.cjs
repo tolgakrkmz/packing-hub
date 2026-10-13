@@ -33,7 +33,8 @@ async function main() {
   // The pinned fictional seed fingerprint also prevents accidentally serving the production checkout.
   inspect('js/employees-seed.js', fs.readFileSync(path.join(root, 'js/employees-seed.js')), tokens);
   const server = http.createServer((request, response) => {
-    const name = request.url === '/' ? '/index.html' : request.url;
+    const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
+    const name = pathname === '/' ? '/index.html' : pathname;
     const body = assets.get(name);
     response.writeHead(body ? 200 : 404, {
       'Content-Type': name.endsWith('.js') ? 'text/javascript; charset=utf-8' : name.endsWith('.css') ? 'text/css; charset=utf-8' : name === '/assets/package-hub-mark.svg' ? 'image/svg+xml; charset=utf-8' : 'text/html; charset=utf-8',
@@ -45,7 +46,30 @@ async function main() {
   let browser;
   try {
     const headed = !process.argv.includes('--headless');
-    browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0});
+    browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0,
+      ...(process.argv.includes('--security-only') || process.argv.includes('--security-client-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+    if (process.argv.includes('--security-client-only')) {
+      await require('../tests/browser/security-client.cjs').exerciseOfflineClientSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
+    }
+    if (process.argv.includes('--security-only')) {
+      await require('../tests/browser/security-personnel.cjs').exerciseOfflineSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
+    }
+    if (process.argv.includes('--quantities-only')) {
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+      await context.addInitScript(installStorage, {});
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base + '/production-log.html'); await page.evaluate(() => window.__browserTest.ready);
+      await page.evaluate(() => { window.__browserTest.nextFile = 'production-log.json'; });
+      await page.locator('#openFileBtn').click(); await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);
+      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page, expect,
+        read:() => page.evaluate(() => window.__browserTest.read('production-log.json')),
+        replaceGoal:goal => page.evaluate(async goal => { const data = await window.__browserTest.read('production-log.json'); await window.__browserTest.write('production-log.json', {...data, goalTons:goal}); }, goal)
+      });
+      require('node:assert/strict').deepEqual(errors, []); await context.close(); return;
+    }
     if (process.argv.includes('--responsive-only')) {
       await require('../tests/browser/responsive-layout.cjs').exerciseOfflineResponsiveLayouts(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
     }

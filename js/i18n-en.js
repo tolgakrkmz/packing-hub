@@ -243,6 +243,14 @@ const HUB_EN_MESSAGES = {
   "Проверяваме връзката и актуалните данни.": "Checking the connection and current data.",
   "Изход": "Sign out",
   "Нова версия — обнови": "New version — refresh",
+  "Текуща версия:": "Current version:",
+  "Налична версия:": "Available version:",
+  "Обновяване с незапазени промени": "Update with unsaved changes",
+  "Има чернова или непотвърдена промяна. Обновяването ще затвори формата и ще загуби незапазените полета.": "There is a draft or an unconfirmed change. Updating will close the form and discard unsaved fields.",
+  "Обновяването не отменя промяна, която сървърът вече е записал.": "Updating does not undo a change the server has already saved.",
+  "Върни се към формата": "Return to the form",
+  "Откажи промените и обнови": "Discard changes and update",
+  "Изчакай текущия запис и опитай обновяването отново. Формата остава отворена.": "Wait for the current save and try updating again. The form stays open.",
   "Общи данни за всички устройства. Изберете модул.": "Shared data on all devices. Choose a module.",
   "Съставът е променен от друг потребител. Опресни и опитай отново.": "Another user changed the personnel data. Refresh and try again.",
   "Записът не е направен. Опитай отново.": "The change was not saved. Try again.",
@@ -1501,5 +1509,6 @@ Object.assign(HUB_EN_MESSAGES, {
   "Обнови този запис": "Refresh this record",
   "Съдържание на записа": "Record content",
   "Ръчно обновяване": "Manual refresh",
-  "Провери датата и зареди записите отново.": "Check the date and load the records again."
+  "Провери датата и зареди записите отново.": "Check the date and load the records again.",
+  "Въведи неотрицателни цели числа в допустимия диапазон за количествата и целта.": "Enter non-negative whole numbers within the supported range for quantities and the goal."
 });

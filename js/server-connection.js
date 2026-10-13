@@ -13,6 +13,20 @@ const HubServer = (() => {
   }
   const listeners = new Map();
   const watchers = new WeakMap(), idle = () => false;
+  const updateGuards = new Set();
+  let pendingWrites = 0;
+  function guardUpdate({isBusy = idle, hasDraft = idle}) {
+    const guard = {isBusy, hasDraft}; updateGuards.add(guard);
+    return () => updateGuards.delete(guard);
+  }
+  function updateState() {
+    let busy = pendingWrites > 0, dirty = false;
+    for (const guard of updateGuards) {
+      try { busy = guard.isBusy() || busy; dirty = guard.hasDraft() || dirty; }
+      catch { busy = true; }
+    }
+    return {busy, dirty};
+  }
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
   messages.LAST_ACCOUNT_MANAGER = 'Трябва да остане поне един активен акаунт с право за управление на акаунти.';
@@ -29,6 +43,7 @@ const HubServer = (() => {
     CORRECTION_REASON_REQUIRED: 'Добави причина за корекцията.'
   });
   const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.', REPORT_RESTORED: 'Сървърът потвърди възстановяването.'};
+  const receiptCodes = {create:'REPORT_SAVED', update:'REPORT_SAVED', delete:'REPORT_DELETED', restore:'REPORT_RESTORED'};
   Object.assign(messages, {TASK_PHOTO_REQUIRED: 'Добави снимка преди запис.', TASK_PHOTO_INVALID: 'Снимката не е валидна. Избери я отново.', TASK_PHOTO_STORAGE: 'Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.', TASK_PHOTO_EXPIRED: 'Снимката е изтрита след срока за съхранение.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
@@ -46,7 +61,12 @@ const HubServer = (() => {
     }
     return response;
   }
-  const json = async (url, options) => (await request(url, options)).json();
+  const json = async (url, options) => {
+    const writing = options?.method && !['GET', 'HEAD'].includes(options.method);
+    if (writing) pendingWrites++;
+    try { return await (await request(url, options)).json(); }
+    finally { if (writing) pendingWrites--; }
+  };
   const send = (url, method, data, headers = {}) => json(url, {method, headers: {'Content-Type': 'application/json', ...headers}, body: JSON.stringify(data)});
   function watch(module, refresh, busy = idle) {
     let shared = watchers.get(refresh);
@@ -157,7 +177,12 @@ const HubServer = (() => {
         const result = await send('/api/reports/' + kind + '/operations', 'POST', input, version ? {'If-Match': '"' + version + '"'} : {});
         ++sequence;
         pendingRead = null;
-        if (result.receipt?.operationId !== operation.operationId || result.receipt.status !== 'confirmed' || !receiptMessages[result.receipt.message]) throw new Error('Сървърът не потвърди резултата. Опитай отново.');
+        const receipt = result.receipt;
+        if (!Object.hasOwn(receiptCodes, operation.action) || receipt?.operationId !== operation.operationId ||
+            receipt.entryId !== operation.entryId || receipt.action !== operation.action ||
+            receipt.status !== 'confirmed' || receipt.message !== receiptCodes[operation.action]) {
+          throw new Error('Сървърът не потвърди резултата. Опитай отново.');
+        }
         revision = result.revision; versions = result.versions; ready = true;
         await cfg.onRefresh(result.data);
         acceptedText = JSON.stringify(result.data);
@@ -423,9 +448,62 @@ const HubServer = (() => {
       // The server emits this for normal session expiry too. Keep the phone's
       // opt-in; account revocation already removes its subscriptions server-side.
       eventSource.addEventListener('logout', () => { finishRecovery(recovery.id); eventSource.close(); location.assign('/login'); });
+      let availableVersion = boot.version, updateNotice = null, updateDialog = null;
+      const busyUpdateMessage = 'Изчакай текущия запис и опитай обновяването отново. Формата остава отворена.';
+      function updateElement(tag, id, text) {
+        const node = document.createElement(tag); node.id = id; node.textContent = text; return node;
+      }
+      function requestUpdate() {
+        if (availableVersion === boot.version) return;
+        const status = updateState(), feedback = document.getElementById('serverUpdateFeedback');
+        feedback.textContent = status.busy ? busyUpdateMessage : '';
+        if (status.busy) return;
+        if (!status.dirty) { location.reload(); return; }
+        if (!updateDialog) {
+          updateDialog = updateElement('dialog', 'serverUpdateDialog', ''); updateDialog.className = 'report-reason';
+          updateDialog.setAttribute('aria-labelledby', 'serverUpdateTitle');
+          const title = updateElement('h2', 'serverUpdateTitle', 'Обновяване с незапазени промени');
+          const note = updateElement('p', 'serverUpdateWarning', 'Има чернова или непотвърдена промяна. Обновяването ще затвори формата и ще загуби незапазените полета.');
+          const saved = updateElement('p', 'serverUpdateSavedNote', 'Обновяването не отменя промяна, която сървърът вече е записал.');
+          const message = updateElement('p', 'serverUpdateDialogFeedback', ''); message.setAttribute('role', 'status');
+          const cancel = updateElement('button', 'serverUpdateCancel', 'Върни се към формата'); cancel.type = 'button';
+          const confirm = updateElement('button', 'serverUpdateConfirm', 'Откажи промените и обнови'); confirm.type = 'button';
+          const close = () => { updateDialog.close(); button.focus(); };
+          cancel.addEventListener('click', close);
+          // Escape belongs to this dialog, not an underlying editor's page handler.
+          updateDialog.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
+          updateDialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+          confirm.addEventListener('click', () => {
+            if (availableVersion === boot.version) { close(); return; }
+            if (updateState().busy) { message.textContent = busyUpdateMessage; return; }
+            updateDialog.close(); location.reload();
+          });
+          updateDialog.append(title, note, saved, message, cancel, confirm); document.body.append(updateDialog);
+        }
+        document.getElementById('serverUpdateDialogFeedback').textContent = '';
+        if (!updateDialog.open) updateDialog.showModal();
+        document.getElementById('serverUpdateCancel').focus();
+      }
+      let button;
       eventSource.addEventListener('version', event => {
-        if (JSON.parse(event.data).version !== boot.version && !document.getElementById('serverUpdate')) {
-          const button = document.createElement('button'); button.id = 'serverUpdate'; button.textContent = 'Нова версия — обнови'; button.onclick = () => location.reload(); tools.append(button);
+        const version = JSON.parse(event.data).version;
+        if (typeof version === 'string' && version) availableVersion = version;
+        if (availableVersion !== boot.version && !updateNotice) {
+          updateNotice = updateElement('div', 'serverUpdateNotice', ''); updateNotice.className = 'server-update-notice';
+          const versions = document.createElement('span');
+          const current = updateElement('span', 'serverCurrentVersion', boot.version); current.setAttribute('translate', 'no');
+          const available = updateElement('span', 'serverAvailableVersion', availableVersion); available.setAttribute('translate', 'no');
+          const currentLabel = document.createElement('span'); currentLabel.textContent = 'Текуща версия: ';
+          const availableLabel = document.createElement('span'); availableLabel.textContent = ' · Налична версия: ';
+          versions.append(currentLabel, current, availableLabel, available);
+          button = updateElement('button', 'serverUpdate', 'Нова версия — обнови'); button.type = 'button'; button.onclick = requestUpdate;
+          const feedback = updateElement('span', 'serverUpdateFeedback', ''); feedback.setAttribute('role', 'status');
+          updateNotice.append(versions, button, feedback); tools.append(updateNotice);
+        }
+        if (updateNotice) {
+          updateNotice.hidden = availableVersion === boot.version;
+          document.getElementById('serverAvailableVersion').textContent = availableVersion;
+          if (updateNotice.hidden && updateDialog?.open) updateDialog.close();
         }
         const current = recovery.id, connection = transportEpoch;
         refreshVisibleWatchers().then(() => {
@@ -500,5 +578,5 @@ const HubServer = (() => {
       dialog.showModal(); dialog.querySelector('textarea').focus();
     });
   }
-  return {correctionReason, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
+  return {correctionReason, guardUpdate, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
 })();

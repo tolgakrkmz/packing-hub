@@ -115,6 +115,10 @@
 .server-bar .hub-language button { padding: 8px; background: var(--bg); color: var(--text-muted); }
 .server-bar .hub-language button[aria-pressed=true] { color: var(--amber); background: #f5a62312; border-color: #f5a62355; }
 .server-bar #serverUpdate { color: var(--amber); background: #f5a62312; border-color: #f5a62355; }
+.server-update-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12px; overflow-wrap: anywhere; }
+.server-update-notice[hidden] { display: none; }
+.server-update-notice > span:first-child { min-width: 0; }
+.server-update-notice > [role=status]:not(:empty) { flex-basis: 100%; color: var(--amber); }
 .server-bar :is(a, button, select):focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 body.login-page {

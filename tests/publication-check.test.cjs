@@ -87,6 +87,14 @@ test('only the named technical documents are allowed and private content is stil
   }
   for (const other of ['PRIVATE-GUIDE.md', 'private/GUIDE.md', 'RECOVERY-REPORT.md', 'backups/SCENARIOS.md', 'private/BACKUP-RECOVERY-SCENARIOS.md', 'SYSTEM-STATUS-REPORT.md', 'private/SYSTEM-STATUS-SCENARIOS.md']) assert.throws(() => inspect(other, Buffer.from('Fictional local document')), /Unapproved/);
 });
+test('the named security review accepts technical findings while retaining every publication guard', () => {
+  const file = 'SECURITY-REVIEW.md', restricted = 'Synthetic Restricted Example';
+  assert.doesNotThrow(() => inspect(file, Buffer.from('Technical demo security findings')));
+  assert.throws(() => inspect(file, Buffer.from(restricted), [restricted.toLowerCase()]), /Private source/);
+  assert.throws(() => inspect(file, Buffer.from([0, 1, 2])), /Binary/);
+  assert.throws(() => inspect(file, Buffer.from('Technical review'), [], '120000'), /Unapproved/);
+  for (const other of ['SECURITY-PRIVATE.md', 'private/SECURITY-REVIEW.md']) assert.throws(() => inspect(other, Buffer.from('Technical review')), /Unapproved/);
+});
 test('only the named maintenance adapter, units, override and fictional Python tests are approved', () => {
   for (const file of ['scripts/maintenance-host.py', 'scripts/install-maintenance.sh', 'scripts/package-hub-maintenance.socket', 'scripts/package-hub-maintenance.service', 'compose.maintenance.yaml', 'tests/maintenance-host-test.py']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
   for (const file of ['scripts/private.py', 'scripts/package-hub-maintenance.conf', 'maintenance/status.json', 'maintenance/control.sock', 'compose.maintenance-private.yaml', 'tests/private.py']) assert.throws(() => inspect(file, Buffer.from('Fictional private state')), /Unapproved/);

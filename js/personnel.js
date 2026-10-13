@@ -86,6 +86,8 @@ function parseLocalDate(str){
 }
 
 let personnelSaving = false;
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => personnelSaving,
+  hasDraft:() => ['personModal','settingsModal'].some(id => document.getElementById(id).classList.contains('open'))});
 const sync = createFileSync({
   isBusy: () => personnelSaving,
   dbName:'portfolio-personnel-fs-db',
@@ -418,12 +420,13 @@ function renderLog(){
   const el=document.getElementById('logList');
   if(!moveLog.length){ el.innerHTML='<div class="empty">Все още няма промени.</div>'; return; }
   el.innerHTML=moveLog.slice(0,60).map(m=>{
-    if(m.type==='migration') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name||'Система')}</b> — ${escapeHTML(m.detail||'Миграция')}</span></div>`;
-    if(m.type==='settings') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b>Настройки:</b> ${escapeHTML(m.detail||'')}</span></div>`;
-    if(m.type==='create') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name)}</b> — добавен → ${escapeHTML(m.to||'')}</span></div>`;
-    if(m.type==='update') return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name)}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}${m.detail?' · <span translate="no">'+escapeHTML(m.detail)+'</span>':''}</span></div>`;
+    const date=escapeHTML(fmtDateBg(m.date));
+    if(m.type==='migration') return `<div class="log-item"><span class="log-date">${date}</span><span><b translate="no">${escapeHTML(m.name||'Система')}</b> — ${escapeHTML(m.detail||'Миграция')}</span></div>`;
+    if(m.type==='settings') return `<div class="log-item"><span class="log-date">${date}</span><span><b>Настройки:</b> ${escapeHTML(m.detail||'')}</span></div>`;
+    if(m.type==='create') return `<div class="log-item"><span class="log-date">${date}</span><span><b translate="no">${escapeHTML(m.name)}</b> — добавен → ${escapeHTML(m.to||'')}</span></div>`;
+    if(m.type==='update') return `<div class="log-item"><span class="log-date">${date}</span><span><b translate="no">${escapeHTML(m.name)}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}${m.detail?' · <span translate="no">'+escapeHTML(m.detail)+'</span>':''}</span></div>`;
     // Accept the legacy history shape: {date, name, from, to}.
-    return `<div class="log-item"><span class="log-date">${fmtDateBg(m.date)}</span><span><b translate="no">${escapeHTML(m.name||'')}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}</span></div>`;
+    return `<div class="log-item"><span class="log-date">${date}</span><span><b translate="no">${escapeHTML(m.name||'')}</b>: ${escapeHTML(m.from||'')} → ${escapeHTML(m.to||'')}</span></div>`;
   }).join('');
 }
 

@@ -21,8 +21,8 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
   // The default flows already cover permission matrices, account deletion,
   // assignment and photo options. Focused suites below add distinct scenarios.
   for (const [script, modes] of [
-    ['run-browser-tests.cjs', ['', 'statistics', 'transfer', 'pair-cancellation', 'lists', 'i18n', 'responsive']],
-    ['run-server-browser-tests.cjs', ['', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'navigation', 'login', 'connection-copy', 'lists', 'static', 'admin-panel', 'task-history', 'task-performance', 'reconnect']]
+    ['run-browser-tests.cjs', ['', 'statistics', 'transfer', 'pair-cancellation', 'lists', 'i18n', 'security', 'security-client', 'responsive', 'quantities']],
+    ['run-server-browser-tests.cjs', ['', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'navigation', 'login', 'connection-copy', 'lists', 'static', 'admin-panel', 'task-history', 'task-performance', 'security', 'security-client', 'reconnect', 'quantities', 'version-update']]
   ]) {
     // The report-history feature has its own focused flow. Include it once
     // that reviewed feature is integrated, without requiring its branch here.

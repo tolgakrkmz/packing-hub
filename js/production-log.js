@@ -3,6 +3,8 @@ let selectedShift = null;
 let entries = [];
 let addedHistoryMonth = null;
 let goalTons = 3000;
+let goalDraft = false;
+let reportDraft = false;
 let editingReport = null;
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
@@ -21,6 +23,15 @@ const manKgInput = document.getElementById('manKgInput');
 const manCrateInput = document.getElementById('manCrateInput');
 const totalReadout = document.getElementById('totalReadout');
 
+function readQuantity(control){
+  const value = Number(control.value || '0');
+  return !control.validity?.badInput && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+function quantityError(){
+  msg.textContent = 'Въведи неотрицателни цели числа в допустимия диапазон за количествата и целта.';
+  msg.dataset.state = 'error';
+}
+
 breakdownToggle.addEventListener('change', ()=>{
   const on = breakdownToggle.checked;
   simpleTonRow.style.display = on ? 'none' : 'flex';
@@ -29,8 +40,9 @@ breakdownToggle.addEventListener('change', ()=>{
 });
 
 function updateTotalReadout(){
-  const total = (parseInt(autoKgInput.value||'0',10)) + (parseInt(manKgInput.value||'0',10));
-  totalReadout.textContent = fmt(total)+' кг';
+  const auto = readQuantity(autoKgInput), manual = readQuantity(manKgInput);
+  const total = auto === null || manual === null ? null : auto + manual;
+  totalReadout.textContent = Number.isSafeInteger(total) ? fmt(total)+' кг' : '—';
 }
 [autoKgInput, manKgInput].forEach(inp=>{
   inp.addEventListener('input', updateTotalReadout);
@@ -59,13 +71,20 @@ const writer = createReportWriter({
   controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
   message: msg, retryButton: document.getElementById('retrySaveBtn')
 });
+for(const control of [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]) {
+  for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
+}
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
+  hasDraft:() => reportDraft || !!selectedShift || !!editingReport || goalDraft});
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
+goalInput.addEventListener('input', () => { goalDraft = true; });
 goalInput.addEventListener('change', async ()=>{
   if(writer.busy || typeof HubServer !== 'undefined' && !HubServer.can('canManageProductionSettings')) return;
-  let v = parseInt(goalInput.value || '0', 10);
-  if(v < 0) v = 0;
-  await writer.run(current => ({...current,goalTons:v}), () => { goalInput.value = v; }, 'Целта е записана.');
+  goalDraft = true;
+  const v = readQuantity(goalInput);
+  if(v === null) { quantityError(); return; }
+  await writer.run(current => ({...current,goalTons:v}), () => { goalDraft = false; goalInput.value = v; }, 'Целта е записана.');
 });
 
 document.getElementById('shiftGrid').addEventListener('click', (e)=>{
@@ -114,13 +133,18 @@ document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
     const target = document.getElementById(btn.dataset.target);
     if(btn.dataset.set !== undefined){
       target.value = btn.dataset.set;
+      reportDraft = true;
       updateTotalReadout();
       return;
     }
-    const step = parseInt(btn.dataset.step,10);
-    let v = parseInt(target.value || '0', 10) + step;
+    const current = readQuantity(target);
+    if(current === null) { quantityError(); return; }
+    const step = Number(btn.dataset.step);
+    let v = current + step;
     if(v < 0) v = 0;
+    if(!Number.isSafeInteger(v)) { quantityError(); return; }
     target.value = v;
+    reportDraft = true;
     updateTotalReadout();
   });
 });
@@ -141,13 +165,13 @@ const sync = createFileSync({
     entries = data.entries || [];
     globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    if(!writer.busy) goalInput.value = goalTons;
+    if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   },
   onRefresh: (data)=>{
     entries = data.entries || [];
     globalThis.HubNotificationTarget?.select(entries, entry => entry.id, entry => { addedHistoryMonth = entry.date.slice(0,7); dateInput.value = entry.date; dateInput.dispatchEvent(new Event('change')); });
     goalTons = (data.goalTons !== undefined) ? data.goalTons : 3000;
-    if(!writer.busy) goalInput.value = goalTons;
+    if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   },
   elements: {
     connDot: document.getElementById('connDot'),
@@ -182,7 +206,7 @@ function renderDayTotal(){
 }
 
 function renderGoal(){
-  if(!writer.busy) goalInput.value = goalTons;
+  if(!writer.busy && !goalDraft) goalInput.value = goalTons;
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -239,26 +263,30 @@ saveBtn.addEventListener('click', async ()=>{
   const useBreakdown = breakdownToggle.checked;
   let tonnage, breakdown = null;
   if(useBreakdown){
-    const autoKg = parseInt(autoKgInput.value||'0',10);
-    const autoCrates = parseInt(autoCrateInput.value||'0',10);
-    const manKg = parseInt(manKgInput.value||'0',10);
-    const manCrates = parseInt(manCrateInput.value||'0',10);
+    const autoKg = readQuantity(autoKgInput);
+    const autoCrates = readQuantity(autoCrateInput);
+    const manKg = readQuantity(manKgInput);
+    const manCrates = readQuantity(manCrateInput);
+    if([autoKg,autoCrates,manKg,manCrates].includes(null)) { quantityError(); return; }
     tonnage = autoKg + manKg;
     breakdown = { autoKg, autoCrates, manKg, manCrates };
   } else {
-    tonnage = parseInt(tonInput.value||'0',10);
+    tonnage = readQuantity(tonInput);
   }
+  const brak = readQuantity(brakInput);
+  if(!Number.isSafeInteger(tonnage) || brak === null) { quantityError(); return; }
   const draft = {
     date: dateInput.value,
     shift: selectedShift,
     tonnage: tonnage,
-    brak: parseInt(brakInput.value||'0',10),
+    brak: brak,
     breakdown: breakdown
   };
   const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);
   const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
+    reportDraft = false;
     editingReport = null;
     addedHistoryMonth = entry.date.slice(0,7);
     tonInput.value = 0;

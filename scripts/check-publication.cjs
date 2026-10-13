@@ -51,7 +51,7 @@ function privateTokens(sourceRoot) {
 }
 function allowedFile(file) {
   return Object.hasOwn(fixtures,file) || Object.hasOwn(approvedAssets,file) ||
-    ['.gitignore','.dockerignore','Dockerfile','compose.yaml','compose.maintenance.yaml','AGENTS.md','README.md','GUIDE.md','PUBLICATION-NOTES.md','BACKUP-RECOVERY-SCENARIOS.md','SYSTEM-STATUS-SCENARIOS.md','LICENSE','manifest.webmanifest',
+    ['.gitignore','.dockerignore','Dockerfile','compose.yaml','compose.maintenance.yaml','AGENTS.md','README.md','GUIDE.md','PUBLICATION-NOTES.md','BACKUP-RECOVERY-SCENARIOS.md','SYSTEM-STATUS-SCENARIOS.md','SECURITY-REVIEW.md','LICENSE','manifest.webmanifest',
       'scripts/auto-update.sh','scripts/install-auto-update.sh',
       'scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer',
       'scripts/backup.sh','scripts/install-backups.sh','scripts/restore-rehearsal.sh',

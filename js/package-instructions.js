@@ -40,6 +40,8 @@ let dbIndex = {};
 let rootDirHandle = null;
 let selectedImageFiles = [];
 let instructionsWriting = false;
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => instructionsWriting,
+  hasDraft:() => el.formPanel.style.display === 'block' || document.getElementById('bulkPanel').style.display === 'block'});
 const profilePageSize = 50;
 let profilePage = 1, profileSearchTimer;
 
@@ -338,9 +340,9 @@ categoryChips.forEach(chip => {
 });
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
+  return String(str ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
 }
 
 let activeCategoryFilter = '';
