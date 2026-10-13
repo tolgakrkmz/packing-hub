@@ -258,6 +258,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     const {page, go, connect, read, saved} = t;
     await go('personnel');
     await expect(page.locator('#hubContent')).toBeVisible();
+    await expect(page.locator('#rosterEmptyState')).toContainText('Заредете състава от файл');
     await connect('#openFileBtn', 'personnel.json');
     await addPerson(t, 'E2E Demo Moving Packer', 'auto', 'А');
     await addPerson(t, 'E2E Demo Sticker One', 'stickers', '1 смяна');

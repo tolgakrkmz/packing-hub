@@ -2065,7 +2065,9 @@ function renderAvKpis(
               : ''
           )
         )
-      : 'Свържи файла на авариите отгоре ("Аварии на автоматична линия"), за да видиш реални данни.';
+      : globalThis.HUB_SERVER_BOOT
+        ? 'Данните за престои още не са заредени. Провери връзката с общата база и натисни „Опресни“ от панела за връзка.'
+        : 'Свържи файла на авариите отгоре ("Аварии на автоматична линия"), за да видиш реални данни.';
 }
 
 function calculateDowntimeReasons(periodKey) {
@@ -3032,8 +3034,12 @@ function renderWorkforceDashboard() {
   if (!counts) {
     el.wfNoData.style.display = 'block';
     el.wfBody.style.display = 'none';
-    el.wfNoData.innerHTML = '<strong>Няма свързан файл за състава.</strong> Свържи <b>personnel.json</b> от панела „Споделени файлове“. Ако вече е отварян в Personnel / Shift на този компютър, връзката обикновено се възстановява автоматично.';
-    el.wfStaffSource.textContent = 'не е свързан';
+    el.wfNoData.innerHTML = globalThis.HUB_SERVER_BOOT
+      ? personnelLoaded
+        ? '<strong>Съставът в общата база е празен.</strong> За статистиката е нужен въведен активен състав.'
+        : '<strong>Данните за състава още не са заредени.</strong> Провери връзката с общата база и натисни „Опресни“ от панела за връзка.'
+      : '<strong>Няма свързан файл за състава.</strong> Свържи <b>personnel.json</b> от панела „Споделени файлове“. Ако вече е отварян в Personnel / Shift на този компютър, връзката обикновено се възстановява автоматично.';
+    el.wfStaffSource.textContent = globalThis.HUB_SERVER_BOOT && personnelLoaded ? 'празен' : 'не е свързан';
     el.wfStatus.className = 'status-chip neutral';
     el.wfStatus.textContent = 'Няма personnel данни';
     return;

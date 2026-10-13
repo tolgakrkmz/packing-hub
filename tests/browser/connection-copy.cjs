@@ -25,6 +25,67 @@ async function exerciseConnectionCopy({admin: page, base, expect}) {
     await page.locator('[data-hub-language=bg]').click();
   }
   console.log('PASS shared database guidance, connection controls and BG/EN across six modules');
+
+  const failedRead = route => {
+    const path = new URL(route.request().url()).pathname;
+    if (['/api/data/personnel', '/api/statistics/workforce', '/api/data/pair-targets', '/api/pair-roster', '/api/data/package-instructions'].includes(path) || /^\/api\/statistics\/(period|data)\/(line-downtime|pair-targets)/.test(path)) {
+      return route.fulfill({status: 503, json: {error: 'FICTIONAL_UNAVAILABLE'}});
+    }
+    return route.continue();
+  };
+  await page.route('**/api/**', failedRead);
+  await page.goto(base + '/personnel');
+  await expect(page.locator('#connPanel .conn-dot.off')).toHaveCount(1);
+  await expect(page.locator('#rosterEmptyState')).toBeVisible();
+  const failures = [];
+  for (const language of ['bg', 'en']) {
+    await page.locator(`[data-hub-language=${language}]`).click();
+    const guidance = await page.locator('#rosterEmptyState').innerText();
+    if (/файл|file|\.json|network folder/i.test(guidance) || !guidance.includes(language === 'bg' ? 'Опресни' : 'Refresh')) failures.push('personnel/' + language);
+  }
+  await page.locator('[data-hub-language=bg]').click();
+  for (const [module, selector, disconnected] of [['pair-targets', '#contextNote', 2], ['package-instructions', '#resultsWrap', 1]]) {
+    await page.goto(base + '/' + module);
+    await expect(page.locator('#connPanel .conn-dot.off')).toHaveCount(disconnected);
+    for (const language of ['bg', 'en']) {
+      await page.locator(`[data-hub-language=${language}]`).click();
+      const guidance = await page.locator(selector).innerText();
+      if (/файл|file|\.json|папк|folder/i.test(guidance) || !guidance.includes(language === 'bg' ? 'Опресни' : 'Refresh')) failures.push(module + '/' + language);
+    }
+    await page.locator('[data-hub-language=bg]').click();
+  }
+  await page.goto(base + '/statistics');
+  await page.locator('#statsFilesBtn').click();
+  await expect(page.locator('#connPanel .conn-dot.off')).toHaveCount(3);
+  for (const language of ['bg', 'en']) {
+    await page.locator(`[data-hub-language=${language}]`).click();
+    for (const [tab, selector] of [['workforce', '#wfNoData'], ['downtime', '#avHint'], ['pairs', '#pairStatsHint']]) {
+      await page.locator(`[data-stats-tab=${tab}]`).click();
+      await expect(page.locator(selector)).toBeVisible();
+      const guidance = await page.locator(selector).innerText();
+      if (/файл|file|\.json|network folder/i.test(guidance) || !guidance.includes(language === 'bg' ? 'Опресни' : 'Refresh')) failures.push(tab + '/' + language);
+      if (tab === 'pairs' && /файл|file|\.json/i.test(await page.locator('#pairStatsBody').innerText())) failures.push('pairs body/' + language);
+    }
+  }
+  assert.deepEqual(failures, [], 'Initial failed reads offer server recovery rather than local file actions');
+  await page.unroute('**/api/**', failedRead);
+  await page.locator('[data-hub-language=bg]').click();
+  await page.locator('#personnelRefreshBtn').click();
+  await page.locator('#avRefreshBtn').click();
+  await page.locator('#pairStatsRefreshBtn').click();
+  await expect(page.locator('#connPanel .conn-dot.on')).toHaveCount(4);
+  await page.locator('[data-stats-tab=workforce]').click();
+  await expect(page.locator('#wfNoData')).toContainText('Съставът в общата база е празен.');
+  await expect(page.locator('#wfStaffSource')).toHaveText('празен');
+  await page.locator('[data-hub-language=en]').click();
+  await expect(page.locator('#wfNoData')).toContainText('The shared database has no personnel.');
+  await expect(page.locator('#wfStaffSource')).toHaveText('empty');
+  await page.locator('[data-hub-language=bg]').click();
+  await page.locator('[data-stats-tab=downtime]').click();
+  await expect(page.locator('#avHint')).not.toContainText('още не са заредени');
+  await page.goto(base + '/personnel');
+  await expect(page.locator('#rosterEmptyState')).toBeHidden();
+  console.log('PASS initial failed reads, BG/EN database recovery guidance and successful retry');
 }
 
 module.exports = {exerciseConnectionCopy};

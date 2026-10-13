@@ -102,6 +102,7 @@ const sync = createDirectorySync({
   elements: el
 });
 
+if (globalThis.HUB_SERVER_BOOT) renderSearch();
 sync.init();
 
 async function readIndexFromDisk() {
@@ -370,7 +371,9 @@ function renderSearch() {
   profileSearchTimer = null;
   el.resultsWrap.removeAttribute('aria-busy');
   if (!rootDirHandle) {
-    el.resultsWrap.innerHTML = '<div class="empty">Свържете папката с проекта, за да видите профилите.</div>';
+    el.resultsWrap.innerHTML = globalThis.HUB_SERVER_BOOT
+      ? '<div class="empty">Провери връзката с общата база и натисни „Опресни“ от панела за връзка.</div>'
+      : '<div class="empty">Свържете папката с проекта, за да видите профилите.</div>';
     el.resultCount.textContent = '';
     return;
   }

@@ -90,7 +90,11 @@
     const actualKg = entries.reduce((sum,entry) => sum+(entry.result?.kg || 0),0);
     const totalCrates = entries.reduce((sum,entry) => sum+entry.targetCrates,0);
     const actualCrates = entries.reduce((sum,entry) => sum+(entry.result?.crates || 0),0);
-    $('contextNote').textContent = !pairsLoaded || !rosterLoaded ? 'Свържете файла за двойките и файла за състава, за да започнете.' : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.HOURS[context.shiftCode]}. Таргетът е постигнат при изпълнение и на двете цели.${context.team === 'СТИКЕРИ' ? ' 1 смяна, фиксиран състав, без автоматична ротация.' : ''}`;
+    $('contextNote').textContent = !pairsLoaded || !rosterLoaded
+      ? globalThis.HUB_SERVER_BOOT
+        ? 'Провери връзката с общата база и натисни „Опресни“ от панела за връзка.'
+        : 'Свържете файла за двойките и файла за състава, за да започнете.'
+      : !scheduled ? `Екип ${context.team} не работи в избраните часове според ротацията. Изберете работната му смяна.` : `Екип ${context.team} · ${fmtDate(context.date)} · ${ShiftSchedule.HOURS[context.shiftCode]}. Таргетът е постигнат при изпълнение и на двете цели.${context.team === 'СТИКЕРИ' ? ' 1 смяна, фиксиран състав, без автоматична ротация.' : ''}`;
     $('shiftTotals').innerHTML = [
       [rosterLoaded ? people.length : '—','Хора в състава'],[rosterLoaded ? available.length : '—','Неразпределени'],
       [entries.length,`Двойки · ${done} отчетени · ${hit} постигнати`],[`${fmt(actualKg)} / ${fmt(totalKg)}`,`кг · ${fmt(actualCrates)} / ${fmt(totalCrates)} каси`]

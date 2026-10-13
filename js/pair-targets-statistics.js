@@ -37,11 +37,15 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     const openGroups = new Set(Array.from($('pairStatsBody').querySelectorAll('details[open]')).map(node => node.dataset.group));
     const selectedMonth = getPeriod();
     $('pairStatsPeriod').textContent = monthLabel(selectedMonth);
-    $('pairStatsHint').textContent = !loaded ? 'Свържете pair-targets.json от панела за файловете. Статистиката само чете отчетите.' : 'Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Количествата на двойките не се добавят към „Тонаж и брак“.';
+    $('pairStatsHint').textContent = !loaded
+      ? globalThis.HUB_SERVER_BOOT
+        ? 'Провери връзката с общата база и натисни „Опресни“ от панела за връзка.'
+        : 'Свържете pair-targets.json от панела за файловете. Статистиката само чете отчетите.'
+      : 'Изпълнението е спрямо целите на отчетените двойки. Неотчетените планове се показват отделно. Количествата на двойките не се добавят към „Тонаж и брак“.';
     const team = $('pairStatsTeam').value;
     const result = cache.get('pairs', [data], selectedMonth + '|' + team, () => PairTargetsStatistics.aggregate(data.entries, selectedMonth, team));
     if (!result.planned && !result.cancelled) {
-      $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
+      $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? globalThis.HUB_SERVER_BOOT ? 'Данните за двойките още не са заредени.' : 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
       return;
     }
     const card = (label, value, sub) => `<div class="kpi-card"><div class="lab">${label}</div><div class="val">${value}</div><div class="sub">${sub}</div></div>`;
