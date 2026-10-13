@@ -4,7 +4,7 @@
   if (typeof HubServer === 'undefined') { $('taskMessage').textContent = 'Задачите са достъпни в сървърната версия след вход с личен акаунт.'; $('taskContent').hidden = true; return; }
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
-  const completer = admin && HubServer.user.role === 'admin';
+  const administrator = admin && HubServer.user.role === 'admin';
   let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const pageSize = 50;
   let listPage = 1, searchTimer;
@@ -18,7 +18,7 @@
   function observePhotos(container) { for (const img of container.querySelectorAll('img[data-photo-src]')) photoObserver.observe(img); }
   function forgetPhotos(container) { for (const img of container.querySelectorAll('img[data-photo-src]')) photoObserver.unobserve(img); }
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
-  const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', complete: 'Завършена от администратор', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
+  const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', complete: 'Завършена от администратор', transfer: 'Прехвърлена', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
   const requiresPhotos = item => item?.requiresPhotos !== false;
   const photoList = (item, plural, single) => Array.isArray(item?.[plural]) ? item[plural] : item?.[single] ? [item[single]] : [];
   const problemPhotos = item => photoList(item, 'problemPhotos', 'problemPhoto');
@@ -202,7 +202,7 @@
   }
   function history(item) {
     const content = $('historyContent'); forgetPhotos(content); content.replaceChildren(el('h3', item.title, '', true));
-    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true), el('span', photoRequirementLabel(entry.snapshot), 'task-badge')); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot) row.append(...photoViews(item, problemPhotos(entry.snapshot), 'Проблем', !item.kind)); row.append(...photoViews(item, solutionPhotos(entry), 'Решение')); content.append(row); }
+    for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.transfer) row.append(el('p', `${entry.transfer.from.username} → ${entry.transfer.to.username}`, 'task-muted', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true), el('span', photoRequirementLabel(entry.snapshot), 'task-badge')); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot) row.append(...photoViews(item, problemPhotos(entry.snapshot), 'Проблем', !item.kind)); row.append(...photoViews(item, solutionPhotos(entry), 'Решение')); content.append(row); }
     $('taskHistory').showModal(); observePhotos(content);
   }
   function card(item, recurring = false) {
@@ -233,7 +233,8 @@
       if (supervisor && item.kind === 'global' && !final && (item.owner.id === HubServer.user.id || item.participants.some(person => person.id === HubServer.user.id))) actions.append(button('Добави напредък', () => openAction(item, 'progress')));
       if (reviewer && item.status === 'review') actions.append(button('Потвърди приключване', () => openAction(item, 'approve'), ''), button('Върни за работа', () => openAction(item, 'return')));
       if (admin && !final) {
-        if (completer && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Завърши задача', () => openAction(item, 'complete'), ''));
+        if (administrator) actions.append(button('Прехвърли задача', () => openAction(item, 'transfer')));
+        if (administrator && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Завърши задача', () => openAction(item, 'complete'), ''));
         if (item.kind === 'global' || state.now < item.due && !item.report) actions.append(button('Промени', () => openEditor(item)));
         actions.append(button('Отмени', () => openAction(item, 'cancel')));
       }
@@ -358,6 +359,7 @@
       const label = el('label'), check = el('input'); check.type = 'checkbox'; check.value = person.id; check.checked = !!item?.participants.some(value => value.id === person.id); label.append(check, el('span', person.username, '', true)); $('participantOptions').append(label);
     }
     $('taskOwner').value = item ? String(item.owner.id) : '';
+    $('taskOwner').disabled = !!item && !administrator;
     $('taskFrom').value = recurring ? item.from : item?.shift?.date || state.currentShift.date; $('taskUntil').value = item?.until || date(state.now + 30 * 86400000);
     $('taskDueDate').value = item?.due ? date(item.due) : date(state.now + 86400000);
     $('taskDueTime').value = item?.due ? new Intl.DateTimeFormat('en-GB', {timeZone: state.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(item.due)) : '17:00';
@@ -366,7 +368,13 @@
   function openAction(item, action, recurring = false) {
     acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, action === 'complete' ? 0 : requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'complete' && (action !== 'report' || !requiresPhotos(item));
     $('solutionPhotoHelp').textContent = action === 'complete' ? 'Снимките са незадължителни при завършване от администратор. Можеш да завършиш със или без снимки.' : 'Всеки отчет изисква толкова нови снимки на решението или текущото състояние, колкото са снимките на проблема, включително при неизпълнена задача.';
-    $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
+    $('transferOwnerLabel').hidden = action !== 'transfer'; $('transferHelp').hidden = action !== 'transfer'; $('transferOwner').required = action === 'transfer';
+    $('transferOwner').replaceChildren(new Option('Избери нов отговорник', ''));
+    for (const person of state.supervisors.filter(person => person.id !== item.owner.id)) {
+      const option = new Option(person.username + ' · ' + person.team, person.id); option.setAttribute('translate', 'no'); $('transferOwner').append(option);
+    }
+    if (action === 'transfer' && $('transferOwner').options.length === 1) $('actionFeedback').textContent = 'Няма друг активен отговорник с право за отчитане.';
+    $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : action === 'transfer' ? 'Прехвърли задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
     $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
     for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
     $('actionNote').required = !['approve', 'complete'].includes(action) && (action !== 'report' || $('reportStatus').value !== 'completed'); $('taskAction').showModal();
@@ -400,6 +408,7 @@
     if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.failed) { $('actionFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
     if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.count !== requiredPhotoCount(acting.item)) { $('actionFeedback').textContent = 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.'; return; }
     const payload = {action: acting.action, status: $('reportStatus').value, note: $('actionNote').value};
+    if (acting.action === 'transfer') payload.assigneeId = Number($('transferOwner').value);
     if (acting.action === 'complete' || acting.action === 'report' && requiresPhotos(acting.item)) payload.solutionPhotos = solutionPicker.values;
     const signature = JSON.stringify(payload); if (!actionKey || actionKey.signature !== signature) actionKey = {signature, id: crypto.randomUUID()}; payload.requestId = actionKey.id;
     mutate($('actionForm'), $('actionFeedback'), () => HubServer.send('/api/tasks/' + (acting.recurring ? 'schedules/' : 'items/') + acting.item.id, 'PATCH', payload, {'If-Match': '"' + acting.item.revision + '"'}));

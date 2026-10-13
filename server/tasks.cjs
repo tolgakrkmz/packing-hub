@@ -224,13 +224,14 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     access(user); const at = now();
     const required = ['approve', 'return'].includes(input.action) ? 'canReviewTasks' : ['report', 'progress'].includes(input.action) ? 'canReportTasks' : 'canManageTasks';
     if (!can(user, required)) throw problem(403, 'FORBIDDEN');
-    if (input.action === 'complete' && user.role !== 'admin') throw problem(403, 'FORBIDDEN');
+    if (['complete', 'transfer'].includes(input.action) && user.role !== 'admin') throw problem(403, 'FORBIDDEN');
     const work = () => {
       materialize(at);
       const table = isSchedule ? 'task_schedules' : 'task_items', item = row(table, id);
       if (!visible(item, user)) throw problem(403, 'FORBIDDEN');
       revision(item, expected);
       let note = text(input.note ?? '', 4000);
+      let transfer;
       clean(at);
       if (isSchedule) {
         manager(user);
@@ -239,6 +240,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
         else if (input.action === 'edit') {
           if (!note) throw problem(400, 'TASK_REASON');
           const value = fields(input, requiresPhotos(item));
+          if (value.owner.id !== item.owner.id && user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (value.participants.length || value.owner.team !== item.team) throw problem(400, 'INVALID_TASK_ASSIGNEE');
           Object.assign(item, value);
           updateProblemPhoto(item, input, at);
@@ -249,6 +251,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
           manager(user); if (!note) throw problem(400, 'TASK_REASON');
           if (item.kind === 'shift' && (at >= item.due || item.report)) throw problem(409, 'TASK_STATE');
           const value = fields(input, requiresPhotos(item));
+          if (value.owner.id !== item.owner.id && user.role !== 'admin') throw problem(403, 'FORBIDDEN');
           if (item.kind === 'shift' && value.participants.length) throw problem(400, 'INVALID_TASK');
           if (item.kind === 'global') {
             const due = instant(input.dueDate, input.dueTime);
@@ -258,6 +261,13 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
           }
           Object.assign(item, value);
           updateProblemPhoto(item, input, at);
+        } else if (input.action === 'transfer') {
+          if (!note) throw problem(400, 'TASK_REASON');
+          const owner = Number.isSafeInteger(input.assigneeId) && roster().find(person => person.id === input.assigneeId);
+          if (!owner || owner.id === item.owner.id) throw problem(400, 'INVALID_TASK_ASSIGNEE');
+          transfer = {from: {...item.owner}, to: {...owner}};
+          item.owner = owner; item.participants = item.participants.filter(person => person.id !== owner.id);
+          item.status = 'pending'; item.report = null;
         } else if (input.action === 'report') {
           if (!can(user, 'canReportTasks') || item.owner.id !== user.id) throw problem(403, 'FORBIDDEN');
           if (item.kind === 'shift' && at < item.shift.start) throw problem(409, 'TASK_NOT_STARTED');
@@ -291,7 +301,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
         } else throw problem(400, 'INVALID_TASK');
       }
       if (!isSchedule) item.closedAt = ['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) ? at : null;
-      item.events.push({...event(user, input.action, note, at), status: item.status || null, photos: ['report', 'complete'].includes(input.action) ? item.report.photos : undefined, late: ['report', 'complete'].includes(input.action) ? item.report.late : undefined, snapshot: input.action === 'edit' ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
+      item.events.push({...event(user, input.action, note, at), status: item.status || null, transfer, photos: ['report', 'complete'].includes(input.action) ? item.report.photos : undefined, late: ['report', 'complete'].includes(input.action) ? item.report.late : undefined, snapshot: ['edit', 'transfer'].includes(input.action) ? {...fieldsSnapshot(item), due: item.due || null} : undefined});
       store.audit(user, 'task-' + input.action, 'tasks');
       return {item: save(table, item)};
     };
