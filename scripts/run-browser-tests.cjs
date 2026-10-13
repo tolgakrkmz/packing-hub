@@ -48,6 +48,26 @@ async function main() {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0,
       ...(process.argv.includes('--security-only') || process.argv.includes('--security-client-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+    if(process.argv.includes('--personnel-transfers-only')){
+      const context=await browser.newContext({timezoneId:'UTC'}),base=`http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+      await context.addInitScript(installStorage,{});const page=await context.newPage(),errors=[];page.setDefaultTimeout(10000);
+      page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date('2026-10-13T12:00:00+03:00'));
+      await page.goto(base+'/personnel.html');await page.evaluate(()=>window.__browserTest.ready);
+      await page.evaluate(()=>{window.__browserTest.nextFile='personnel.json';});await page.locator('#openFileBtn').click();
+      await require('../tests/browser/personnel-transfers.cjs').exercisePersonnelTransfers({page,expect,
+        read:()=>page.evaluate(()=>window.__browserTest.read('personnel.json')),
+        replace:data=>page.evaluate(data=>window.__browserTest.write('personnel.json',data),data),
+        setTime:value=>page.clock.setFixedTime(new Date(value)),
+        capture:mode=>page.screenshot({path:'/tmp/package-hub-transfer-'+mode+'.png'}),
+        failNextWrite:()=>page.evaluate(()=>{window.__browserTest.fault={file:'personnel.json',stage:'open'};})});
+      await require('../tests/browser/personnel-transfers.cjs').exerciseTransferConsumers({page,expect,
+        go:async name=>{await page.goto(base+'/'+name+'.html');await page.evaluate(()=>window.__browserTest.ready);},
+        connect:async(button,file,dot)=>{if(await page.locator(dot).getAttribute('class').then(value=>/\bon\b/.test(value)))return;await page.evaluate(file=>{window.__browserTest.nextFile=file;},file);await page.locator(button).click();await expect(page.locator(dot)).toHaveClass(/\bon\b/);},
+        setTime:value=>page.clock.setFixedTime(new Date(value)),
+        replaceSources:async sources=>{for(const [key,value] of Object.entries(sources))await page.evaluate(({key,value})=>window.__browserTest.write(key+'.json',value),{key,value});}});
+      require('node:assert/strict').deepEqual(errors,[]);await context.close();console.log('PASS offline planned personnel transfers');return;
+    }
     if (process.argv.includes('--personnel-only')) {
       const context = await browser.newContext({timezoneId:'Europe/Sofia'});
       const base = `http://127.0.0.1:${server.address().port}`;

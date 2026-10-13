@@ -32,8 +32,12 @@ const PairTargets = (() => {
     }
     return [...new Set(value)];
   }
-  function roster(employees, team) {
-    return employees.filter(person => person.active !== false && person.id && person.name &&
+  function roster(employees, team, date = ShiftSchedule.sofiaDate()) {
+    return employees.map(person => {
+      if(typeof PersonnelModel !== 'undefined') return PersonnelModel.assignmentAt(person,date);
+      if(person.transfers?.length) throw new Error('Липсва моделът за планирания състав.');
+      return person;
+    }).filter(person => person.active !== false && person.id && person.name &&
       typeof person.role === 'string' && person.role.trim().toLowerCase() === 'опаковчик' &&
       (team === 'СТИКЕРИ' ? person.category === 'stickers' : person.team === team && ['auto','manual'].includes(person.category))
     ).slice().sort((a,b) => a.name.localeCompare(b.name,'bg'));
@@ -55,7 +59,7 @@ const PairTargets = (() => {
     if(!Array.isArray(memberIds) || memberIds.length !== 2 || !memberIds[0] || !memberIds[1] || memberIds[0] === memberIds[1]) {
       throw new Error('Изберете двама различни човека.');
     }
-    const people = roster(employees,context.team);
+    const people = roster(employees,context.team,context.date);
     const members = memberIds.map(memberId => {
       const person = people.find(person => person.id === memberId);
       if(person) return {id:person.id, name:person.name, category:person.category, role:person.role || ''};

@@ -269,8 +269,9 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await page.locator('#personTeam').selectOption('Б');
     await page.locator('#personNote').fill('Fictional reassignment');
     await page.locator('#personForm button[type=submit]').click();
-    await saved('personnel.json', data => data.employees[0].category === 'manual' && data.employees[0].team === 'Б');
+    await saved('personnel.json', data => data.employees[0].transfers?.[0]?.category === 'manual' && data.employees[0].transfers[0].team === 'Б' && data.employees[0].team === 'А');
     await page.locator('#peopleWrap [data-edit-person]').click();
+    await page.locator('#cancelTransferPlan').click();
     await page.locator('.status-switch').click();
     await expect(page.locator('#personActive')).not.toBeChecked();
     await page.locator('#personForm button[type=submit]').click();

@@ -115,7 +115,7 @@ function createImports(store, filename) {
         const normalize = kind === 'personnel' ? row => ({...row, ...clone(personnelModel.normalizeEmployee(row))}) : kind === 'production-log' ? row => ({...row, breakdown: row.breakdown ?? null}) : row => row;
         data[field] = mergeRows(current[field], input[field], 'id', summary, normalize, kind !== 'personnel');
         if (kind === 'personnel') {
-          data.schemaVersion = 3;
+          data.schemaVersion = current.schemaVersion===4 || input.schemaVersion===4 || data.employees.some(p=>p.transfers!==undefined) ? 4 : 3;
           data.moveLog = mergeHistory(current.moveLog || [], input.moveLog || []);
           summary.historyAdded = data.moveLog.length - (current.moveLog || []).length;
           if (manifest.includeSettings && input.settings) {
@@ -134,7 +134,7 @@ function createImports(store, filename) {
           if (!same(current.reasons, data.reasons)) summary.settingsChanges++;
         }
       }
-      try { validateData(kind, data); } catch { summary.conflicts++; }
+      try { validateData(kind, data); if(kind==='personnel') store.validatePersonnelChange(data,true); } catch { summary.conflicts++; }
       if (Buffer.byteLength(JSON.stringify(data)) > limits.jsonBytes) throw problem(413, 'TOO_LARGE');
       if (!same(current, data)) updates[kind] = data;
       summaries[kind] = summary;
@@ -204,7 +204,7 @@ function createImports(store, filename) {
       const value = checked(), revisions = {};
       for (const [kind, data] of Object.entries(value.updates)) {
         const previous = store.get(kind).data, detail = reportChanges(previous, data), targets = notificationTargets(previous, data);
-        store.updateDocument(kind, data, user);
+        store.updateDocument(kind, data, user, {personnelImport:true});
         store.audit(user, 'import', kind, detail, targets); revisions[kind] = store.get(kind).revision;
       }
       for (const name of [...value.directories].sort((a, b) => a.split('/').length - b.split('/').length)) store.db.prepare("INSERT INTO files(path,kind) VALUES(?,'directory')").run(name);

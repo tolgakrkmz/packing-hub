@@ -1,7 +1,6 @@
-/* Personnel schema v3: one record per person, active-only headcounts,
- * a weekday stickers shift, and shared role options. */
+/* Personnel schema v4: immutable assignment history and planned transfers. */
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const CATS = [
   {key:'auto', label:'Автоматична линия', short:'Автоматична', teams:['А','Б','В','Г']},
   {key:'manual', label:'Ръчна опаковка', short:'Ръчна', teams:['А','Б','В','Г']},
@@ -20,12 +19,7 @@ let searchTerm = '';
 let toastTimer = null;
 
 function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
-function localISODate(d=new Date()){
-  const y=d.getFullYear();
-  const m=String(d.getMonth()+1).padStart(2,'0');
-  const day=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
+function localISODate(d=new Date()){ return ShiftSchedule.sofiaDate(d); }
 function fmtDateBg(str){
   if(!str) return '—';
   const p=String(str).split('-');
@@ -63,7 +57,7 @@ function loadIncomingData(data, allowMigration){
   settings=normalizeSettings(src.settings,employees);
   moveLog=Array.isArray(src.moveLog) ? src.moveLog : [];
 
-  if(version < SCHEMA_VERSION && allowMigration){
+  if(version < 3 && allowMigration){
     addLog({type:'migration',name:'Система',detail:'Стикери: 1 смяна · общи роли (schema v3)'});
   }
   return version !== SCHEMA_VERSION;
@@ -83,7 +77,7 @@ let personnelSaving = false;
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => personnelSaving,
   hasDraft:() => ['personModal','settingsModal'].some(id => document.getElementById(id).classList.contains('open'))});
 const sync = createFileSync({
-  isBusy: () => personnelSaving,
+  isBusy: () => personnelSaving || !!document.querySelector('.modal-backdrop.open'),
   dbName:'portfolio-personnel-fs-db',
   suggestedFileName:'personnel.json',
   localStorageKey:'portfolio-personnel-fallback',
@@ -105,10 +99,10 @@ const sync = createFileSync({
   }
 });
 
-function activePeople(category=null,team=null){
-  return employees.filter(p=>p.active && (!category || p.category===category) && (!team || p.team===team));
+function activePeople(category=null,team=null,date=localISODate()){
+  return employees.map(p=>PersonnelModel.assignmentAt(p,date)).filter(p=>p.active && (!category || p.category===category) && (!team || p.team===team));
 }
-function activeCount(category=null,team=null){ return activePeople(category,team).length; }
+function activeCount(category=null,team=null,date=localISODate()){ return activePeople(category,team,date).length; }
 function inactiveCount(){ return employees.filter(p=>!p.active).length; }
 function renderSummary(){
   const total=activeCount();
@@ -170,8 +164,8 @@ function renderToday(){
   const openTeams=new Set(Array.from(grid.querySelectorAll('.today-card[open]'),card=>card.dataset.team));
   grid.innerHTML=MAIN_TEAMS.map(t=>{
     const code=shiftCodeFor(t,dateObj);
-    const auto=activePeople('auto',t);
-    const manual=activePeople('manual',t);
+    const auto=activePeople('auto',t,todayDateInput.value||localISODate());
+    const manual=activePeople('manual',t,todayDateInput.value||localISODate());
     return `<details class="today-card" data-team="${t}"${openTeams.has(t)?' open':''}>
       <summary>
         <div class="tt"><span class="badge ${teamClass(t)}">Екип ${t}</span><span class="badge shift-${code}">${SHIFT_LABELS[code]}</span></div>
@@ -186,7 +180,7 @@ function renderToday(){
     </details>`;
   }).join('');
 
-  const stickers=activeCount('stickers','1 смяна');
+  const stickers=activeCount('stickers','1 смяна',todayDateInput.value||localISODate());
   const stickersCode=shiftCodeFor('СТИКЕРИ',dateObj);
   document.getElementById('stickersNote').innerHTML=`<b>Стикери:</b> понеделник–петък · ${ShiftSchedule.STICKERS.hours}.
     <span class="badge ${stickersCode === 'Н' ? 'shift-Н' : 'team-1_смяна'}">${stickersCode === 'Н' ? 'Почивка' : '1 смяна'} — ${stickers} души</span>`;
@@ -252,17 +246,19 @@ function renderCatFilters(){
 }
 document.getElementById('searchInput').addEventListener('input',e=>{ searchTerm=e.target.value.trim().toLowerCase(); renderPeople(); });
 function personRow(p){
+  const pending=(p.transfers||[]).find(t=>t.effectiveDate>localISODate());
+  const plan=pending?`<span class="badge transfer-badge"><span>Планирано</span> <span translate="no">${escapeHTML(fmtDateBg(pending.effectiveDate))} · ${escapeHTML(pending.team)}</span></span>`:'';
   const note=p.note?`<span class="badge note-badge" translate="no" title="${escapeHTML(p.note)}">${escapeHTML(p.note)}</span>`:'';
   return `<div class="person-row">
     <div class="person-meta"><div class="person-name" translate="no">${escapeHTML(p.name)}</div><div class="person-role">${escapeHTML(p.role||'Без зададена роля')}</div></div>
-    <div class="person-tags">${note}<button class="edit-btn" data-edit-person="${escapeHTML(p.id)}">Промени</button></div>
+    <div class="person-tags">${plan}${note}<button class="edit-btn" data-edit-person="${escapeHTML(p.id)}">Промени</button></div>
   </div>`;
 }
 function renderCategoryBlock(catKey){
   const cat=CAT_BY_KEY[catKey];
   const teams=cat.teams;
   const cards=teams.map(team=>{
-    let list=employees.filter(p=>p.active && p.category===catKey && p.team===team && matchesSearch(p)).sort(sortPeople);
+    let list=activePeople(catKey,team).filter(matchesSearch).sort(sortPeople);
     if(searchTerm && !list.length) return '';
     return `<div class="team-card">
       <div class="team-card-head"><div class="team-title"><span class="badge ${teamClass(team)}">${escapeHTML(team)}</span><span>${escapeHTML(cat.short)}</span></div><div class="team-total">${list.length}${searchTerm?' резултата':' души'}</div></div>
@@ -270,7 +266,7 @@ function renderCategoryBlock(catKey){
     </div>`;
   }).join('');
   if(searchTerm && !cards) return '';
-  const count=employees.filter(p=>p.active && p.category===catKey && matchesSearch(p)).length;
+  const count=activePeople(catKey).filter(matchesSearch).length;
   return `<section class="category-block"><div class="category-heading"><h3>${escapeHTML(cat.label)}</h3><span>${count} ${searchTerm?'съвпадения':'активни'}</span></div><div class="team-board${teams.length===1?' single-team':''}">${cards}</div></section>`;
 }
 function renderInactive(){
@@ -321,14 +317,81 @@ function updateNewRoleField(){
   personNewRole.disabled=!adding;
   personNewRole.required=adding;
 }
+const transferPanel=document.getElementById('transferPanel');
+const transferStart=document.getElementById('transferSearchStart');
+const transferDate=document.getElementById('transferEffectiveDate');
+let editedPerson=null,editedPending=null,transferDirty=false,cancelPending=false;
+function uiText(text){ return typeof HubI18n==='undefined'?text:HubI18n.t(text); }
+function needsTransfer(){
+  if(!editedPerson) return false;
+  const current=PersonnelModel.assignmentAt(editedPerson,localISODate());
+  return current.category!==personCategory.value || current.team!==personTeam.value;
+}
+function renderTransfer(recommend=false){
+  transferPanel.hidden=!editedPerson;
+  const submit=personForm.querySelector('[type=submit]');
+  if(!editedPerson){ submit.disabled=personnelSaving; return true; }
+  const today=localISODate(),tomorrow=ShiftSchedule.addDays(today,1);
+  const current=PersonnelModel.assignmentAt(editedPerson,today);
+  const pending=(editedPerson.transfers||[]).find(t=>t.effectiveDate>today);
+  document.getElementById('transferCurrent').textContent=uiText(catLabel(current.category))+' / '+current.team;
+  document.getElementById('transferPending').textContent=cancelPending?uiText('Планираното преместване ще бъде отменено.'):pending?uiText('Планирано')+' · '+fmtDateBg(pending.effectiveDate)+' · '+uiText(catLabel(pending.category))+' / '+pending.team:'';
+  document.getElementById('cancelTransferPlan').hidden=!pending || cancelPending;
+  transferStart.min=tomorrow; transferDate.min=tomorrow;
+  let valid=true;
+  const error=document.getElementById('transferError'); error.textContent='';
+  document.getElementById('transferRecommendations').innerHTML='';
+  document.getElementById('transferDays').innerHTML='';
+  document.getElementById('transferWindow').textContent='';
+  for(const id of ['transferBefore','transferAfter','transferDelta','transferRun','transferRest']) document.getElementById(id).textContent='—';
+  const planning=needsTransfer() && !cancelPending;
+  transferStart.disabled=!planning; transferDate.disabled=!planning;
+  if(planning){
+    try{
+      if(!transferStart.value || transferStart.value<tomorrow) throw new Error('Изберете бъдеща дата за активен човек.');
+      const source={...editedPerson,active:document.getElementById('personActive').checked,transfers:(editedPerson.transfers||[]).filter(t=>t.effectiveDate<=today)};
+      const options=PersonnelModel.transferOptions(source,{category:personCategory.value,team:personTeam.value},transferStart.value);
+      transferDate.max=ShiftSchedule.addDays(transferStart.value,31);
+      if(recommend) transferDate.value=options.recommendedDate||transferStart.value;
+      const row=options.candidates.find(t=>t.effectiveDate===transferDate.value);
+      if(!row || transferDate.value<tomorrow) throw new Error('Изберете дата от периода за търсене.');
+      valid=row.valid;
+      if(!valid) error.textContent=uiText(row.reason==='inactive'?'Преместването е само за активен човек.':row.reason==='overlap'?'Смените се застъпват. Изберете друга дата.':'Преместването изисква почивен ден.');
+      document.getElementById('transferWindow').textContent=uiText('Период за сравнение:')+' '+fmtDateBg(options.startDate)+' – '+fmtDateBg(options.endDate);
+      for(const [id,value] of Object.entries({transferBefore:options.baselineDays,transferAfter:row.workingDays,transferDelta:row.delta>0?'+'+row.delta:row.delta,transferRun:row.longestRun,transferRest:row.restHours??'—'})) document.getElementById(id).textContent=String(value);
+      const preferred=options.candidates.filter(t=>t.valid).sort((a,b)=>Number(b.effectiveDate===options.recommendedDate)-Number(a.effectiveDate===options.recommendedDate)||b.delta-a.delta||a.effectiveDate.localeCompare(b.effectiveDate)).slice(0,3);
+      document.getElementById('transferRecommendations').innerHTML=preferred.length?preferred.map(t=>`<button type="button" class="chip" data-transfer-date="${t.effectiveDate}"><span>${t.effectiveDate===options.recommendedDate?'Препоръчана дата:':'Друга дата:'}</span> <span translate="no">${fmtDateBg(t.effectiveDate)} (${t.delta>0?'+':''}${t.delta})</span></button>`).join(''):'<span>Няма допустима дата в периода. Потърсете от по-късна дата.</span>';
+      document.querySelectorAll('[data-transfer-date]').forEach(btn=>btn.addEventListener('click',()=>{transferDate.value=btn.dataset.transferDate;transferDirty=true;renderTransfer(false);}));
+      const next={...source,transfers:[...source.transfers,{effectiveDate:row.effectiveDate,category:row.category,team:row.team}]};
+      const label=(person,date)=>{const interval=PersonnelModel.scheduledInterval(person,date);return interval?(PersonnelModel.assignmentAt(person,date).category==='stickers'?ShiftSchedule.STICKERS.hours:ShiftSchedule.HOURS[interval.code]):uiText('Почивка');};
+      document.getElementById('transferDays').innerHTML=Array.from({length:13},(_,n)=>{const date=ShiftSchedule.addDays(row.effectiveDate,n-6);return `<tr${date===row.effectiveDate?' class="transfer-effective"':''}><td translate="no">${fmtDateBg(date)}</td><td>${label(source,date)}</td><td>${label(next,date)}</td></tr>`;}).join('');
+    }catch(problem){ valid=false; error.textContent=uiText(problem.message); }
+  }
+  if(!document.getElementById('personActive').checked && pending && !cancelPending){valid=false;error.textContent=uiText('Първо отменете планираното преместване.');}
+  if(transferDirty && editedPending && editedPending.effectiveDate<=today){
+    valid=false;error.textContent=uiText('Планираното преместване вече е в сила. Отворете актуалния запис.');
+  }
+  submit.disabled=!valid || personnelSaving;
+  return valid;
+}
+personTeam.addEventListener('change',()=>{transferDirty=true;cancelPending=false;renderTransfer(true);});
+transferStart.addEventListener('change',()=>{transferDirty=true;renderTransfer(true);});
+transferDate.addEventListener('change',()=>{transferDirty=true;renderTransfer(false);});
+document.getElementById('personActive').addEventListener('change',()=>renderTransfer(false));
+document.getElementById('cancelTransferPlan').addEventListener('click',()=>{
+  cancelPending=true;transferDirty=true;
+  const current=PersonnelModel.assignmentAt(editedPerson,localISODate());
+  personCategory.value=current.category;populateTeams(current.team);renderTransfer(false);
+});
 personRole.addEventListener('change',()=>{ updateNewRoleField(); if(personRole.value === NEW_ROLE) personNewRole.focus(); });
 personCategory.addEventListener('change',()=>{
   const previousRole=personRole.value;
   populateTeams();
   populateRoles(previousRole);
+  transferDirty=true; cancelPending=false; renderTransfer(true);
 });
 function openModal(el){ el.classList.add('open'); el.setAttribute('aria-hidden','false'); }
-function closeModal(el){ el.classList.remove('open'); el.setAttribute('aria-hidden','true'); }
+function closeModal(el){ if(personnelSaving) return; el.classList.remove('open'); el.setAttribute('aria-hidden','true'); }
 document.querySelectorAll('[data-close-modal]').forEach(btn=>btn.addEventListener('click',()=>closeModal(document.getElementById(btn.dataset.closeModal))));
 document.querySelectorAll('.modal-backdrop').forEach(modal=>modal.addEventListener('click',e=>{ if(e.target===modal) closeModal(modal); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-backdrop.open').forEach(closeModal); });
@@ -337,12 +400,21 @@ function openPersonModal(id=''){
   document.getElementById('personModalTitle').textContent=p?'Редакция на човек':'Нов човек';
   document.getElementById('personId').value=p?.id||'';
   document.getElementById('personName').value=p?.name||'';
-  personCategory.value=p?.category||'auto';
+  editedPerson=p?deepClone(p):null; transferDirty=false; cancelPending=false;
+  const pending=(p?.transfers||[]).find(t=>t.effectiveDate>localISODate());
+  editedPending=pending?{...pending}:null;
+  const target=pending||(p?PersonnelModel.assignmentAt(p,localISODate()):null);
+  personCategory.value=target?.category||'auto';
   personNewRole.value='';
-  populateTeams(p?.team);
+  populateTeams(target?.team);
   populateRoles(p?.role||'');
   document.getElementById('personNote').value=p?.note||'';
   document.getElementById('personActive').checked=p ? p.active : true;
+  document.getElementById('personError').textContent='';
+  const tomorrow=ShiftSchedule.addDays(localISODate(),1);
+  transferStart.value=pending && pending.effectiveDate>ShiftSchedule.addDays(tomorrow,31)?pending.effectiveDate:tomorrow;
+  transferDate.value=pending?.effectiveDate||transferStart.value;
+  renderTransfer(false);
   openModal(personModal);
   setTimeout(()=>document.getElementById('personName').focus(),0);
 }
@@ -375,35 +447,38 @@ async function saveWithFreshData(mutator){
 }
 personForm.addEventListener('submit',async e=>{
   e.preventDefault();
+  if(personnelSaving) return;
   const id=document.getElementById('personId').value;
   const draft={
-    name:document.getElementById('personName').value.trim(),
-    category:personCategory.value,
-    team:personTeam.value,
+    name:document.getElementById('personName').value.trim(), category:personCategory.value, team:personTeam.value,
     role:normalizeRole(personCategory.value,personRole.value === NEW_ROLE ? personNewRole.value : personRole.value,PersonnelModel.roles(settings,employees)),
-    note:document.getElementById('personNote').value.trim(),
-    active:document.getElementById('personActive').checked
+    note:document.getElementById('personNote').value.trim(), active:document.getElementById('personActive').checked
   };
-  if(!draft.name || personRole.value === NEW_ROLE && (!personNewRole.value.trim() || draft.role.length > 100)){ alert('Попълни име и избери роля / позиция.'); return; }
-  const duplicate=employees.find(p=>p.id!==id && p.name.localeCompare(draft.name,'bg',{sensitivity:'base'})===0);
-  if(duplicate){ alert('Вече има човек с това име. Редактирай съществуващия запис.'); return; }
-
-  if(!await saveWithFreshData(async()=>{
+  const errorEl=document.getElementById('personError'); errorEl.textContent='';
+  if(!draft.name || personRole.value === NEW_ROLE && (!personNewRole.value.trim() || draft.role.length > 100)){ errorEl.textContent=uiText('Попълни име и избери роля / позиция.'); return; }
+  if(id && !renderTransfer(false)) return;
+  const planned=id && transferDirty && !cancelPending && needsTransfer() ? {effectiveDate:transferDate.value,category:draft.category,team:draft.team} : null;
+  const button=personForm.querySelector('[type=submit]'); button.disabled=true;
+  const saved=await saveWithFreshData(async()=>{
+    if(id && transferDirty && editedPending && editedPending.effectiveDate<=localISODate()) throw new Error('stale transfer');
+    const duplicate=employees.find(p=>p.id!==id && p.name.localeCompare(draft.name,'bg',{sensitivity:'base'})===0);
+    if(duplicate) throw new Error('duplicate');
     if(!PersonnelModel.DEFAULT_ROLES.includes(draft.role)) settings=normalizeSettings({...settings,customRoles:[...(settings.customRoles||[]),draft.role]});
     if(id){
       const p=employees.find(x=>x.id===id);
-      if(!p) return;
+      if(!p || JSON.stringify(p)!==JSON.stringify(editedPerson)) throw Object.assign(new Error('conflict'),{code:'REPORT_CONFLICT'});
       const before=deepClone(p);
-      Object.assign(p,draft);
-      addLog({type:'update',name:p.name,from:locationText(before),to:locationText(p),detail:p.note||''});
+      const next=transferDirty ? PersonnelModel.changeTransfer({...p,active:draft.active},planned,localISODate()) : p;
+      if(!draft.active && (next.transfers||[]).some(t=>t.effectiveDate>localISODate())) throw new Error('pending');
+      Object.assign(p,next,{name:draft.name,role:draft.role,note:draft.note,active:draft.active});
+      addLog({type:'update',name:p.name,from:locationText(PersonnelModel.assignmentAt(before,localISODate())),to:locationText(PersonnelModel.assignmentAt(p,localISODate())),detail:planned?'Планирано преместване · '+planned.effectiveDate:cancelPending?'Отменено планирано преместване':p.note||''});
     }else{
-      const p=Object.assign({id:nextEmployeeId()},draft);
-      employees.push(p);
+      const p=Object.assign({id:nextEmployeeId()},draft); employees.push(p);
       addLog({type:'create',name:p.name,to:locationText(p),detail:p.note||''});
     }
-  })) return;
-  closeModal(personModal);
-  showToast(id?'Промяната е записана.':'Човекът е добавен.');
+  });
+  if(!saved){ errorEl.textContent=uiText('Записът не е направен. Черновата остава във формата. Опресни и опитай отново.'); renderTransfer(false); return; }
+  closeModal(personModal); showToast(id?'Промяната е записана.':'Човекът е добавен.');
 });
 
 const settingsModal=document.getElementById('settingsModal');
@@ -456,4 +531,21 @@ function renderAll(){
   renderLog();
 }
 
+let renderedPersonnelDay=localISODate();
+function refreshPersonnelDay(){
+  const day=localISODate();
+  if(day===renderedPersonnelDay || personnelSaving || document.querySelector('.modal-backdrop.open')) return;
+  if(todayDateInput.value===renderedPersonnelDay) todayDateInput.value=day;
+  renderedPersonnelDay=day; renderAll();
+}
+setInterval(refreshPersonnelDay,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) refreshPersonnelDay();});
+document.addEventListener('keydown',e=>{
+  const modal=document.querySelector('.modal-backdrop.open');
+  if(e.key!=='Tab' || !modal) return;
+  const fields=[...modal.querySelectorAll('button,input,select,[tabindex]')].filter(el=>!el.disabled && el.tabIndex>=0 && el.getClientRects().length);
+  const first=fields[0],last=fields.at(-1);
+  if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+});
 sync.init();

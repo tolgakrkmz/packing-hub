@@ -23,7 +23,7 @@
     if(!value || !Array.isArray(value.employees) || value.employees.some(person => !person || typeof person.id !== 'string' || !person.id || typeof person.name !== 'string' || !person.name.trim()) || new Set(value.employees.map(person => person.id)).size !== value.employees.length) {
       throw new Error('Изберете файла personnel.json със състава от „Смени и хора“.');
     }
-    personnel = value;
+    personnel = HubDataValidation.validate('personnel',value);
     rosterLoaded = true;
   };
   const sync = createFileSync({
@@ -83,7 +83,7 @@
     const scheduled = validScope();
     const selected = selectedEntries();
     const entries = selected.filter(entry => !entry.cancellation);
-    const people = PairTargets.roster(personnel.employees,context.team);
+    const people = PairTargets.roster(personnel.employees,context.team,context.date);
     const used = new Set(entries.flatMap(entry => entry.members.map(person => person.id)));
     const available = people.filter(person => !used.has(person.id));
     const done = entries.filter(entry => entry.result).length;
@@ -157,7 +157,7 @@
     $('cancellationText').required = false;
     $('cancellationReason').innerHTML = '<option value="">Изберете причина</option>'+PairTargets.CANCELLATION_REASONS.map(reason => `<option value="${reason.key}">${reason.label}</option>`).join('');
     const occupied = new Set(selectedEntries().filter(item => !item.cancellation && item.id !== entry?.id).flatMap(item => item.members.map(person => person.id)));
-    const people = PairTargets.roster(personnel.employees,scope.team).filter(person => !occupied.has(person.id));
+    const people = PairTargets.roster(personnel.employees,scope.team,scope.date).filter(person => !occupied.has(person.id));
     (entry?.members || []).forEach(person => { if(!people.some(item => item.id === person.id)) people.push(person); });
     const options = '<option value="">Изберете човек</option>'+people.map(person => `<option translate="no" value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
     $('memberOne').innerHTML = options;

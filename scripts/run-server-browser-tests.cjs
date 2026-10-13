@@ -27,9 +27,10 @@ async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-online-e2e-'));
   const status = process.argv.includes('--status-only') ? await statusFixture(dir) : null;
   let taskTime = Date.now();
+  let personnelTime=Date.parse(process.argv.includes('--personnel-transfers-only')?'2026-10-13T12:00:00+03:00':'2026-10-05T08:30:00+03:00');
   const notificationMode = process.argv.includes('--notifications-only');
   const notificationKey = notificationMode ? require('node:crypto').generateKeyPairSync('ec', {namedCurve: 'prime256v1'}).privateKey.export({format: 'jwk'}) : null;
-  const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, maintenanceSocket: status?.socketPath});
+  const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, personnelNow:()=>personnelTime, maintenanceSocket: status?.socketPath});
   let browser;
   const errors = [];
   try {
@@ -44,7 +45,7 @@ async function main() {
     browser = await chromium.launch({channel: 'chrome', headless: process.argv.includes('--headless'), slowMo: process.argv.includes('--headless') ? 0 : 250,
       ...(process.argv.includes('--static-only') || process.argv.includes('--security-only') || process.argv.includes('--security-client-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
     async function device(username, mobile = false) {
-      const context = await browser.newContext({timezoneId: 'Europe/Sofia', ...(mobile ? {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true} : {})});
+      const context = await browser.newContext({timezoneId: process.argv.includes('--personnel-transfers-only')?'UTC':'Europe/Sofia', ...(mobile ? {viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true} : {})});
       await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
       await context.addInitScript(() => { window.showOpenFilePicker = () => { throw new Error('Online mode must not ask for a local JSON file'); }; });
       // Existing workflow suites supply a fictional correction reason. The
@@ -58,7 +59,7 @@ async function main() {
         }).observe(document,{subtree:true,childList:true});
       });
       const page = await context.newPage(); page.setDefaultTimeout(10000); page.on('pageerror', error => errors.push(error.message));
-      await page.clock.setFixedTime(new Date('2026-10-05T08:30:00+03:00'));
+      await page.clock.setFixedTime(new Date(personnelTime));
       await page.goto(base + '/'); await expect(page).toHaveURL(base + '/login');
       await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
       await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#loginForm button[type=submit]')).toHaveText('Sign in'); await expect(page.locator('#username')).toHaveValue(username); await expect(page.locator('#password')).toHaveValue(demoPassword);
@@ -68,6 +69,18 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if(process.argv.includes('--personnel-transfers-only')){
+      await admin.goto(base+'/personnel');
+      await require('../tests/browser/personnel-transfers.cjs').exercisePersonnelTransfers({page:admin,expect,read:async()=>hub.store.get('personnel').data,
+        replace:async data=>{const current=hub.store.get('personnel');hub.store.put('personnel',data,current.revision,hub.auth.list()[0]);},
+        setTime:async value=>{personnelTime=Date.parse(value);await admin.clock.setFixedTime(new Date(value));},
+        failNextWrite:async()=>{await admin.route('**/api/data/personnel',async route=>{if(route.request().method()==='PUT'){await route.fulfill({status:503,contentType:'application/json',body:'{"error":"UNAVAILABLE"}'});await admin.unroute('**/api/data/personnel');}else await route.continue();});}});
+      await require('../tests/browser/personnel-transfers.cjs').exerciseTransferConsumers({page:admin,expect,
+        go:name=>admin.goto(base+'/'+name),connect:async(button,file,dot)=>{await expect(admin.locator(dot)).toHaveClass(/\bon\b/);},
+        setTime:async value=>{personnelTime=Date.parse(value);await admin.clock.setFixedTime(new Date(value));},
+        replaceSources:async sources=>{for(const [key,value] of Object.entries(sources)){const state=hub.store.get(key);hub.store.put(key,value,state.revision,hub.auth.list()[0]);}}});
+      assert.deepEqual(errors,[]);console.log('PASS server planned personnel transfers');return;
+    }
     if (process.argv.includes('--personnel-only')) {
       await admin.goto(base+'/personnel');
       await require('../tests/browser/personnel-schedule-roles.cjs').exercisePersonnelScheduleRoles({page:admin,expect,read:async()=>hub.store.get('personnel').data});

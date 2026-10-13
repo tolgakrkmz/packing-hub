@@ -1,12 +1,14 @@
 /* Purpose-specific read views avoid granting the complete personnel module. */
 const {canViewModule} = require('./permissions.cjs');
+const {personnelModel,shiftSchedule} = require('./store.cjs');
 function pairRoster(employees) {
   return employees.filter(person => person.active !== false && typeof person.role === 'string' && person.role.trim().toLowerCase() === 'опаковчик')
-    .map(({id, name, category, team, role}) => ({id, name, category, team, role, active: true}));
+    .map(({id, name, category, team, role, transfers}) => ({id, name, category, team, role, active: true,
+      ...(transfers!==undefined ? {transfers:transfers.map(({effectiveDate,category,team})=>({effectiveDate,category,team}))} : {})}));
 }
-function workforceCounts(employees) {
+function workforceCounts(employees, date=shiftSchedule.sofiaDate()) {
   if (!employees.length) return null;
-  const active = employees.filter(person => person.active !== false);
+  const active = employees.filter(person => person.active !== false).map(person=>personnelModel.assignmentAt(person,date));
   const counts = {auto: {}, manual: {}, production: {}, autoTotal: 0, manualTotal: 0, productionTotal: 0,
     stickers: active.filter(person => person.category === 'stickers').length,
     additional: employees.length - active.length, totalActive: active.length};

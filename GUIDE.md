@@ -1994,6 +1994,142 @@ task after the complete view is attached, including history sections assembled
 off-DOM. A regression refreshes a neighboring task and verifies that the reused
 linked card retains focus and loads its photo after automatic scrolling.
 
+## Planned shift transfers
+
+Status: implemented. Production deployment uses a separate manual copy. Trello:
+[planned shift transfers](https://trello.com/c/09ZI3cLS).
+
+### Required behavior
+
+An administrator plans a person's move from any production team A/B/V/G to
+another team or to/from Stickers in Personnel → Edit person. The source
+assignment remains effective until the selected date. The target assignment
+then applies automatically, including after a restart or while no client is
+open. No scheduled job needs to rewrite the roster: readers resolve the
+assignment for the requested date.
+
+The user requires a maximum of **6 consecutive working days** across the
+transition, including days preceding the transfer. A date that creates a
+seventh consecutive working day is rejected by the UI and server. This is a
+schedule check; actual overtime, attendance and payroll are not recorded here.
+The interface describes planned working days and does not promise wages.
+
+### Calculation rules
+
+- A working day is the local date on which a scheduled shift starts. A night
+  shift belongs to its start date and finishes the following morning. A move
+  never interrupts that shift at midnight.
+- All calendar calculations use Europe/Sofia. Date stepping uses calendar
+  days, not elapsed blocks of 24 hours, including daylight-saving changes.
+- The first selectable date is tomorrow, avoiding reassignment of a shift
+  already under way. Search the following **32 dates** (inclusive of that
+  first date). The administrator can choose a later search start.
+- Compare every candidate against staying in the original assignment over
+  the **same 64-day window**, starting at the search start. This keeps the
+  displayed gain/loss comparable and covers at least 32 days after each move.
+  Show the window explicitly; do not imply a lifetime or monthly wage result.
+- Reject overlapping shifts and display the interval between the last old shift
+  and the first new shift. The user explicitly declined a general minimum of
+  12 hours. A rest day is required where otherwise a seventh consecutive working
+  date would occur; recommend a different effective date with a valid rest day
+  rather than silently deleting a scheduled working day.
+- Count consecutive working dates across the complete assignment timeline,
+  checking at least six days on each side of every changed boundary. Rest
+  dates reset the count. A night shift's end does not create another working
+  date. Changes in section without a change in rotation still count as work.
+- Recommend the earliest valid candidate with no reduction in working days.
+  If none exists, show the smallest reduction and all relevant warnings. If
+  all dates fail the hard checks, show that no allowed date was found; never
+  save a rejected date through an override.
+
+### Data and integration
+
+Use personnel schema **4**, accepting legacy schemas 1–3 on input. Preserve
+the initial category/team as a baseline and add an ordered, bounded per-person
+`transfers` array of `{effectiveDate, category, team}` (maximum 256 entries; no history is truncated). Resolving a date applies
+the latest transfer starting on or before it. Normalization, export and import
+retain these fields. Existing fictional fixtures remain unchanged. Old clients
+must reject schema 4 rather than silently drop the timeline.
+
+Allow **one pending future transfer per person**. The editor can replace or
+cancel that pending transfer, with fresh validation. Completed transfer history
+is immutable through ordinary editing. Changing team/category in Edit person
+uses this flow; name, role and note edits retain their current behavior. Initial
+assignment of a new person is unchanged. Inactive people do not get a new
+transfer plan; their previous history remains stored.
+
+The shared personnel model resolves assignments and provides a pure transfer
+planner using the existing shift rotation. Personnel summaries use the current
+date; the selected-day roster uses that day's assignment. Pair planning resolves
+the roster on the pair's production date, in both browser and server validation.
+Already saved pair snapshots are not rewritten. Workforce statistics continue
+to show the current roster, now resolved by date. Narrow roster endpoints retain
+only the assignment fields their consumers need; notes and the personnel change
+log remain private to the personnel permission boundary.
+
+Validate structure and transition rules in the shared file validator and again
+against fresh data on server writes/imports. Preserve past transfer history;
+reject stale revisions and attempts to bypass the dated transfer through a raw
+team change. Keep the current permissions, transactional writes and rollback.
+Failed saves keep the editor's draft and produce fixed error text without private
+values. Future dates apply from the model's date resolution, not from a timer or
+database mutation at midnight. Visible screens refresh at the local day boundary
+and on returning to the page; the server checks dates independently.
+
+### Editor and acceptance
+
+The existing Edit person dialog includes a transfer section with target assignment,
+search start, recommendations, chosen effective date, the comparison window,
+old/new working days, longest consecutive run, rest interval and a daily preview.
+Show the current and pending assignment separately. Save/replan/cancel are
+explicit actions, guarded against double submits and concurrent changes. Use
+the project's dark styling, accessible controls, BG/EN text and phone layout.
+
+Verify all directed combinations of the four production rotations and Stickers,
+and moves between automatic/manual sections. Tests must distinguish allowed six
+days from rejected seven days, count work preceding the transfer, cover nearby
+completed transfers, night boundaries, weekends, month/year/leap-day/DST changes,
+fixed-window comparisons and the absence of valid candidates. Cover persistence,
+date-based activation, cancellation, stale writes, import retention, malformed
+timelines and direct API bypass attempts. Browser checks cover Personnel and pair
+rosters in offline/server mode, 390 px and desktop, BG/EN and denied permissions.
+
+Implementation touches the shared personnel/shift models, data validation,
+Personnel editor, pair planning, workforce counts, restricted roster endpoints,
+store/import validation, translations and focused tests. It introduces no payroll
+or attendance subsystem and performs no deployment or production-data migration
+during development. Run publication checks and relevant tests before each commit
+and push. Merge only on the user's request; the card remains unfinished until
+the completed changes are merged and pushed to main.
+
+### Using the editor and validation
+
+Open Personnel → Edit person and choose the target section/team. The current
+assignment and any pending plan appear separately. Select a search start, choose
+one of the recommended dates or a permitted date in that search period, inspect
+the comparison and save. Changing the pending destination/date replaces that
+plan. Use Cancel planned transfer to remove only the future plan. Name, role and
+note edits preserve it, including plans more than a month away.
+
+New personnel saves use schema 4, including edits to legacy input. All clients
+reading that shared file must use this version; older validators intentionally
+reject schema 4. A future transfer becomes effective from its date without a
+write, revision change or running browser. This feature checks the scheduled
+rotation; actual attendance, overtime and payroll remain outside the data model.
+The 256-entry history limit rejects further additions and never discards entries.
+
+Validation on the reviewed fictional fixtures: 697 unit/server tests pass.
+Focused offline and server browser flows cover planning, 6/7-day rejection,
+persistence, distant plans, replacement, cancellation, failed writes, concurrent
+editing, double submission, keyboard focus, BG/EN and 390/1440 px layout.
+A cancellation/replan that has become effective while its dialog was open is
+rejected with its draft retained; Stickers preview hours are checked in both
+directions. A failed midnight workforce read is retried before accepting the day. They
+also plan pairs from the dated roster and refresh current workforce at Sofia
+midnight in a UTC browser. Existing offline/server personnel, statistics,
+transfer/import and default workflows pass (10 offline scenarios and 14 online
+workflows in the default runners). No production data was used or published.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license

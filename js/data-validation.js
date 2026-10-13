@@ -36,12 +36,16 @@ const HubDataValidation = (() => {
   }
   function personnel(data) {
     return !('entries' in data) && Array.isArray(data.employees) &&
-      (data.schemaVersion === undefined || [1,2,3].includes(data.schemaVersion)) &&
+      (data.schemaVersion === undefined || [1,2,3,4].includes(data.schemaVersion)) &&
       records(data.employees,row => text(row.name) && (row.category === undefined || ['auto','manual','stickers'].includes(row.category)) &&
-        optionalText(row.team) && optionalText(row.role) && optionalText(row.note) && (row.active === undefined || typeof row.active === 'boolean')) &&
+        optionalText(row.team) && optionalText(row.role) && optionalText(row.note) && (row.active === undefined || typeof row.active === 'boolean') &&
+        (row.transfers===undefined || data.schemaVersion===4 && validTransfers(row))) &&
       (data.settings === undefined || object(data.settings) && ['stickersStage1','stickersStage2'].every(key => data.settings[key] === undefined || number(data.settings[key])) &&
         (data.settings.customRoles === undefined || Array.isArray(data.settings.customRoles) && data.settings.customRoles.every(role => text(role)))) &&
       (data.moveLog === undefined || Array.isArray(data.moveLog) && data.moveLog.every(object));
+  }
+  function validTransfers(row) {
+    try { return PersonnelModel.validateTransfers(row); } catch { return false; }
   }
   function instructions(data) {
     const relative = value => text(value) && !/^[\\/]|^[a-z]:/i.test(value) && !value.split(/[\\/]/).some(part => part === '..' || part === '.');

@@ -11,6 +11,7 @@ for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', '
 const validate = vm.runInContext('HubDataValidation.validate', sandbox);
 const pairModel = vm.runInContext('PairTargets', sandbox);
 const personnelModel = vm.runInContext('PersonnelModel', sandbox);
+const shiftSchedule = vm.runInContext('ShiftSchedule', sandbox);
 const defaults = {
   'production-log': {entries: [], goalTons: 3000},
   'line-downtime': {entries: [], reasons: ['Друго']},
@@ -61,7 +62,7 @@ function notificationTargets(before, after) {
   }
   return {addedIds, changedIds, profiles: [...profiles]};
 }
-function openStore(filename) {
+function openStore(filename, {personnelNow = Date.now} = {}) {
   if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), {recursive: true, mode: 0o700});
   const db = new DatabaseSync(filename, {timeout: 5000});
   if (filename !== ':memory:') fs.chmodSync(filename, 0o600);
@@ -122,7 +123,25 @@ function openStore(filename) {
     try { const result = work(); db.exec('COMMIT'); return result; }
     catch (error) { db.exec('ROLLBACK'); throw error; }
   };
+  function personnelDate() { return shiftSchedule.sofiaDate(new Date(personnelNow())); }
+  function validatePersonnelChange(data, importing = false) {
+    const before=get('personnel').data, today=personnelDate();
+    const prior=new Map(before.employees.map(p=>[p.id,p])), next=new Map(data.employees.map(p=>[p.id,p]));
+    try {
+      if(before.schemaVersion===4 && data.schemaVersion!==4) throw new Error();
+      for(const old of before.employees) if((old.transfers||[]).length && !next.has(old.id)) throw new Error();
+      for(const row of data.employees) {
+        const old=prior.get(row.id), history=row.transfers||[], pending=history.filter(t=>t.effectiveDate>today);
+        if(pending.length>1 || row.active===false && pending.length) throw new Error();
+        if(!old) { if(!importing && history.some(t=>t.effectiveDate<=today)) throw new Error(); continue; }
+        const original=personnelModel.normalizeEmployee(old), normalized=personnelModel.normalizeEmployee(row);
+        if(original.category!==normalized.category || original.team!==normalized.team) throw new Error();
+        if(!isDeepStrictEqual((old.transfers||[]).filter(t=>t.effectiveDate<=today),history.filter(t=>t.effectiveDate<=today))) throw new Error();
+      }
+    } catch { throw problem(400,'INVALID_PERSONNEL_CHANGE'); }
+  }
   function updateDocument(kind, data, user, context = {}) {
+    if(kind==='personnel') { validateData(kind,data); validatePersonnelChange(data,context.personnelImport===true); }
     const before = get(kind);
     if (Object.hasOwn(reports, kind)) {
       const prior = new Map(before.data.entries.map(entry => [entry.id, entry]));
@@ -202,7 +221,7 @@ function openStore(filename) {
           }
         } catch { throw problem(400, 'INVALID_PAIR_CHANGE'); }
       }
-      updateDocument(kind, data, user, context);
+      updateDocument(kind, data, user, {...context,personnelImport:importing});
       audit(user, 'write', kind, reportChanges(current.data, data), notificationTargets(current.data, data));
       return get(kind);
     };
@@ -393,6 +412,6 @@ function openStore(filename) {
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  return {db, get, put, updateDocument, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  return {db, get, put, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
-module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, reportChanges, notificationTargets};
+module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

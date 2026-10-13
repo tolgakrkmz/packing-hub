@@ -17,10 +17,10 @@ const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
-  const store = openStore(filename);
+  const store = openStore(filename,{personnelNow});
   const auth = accounts(store);
   const accountInstructions = createAccountInstructions(store);
   const activity = createActivity(store);
@@ -233,7 +233,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           if (!canViewModule(session.user, pathname === '/api/pair-roster' ? 'pair-targets' : 'statistics')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
           const current = store.get('personnel');
-          const data = pathname === '/api/pair-roster' ? {employees: pairRoster(current.data.employees)} : {counts: workforceCounts(current.data.employees)};
+          const data = pathname === '/api/pair-roster' ? {employees: pairRoster(current.data.employees),
+            ...(current.data.employees.some(p=>p.transfers!==undefined) ? {schemaVersion:4} : {})} : {counts: workforceCounts(current.data.employees,store.personnelDate())};
           return json(response, 200, {data, revision: current.revision});
         }
         const statisticsPeriod = pathname.match(/^\/api\/statistics\/period\/(production-log|line-downtime|pair-targets)$/);
