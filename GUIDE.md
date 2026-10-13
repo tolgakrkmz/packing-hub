@@ -1996,7 +1996,7 @@ linked card retains focus and loads its photo after automatic scrolling.
 
 ## Planned shift transfers
 
-Status: implemented in the dedicated feature branch; merge and deployment pending. Trello:
+Status: implemented. Production deployment uses a separate manual copy. Trello:
 [planned shift transfers](https://trello.com/c/09ZI3cLS).
 
 ### Required behavior
