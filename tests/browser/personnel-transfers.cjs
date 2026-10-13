@@ -26,6 +26,7 @@ async function exercisePersonnelTransfers({page,expect,read,replace,failNextWrit
   await expect(page.locator('.today-card[data-team="Г"] .names')).toContainText(demo.employees[0].name);
   await edit();await page.locator('#personCategory').selectOption('stickers');
   await page.locator('#transferEffectiveDate').fill('2026-10-16');await page.locator('#transferEffectiveDate').dispatchEvent('change');
+  await expect(page.locator('#transferDays tr').filter({hasText:'16.10.2026'}).locator('td').nth(2)).toHaveText('09:00–17:30');
   await page.locator('#personForm button[type=submit]').click();await expect(page.locator('#personModal')).not.toHaveClass(/open/);
   assert.deepEqual((await read()).employees[0].transfers,[{effectiveDate:'2026-10-16',category:'stickers',team:'1 смяна'}]);
   await edit();await page.locator('#cancelTransferPlan').click();await page.locator('#personForm button[type=submit]').click();
@@ -70,9 +71,14 @@ async function exercisePersonnelTransfers({page,expect,read,replace,failNextWrit
   // Modal keyboard focus stays inside the form; a day change keeps its draft.
   await page.locator('#personModal [data-close-modal]').first().focus();await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#personForm button[type=submit]')).toBeFocused();
+  await page.locator('#cancelTransferPlan').click();
   await setTime('2026-10-14T12:00:00+03:00');
   await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
   await expect(page.locator('#transferEffectiveDate')).toHaveValue('2026-10-14');
+  await page.evaluate(()=>document.getElementById('personForm').requestSubmit());
+  await expect(page.locator('#personModal')).toHaveClass(/open/);
+  await expect(page.locator('#transferError')).toContainText('вече е в сила');
+  assert.deepEqual(await read(),beforeActivation);
   await page.keyboard.press('Escape');await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
   await edit();await expect(page.locator('#transferCurrent')).toContainText('Г');
   await expect(page.locator('#cancelTransferPlan')).toBeHidden();
@@ -107,5 +113,10 @@ async function exerciseTransferConsumers({page,expect,go,connect,setTime,replace
   await page.locator('[data-stats-tab=workforce]').click();await expect(page.locator('#wfCurrentStaff')).toHaveText('3');await expect(page.locator('#wfStickersCount')).toHaveText('0 души');
   await setTime('2026-10-15T22:00:00Z');await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
   await expect(page.locator('#wfCurrentStaff')).toHaveText('2');await expect(page.locator('#wfStickersCount')).toHaveText('1 души');
+  await go('personnel');await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);await page.locator('[data-edit-person="demo-transfer-stickers"]').click();
+  await page.locator('#personCategory').selectOption('auto');await page.locator('#personTeam').selectOption('Г');
+  await page.locator('#transferEffectiveDate').fill('2026-10-17');await page.locator('#transferEffectiveDate').dispatchEvent('change');
+  await expect(page.locator('#transferDays tr').filter({hasText:'16.10.2026'}).locator('td').nth(1)).toHaveText('09:00–17:30');
+  await page.keyboard.press('Escape');
 }
 module.exports.exerciseTransferConsumers=exerciseTransferConsumers;

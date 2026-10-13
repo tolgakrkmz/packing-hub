@@ -3409,15 +3409,17 @@ function renderAll() {
   });
 }
 
-let renderedStatisticsDay=statisticsDay();
+let renderedStatisticsDay=statisticsDay(),statisticsDayRefreshing=false;
 async function refreshStatisticsDay(){
   const day=statisticsDay();
-  if(day===renderedStatisticsDay || document.hidden || periodPending) return;
-  renderedStatisticsDay=day;
-  if(typeof HubServer !== 'undefined') {
-    try { await personnelSync.refreshFromDisk({fresh:true}); } catch { return; }
-  }
-  renderAll();
+  if(day===renderedStatisticsDay || statisticsDayRefreshing || document.hidden || periodPending) return;
+  statisticsDayRefreshing=true;
+  try {
+    if(typeof HubServer !== 'undefined') await personnelSync.refreshFromDisk({fresh:true});
+    renderAll();
+    renderedStatisticsDay=day;
+  } catch { /* Keep the previous day so the next visible refresh retries. */ }
+  finally { statisticsDayRefreshing=false; }
 }
 setInterval(refreshStatisticsDay,30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden) refreshStatisticsDay();});

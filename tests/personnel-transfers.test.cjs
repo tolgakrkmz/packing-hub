@@ -106,3 +106,15 @@ test('pair planning resolves the roster on the production date and retains saved
   assert.deepEqual(plain(preserved.members),plain(entry.members));
   assert.equal(pairs.report(entry,{context:entry,kg:1,crates:1,workAreas:['auto'],now:'2026-10-14T10:00:00Z'}).result.kg,1);
 });
+
+test('Sofia day refresh retries a transient read failure before accepting the day', async () => {
+  const source=fs.readFileSync(path.join(__dirname,'../js/statistics.js'),'utf8');
+  const refresh=source.slice(source.indexOf('let renderedStatisticsDay='),source.indexOf('setInterval(refreshStatisticsDay'));
+  let day='2026-10-13',reads=0,renders=0;
+  const clock=vm.createContext({statisticsDay:()=>day,document:{hidden:false},periodPending:false,HubServer:{},
+    personnelSync:{refreshFromDisk:async()=>{reads++;if(reads===1)throw new Error('Demo transient read failure');}},renderAll:()=>{renders++;}});
+  vm.runInContext(refresh,clock);day='2026-10-14';
+  await vm.runInContext('refreshStatisticsDay()',clock);assert.equal(renders,0);
+  await vm.runInContext('refreshStatisticsDay()',clock);assert.equal(reads,2);assert.equal(renders,1);
+  await vm.runInContext('refreshStatisticsDay()',clock);assert.equal(reads,2);assert.equal(renders,1);
+});

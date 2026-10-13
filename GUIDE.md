@@ -1994,9 +1994,9 @@ task after the complete view is attached, including history sections assembled
 off-DOM. A regression refreshes a neighboring task and verifies that the reused
 linked card retains focus and loads its photo after automatic scrolling.
 
-## Planned shift transfers — design for review
+## Planned shift transfers
 
-Status: design clarified on 13 October 2026; implementation pending. Trello:
+Status: implemented in the dedicated feature branch; merge and deployment pending. Trello:
 [planned shift transfers](https://trello.com/c/09ZI3cLS).
 
 ### Required behavior
@@ -2014,7 +2014,7 @@ seventh consecutive working day is rejected by the UI and server. This is a
 schedule check; actual overtime, attendance and payroll are not recorded here.
 The interface describes planned working days and does not promise wages.
 
-### Proposed calculation rules
+### Calculation rules
 
 - A working day is the local date on which a scheduled shift starts. A night
   shift belongs to its start date and finishes the following morning. A move
@@ -2046,7 +2046,7 @@ The interface describes planned working days and does not promise wages.
 
 Use personnel schema **4**, accepting legacy schemas 1–3 on input. Preserve
 the initial category/team as a baseline and add an ordered, bounded per-person
-`transfers` array of `{effectiveDate, category, team}`. Resolving a date applies
+`transfers` array of `{effectiveDate, category, team}` (maximum 256 entries; no history is truncated). Resolving a date applies
 the latest transfer starting on or before it. Normalization, export and import
 retain these fields. Existing fictional fixtures remain unchanged. Old clients
 must reject schema 4 rather than silently drop the timeline.
@@ -2058,8 +2058,8 @@ uses this flow; name, role and note edits retain their current behavior. Initial
 assignment of a new person is unchanged. Inactive people do not get a new
 transfer plan; their previous history remains stored.
 
-Extend the shared personnel model with assignment resolution and a pure transfer
-planner, using the existing shift rotation. Personnel summaries use the current
+The shared personnel model resolves assignments and provides a pure transfer
+planner using the existing shift rotation. Personnel summaries use the current
 date; the selected-day roster uses that day's assignment. Pair planning resolves
 the roster on the pair's production date, in both browser and server validation.
 Already saved pair snapshots are not rewritten. Workforce statistics continue
@@ -2078,7 +2078,7 @@ and on returning to the page; the server checks dates independently.
 
 ### Editor and acceptance
 
-The existing Edit person dialog gets a transfer section with target assignment,
+The existing Edit person dialog includes a transfer section with target assignment,
 search start, recommendations, chosen effective date, the comparison window,
 old/new working days, longest consecutive run, rest interval and a daily preview.
 Show the current and pending assignment separately. Save/replan/cancel are
@@ -2101,6 +2101,34 @@ or attendance subsystem and performs no deployment or production-data migration
 during development. Run publication checks and relevant tests before each commit
 and push. Merge only on the user's request; the card remains unfinished until
 the completed changes are merged and pushed to main.
+
+### Using the editor and validation
+
+Open Personnel → Edit person and choose the target section/team. The current
+assignment and any pending plan appear separately. Select a search start, choose
+one of the recommended dates or a permitted date in that search period, inspect
+the comparison and save. Changing the pending destination/date replaces that
+plan. Use Cancel planned transfer to remove only the future plan. Name, role and
+note edits preserve it, including plans more than a month away.
+
+New personnel saves use schema 4, including edits to legacy input. All clients
+reading that shared file must use this version; older validators intentionally
+reject schema 4. A future transfer becomes effective from its date without a
+write, revision change or running browser. This feature checks the scheduled
+rotation; actual attendance, overtime and payroll remain outside the data model.
+The 256-entry history limit rejects further additions and never discards entries.
+
+Validation on the reviewed fictional fixtures: 697 unit/server tests pass.
+Focused offline and server browser flows cover planning, 6/7-day rejection,
+persistence, distant plans, replacement, cancellation, failed writes, concurrent
+editing, double submission, keyboard focus, BG/EN and 390/1440 px layout.
+A cancellation/replan that has become effective while its dialog was open is
+rejected with its draft retained; Stickers preview hours are checked in both
+directions. A failed midnight workforce read is retried before accepting the day. They
+also plan pairs from the dated roster and refresh current workforce at Sofia
+midnight in a UTC browser. Existing offline/server personnel, statistics,
+transfer/import and default workflows pass (10 offline scenarios and 14 online
+workflows in the default runners). No production data was used or published.
 
 ## Publication
 

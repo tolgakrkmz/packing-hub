@@ -1,5 +1,6 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Планираното преместване вече е в сила. Отворете актуалния запис.": "The planned transfer is already effective. Open the current record.",
   "Изчислението използва текущия активен състав.": "The calculation uses the current active roster.",
   "Планирано преместване": "Planned transfer",
   "Текущ състав:": "Current assignment:",
