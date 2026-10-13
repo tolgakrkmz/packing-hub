@@ -52,10 +52,7 @@ let personnelCounts = null;
 let personnelLoaded = false;
 
 const statisticsCache = createStatisticsCache();
-function statisticsDay() {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-}
+function statisticsDay() { return ShiftSchedule.sofiaDate(); }
 function productionMonthEntries() {
   const period = `${selectedYear}-${selectedDashboardMonth}`;
   return statisticsCache.get('month-entries', [entries], period, () => entries.filter(entry => entry.date?.startsWith(period + '-')));
@@ -2756,13 +2753,13 @@ function wfShiftCodeFor(team, dateObj) {
 }
 
 function getPersonnelSnapshot() {
-  return statisticsCache.get('personnel-counts', [personnelEmployees, personnelCounts, personnelLoaded], '', calculatePersonnelSnapshot);
+  return statisticsCache.get('personnel-counts', [personnelEmployees, personnelCounts, personnelLoaded], ShiftSchedule.sofiaDate(), calculatePersonnelSnapshot);
 }
 function calculatePersonnelSnapshot() {
   if (personnelCounts) return personnelCounts;
   if (!personnelLoaded || !personnelEmployees.length) return null;
 
-  const active = personnelEmployees.filter(p => p && p.active !== false);
+  const active = personnelEmployees.filter(p => p && p.active !== false).map(p => PersonnelModel.assignmentAt(p,ShiftSchedule.sofiaDate()));
   const counts = {
     auto: {},
     manual: {},
@@ -3062,7 +3059,7 @@ function renderWorkforceDashboard() {
   const scenario = workforceScenario(monthData, counts);
   const monthName = MONTH_FULL_LABELS[monthData.month - 1];
   el.wfStaffSource.textContent = `${counts.productionTotal} производствени + ${counts.additional} допълнителни`;
-  el.wfSubtitle.textContent = `${monthName} ${monthData.year}: цел ${StatisticsUnits.formatTons(goalTons)} т от „Тонаж и брак“, производителност от реалния тонаж и текущия активен състав, резерв от ${counts.additional} души в „Допълнителни“. Историческият щат по дата не се пази.`;
+  el.wfSubtitle.textContent = `${monthName} ${monthData.year}: цел ${StatisticsUnits.formatTons(goalTons)} т от „Тонаж и брак“, производителност от реалния тонаж и текущия активен състав, резерв от ${counts.additional} души в „Допълнителни“. Изчислението използва текущия активен състав.`;
 
   el.wfCurrentStaff.textContent = `${counts.productionTotal}`;
   el.wfCurrentStaffSub.textContent = `Автоматична ${counts.autoTotal} + Ръчна ${counts.manualTotal}`;
@@ -3412,6 +3409,18 @@ function renderAll() {
   });
 }
 
+let renderedStatisticsDay=statisticsDay();
+async function refreshStatisticsDay(){
+  const day=statisticsDay();
+  if(day===renderedStatisticsDay || document.hidden || periodPending) return;
+  renderedStatisticsDay=day;
+  if(typeof HubServer !== 'undefined') {
+    try { await personnelSync.refreshFromDisk({fresh:true}); } catch { return; }
+  }
+  renderAll();
+}
+setInterval(refreshStatisticsDay,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) refreshStatisticsDay();});
 pairStatistics.init();
 sync.init();
 avSync.init();

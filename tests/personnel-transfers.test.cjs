@@ -94,3 +94,15 @@ test('inactive people have no permissible recommended transfer date', () => {
   assert.equal(result.recommendedDate,null);
   assert.ok(result.candidates.every(row=>!row.valid));
 });
+test('pair planning resolves the roster on the production date and retains saved members', () => {
+  const pairs=vm.runInContext('PairTargets',context),employee={...person,transfers:[transfer('2026-10-14')]};
+  assert.equal(pairs.roster([employee],'А','2026-10-13').length,1);
+  assert.equal(pairs.roster([employee],'А','2026-10-14').length,0);
+  assert.equal(pairs.roster([employee],'Г','2026-10-14').length,1);
+  const second={...employee,id:'demo-transfer-two',name:'Demo Transfer Two'};
+  const entry=pairs.plan({data:pairs.emptyData(),employees:[employee,second],context:{date:'2026-10-14',team:'Г',shiftCode:1},memberIds:[employee.id,second.id],targetKg:1,targetCrates:1,workAreas:['auto'],id:'demo-future-pair',now:'2026-10-14T03:00:00Z'});
+  assert.equal(entry.members[0].id,employee.id);
+  const preserved=pairs.plan({data:{...pairs.emptyData(),entries:[entry]},employees:[],context:entry,existingId:entry.id,memberIds:[employee.id,second.id],targetKg:2,targetCrates:1,workAreas:['auto'],id:entry.id,now:'2026-10-15T10:00:00Z'});
+  assert.deepEqual(plain(preserved.members),plain(entry.members));
+  assert.equal(pairs.report(entry,{context:entry,kg:1,crates:1,workAreas:['auto'],now:'2026-10-14T10:00:00Z'}).result.kg,1);
+});

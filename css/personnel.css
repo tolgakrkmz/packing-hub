@@ -169,3 +169,20 @@ body{padding:24px 16px 64px;}
   .field-wide{grid-column:auto;}
   .person-tags .badge{display:none;}
 }
+
+/* Planned transfer preview fits the existing person editor on narrow screens. */
+.transfer-panel{margin-top:18px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--bg)}
+.transfer-panel[hidden],#cancelTransferPlan[hidden]{display:none}
+.transfer-panel h4{margin:0 0 10px;font-size:16px}
+.transfer-panel p{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.transfer-recommendations{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.transfer-recommendations .chip{white-space:normal;text-align:left;min-height:44px}
+.transfer-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;font-size:12px}
+.transfer-metrics b{display:block;font-size:19px;margin-top:3px}
+.transfer-error{color:var(--red);font-size:13px;line-height:1.5}
+.transfer-preview{width:100%;table-layout:fixed;border-collapse:collapse;margin:12px 0;font-size:12px}
+.transfer-preview caption{text-align:left;margin-bottom:8px;font-weight:700}
+.transfer-preview th,.transfer-preview td{padding:7px 2px;text-align:left;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.transfer-effective{font-weight:700;background:var(--surface)}
+.person-tags .transfer-badge{white-space:normal;max-width:220px}
+@media(max-width:640px){.person-tags .transfer-badge{display:inline-flex}.transfer-panel{padding:10px}.transfer-panel .form-grid{grid-template-columns:minmax(0,1fr)}.transfer-preview{font-size:11px}.transfer-panel input{min-width:0;max-width:100%}}

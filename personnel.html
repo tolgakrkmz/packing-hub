@@ -149,11 +149,35 @@
           <input id="personNote" type="text" placeholder="напр. ТР, преси, предизвестие…" autocomplete="off">
         </label>
       </div>
+      <section id="transferPanel" class="transfer-panel" hidden aria-labelledby="transferTitle">
+        <h4 id="transferTitle">Планирано преместване</h4>
+        <p><span>Текущ състав:</span> <b id="transferCurrent"></b></p>
+        <p id="transferPending"></p>
+        <p id="transferRules">Максимум 6 последователни работни дни. При риск от седми ден изберете дата с почивка. Нощната смяна принадлежи на датата на започване.</p>
+        <div class="form-grid">
+          <label class="field">Търси от дата<input id="transferSearchStart" type="date"></label>
+          <label class="field">В сила от<input id="transferEffectiveDate" type="date"></label>
+        </div>
+        <div id="transferRecommendations" class="transfer-recommendations"></div>
+        <p id="transferWindow"></p>
+        <div class="transfer-metrics">
+          <span><span>Работни дни преди:</span> <b id="transferBefore">—</b></span>
+          <span><span>Работни дни след:</span> <b id="transferAfter">—</b></span>
+          <span><span>Разлика:</span> <b id="transferDelta">—</b></span>
+          <span><span>Поредни дни:</span> <b id="transferRun">—</b></span>
+          <span><span>Почивка (часове):</span> <b id="transferRest">—</b></span>
+        </div>
+        <p>Сравнението е по график, а не отчет за присъствие.</p>
+        <p id="transferError" role="alert" class="transfer-error"></p>
+        <table class="transfer-preview"><caption>Дни около преместването</caption><thead><tr><th>Дата</th><th>Преди</th><th>След</th></tr></thead><tbody id="transferDays"></tbody></table>
+        <button id="cancelTransferPlan" type="button" class="action-btn ghost" hidden>Отмени планираното преместване</button>
+      </section>
       <label class="status-switch">
         <input id="personActive" type="checkbox" checked>
         <span class="switch-ui"></span>
         <span><b>Активен състав</b><small>Ако е изключено, човекът остава в системата, но не влиза в броя на екипа.</small></span>
       </label>
+      <p id="personError" class="transfer-error" role="alert"></p>
       <div class="modal-actions">
         <button type="button" class="action-btn ghost" data-close-modal="personModal">Отказ</button>
         <button type="submit" class="action-btn">Запази</button>
