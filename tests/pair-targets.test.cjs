@@ -55,7 +55,7 @@ test('two distinct active people, from the scheduled team, are required',() => {
 test('only active packers are available and can be added to new pairs in every category',() => {
   const excludedRoles = ['Началник смяна','Чемберовач','Кранист/чемберовач','Кранист','Оператор пулт 1','Оператор пулт 2','Обслужващ','Unknown','',undefined];
   for(const category of ['auto','manual','stickers']) {
-    const scope = category === 'stickers' ? {...context,team:'СТИКЕРИ'} : context;
+    const scope = category === 'stickers' ? {...context,date:'2026-10-05',team:'СТИКЕРИ'} : context;
     const packers = employees.map(person => ({...person,category,role:'  ОПАКОВЧИК  ',team:category === 'stickers' ? '1 смяна' : team}));
     const others = excludedRoles.map((role,index) => ({...packers[0],id:'other-'+index,name:'Demo Other '+index,role}));
     const roster = [...packers,...others,{...packers[0],id:'inactive',active:false},
@@ -148,9 +148,10 @@ test('data files reject other modules, malformed records and duplicates',() => {
     [{...entry,result:{...entry.result,kg:0,reasonKey:'',reasonText:''}}]
   ]) assert.throws(() => model.validateData({...model.emptyData(),entries:invalid}));
 });
-test('stickers use their active roster in first shift',() => {
+test('stickers use their active roster on weekdays and reject weekends',() => {
   const people = employees.map(person => ({...person,team:'1 смяна',category:'stickers'}));
-  assert.equal(plan({context:{...context,team:'СТИКЕРИ'},employees:people}).team,'СТИКЕРИ');
+  assert.equal(plan({context:{...context,date:'2026-10-05',team:'СТИКЕРИ'},employees:people}).team,'СТИКЕРИ');
+  assert.throws(() => plan({context:{...context,team:'СТИКЕРИ'},employees:people}),/ротацията/);
   assert.throws(() => plan({context:{...context,team:'СТИКЕРИ',shiftCode:2},employees:people}),/ротацията/);
 });
 test('cancellation requires a preset or explained Other and preserves the original plan',() => {

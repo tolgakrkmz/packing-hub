@@ -1,5 +1,5 @@
 /* Personnel schema v3: one record per person, active-only headcounts,
- * a single stickers shift, and category-specific role options. */
+ * a weekday stickers shift, and shared role options. */
 
 const SCHEMA_VERSION = 3;
 const CATS = [
@@ -9,12 +9,6 @@ const CATS = [
 ];
 const CAT_BY_KEY = Object.fromEntries(CATS.map(c=>[c.key,c]));
 const MAIN_TEAMS = ['А','Б','В','Г'];
-
-const ROLE_OPTIONS = {
-  auto:['Началник смяна','Оператор пулт 1','Оператор пулт 2','Чемберовач','Обслужващ','Опаковчик'],
-  manual:['Началник смяна','Кранист/чемберовач','Обслужващ','Опаковчик'],
-  stickers:['Началник смяна','Опаковчик']
-};
 
 const DEFAULT_PERSONNEL_SETTINGS = {stickersStage1:4,stickersStage2:6};
 let employees = [];
@@ -64,13 +58,13 @@ function loadIncomingData(data, allowMigration){
   personnelLoaded = true;
   const version=Number(src.schemaVersion||1);
 
-  // Preserve existing records while normalizing teams and category-specific roles.
+  // Preserve existing records and roles while normalizing teams.
   employees=src.employees.map(normalizeEmployee).filter(p=>p.id && p.name);
-  settings=normalizeSettings(src.settings);
+  settings=normalizeSettings(src.settings,employees);
   moveLog=Array.isArray(src.moveLog) ? src.moveLog : [];
 
   if(version < SCHEMA_VERSION && allowMigration){
-    addLog({type:'migration',name:'Система',detail:'Стикери: 1 смяна · фиксирани роли (schema v3)'});
+    addLog({type:'migration',name:'Система',detail:'Стикери: 1 смяна · общи роли (schema v3)'});
   }
   return version !== SCHEMA_VERSION;
 }
@@ -193,8 +187,9 @@ function renderToday(){
   }).join('');
 
   const stickers=activeCount('stickers','1 смяна');
-  document.getElementById('stickersNote').innerHTML=`<b>Стикери:</b> 1 смяна, фиксиран състав, без автоматична ротация.
-    <span class="badge team-1_смяна">1 смяна — ${stickers} души</span>`;
+  const stickersCode=shiftCodeFor('СТИКЕРИ',dateObj);
+  document.getElementById('stickersNote').innerHTML=`<b>Стикери:</b> понеделник–петък · ${ShiftSchedule.STICKERS.hours}.
+    <span class="badge ${stickersCode === 'Н' ? 'shift-Н' : 'team-1_смяна'}">${stickersCode === 'Н' ? 'Почивка' : '1 смяна'} — ${stickers} души</span>`;
 }
 
 const monthNames=['Януари','Февруари','Март','Април','Май','Юни','Юли','Август','Септември','Октомври','Ноември','Декември'];
@@ -219,11 +214,11 @@ function renderSchedule(){
     head+=`<div class="schedule-day${wk?' weekend':''}"><b>${d}</b><span>${WEEKDAYS_SHORT[wd]}</span></div>`;
   }
   head+='</div>';
-  const rows=MAIN_TEAMS.map(t=>{
+  const rows=[...MAIN_TEAMS,'СТИКЕРИ'].map(t=>{
     let s=`<div class="schedule-line" style="grid-template-columns:${cols}"><div class="schedule-team-label"><span class="badge ${teamClass(t)}">${t}</span></div>`;
     for(let d=1;d<=days;d++){
       const o=new Date(year,month,d); const wd=(o.getDay()+6)%7; const wk=wd>=5; const code=shiftCodeFor(t,o);
-      s+=`<div class="schedule-cell shift-${code}${wk?' weekend':''}" title="${d}.${month+1}.${year} — ${SHIFT_LABELS[code]}">${code}</div>`;
+      s+=`<div class="schedule-cell shift-${code}${wk?' weekend':''}" title="${d}.${month+1}.${year} — ${SHIFT_LABELS[code]}${t === 'СТИКЕРИ' && code !== 'Н' ? ' · '+ShiftSchedule.STICKERS.hours : ''}">${code}</div>`;
     }
     return s+'</div>';
   }).join('');
@@ -231,7 +226,7 @@ function renderSchedule(){
 }
 
 function roleRank(p){
-  const list=ROLE_OPTIONS[p.category] || ROLE_OPTIONS.auto;
+  const list=PersonnelModel.DEFAULT_ROLES;
   const idx=list.indexOf(p.role);
   return idx===-1?99:idx;
 }
@@ -304,6 +299,8 @@ const personForm=document.getElementById('personForm');
 const personCategory=document.getElementById('personCategory');
 const personTeam=document.getElementById('personTeam');
 const personRole=document.getElementById('personRole');
+const personNewRole=document.getElementById('personNewRole');
+const NEW_ROLE='__new_role__';
 personCategory.innerHTML=CATS.map(c=>`<option value="${c.key}">${escapeHTML(c.label)}</option>`).join('');
 function populateTeams(preferred){
   const cat=CAT_BY_KEY[personCategory.value]||CATS[0];
@@ -311,11 +308,20 @@ function populateTeams(preferred){
   if(preferred && cat.teams.includes(preferred)) personTeam.value=preferred;
 }
 function populateRoles(preferred){
-  const roles=ROLE_OPTIONS[personCategory.value]||ROLE_OPTIONS.auto;
-  personRole.innerHTML=roles.map(r=>`<option value="${escapeHTML(r)}">${escapeHTML(r)}</option>`).join('');
-  const normalized=normalizeRole(personCategory.value,preferred,document.getElementById('personName').value);
+  const roles=PersonnelModel.roles(settings,employees);
+  personRole.innerHTML=roles.map(r=>`<option value="${escapeHTML(r)}">${escapeHTML(r)}</option>`).join('')+`<option value="${NEW_ROLE}">+ Добави нова роля…</option>`;
+  const normalized=normalizeRole(personCategory.value,preferred,roles);
   if(roles.includes(normalized)) personRole.value=normalized;
+  if(preferred === NEW_ROLE) personRole.value=NEW_ROLE;
+  updateNewRoleField();
 }
+function updateNewRoleField(){
+  const adding=personRole.value === NEW_ROLE;
+  document.getElementById('newRoleField').hidden=!adding;
+  personNewRole.disabled=!adding;
+  personNewRole.required=adding;
+}
+personRole.addEventListener('change',()=>{ updateNewRoleField(); if(personRole.value === NEW_ROLE) personNewRole.focus(); });
 personCategory.addEventListener('change',()=>{
   const previousRole=personRole.value;
   populateTeams();
@@ -332,6 +338,7 @@ function openPersonModal(id=''){
   document.getElementById('personId').value=p?.id||'';
   document.getElementById('personName').value=p?.name||'';
   personCategory.value=p?.category||'auto';
+  personNewRole.value='';
   populateTeams(p?.team);
   populateRoles(p?.role||'');
   document.getElementById('personNote').value=p?.note||'';
@@ -373,15 +380,16 @@ personForm.addEventListener('submit',async e=>{
     name:document.getElementById('personName').value.trim(),
     category:personCategory.value,
     team:personTeam.value,
-    role:normalizeRole(personCategory.value,personRole.value,document.getElementById('personName').value.trim()),
+    role:normalizeRole(personCategory.value,personRole.value === NEW_ROLE ? personNewRole.value : personRole.value,PersonnelModel.roles(settings,employees)),
     note:document.getElementById('personNote').value.trim(),
     active:document.getElementById('personActive').checked
   };
-  if(!draft.name || !draft.role){ alert('Попълни име и избери роля / позиция.'); return; }
+  if(!draft.name || personRole.value === NEW_ROLE && (!personNewRole.value.trim() || draft.role.length > 100)){ alert('Попълни име и избери роля / позиция.'); return; }
   const duplicate=employees.find(p=>p.id!==id && p.name.localeCompare(draft.name,'bg',{sensitivity:'base'})===0);
   if(duplicate){ alert('Вече има човек с това име. Редактирай съществуващия запис.'); return; }
 
   if(!await saveWithFreshData(async()=>{
+    if(!PersonnelModel.DEFAULT_ROLES.includes(draft.role)) settings=normalizeSettings({...settings,customRoles:[...(settings.customRoles||[]),draft.role]});
     if(id){
       const p=employees.find(x=>x.id===id);
       if(!p) return;
@@ -409,7 +417,7 @@ document.getElementById('settingsForm').addEventListener('submit',async e=>{
   const stage1=Math.max(0,parseInt(document.getElementById('stickersStage1').value,10)||0);
   const stage2=Math.max(0,parseInt(document.getElementById('stickersStage2').value,10)||0);
   if(!await saveWithFreshData(async()=>{
-    settings={stickersStage1:stage1,stickersStage2:stage2};
+    settings={...settings,stickersStage1:stage1,stickersStage2:stage2};
     addLog({type:'settings',name:'Стикери',detail:`Етап 1: ${stage1} души · Етап 2: ${stage2} души`});
   })) return;
   closeModal(settingsModal);

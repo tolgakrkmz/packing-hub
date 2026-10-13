@@ -68,6 +68,11 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--personnel-only')) {
+      await admin.goto(base+'/personnel');
+      await require('../tests/browser/personnel-schedule-roles.cjs').exercisePersonnelScheduleRoles({page:admin,expect,read:async()=>hub.store.get('personnel').data});
+      assert.deepEqual(errors,[]); console.log('PASS online personnel shared roles and weekday schedule'); return;
+    }
     if (process.argv.includes('--connection-copy-only')) {
       await require('../tests/browser/connection-copy.cjs').exerciseConnectionCopy({admin,base,expect});
       assert.deepEqual(errors,[]); return;
@@ -256,6 +261,8 @@ async function main() {
       await exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskMultiplePhotos({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
+      // History owns a fresh set of fictional tasks in this temporary test database.
+      hub.store.db.exec('DELETE FROM task_items; DELETE FROM task_schedules;');
       await exerciseTaskHistory({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;

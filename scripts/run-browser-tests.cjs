@@ -48,6 +48,20 @@ async function main() {
     const headed = !process.argv.includes('--headless');
     browser = await chromium.launch({channel: 'chrome', headless: !headed, slowMo: headed ? 350 : 0,
       ...(process.argv.includes('--security-only') || process.argv.includes('--security-client-only') ? {args:['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']} : {})});
+    if (process.argv.includes('--personnel-only')) {
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+      await context.addInitScript(installStorage,{});
+      const page = await context.newPage(), errors=[];
+      page.on('pageerror',error=>errors.push(error.message));
+      await page.clock.setFixedTime(new Date('2026-10-05T10:00:00+03:00'));
+      await page.goto(base+'/personnel.html'); await page.evaluate(()=>window.__browserTest.ready);
+      await page.evaluate(()=>{ window.__browserTest.nextFile='personnel.json'; }); await page.locator('#openFileBtn').click();
+      await require('../tests/browser/personnel-schedule-roles.cjs').exercisePersonnelScheduleRoles({page,expect,read:()=>page.evaluate(()=>window.__browserTest.read('personnel.json'))});
+      require('node:assert/strict').deepEqual(errors,[]); console.log('PASS offline personnel shared roles and weekday schedule');
+      await context.close(); return;
+    }
     if (process.argv.includes('--security-client-only')) {
       await require('../tests/browser/security-client.cjs').exerciseOfflineClientSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
     }
