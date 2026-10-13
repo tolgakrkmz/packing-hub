@@ -4,6 +4,7 @@
   if (typeof HubServer === 'undefined') { $('taskMessage').textContent = 'Задачите са достъпни в сървърната версия след вход с личен акаунт.'; $('taskContent').hidden = true; return; }
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
+  const completer = admin && HubServer.user.role === 'admin';
   let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const pageSize = 50;
   let listPage = 1, searchTimer;
@@ -17,7 +18,7 @@
   function observePhotos(container) { for (const img of container.querySelectorAll('img[data-photo-src]')) photoObserver.observe(img); }
   function forgetPhotos(container) { for (const img of container.querySelectorAll('img[data-photo-src]')) photoObserver.unobserve(img); }
   const statusLabels = {pending: 'Чака отчет', unreported: 'Неотчетена', completed: 'Изпълнена', 'not-done': 'Неизпълнена', 'not-applicable': 'Не е приложима', 'in-progress': 'В процес', blocked: 'Има пречка', review: 'Готова за проверка', cancelled: 'Отменена'};
-  const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
+  const actionLabels = {created: 'Възложена', report: 'Отчет', progress: 'Напредък', approve: 'Потвърдено приключване', complete: 'Завършена от администратор', return: 'Върната за работа', reopen: 'Отворена отново', cancel: 'Отменена', edit: 'Променена', stop: 'Повторението е спряно'};
   const requiresPhotos = item => item?.requiresPhotos !== false;
   const photoList = (item, plural, single) => Array.isArray(item?.[plural]) ? item[plural] : item?.[single] ? [item[single]] : [];
   const problemPhotos = item => photoList(item, 'problemPhotos', 'problemPhoto');
@@ -218,7 +219,8 @@
     if (requiresPhotos(item) || problemPhotos(item).length || solutionPhotos(item.report).length) {
       const evidence = el('div', '', 'task-photos');
       if (requiresPhotos(item) || problemPhotos(item).length) evidence.append(...photoViews(item, problemPhotos(item).length ? problemPhotos(item) : [null], 'Проблем', recurring));
-      if (item.report && (requiresPhotos(item) || solutionPhotos(item.report).length)) evidence.append(...photoViews(item, solutionPhotos(item.report).length ? solutionPhotos(item.report) : [null], 'Решение')); node.append(evidence);
+      if (item.report && !solutionPhotos(item.report).length && item.events.at(-1)?.action === 'complete') evidence.append(el('p', 'Завършена от администратор без снимки.', 'task-muted'));
+      else if (item.report && (requiresPhotos(item) || solutionPhotos(item.report).length)) evidence.append(...photoViews(item, solutionPhotos(item.report).length ? solutionPhotos(item.report) : [null], 'Решение')); node.append(evidence);
     }
     node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
     if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
@@ -231,6 +233,7 @@
       if (supervisor && item.kind === 'global' && !final && (item.owner.id === HubServer.user.id || item.participants.some(person => person.id === HubServer.user.id))) actions.append(button('Добави напредък', () => openAction(item, 'progress')));
       if (reviewer && item.status === 'review') actions.append(button('Потвърди приключване', () => openAction(item, 'approve'), ''), button('Върни за работа', () => openAction(item, 'return')));
       if (admin && !final) {
+        if (completer && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Завърши задача', () => openAction(item, 'complete'), ''));
         if (item.kind === 'global' || state.now < item.due && !item.report) actions.append(button('Промени', () => openEditor(item)));
         actions.append(button('Отмени', () => openAction(item, 'cancel')));
       }
@@ -361,11 +364,12 @@
     $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); $('taskEditor').showModal(); $('taskTitle').focus();
   }
   function openAction(item, action, recurring = false) {
-    acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'report' || !requiresPhotos(item);
-    $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
+    acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, action === 'complete' ? 0 : requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'complete' && (action !== 'report' || !requiresPhotos(item));
+    $('solutionPhotoHelp').textContent = action === 'complete' ? 'Снимките са незадължителни при завършване от администратор. Можеш да завършиш със или без снимки.' : 'Всеки отчет изисква толкова нови снимки на решението или текущото състояние, колкото са снимките на проблема, включително при неизпълнена задача.';
+    $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
     $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
     for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
-    $('actionNote').required = action !== 'approve' && (action !== 'report' || $('reportStatus').value !== 'completed'); $('taskAction').showModal();
+    $('actionNote').required = !['approve', 'complete'].includes(action) && (action !== 'report' || $('reportStatus').value !== 'completed'); $('taskAction').showModal();
   }
   async function mutate(form, feedback, fn) {
     if (busy) return;
@@ -391,11 +395,12 @@
   $('actionForm').addEventListener('submit', event => {
     event.preventDefault();
     if (solutionPicker.pending) { $('actionFeedback').textContent = 'Изчакай снимката да е готова.'; return; }
+    if (acting.action === 'complete' && solutionPicker.failed) { $('actionFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
     if (acting.action === 'report' && requiresPhotos(acting.item) && !solutionPicker.count) { $('actionFeedback').textContent = 'Добави снимка преди запис.'; return; }
     if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.failed) { $('actionFeedback').textContent = 'Снимката не е валидна. Избери я отново.'; return; }
     if (acting.action === 'report' && requiresPhotos(acting.item) && solutionPicker.count !== requiredPhotoCount(acting.item)) { $('actionFeedback').textContent = 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.'; return; }
     const payload = {action: acting.action, status: $('reportStatus').value, note: $('actionNote').value};
-    if (acting.action === 'report' && requiresPhotos(acting.item)) payload.solutionPhotos = solutionPicker.values;
+    if (acting.action === 'complete' || acting.action === 'report' && requiresPhotos(acting.item)) payload.solutionPhotos = solutionPicker.values;
     const signature = JSON.stringify(payload); if (!actionKey || actionKey.signature !== signature) actionKey = {signature, id: crypto.randomUUID()}; payload.requestId = actionKey.id;
     mutate($('actionForm'), $('actionFeedback'), () => HubServer.send('/api/tasks/' + (acting.recurring ? 'schedules/' : 'items/') + acting.item.id, 'PATCH', payload, {'If-Match': '"' + acting.item.revision + '"'}));
   });
