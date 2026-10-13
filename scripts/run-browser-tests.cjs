@@ -54,6 +54,22 @@ async function main() {
     if (process.argv.includes('--security-only')) {
       await require('../tests/browser/security-personnel.cjs').exerciseOfflineSecurity({browser, base: `http://127.0.0.1:${server.address().port}`, expect}); return;
     }
+    if (process.argv.includes('--quantities-only')) {
+      const context = await browser.newContext({timezoneId:'Europe/Sofia'});
+      const base = `http://127.0.0.1:${server.address().port}`;
+      await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+      await context.addInitScript(installStorage, {});
+      const page = await context.newPage(), errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base + '/production-log.html'); await page.evaluate(() => window.__browserTest.ready);
+      await page.evaluate(() => { window.__browserTest.nextFile = 'production-log.json'; });
+      await page.locator('#openFileBtn').click(); await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);
+      await require('../tests/browser/production-quantities.cjs').exerciseProductionQuantities({page, expect,
+        read:() => page.evaluate(() => window.__browserTest.read('production-log.json')),
+        replaceGoal:goal => page.evaluate(async goal => { const data = await window.__browserTest.read('production-log.json'); await window.__browserTest.write('production-log.json', {...data, goalTons:goal}); }, goal)
+      });
+      require('node:assert/strict').deepEqual(errors, []); await context.close(); return;
+    }
     if (process.argv.includes('--responsive-only')) {
       await require('../tests/browser/responsive-layout.cjs').exerciseOfflineResponsiveLayouts(browser, `http://127.0.0.1:${server.address().port}`, expect); return;
     }

@@ -53,13 +53,30 @@ Each attempt has a stable operation ID. SQLite commits the report, its version
 and a confirmation receipt together. Retrying an interrupted response returns
 the same receipt without another write, audit event or notification. The result
 also includes current module data, so replaying an old receipt never rolls back
-a later correction. Changing an unconfirmed draft retains its report identity
+a later correction. The client accepts a receipt only when its operation ID,
+report ID, action, confirmed status and action-specific message match the
+attempt. An unrelated receipt keeps the result unconfirmed and the draft
+available for a retry with the same operation ID.
+Changing an unconfirmed draft retains its report identity
 and requires review if the original attempt already committed. All module view,
 creation and correction flags are checked again on the server, including retries.
 
 The status distinguishes a server-confirmed result, an unconfirmed response,
-a rejected change and a conflict. Drafts remain in the open page; closing or
-reloading the page does not provide durable offline draft storage.
+a rejected change and a conflict. Drafts remain in the open page; closing the
+page or using the browser's reload does not provide durable offline draft storage.
+
+The new-version notice shows the current and available versions. Its update
+button waits for active writes. Production, downtime, pairs, task editor/action,
+personnel/settings and instruction form/bulk drafts require an explicit choice
+to return to the form or discard unsaved fields and update. An unconfirmed report
+operation also requires that choice, even with an empty form. Confirmation checks
+for active writes again. This guard keeps drafts in memory only; discarding fields
+does not undo a change already accepted by the server.
+
+```sh
+node --test tests/server/version-update.test.cjs tests/report-save-recovery.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --version-update-only
+```
 
 Deploy the reviewed server and HTML/CSS/JS together. Startup adds private SQLite
 version, receipt and report-history tables and initializes versions for existing reports; it
@@ -72,6 +89,23 @@ Verification with fictional fixtures:
 ```sh
 node --test tests/server/report-operations.test.cjs tests/server/client.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --report-operations-only
+```
+
+The production form accepts non-negative safe whole numbers for kilograms,
+crates and the monthly goal. Scientific notation such as `1e3` means `1000`;
+fractions, negative values, incomplete input and unsafe totals stop the write
+and retain the draft. Empty quantity fields keep their existing zero default.
+The breakdown preview and increment buttons use the same numeric rules.
+An edited or rejected monthly goal stays in the field across refreshes until
+its write is confirmed; background updates still update the saved goal.
+Stored legacy reports are not rewritten by this form validation.
+
+Run the shared quantity flow in both modes:
+
+```sh
+node --test tests/production-quantities.test.cjs tests/report-save-recovery.test.cjs
+node scripts/run-browser-tests.cjs --headless --quantities-only
+node scripts/run-server-browser-tests.cjs --headless --quantities-only
 ```
 
 ### Page addresses

@@ -12,6 +12,21 @@ const errorShown = env => {
   assert.equal(env.controls.saveBtn.disabled,false);
   assert.doesNotMatch(env.controls.saveBtn.textContent,/Записва се/);
 };
+test('an unconfirmed deletion still guards an empty form after its retry control is cleared', async () => {
+  const env = await environment('production-log'); await env.draft(); await env.save();
+  const entry = env.data.entries[0];
+  env.sandbox.crypto = require('node:crypto').webcrypto;
+  env.sandbox.HubServer = {can:() => true,correctionReason:async () => 'Fictional correction'};
+  env.sync.recordVersion = () => 1;
+  env.sync.commitOperation = async () => { throw new Error('Fictional interrupted response'); };
+  await env.remove(entry.id);
+  const writer = vm.runInContext('writer',env.sandbox);
+  assert.equal(writer.hasPendingChange,true); writer.clearRetry(); assert.equal(writer.hasPendingChange,true);
+  // A reviewed/new-version retry confirms the same entry with a new operation identity.
+  env.sync.recordVersion = () => 2;
+  env.sync.commitOperation = async () => ({data:{...env.data,entries:[]},message:'Confirmed'});
+  await env.remove(entry.id); assert.equal(writer.hasPendingChange,false);
+});
 for(const module of ['production-log','line-downtime']) {
   for(const [phase,name,offset] of [['read','NotReadableError',1],['read','NotReadableError',2],['permission','NotAllowedError'],['write','UnknownError'],['close','UnknownError']]) {
     test(module+': failed '+phase+' ('+name+', read '+(offset || 0)+') rolls back and retries the same form',async () => {

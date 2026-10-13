@@ -10,6 +10,7 @@
   let personnel = {employees:[]};
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
+  if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy, hasDraft:() => !!editing});
   const elements = prefix => Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key,$(prefix+key[0].toUpperCase()+key.slice(1))]));
   const acceptPairs = value => {
     data = PairTargets.validateData(value); pairsLoaded = true;

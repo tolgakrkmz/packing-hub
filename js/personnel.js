@@ -86,6 +86,8 @@ function parseLocalDate(str){
 }
 
 let personnelSaving = false;
+if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => personnelSaving,
+  hasDraft:() => ['personModal','settingsModal'].some(id => document.getElementById(id).classList.contains('open'))});
 const sync = createFileSync({
   isBusy: () => personnelSaving,
   dbName:'portfolio-personnel-fs-db',
