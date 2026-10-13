@@ -601,12 +601,16 @@ sessions remain required. Private instruction accounts have read-only instructio
 and data imports disabled while the private bundle is installed; the configured
 account permissions remain unchanged in storage.
 
-For Docker Compose, copy the local bundle to the application's temporary directory,
-then import it with the same command inside the container. Remove the input copy
-after a successful import. Never add a bundle to the image or publishing checkout:
+For Docker Compose, run from the existing Compose project and stream the bundle's
+`data` directory into a private temporary folder as the container's runtime user.
+This keeps ownership suitable for reading and cleanup on the read-only image with
+its `/tmp` tmpfs. Import it with the same command inside the container, then remove
+the input copy after a successful import. Keep the source folder outside the
+publishing checkout and image:
 
 ```sh
-docker compose cp /private/local-bundle package-hub:/tmp/account-instructions
+docker compose exec -T package-hub mkdir -m 700 /tmp/account-instructions
+tar -C /private/local-bundle -cf - data | docker compose exec -T package-hub tar --no-same-owner -xf - -C /tmp/account-instructions
 docker compose exec package-hub node server/manage.cjs install-account-instructions demo-preview /tmp/account-instructions
 docker compose exec package-hub rm -rf /tmp/account-instructions
 ```
