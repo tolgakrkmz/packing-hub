@@ -1996,7 +1996,7 @@ linked card retains focus and loads its photo after automatic scrolling.
 
 ## Planned shift transfers — design for review
 
-Status: proposed design, not an implemented feature. Trello:
+Status: design clarified on 13 October 2026; implementation pending. Trello:
 [planned shift transfers](https://trello.com/c/09ZI3cLS).
 
 ### Required behavior
@@ -2028,9 +2028,11 @@ The interface describes planned working days and does not promise wages.
   the **same 64-day window**, starting at the search start. This keeps the
   displayed gain/loss comparable and covers at least 32 days after each move.
   Show the window explicitly; do not imply a lifetime or monthly wage result.
-- Reject overlapping shifts and, as a proposed operational safeguard, require
-  **12 hours between the last old shift and the first new shift**. Display the
-  actual interval. This is a proposed project rule, not a legal compliance claim.
+- Reject overlapping shifts and display the interval between the last old shift
+  and the first new shift. The user explicitly declined a general minimum of
+  12 hours. A rest day is required where otherwise a seventh consecutive working
+  date would occur; recommend a different effective date with a valid rest day
+  rather than silently deleting a scheduled working day.
 - Count consecutive working dates across the complete assignment timeline,
   checking at least six days on each side of every changed boundary. Rest
   dates reset the count. A night shift's end does not create another working
