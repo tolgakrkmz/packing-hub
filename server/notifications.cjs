@@ -77,15 +77,15 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
         for (let i = cursor; i < item.events.length; i++) {
           const event = item.events[i], snapshot = event.snapshot || item;
           if (i === 0 && item.scheduleId && item.shift.start <= item.createdAt) continue;
-          const assigned = [snapshot.owner.id, ...snapshot.participants.map(p => p.id)];
+          const assigned = event.action === 'transfer' && event.transfer ? [event.transfer.to.id] : [snapshot.owner.id, ...snapshot.participants.map(p => p.id)];
           const creator = item.events.find(e => e.action === 'created')?.actor.id;
           const key = 'task:' + item.id + ':' + i;
-          const recipients = roster.filter(user => assigned.includes(user.id) && user.id !== event.actor.id);
+          const recipients = roster.filter(user => assigned.includes(user.id) && (event.action === 'transfer' || user.id !== event.actor.id));
           if (['report', 'progress'].includes(event.action)) {
             emit('taskReport', key, roster.filter(user => user.id === creator && user.id !== event.actor.id), item.id, event.at);
             if (event.status === 'review' && event.action === 'report') emit('taskReview', key, roster.filter(user => user.id !== event.actor.id && can(user, 'canReviewTasks')), item.id, event.at);
           } else {
-            const type = event.action === 'created' ? 'taskAssigned' : ['approve', 'complete', 'cancel', 'stop'].includes(event.action) ? 'taskOutcome' : 'taskChanged';
+            const type = ['created', 'transfer'].includes(event.action) ? 'taskAssigned' : ['approve', 'complete', 'cancel', 'stop'].includes(event.action) ? 'taskOutcome' : 'taskChanged';
             // Recurring instances notify when their shift starts, independently of the initial plan.
             emit(type, key, recipients, item.id, item.scheduleId && i === 0 ? now() : event.at);
           }
@@ -93,7 +93,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
         saveState('task:' + item.id, item.events.length);
         if (table !== 'task_items' || !['pending', 'in-progress', 'blocked'].includes(item.status) || item.kind === 'shift' && item.shift.start > at) continue;
         const recipients = roster.filter(user => [item.owner.id, ...item.participants.map(p => p.id)].includes(user.id));
-        const cycle = item.events.filter(e => ['edit', 'reopen', 'return'].includes(e.action)).length;
+        const cycle = item.events.filter(e => ['edit', 'reopen', 'return', 'transfer'].includes(e.action)).length;
         function remind(type) {
           const key = type + ':' + item.id + ':' + cycle;
           if (state(key) === undefined) { emit(type, key, recipients, item.id); saveState(key, 1); }

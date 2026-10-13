@@ -29,6 +29,17 @@ async function setup(t, filename = ':memory:') {
   const change = (id, user, data, revision = 1, recurring = false) => request('/api/tasks/' + (recurring ? 'schedules/' : 'items/') + id, user, 'PATCH', {...(data.action === 'report' ? {solutionPhoto: photo} : {}), ...data}, {'If-Match': '"' + revision + '"'});
   return {hub, admin, chief, other, request, login, payload, create, list, change, time: value => { time = Date.parse(value); }};
 }
+test('HTTP task transfer enforces admin identity and revokes the previous owner reporting access', async t => {
+  const s = await setup(t), id = await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
+  const input = {action: 'transfer', assigneeId: s.other.user.id, note: 'Fictional task handover', requestId: randomUUID()};
+  assert.equal((await s.change(id, s.chief, {...input, role: 'admin'})).status, 403);
+  assert.equal((await s.change(id, s.admin, input, 99)).status, 409);
+  const response = await s.change(id, s.admin, input); assert.equal(response.status, 200);
+  const result = await response.json(); assert.equal(result.item.owner.id, s.other.user.id);
+  const retry = await s.change(id, s.admin, input); assert.equal(retry.status, 200); assert.deepEqual(await retry.json(), result);
+  assert.equal((await s.change(id, s.chief, {action: 'report', status: 'review', note: 'Fictional former owner'}, 2)).status, 403);
+  assert.equal((await s.change(id, s.other, {action: 'report', status: 'review', note: 'Fictional recipient result'}, 2)).status, 200);
+});
 test('HTTP completion uses authenticated admin rights, revision and idempotent requests', async t => {
   const s = await setup(t), id = await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
   const input = {action: 'complete', requestId: randomUUID(), note: ''};

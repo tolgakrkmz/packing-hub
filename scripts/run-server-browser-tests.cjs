@@ -17,6 +17,7 @@ const {exerciseTaskMultiplePhotos} = require('../tests/browser/task-multiple-pho
 const {exerciseModulePermissions} = require('../tests/browser/module-permissions.cjs');
 const {exerciseTaskAssignment} = require('../tests/browser/task-assignment.cjs');
 const {exerciseAdminTaskCompletion} = require('../tests/browser/admin-task-completion.cjs');
+const {exerciseTaskTransfer} = require('../tests/browser/task-transfer.cjs');
 const {exerciseAccountDeletion} = require('../tests/browser/accounts-delete.cjs');
 const {openAdminModule,exerciseAdminPanel} = require('../tests/browser/admin-panel.cjs');
 const {exerciseBranding} = require('../tests/browser/branding.cjs');
@@ -270,6 +271,10 @@ async function main() {
       await exerciseTaskHistory({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       assert.deepEqual(errors, []); return;
     }
+    if (process.argv.includes('--task-transfer-only')) {
+      await exerciseTaskTransfer({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--admin-task-completion-only')) {
       await exerciseAdminTaskCompletion({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); return;
@@ -284,6 +289,7 @@ async function main() {
       await exerciseTaskHistory({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseTaskAssignment({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir: process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length)});
       await exerciseAdminTaskCompletion({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
+      await exerciseTaskTransfer({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); console.log('PASS tasks browser workflows'); return;
     }
     if (process.argv.includes('--task-photos-only')) {
@@ -594,6 +600,7 @@ async function main() {
     await exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
     await exerciseTaskMultiplePhotos({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
     await exerciseAdminTaskCompletion({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
+    await exerciseTaskTransfer({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
     console.log('Online browser E2E: 14 workflows passed.');
