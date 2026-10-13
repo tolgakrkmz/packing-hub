@@ -28,7 +28,7 @@ test('malformed records, invalid dates, numbers and future schemas are rejected'
   for(const value of ['2026-02-30','2026-13-01','wrong']) {const data=clone(production);data.entries[0].date=value;assert.throws(()=>validation.validate('production-log',data));}
   const duplicate=clone(production);duplicate.entries.push({...duplicate.entries[0]});assert.throws(()=>validation.validate('production-log',duplicate));
   const bad=clone(downtime);bad.entries[0].start='24:00';assert.throws(()=>validation.validate('line-downtime',bad));
-  assert.throws(()=>validation.validate('personnel',{...personnel,schemaVersion:4}));
+  assert.throws(()=>validation.validate('personnel',{...personnel,schemaVersion:5}));
   assert.throws(()=>validation.validate('personnel',{employees:[{...person,id:''}]}));
   assert.throws(()=>validation.validate('personnel',{employees:[person,person]}));
   assert.throws(()=>validation.validate('package-instructions',{'DEMO':{...instructions['DEMO-001'],folderName:'../elsewhere'}}));
