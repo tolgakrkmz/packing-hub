@@ -15,9 +15,23 @@ const HubServer = (() => {
   const watchers = new WeakMap(), idle = () => false;
   const updateGuards = new Set();
   let pendingWrites = 0;
+  let approvedLeave = false;
+  let preparingLeave = false, signingOut = false;
   function guardUpdate({isBusy = idle, hasDraft = idle}) {
     const guard = {isBusy, hasDraft}; updateGuards.add(guard);
     return () => updateGuards.delete(guard);
+  }
+  // Baselines live only in this page's memory, never in browser persistence.
+  function formDraft(root, {isOpen = () => true, extra = () => null} = {}) {
+    const fileIds = new WeakMap(); let nextFile = 0, baseline;
+    const read = () => JSON.stringify([
+      [...root.querySelectorAll('input,select,textarea')].map(field => field.type === 'file'
+        ? [...field.files].map(file => { if (!fileIds.has(file)) fileIds.set(file, ++nextFile); return fileIds.get(file); })
+        : [field.value, field.checked]), extra()
+    ]);
+    const accept = () => { baseline = read(); };
+    accept();
+    return {accept, hasDraft:() => isOpen() && read() !== baseline};
   }
   function updateState() {
     let busy = pendingWrites > 0, dirty = false;
@@ -26,6 +40,67 @@ const HubServer = (() => {
       catch { busy = true; }
     }
     return {busy, dirty};
+  }
+  window.addEventListener('beforeunload', event => {
+    const state = updateState();
+    if (!approvedLeave && (state.busy || state.dirty)) { event.preventDefault(); event.returnValue = ''; }
+  });
+  window.addEventListener('pageshow', () => { approvedLeave = false; });
+  function leavePage(action) {
+    if (updateState().busy) { showLeaveError(busyLeaveMessage); return; }
+    approvedLeave = true;
+    try { action(); } catch { approvedLeave = false; showLeaveError('Напускането не успя. Опитай отново.'); }
+  }
+  function prepareDeparture(action) {
+    if (preparingLeave) return;
+    try {
+      const result = action();
+      if (!result?.then) return;
+      preparingLeave = true;
+      const wasInert = document.body.inert; document.body.inert = true;
+      result.catch(() => { showLeaveError('Напускането не успя. Опитай отново.'); })
+        .finally(() => { preparingLeave = false; document.body.inert = wasInert; });
+    } catch { showLeaveError('Напускането не успя. Опитай отново.'); }
+  }
+  function showLeaveError(text) {
+    const message = document.getElementById('serverLeaveFeedback');
+    if (message) message.textContent = text;
+  }
+  const busyLeaveMessage = 'Изчакай текущия запис и опитай отново. Формата остава отворена.';
+  let leaveDialog = null, leaveAction = null, leaveTrigger = null;
+  function requestLeave(action, trigger) {
+    if (leaveDialog?.open || preparingLeave) return;
+    const state = updateState(); showLeaveError(state.busy ? busyLeaveMessage : '');
+    if (state.busy) return;
+    if (!state.dirty) { prepareDeparture(action); return; }
+    if (!leaveDialog) {
+      const node = (tag, id, text) => { const element = document.createElement(tag); element.id = id; element.textContent = text; return element; };
+      leaveDialog = node('dialog', 'serverLeaveDialog', ''); leaveDialog.className = 'report-reason';
+      leaveDialog.setAttribute('aria-labelledby', 'serverLeaveTitle');
+      leaveDialog.setAttribute('aria-describedby', 'serverLeaveWarning');
+      const title = node('h2', 'serverLeaveTitle', 'Напускане с незапазени промени');
+      const warning = node('p', 'serverLeaveWarning', 'Има незапазени или непотвърдени промени. Ако напуснеш, въведените полета и избраните файлове ще се загубят.');
+      const saved = node('p', 'serverLeaveSavedNote', 'Напускането не отменя промяна, която сървърът вече е записал.');
+      const message = node('p', 'serverLeaveDialogFeedback', ''); message.setAttribute('role', 'status');
+      const cancel = node('button', 'serverLeaveCancel', 'Върни се към формата'); cancel.type = 'button';
+      const confirm = node('button', 'serverLeaveConfirm', 'Откажи промените и продължи'); confirm.type = 'button';
+      const close = () => { leaveDialog.close(); leaveAction = null; leaveTrigger?.focus(); };
+      cancel.addEventListener('click', close);
+      leaveDialog.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
+      leaveDialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+      confirm.addEventListener('click', () => {
+        if (updateState().busy) { message.textContent = busyLeaveMessage; return; }
+        const action = leaveAction; close(); if (action) prepareDeparture(action);
+      });
+      leaveDialog.append(title, warning, saved, message, cancel, confirm); document.body.append(leaveDialog);
+    }
+    leaveAction = action; leaveTrigger = trigger;
+    document.getElementById('serverLeaveDialogFeedback').textContent = '';
+    leaveDialog.showModal(); document.getElementById('serverLeaveCancel').focus();
+  }
+  function navigate(href, trigger, before) {
+    const go = () => leavePage(() => location.assign(href));
+    requestLeave(before ? async () => { await before(); go(); } : go, trigger);
   }
   const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
@@ -53,7 +128,7 @@ const HubServer = (() => {
     const response = await fetch(url, {...options, headers, credentials: 'same-origin', cache: 'no-store'});
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      if (response.status === 401) location.assign('/login');
+      if (response.status === 401 && !signingOut) location.assign('/login');
       const error = new Error(messages[data.error] || 'Връзката със сървъра е прекъсната. Опитай отново.');
       error.code = response.status === 409 && data.error === 'CONFLICT' ? 'REPORT_CONFLICT' : data.error;
       error.status = response.status;
@@ -400,12 +475,32 @@ const HubServer = (() => {
     }
     const currentRoute = currentModule === 'index' ? '/' : '/' + currentModule;
     moduleSelect.value = modules.some(([name]) => name === currentModule) ? currentRoute : '';
-    moduleSelect.addEventListener('change', () => { if (moduleSelect.value && moduleSelect.value !== currentRoute) location.assign(moduleSelect.value); });
+    const originalSelection = moduleSelect.value;
+    moduleSelect.addEventListener('change', () => {
+      const target = moduleSelect.value; moduleSelect.value = originalSelection;
+      if (target && target !== currentRoute) navigate(target, moduleSelect);
+    });
     moduleNav.append(moduleLabel, moduleSelect); tools.append(moduleNav, links);
     const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
-    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход'; logout.onclick = async () => { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); location.assign('/login'); };
+    const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход';
+    logout.onclick = () => requestLeave(async () => {
+      logout.disabled = true; signingOut = true;
+      try { await window.HubNotifications?.stopDevice().catch(() => {}); await send('/api/logout', 'POST', {}); leavePage(() => location.assign('/login')); }
+      catch (error) { if (error.status === 401) leavePage(() => location.assign('/login')); else throw error; }
+      finally { logout.disabled = false; signingOut = false; }
+    }, logout);
+    const leaveFeedback = document.createElement('span'); leaveFeedback.id = 'serverLeaveFeedback'; leaveFeedback.setAttribute('role', 'status');
+    tools.append(leaveFeedback);
     session.append(identity, state, logout); bar.append(top, tools);
     document.body.prepend(bar);
+    document.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest?.('a[href]');
+      if (!link || link.hasAttribute('download') || link.target && link.target !== '_self') return;
+      const target = new URL(link.href, location.href), current = new URL(location.href);
+      if (target.origin !== current.origin || target.pathname === current.pathname && target.search === current.search) return;
+      event.preventDefault(); navigate(target.href, link);
+    });
     // The language switch is initialized by i18n after the injected server script.
     setTimeout(() => { const language = document.querySelector('.hub-language'); if (language) tools.append(language); }, 0);
     if (currentModule === 'report-history') {
@@ -447,7 +542,7 @@ const HubServer = (() => {
       eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
       // The server emits this for normal session expiry too. Keep the phone's
       // opt-in; account revocation already removes its subscriptions server-side.
-      eventSource.addEventListener('logout', () => { finishRecovery(recovery.id); eventSource.close(); location.assign('/login'); });
+      eventSource.addEventListener('logout', () => { finishRecovery(recovery.id); eventSource.close(); if (!signingOut) location.assign('/login'); });
       let availableVersion = boot.version, updateNotice = null, updateDialog = null;
       const busyUpdateMessage = 'Изчакай текущия запис и опитай обновяването отново. Формата остава отворена.';
       function updateElement(tag, id, text) {
@@ -458,7 +553,7 @@ const HubServer = (() => {
         const status = updateState(), feedback = document.getElementById('serverUpdateFeedback');
         feedback.textContent = status.busy ? busyUpdateMessage : '';
         if (status.busy) return;
-        if (!status.dirty) { location.reload(); return; }
+        if (!status.dirty) { leavePage(() => location.reload()); return; }
         if (!updateDialog) {
           updateDialog = updateElement('dialog', 'serverUpdateDialog', ''); updateDialog.className = 'report-reason';
           updateDialog.setAttribute('aria-labelledby', 'serverUpdateTitle');
@@ -476,7 +571,7 @@ const HubServer = (() => {
           confirm.addEventListener('click', () => {
             if (availableVersion === boot.version) { close(); return; }
             if (updateState().busy) { message.textContent = busyUpdateMessage; return; }
-            updateDialog.close(); location.reload();
+            updateDialog.close(); leavePage(() => location.reload());
           });
           updateDialog.append(title, note, saved, message, cancel, confirm); document.body.append(updateDialog);
         }
@@ -569,14 +664,15 @@ const HubServer = (() => {
     return new Promise(resolve => {
       const dialog = document.createElement('dialog'); dialog.id = 'reportCorrectionDialog'; dialog.className = 'report-reason'; dialog.setAttribute('aria-labelledby','reportCorrectionTitle');
       dialog.innerHTML = '<form><h2 id="reportCorrectionTitle">Причина за промяната</h2><label for="reportCorrectionReason">Опиши защо променяш записа</label><textarea id="reportCorrectionReason" required maxlength="1000"></textarea><button id="reportCorrectionConfirm" type="submit">Потвърди</button><button type="button" id="reportCorrectionCancel">Отказ</button></form>';
+      const reasonDraft = formDraft(dialog,{isOpen:() => dialog.open}), unguard = guardUpdate({hasDraft:reasonDraft.hasDraft});
       const previousFocus = document.activeElement;
       document.body.append(dialog);
-      const finish = value => { dialog.close(); dialog.remove(); previousFocus?.focus(); resolve(value); };
+      const finish = value => { unguard(); dialog.close(); dialog.remove(); previousFocus?.focus(); resolve(value); };
       dialog.querySelector('form').addEventListener('submit', event => { event.preventDefault(); const value=dialog.querySelector('textarea').value.trim(); if(value) finish(value); });
       dialog.querySelector('#reportCorrectionCancel').addEventListener('click', () => finish(null));
       dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
       dialog.showModal(); dialog.querySelector('textarea').focus();
     });
   }
-  return {correctionReason, guardUpdate, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
+  return {correctionReason, guardUpdate, formDraft, navigate, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
 })();

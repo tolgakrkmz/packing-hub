@@ -74,8 +74,9 @@ function parseLocalDate(str){
 }
 
 let personnelSaving = false;
+const personnelDrafts = new Map();
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => personnelSaving,
-  hasDraft:() => ['personModal','settingsModal'].some(id => document.getElementById(id).classList.contains('open'))});
+  hasDraft:() => [...personnelDrafts.values()].some(draft => draft?.hasDraft())});
 const sync = createFileSync({
   isBusy: () => personnelSaving || !!document.querySelector('.modal-backdrop.open'),
   dbName:'portfolio-personnel-fs-db',
@@ -321,6 +322,10 @@ const transferPanel=document.getElementById('transferPanel');
 const transferStart=document.getElementById('transferSearchStart');
 const transferDate=document.getElementById('transferEffectiveDate');
 let editedPerson=null,editedPending=null,transferDirty=false,cancelPending=false;
+if(typeof HubServer !== 'undefined') for(const id of ['personModal','settingsModal']) {
+  const modal=document.getElementById(id);
+  personnelDrafts.set(id,HubServer.formDraft?.(modal,{isOpen:()=>modal.classList.contains('open'),extra:()=>id==='personModal' && cancelPending}));
+}
 function uiText(text){ return typeof HubI18n==='undefined'?text:HubI18n.t(text); }
 function needsTransfer(){
   if(!editedPerson) return false;
@@ -390,7 +395,7 @@ personCategory.addEventListener('change',()=>{
   populateRoles(previousRole);
   transferDirty=true; cancelPending=false; renderTransfer(true);
 });
-function openModal(el){ el.classList.add('open'); el.setAttribute('aria-hidden','false'); }
+function openModal(el){ el.classList.add('open'); el.setAttribute('aria-hidden','false'); personnelDrafts.get(el.id)?.accept(); }
 function closeModal(el){ if(personnelSaving) return; el.classList.remove('open'); el.setAttribute('aria-hidden','true'); }
 document.querySelectorAll('[data-close-modal]').forEach(btn=>btn.addEventListener('click',()=>closeModal(document.getElementById(btn.dataset.closeModal))));
 document.querySelectorAll('.modal-backdrop').forEach(modal=>modal.addEventListener('click',e=>{ if(e.target===modal) closeModal(modal); }));

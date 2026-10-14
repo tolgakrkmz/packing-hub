@@ -64,8 +64,11 @@ const writer = createReportWriter({
 for(const control of [startInput,endInput,reasonSelect,otherReasonInput,noteInput]) {
   for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
 }
+const downtimeDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.(
+  {querySelectorAll:() => [startInput,endInput,reasonSelect,otherReasonInput,noteInput]},
+  {extra:() => [selectedShift,editingReport ? dateInput.value : null]});
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
-  hasDraft:() => reportDraft || !!selectedShift || !!editingReport || !!newReasonInput.value.trim()});
+  hasDraft:() => (downtimeDraft ? downtimeDraft.hasDraft() : reportDraft || !!selectedShift || !!editingReport) || !!newReasonInput.value.trim()});
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
 function timeToMin(t){
@@ -150,6 +153,7 @@ function editEntry(id) {
   durationReadout.textContent = fmtDur(entry.durationMin);
   document.querySelectorAll('.shift-btn').forEach(button => { for(const shift of SHIFTS) button.classList.remove('sel-'+shift); if(button.dataset.shift === selectedShift) button.classList.add('sel-'+selectedShift); });
   updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
+  downtimeDraft?.accept();
   dateInput.scrollIntoView?.({block:'center'});
 }
 
@@ -163,6 +167,7 @@ function renderReasonSelect(){
   reasonSelect.innerHTML = choices.map(r=>'<option data-i18n-exact value="'+escapeDowntimeText(r)+'">'+escapeDowntimeText(r)+'</option>').join('');
   if(prev) reasonSelect.value = prev;
   otherReasonRow.style.display = (reasonSelect.value === 'Друго') ? 'flex' : 'none';
+  if(!reportDraft && !editingReport && !selectedShift) downtimeDraft?.accept();
 }
 
 function escapeDowntimeText(value){
@@ -272,6 +277,7 @@ saveBtn.addEventListener('click', async ()=>{
     durationReadout.textContent = '—';
     durationReadout.classList.remove('warn');
     selectedShift = null;
+    downtimeDraft?.accept();
     document.querySelectorAll('.shift-btn').forEach(b=>{
       b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
     });

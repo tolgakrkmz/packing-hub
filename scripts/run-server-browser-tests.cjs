@@ -71,6 +71,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--unsaved-navigation-only')) {
+      await require('../tests/browser/unsaved-navigation.cjs').exerciseUnsavedNavigation({admin,hub,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if(process.argv.includes('--personnel-transfers-only')){
       await admin.goto(base+'/personnel');
       await require('../tests/browser/personnel-transfers.cjs').exercisePersonnelTransfers({page:admin,expect,read:async()=>hub.store.get('personnel').data,

@@ -40,8 +40,11 @@ let dbIndex = {};
 let rootDirHandle = null;
 let selectedImageFiles = [];
 let instructionsWriting = false;
+const instructionDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.(el.formPanel,
+  {isOpen:() => el.formPanel.style.display === 'block',extra:() => selectedImageFiles.map(file => [file.name,file.size,file.lastModified])});
+let bulkDraft = null;
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => instructionsWriting,
-  hasDraft:() => el.formPanel.style.display === 'block' || document.getElementById('bulkPanel').style.display === 'block'});
+  hasDraft:() => instructionDraft?.hasDraft() || bulkDraft?.hasDraft()});
 const profilePageSize = 50;
 let profilePage = 1, profileSearchTimer;
 
@@ -187,6 +190,7 @@ el.addBtn.addEventListener('click', () => {
   selectedImageFiles = [];
   renderThumbs();
   el.formMsg.textContent = '';
+  instructionDraft?.accept();
   el.formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
@@ -301,6 +305,7 @@ el.saveBtn.addEventListener('click', async () => {
 
     await saveIndexDatabase([key]);
     delete detailsCache[folderName];
+    instructionDraft?.accept();
 
     el.formMsg.style.color = 'green';
     el.formMsg.textContent = "Профилът е записан успешно!";
@@ -624,6 +629,8 @@ const bulkEl = {
 applyPackageInstructionsAdminUI(typeof HubServer === 'undefined' || HubServer.can('canManageInstructions'));
 
 let bulkCandidates = [];
+if(typeof HubServer !== 'undefined') bulkDraft = HubServer.formDraft?.(bulkEl.bulkPanel,
+  {isOpen:() => bulkEl.bulkPanel.style.display === 'block',extra:() => bulkCandidates.length});
 let bulkCloseTimer = null;
 
 async function scanCandidatesFromDir(dirHandle, options) {
@@ -640,6 +647,7 @@ function openBulkPanel() {
   bulkEl.bulkResults.innerHTML = '<div class="empty">Избери откъде да сканираме — виж бутоните горе.</div>';
   bulkEl.bulkStatus.textContent = '';
   bulkCandidates = [];
+  bulkDraft?.accept();
   bulkEl.bulkPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

@@ -63,7 +63,7 @@ creation and correction flags are checked again on the server, including retries
 
 The status distinguishes a server-confirmed result, an unconfirmed response,
 a rejected change and a conflict. Drafts remain in the open page; closing the
-page or using the browser's reload does not provide durable offline draft storage.
+page does not provide durable offline draft storage.
 
 The new-version notice shows the current and available versions. Its update
 button waits for active writes. Production, downtime, pairs, task editor/action,
@@ -73,9 +73,21 @@ operation also requires that choice, even with an empty form. Confirmation check
 for active writes again. This guard keeps drafts in memory only; discarding fields
 does not undo a change already accepted by the server.
 
+In server mode the same protection covers the module selector, page links and
+sign out. Returning to the form keeps fields, attachments and the current module
+selection; accepting discard leaves without a second warning. Active saves block
+these actions and are checked again at confirmation. Pristine editors and fields
+returned to their accepted values do not warn. Account forms, import selections,
+notification preferences and unconfirmed history restores also participate.
+Browser reload, tab close and back navigation use the browser's own unload
+warning when a draft or pending save exists. Browser support and user interaction
+determine whether that warning appears; it cannot guarantee recovery after the
+browser or operating system terminates the page. No draft content is persisted.
+
 ```sh
 node --test tests/server/version-update.test.cjs tests/report-save-recovery.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --version-update-only
+node scripts/run-server-browser-tests.cjs --headless --unsaved-navigation-only
 ```
 
 Deploy the reviewed server and HTML/CSS/JS together. Startup adds private SQLite
