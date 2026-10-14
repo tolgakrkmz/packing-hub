@@ -8,6 +8,8 @@
   const {groups, permissionsFor} = HubPermissions;
   const editable = HubServer.can('canManageAccounts');
   const cards = new Map();
+  const accountDrafts = new Map();
+  HubServer.guardUpdate({hasDraft:() => [...accountDrafts.values()].some(draft => draft.hasDraft())});
   function element(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -133,12 +135,13 @@
       button.disabled = true; deleteButton.disabled = true; status.textContent = '';
       try {
         await HubServer.send('/api/accounts/' + user.id, 'DELETE', {});
-        details.remove(); cards.delete(user.id); applyFilters();
+        details.remove(); cards.delete(user.id); accountDrafts.delete(user.id); applyFilters();
         message.textContent = 'Акаунтът е изтрит.'; search.focus({preventScroll: true});
       } catch (error) { status.textContent = error.message; }
       finally { button.disabled = false; deleteButton.disabled = ownAccount; }
     });
     if (!editable) { for (const control of form.querySelectorAll('input,select,button')) control.disabled = true; actions.hidden = true; passwordDetails.hidden = true; }
+    accountDrafts.set(user.id,HubServer.formDraft(form,{isOpen:() => editable && form.isConnected,extra:permissions}));
     details.append(form);
     const previous = cards.get(user.id);
     if (previous) previous.details.replaceWith(details);
@@ -157,6 +160,9 @@
   document.getElementById('newAccountButton').hidden = !editable;
   const createPermissions = permissionControls(createForm, document.getElementById('accountRole'));
   const createTaskProfile = taskProfileControls(createForm, document.getElementById('accountRole'));
+  const createDraft = HubServer.formDraft(createForm,{extra:createPermissions});
+  accountDrafts.set('create',createDraft);
+  createForm.addEventListener('reset',() => setTimeout(() => createDraft.accept(),0));
   document.getElementById('newAccountButton').addEventListener('click', () => setCreateOpen(document.getElementById('accountCreate').hidden));
   document.getElementById('cancelCreate').addEventListener('click', () => { createForm.reset(); setCreateOpen(false); });
   search.addEventListener('input', applyFilters); filter.addEventListener('change', applyFilters);

@@ -8,6 +8,7 @@
   const names = {'production-log': 'Производство', 'line-downtime': 'Престои', 'pair-targets': 'Двойки'};
   const actions = {create: 'Създаване', update: 'Редакция', delete: 'Изтриване', restore: 'Възстановяване'};
   let selected = null, history = null, pending = null, busy = false, sequence = 0, listSequence = 0, listCursor = null;
+  HubServer.guardUpdate({isBusy:() => busy,hasDraft:() => !!pending});
   const node = (tag, text, parent) => {
     const element = document.createElement(tag); element.textContent = text;
     parent?.append(element); return element;

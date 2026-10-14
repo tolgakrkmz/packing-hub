@@ -6,6 +6,8 @@
   const check = document.getElementById('checkDataImport'), confirm = document.getElementById('confirmDataImport'), cancel = document.getElementById('cancelDataImport');
   const message = document.getElementById('dataImportMessage'), progress = document.getElementById('importProgress'), rows = document.getElementById('dataImportRows');
   let batch = null, prepared = null, checked = null, busy = false, controller = null, sequence = 0;
+  const importForm = document.getElementById('dataImportForm'), importDraft = HubServer.formDraft(importForm);
+  HubServer.guardUpdate({isBusy:() => busy,hasDraft:() => importDraft.hasDraft() || !!batch || !!prepared});
   const uploaded = new Set();
   const say = value => { message.textContent = value; };
   const request = (url, method, value, binary = false) => HubServer.json(url, {method, signal: controller?.signal, headers: {'Content-Type': binary ? 'application/octet-stream' : 'application/json'}, body: binary ? value : JSON.stringify(value)});
@@ -131,10 +133,11 @@
       const result = await request(route('apply'), 'POST', {token: checked.token});
       if (run !== sequence) return;
       table(result); batch = prepared = checked = null; uploaded.clear();
+      importDraft.accept();
       say('Всички избрани данни са добавени. Провери модулите и отчетите.');
     } catch (error) { if (run === sequence) { checked = null; fail(error); } }
     finally { if (run === sequence) { controller = null; lock(false); } }
   });
-  cancel.addEventListener('click', async () => { if (busy) return; lock(true); await discard(); table(); progress.hidden = true; say('Импортът е отказан. Данните в сайта не са променени.'); lock(false); });
+  cancel.addEventListener('click', async () => { if (busy) return; lock(true); await discard(); importForm.reset(); importDraft.accept(); table(); progress.hidden = true; say('Импортът е отказан. Данните в сайта не са променени.'); lock(false); });
   table();
 })();

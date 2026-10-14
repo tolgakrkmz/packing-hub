@@ -111,7 +111,7 @@ window.HubNotifications = (() => {
     dialog.addEventListener('cancel', () => { prompt.defer(); refreshDeviceUI(); });
     never.addEventListener('click', () => { prompt.never(); dialog.close(); refreshDeviceUI(); });
     accept.addEventListener('click', async () => {
-      if (installFirst || permission() === 'denied') { dialog.close(); location.assign('/notifications#settings'); return; }
+      if (installFirst || permission() === 'denied') { dialog.close(); HubServer.navigate('/notifications#settings',accept); return; }
       accept.disabled = true;
       try { await enable(); if (subscribed) dialog.close(); else { copy.textContent = hint(); status.textContent = 'Можеш да включиш известията по-късно от „Настройки“.'; accept.hidden = true; } }
       catch { status.textContent = 'Включването не успя. Опитай по-късно от „Настройки“.'; prompt.defer(); }
@@ -158,7 +158,10 @@ window.HubNotifications = (() => {
           const link = el('a', 'Отвори', 'notification-open'), read = el('button', 'Прочети'); link.href = item.href; read.type = 'button'; read.hidden = item.read;
           const mark = async () => { await send('/read', 'POST', {id: item.id}); row.dataset.read = 'true'; read.hidden = true; refreshCount(); };
           read.addEventListener('click', () => mark().then(() => load()).catch(showError));
-          link.addEventListener('click', async event => { if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); try { await mark(); } catch {} location.assign(item.href); });
+          link.addEventListener('click', event => {
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            event.preventDefault(); HubServer.navigate(item.href,link,async () => { try { await mark(); } catch {} });
+          });
           const actions = el('div', '', 'notification-actions'); actions.append(time, link, read); row.append(heading, actions); list.append(row);
         }
         message.textContent = '';
@@ -179,10 +182,15 @@ window.HubNotifications = (() => {
       if (!preferences.types.length) container.append(el('p', 'Няма разрешени видове известия. Свържи се с администратор.'));
     }
     renderPreferences(); refreshDeviceUI();
+    const preferenceDraft = HubServer.formDraft(document.getElementById('notificationPreferences'));
+    HubServer.guardUpdate({hasDraft:preferenceDraft.hasDraft,isBusy:() => busy});
     document.getElementById('notificationPreferences').addEventListener('submit', async event => {
-      event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true;
-      try { preferences = await send('/preferences', 'PATCH', Object.fromEntries([...event.target.querySelectorAll('input')].map(input => [input.dataset.type, input.checked]))); message.textContent = 'Настройките са запазени.'; refreshDeviceUI(); }
-      catch (error) { showError(error); } finally { button.disabled = false; }
+      event.preventDefault(); const button = event.target.querySelector('button'); if (button.disabled) return;
+      const values = Object.fromEntries([...event.target.querySelectorAll('input')].map(input => [input.dataset.type, input.checked]));
+      const locked = [...event.target.querySelectorAll('input,button')].map(control => [control,control.disabled]);
+      locked.forEach(([control]) => { control.disabled = true; });
+      try { preferences = await send('/preferences', 'PATCH', values); preferenceDraft.accept(); message.textContent = 'Настройките са запазени.'; refreshDeviceUI(); }
+      catch (error) { showError(error); } finally { locked.forEach(([control,disabled]) => { control.disabled = disabled; }); }
     });
     document.getElementById('notificationEnable').addEventListener('click', () => enable().catch(() => { message.textContent = 'Включването не успя. Опитай по-късно от „Настройки“.'; }));
     document.getElementById('notificationDisable').addEventListener('click', () => stopDevice().catch(showError));

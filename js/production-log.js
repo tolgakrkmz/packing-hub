@@ -74,8 +74,11 @@ const writer = createReportWriter({
 for(const control of [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]) {
   for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
 }
+const productionDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.(
+  {querySelectorAll:() => [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]},
+  {extra:() => [selectedShift,editingReport ? dateInput.value : null]});
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
-  hasDraft:() => reportDraft || !!selectedShift || !!editingReport || goalDraft});
+  hasDraft:() => (productionDraft ? productionDraft.hasDraft() : reportDraft || !!selectedShift || !!editingReport) || goalDraft && goalInput.value !== String(goalTons)});
 document.getElementById('yesterdayBtn').addEventListener('click', writer.clearRetry);
 
 goalInput.addEventListener('input', () => { goalDraft = true; });
@@ -123,6 +126,7 @@ function editEntry(id) {
   for(const [control,key] of [[autoKgInput,'autoKg'],[autoCrateInput,'autoCrates'],[manKgInput,'manKg'],[manCrateInput,'manCrates']]) control.value = entry.breakdown?.[key] || 0;
   document.querySelectorAll('.shift-btn').forEach(button => { for(const shift of SHIFTS) button.classList.remove('sel-'+shift); if(button.dataset.shift === selectedShift) button.classList.add('sel-'+selectedShift); });
   updateTotalReadout(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
+  productionDraft?.accept();
   dateInput.scrollIntoView?.({block:'center'});
 }
 
@@ -297,6 +301,7 @@ saveBtn.addEventListener('click', async ()=>{
     manCrateInput.value = 0;
     updateTotalReadout();
     selectedShift = null;
+    productionDraft?.accept();
     document.querySelectorAll('.shift-btn').forEach(b=>{
       b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
     });

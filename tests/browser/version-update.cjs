@@ -10,7 +10,8 @@ async function exerciseVersionUpdate({admin,base,hub,expect}) {
     };
   });
   async function open(module) {
-    await admin.goto(base + '/' + module);
+    const discard = dialog => dialog.accept(); admin.on('dialog',discard);
+    try { await admin.goto(base + '/' + module); } finally { admin.off('dialog',discard); }
     await expect(admin.locator('#serverState')).toHaveAttribute('data-connection','ready');
     if(module === 'pair-targets') await expect(admin.locator('#rosterConnDot')).toHaveClass(/\bon\b/);
     else if(['production-log','line-downtime','personnel','package-instructions'].includes(module)) await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);

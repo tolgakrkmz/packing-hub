@@ -27,7 +27,6 @@
   const photoRequirementLabel = item => requiresPhotos(item) ? 'Изисква снимки' : 'Снимки не се изискват';
   const dialogs = ['taskEditor', 'taskAction', 'taskHistory', 'taskPhotoViewer'];
   const draftOpen = () => busy || dialogs.some(id => $(id).open);
-  HubServer.guardUpdate({isBusy:() => busy, hasDraft:() => $('taskEditor').open || $('taskAction').open});
   function renderPhotoPolicy() {
     if (!state) return;
     $('photoPolicy').setAttribute('translate', 'no');
@@ -134,6 +133,10 @@
     return {reset, render, get values() { return entries.map(entry => entry.photo ? {id: entry.photo.id} : entry.data); }, get count() { return entries.length; }, get valid() { return entries.every(entry => !entry.photo || entry.photo.available); }, get pending() { return pending; }, get failed() { return failed; }};
   }
   const problemPicker = photoPicker('problem'), solutionPicker = photoPicker('solution');
+  const editorDraft = HubServer.formDraft($('taskEditor'),{isOpen:() => $('taskEditor').open,extra:() => [problemPicker.values,problemPicker.failed,creationKey]});
+  const actionDraft = HubServer.formDraft($('taskAction'),{isOpen:() => $('taskAction').open,extra:() => [solutionPicker.values,solutionPicker.failed,actionKey]});
+  HubServer.guardUpdate({isBusy:() => busy || problemPicker.pending || solutionPicker.pending,
+    hasDraft:() => editorDraft.hasDraft() || actionDraft.hasDraft()});
   function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
   function historyIncludes(item, group) {
     const kind = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
@@ -363,7 +366,7 @@
     $('taskFrom').value = recurring ? item.from : item?.shift?.date || state.currentShift.date; $('taskUntil').value = item?.until || date(state.now + 30 * 86400000);
     $('taskDueDate').value = item?.due ? date(item.due) : date(state.now + 86400000);
     $('taskDueTime').value = item?.due ? new Intl.DateTimeFormat('en-GB', {timeZone: state.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(item.due)) : '17:00';
-    $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); $('taskEditor').showModal(); $('taskTitle').focus();
+    $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); editorDraft.accept(); $('taskEditor').showModal(); $('taskTitle').focus();
   }
   function openAction(item, action, recurring = false) {
     acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, action === 'complete' ? 0 : requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'complete' && (action !== 'report' || !requiresPhotos(item));
@@ -377,7 +380,7 @@
     $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : action === 'transfer' ? 'Прехвърли задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
     $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
     for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
-    $('actionNote').required = !['approve', 'complete'].includes(action) && (action !== 'report' || $('reportStatus').value !== 'completed'); $('taskAction').showModal();
+    $('actionNote').required = !['approve', 'complete'].includes(action) && (action !== 'report' || $('reportStatus').value !== 'completed'); actionDraft.accept(); $('taskAction').showModal();
   }
   async function mutate(form, feedback, fn) {
     if (busy) return;

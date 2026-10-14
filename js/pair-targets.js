@@ -10,7 +10,9 @@
   let personnel = {employees:[]};
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
-  if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy, hasDraft:() => !!editing});
+  const pairDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.($('pairDialog'),{isOpen:() => !!editing});
+  if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy,
+    hasDraft:() => pairDraft?.hasDraft() || !!editing?.attempt || !!editing?.needsConfirmation});
   const elements = prefix => Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key,$(prefix+key[0].toUpperCase()+key.slice(1))]));
   const acceptPairs = value => {
     data = PairTargets.validateData(value); pairsLoaded = true;
@@ -180,7 +182,7 @@
     $('areaAuto').checked = (entry?.areas || []).includes('auto');
     $('areaManual').checked = (entry?.areas || []).includes('manual');
     updateResultPreview();
-    $('pairDialog').showModal();
+    pairDraft?.accept(); $('pairDialog').showModal();
   }
   function updateResultPreview() {
     if(editing?.mode !== 'report') return;
@@ -246,6 +248,7 @@
       return true;
     } catch(error) {
       data = previous;
+      if(editing?.attempt) editing.needsConfirmation = true;
       const conflict = error.code === 'REPORT_CONFLICT';
       $('dialogError').dataset.state = conflict ? 'conflict' : !editing.attempt || error.status && error.status < 500 ? 'rejected' : 'unconfirmed';
       $('dialogError').textContent = (conflict ? 'Конфликт. Двойката е променена. ' : !editing.attempt || error.status && error.status < 500 ? 'Записът не е направен. ' : 'Промяната не е потвърдена. ')+(error.status || !editing.attempt ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново със същата чернова.');

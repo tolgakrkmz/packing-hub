@@ -26,7 +26,10 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
   ]) {
     // The report-history feature has its own focused flow. Include it once
     // that reviewed feature is integrated, without requiring its branch here.
-    if (script === 'run-server-browser-tests.cjs' && fs.existsSync(path.join(root, 'tests/browser/report-history.cjs'))) modes.push('report-history');
+    if (script === 'run-server-browser-tests.cjs') {
+      modes.push('unsaved-navigation');
+      if (fs.existsSync(path.join(root, 'tests/browser/report-history.cjs'))) modes.push('report-history');
+    }
     for (const mode of modes) suites.push([script + ':' + (mode || 'default'), ['scripts/' + script, '--headless', ...(mode ? ['--' + mode + '-only'] : [])]]);
   }
 }

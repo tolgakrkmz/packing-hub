@@ -3,6 +3,9 @@
   const file = document.getElementById('importFile'), preview = document.getElementById('previewImport'), apply = document.getElementById('applyImport');
   const summary = document.getElementById('importSummary'), message = document.getElementById('importMessage');
   let input = null, checked = null, sequence = 0;
+  let working = 0;
+  const importDraft = HubServer.formDraft(file.parentElement);
+  HubServer.guardUpdate({isBusy:() => working > 0,hasDraft:importDraft.hasDraft});
   const say = value => { message.textContent = value; };
   const labels = {total: 'Записи във файла', added: 'Нови записи', duplicates: 'Вече добавени', conflicts: 'Конфликтни записи', firstDate: 'От дата', lastDate: 'До дата', kg: 'Тонаж (кг)', scrapKg: 'Брак (кг)'};
   function show(result) {
@@ -21,7 +24,7 @@
   }
   preview.addEventListener('click', async () => {
     const selected = file.files[0]; if (!selected) return;
-    const run = ++sequence; checked = null; input = null; apply.disabled = preview.disabled = true; summary.hidden = true; say('Проверка…');
+    const run = ++sequence; working++; checked = null; input = null; apply.disabled = preview.disabled = true; summary.hidden = true; say('Проверка…');
     try {
       if (selected.size > 2 * 1024 * 1024 - 1024) throw new Error('TOO_LARGE');
       let data; try { data = JSON.parse(await selected.text()); } catch { throw new Error('INVALID_DATA'); }
@@ -31,16 +34,17 @@
       input = data; checked = result; show(result); apply.disabled = result.conflicts > 0 || result.added === 0;
       say(result.conflicts ? 'Има различни записи с еднакъв идентификатор. Импортът е спрян.' : result.added ? 'Файлът е проверен. Потвърди добавянето.' : 'Всички записи вече са добавени.');
     } catch (error) { if (run === sequence) fail(error); }
-    finally { if (run === sequence) preview.disabled = false; }
+    finally { working--; if (run === sequence) preview.disabled = false; }
   });
   apply.addEventListener('click', async () => {
     if (!input || !checked || checked.conflicts || !checked.added) return;
-    const run = ++sequence; file.disabled = true; apply.disabled = preview.disabled = true; say('Добавяне…');
+    const run = ++sequence; working++; file.disabled = true; apply.disabled = preview.disabled = true; say('Добавяне…');
     try {
       const result = await request('apply', input, checked.revision);
       if (run !== sequence) return;
       show(result); say('Импортът е завършен. Отвори отчетите за проверка.');
+      importDraft.accept();
     } catch (error) { if (run === sequence) fail(error); }
-    finally { if (run === sequence) { checked = null; file.disabled = false; preview.disabled = false; } }
+    finally { working--; if (run === sequence) { checked = null; file.disabled = false; preview.disabled = false; } }
   });
 })();
