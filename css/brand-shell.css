@@ -99,6 +99,11 @@
 .server-module-nav select { width: 220px; min-width: 0; }
 .server-links { gap: 6px; }
 .server-links:empty { display: none; }
+.server-bar .server-closeout { display:inline-flex; flex-direction:column; justify-content:center; gap:3px; min-height:48px; max-width:100%; padding:9px 15px; border:1px solid var(--border); border-radius:10px; background:var(--panel-2); color:var(--text-muted); font-size:13px; font-weight:750; line-height:1.4; text-decoration:none; overflow-wrap:anywhere; }
+.server-closeout .server-closeout-status { font-size:11px; font-weight:600; }
+.server-bar .server-closeout[data-state=missing] { background:var(--amber); border-color:var(--amber); color:#241b09; box-shadow:0 3px 14px #f5a62320; }
+.server-bar .server-closeout[data-state=complete] { background:#3fbfa019; border-color:#3fbfa060; color:var(--teal); }
+@media(max-width:640px) { .server-bar .server-closeout { flex:1 1 100%; flex-direction:row; align-items:center; justify-content:space-between; gap:10px; } }
 .server-links a {
   justify-content: center;
   padding: 9px 12px;

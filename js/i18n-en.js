@@ -1,5 +1,12 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "липси": "missing reports",
+  "липса": "missing report",
+  "Всичко е отчетено": "All reports entered",
+  "Проверката е недостъпна": "Check unavailable",
+  "Проверка…": "Checking…",
+  "Няма пълен достъп": "Incomplete access",
+  "Няма зададен екип": "No assigned team",
   "Край на смяната": "Shift closeout",
   "Проверка на отчетите": "Report check",
   "Тонаж и отчети на двойките за избраната смяна.": "Production and pair reports for the selected shift.",

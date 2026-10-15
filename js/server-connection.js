@@ -619,8 +619,6 @@ const HubServer = (() => {
       window.addEventListener('pageshow', event => { if (event.persisted) resume(); });
     }
     if (currentModule === 'index') {
-      const closeoutLink=document.querySelector('a[href="/shift-closeout"],a[href="shift-closeout.html"]');
-      if(closeoutLink)closeoutLink.hidden=!canViewModule('shift-closeout');
       const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
       if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';

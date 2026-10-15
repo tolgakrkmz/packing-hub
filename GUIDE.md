@@ -2145,11 +2145,20 @@ workflows in the default runners). No production data was used or published.
 ## Shift closeout: design specification (2026-10-15)
 
 **Implemented on the feature branch; awaiting merge.** The shared server-mode
-screen is `/shift-closeout`, available from the home page and module selector.
+screen is `/shift-closeout`, available from a permanent toolbar button beside
+the module selector. It has no separate tile on the home page.
 Supervisors see their assigned team; administrators may select all teams.
 The account editor exposes its viewing permission and the two reminder flags;
 notification settings allow each recipient to disable either reminder category.
 An account without an assigned team receives a configuration message.
+
+The toolbar button is visible on every authenticated page with closeout access.
+It shows an amber count of missing tonnage plus pending pairs in the current
+account's shift, or green "All reports entered" when both permitted sections
+are complete. Rest/upcoming shifts, unavailable reads and incomplete module
+access stay neutral. A partial view never displays an overall missing count.
+The button refreshes every 30 seconds and on report/account changes,
+links to the exact scope and uses the existing unsaved-navigation guard.
 
 Choose the production date, team and shift to inspect entered/missing tonnage,
 reported/pending/cancelled pairs and cancellation reasons. Report links retain
@@ -2165,9 +2174,9 @@ existing production, pair and personnel documents need no conversion. The
 first activation skips historical reminder deadlines. Existing device opt-in
 and payload-free push delivery continue to apply.
 
-Validation with fictional fixtures: 735 unit/API tests passed (330 client/unit,
+Validation with fictional fixtures: 738 unit/API tests passed (333 client/unit,
 405 server). Focused closeout, notifications, notification-targets, navigation,
-routes, report-operations and unsaved-navigation browser suites passed, as did
+routes, report-operations, closeout-indicator and unsaved-navigation browser suites passed, as did
 the offline quantities flow. These include midnight/DST in a UTC browser,
 late zero-tonnage reports, cancellation, opt-out, scope races, stale reads,
 account/module restrictions, BG/EN and narrow-screen layout.

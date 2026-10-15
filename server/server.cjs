@@ -58,7 +58,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   });
   const staticAssets = createStaticAssets(assets,{transformHTML:(name,html) => {
     const content = pageLinks(html);
-    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
+    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
   }});
   const {version} = staticAssets;
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
