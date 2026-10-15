@@ -2144,7 +2144,7 @@ workflows in the default runners). No production data was used or published.
 
 ## Shift closeout: design specification (2026-10-15)
 
-**Implemented on the feature branch; awaiting merge.** The shared server-mode
+**Implemented.** The shared server-mode
 screen is `/shift-closeout`, available from a permanent toolbar button beside
 the module selector. It has no separate tile on the home page.
 Supervisors see their assigned team; administrators may select all teams.
