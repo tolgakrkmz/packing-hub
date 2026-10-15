@@ -2142,6 +2142,144 @@ midnight in a UTC browser. Existing offline/server personnel, statistics,
 transfer/import and default workflows pass (10 offline scenarios and 14 online
 workflows in the default runners). No production data was used or published.
 
+## Shift closeout: design specification (2026-10-15)
+
+**Design for review; not implemented.** This section specifies the shared
+end-of-shift screen and missing-report reminders. It is stored here because
+the publication guard permits this reviewed documentation path. It does not
+describe an available feature. Implementation follows review of this written
+specification and its implementation plan.
+
+### Purpose and expected reports
+
+Shift supervisors and administrators need one screen showing whether a working
+shift has its mandatory production report and whether its planned pairs have
+results. This check is independent of task completion and never adds pair output
+to production totals.
+
+- A working shift is the existing dated team rotation in `ShiftSchedule`,
+  including the existing weekday Stickers schedule. The rotation determines
+  the shift number, start and end; no new per-line production plan is required.
+- Every working team shift requires at least one valid saved production entry
+  with the same production date and team (`shift` in production entries).
+  An explicitly saved zero-tonnage entry counts as entered. Several entries
+  still satisfy one obligation; their presence never creates extra obligations.
+- Every active planned pair in the exact date/team/shift scope needs a saved
+  result. A zero result counts as entered under the existing pair validation.
+  Cancelled pairs are not applicable and show their saved cancellation reason.
+  With no pairs planned, show "No pairs planned"; do not invent missing pairs.
+- A rest day is not applicable and identifies the rotation as its reason.
+  A missing production entry on a working shift is never excused by having no
+  planned pairs. Downtime records remain event-based and create no obligation.
+- Before the shift starts, identify it as upcoming rather than overdue.
+  During and after it, show entered/missing report states; overdue applies
+  only after the end plus the ten-minute grace period.
+
+### Shared screen and navigation
+
+Add a server-mode `shift-closeout` screen, linked from the work-module
+navigation. It has a production-date selector, a shift selector, a permitted
+team selector and a Current shift action. The default is the current shift
+in Europe/Sofia; an overnight shift retains the date on which it started.
+Stickers uses its separate 09:00-17:30 weekday interval.
+
+The summary shows mandatory tonnage as entered or missing, plus counts of
+planned, reported, pending and cancelled pairs. The list identifies each
+unreported pair using the existing pair presentation and offers a Report action.
+Keep cancelled pairs visible with their reason. A production action opens the
+production form; a pair action opens the relevant pair scope and record.
+Both destinations preserve the explicit date/team/shift, including delayed
+night reports, instead of replacing them with the destination's live defaults.
+
+The screen reads a dedicated authenticated API rather than downloading the
+personnel file. It refreshes on relevant server changes and periodically while
+open. A failed read shows an error and marks any retained display as stale;
+it cannot become an empty or completed shift. Read-only screen actions never
+write reports or change existing production, pair or personnel file schemas.
+Bulgarian and English copy, keyboard access and narrow-screen layout follow
+the existing application patterns. File-mode report forms keep working.
+
+### Access and report visibility
+
+Add an explicit closeout-view permission to the shared client/server permission
+model and account editor. Default access is for administrators and the existing
+shift-supervisor account profile; explicit denial takes precedence. Ordinary
+operators and observers receive no default access. Supervisors are scoped to
+their assigned team; administrators may select all teams. An account without
+an assigned supervisor team sees a clear configuration message, not all teams.
+
+The API validates dates, team, shift and account scope. Existing production and
+pair view permissions still apply to their respective sections and links.
+An inaccessible section is labelled unavailable and its records, counts and
+report status are omitted; inaccessible data never appears in reminder text.
+Reporting actions additionally require the destination's existing creation
+permission. Knowing an API URL or notification target cannot grant access.
+
+### Missing-report reminders
+
+Extend the durable local notification service, which already ticks without an
+open browser. Do not use a new external notification service. Existing optional
+device delivery remains subject to the user's opt-in and module permissions.
+
+For each working date/team/shift, calculate its closeout status from committed
+production and pair records. Send at most one combined pre-end reminder and
+one combined overdue reminder per eligible account:
+
+- Pre-end: from ten minutes before the end until the end, only while a visible
+  required report is missing.
+- Overdue: from ten minutes after the end, only while a visible required
+  report is still missing. After a server interruption this event may catch up
+  until 24 hours after that shift's end; older shifts remain inspectable on the
+  screen without producing a backlog of notifications.
+- Persist deduplication by reminder phase, production date, team, shift and
+  recipient. Repeated ticks, restarts and notification retention do not resend
+  the same event. A new missing pair or a deleted report does not reset it.
+- Persist the feature's first activation time. Do not replay reminder events
+  whose due time predates activation. Subsequent restarts preserve that time.
+- Notify the team's active supervisor accounts and entitled administrators.
+  Expose separate configurable pre-end/overdue categories in the existing
+  notification preferences and account permissions. Respect closeout access,
+  team scope, module visibility and preference changes before delivery.
+- Use generic reminder text and a validated link to the selected closeout
+  scope. Resolve the current status when opened. A late report clears its
+  current missing state and suppresses a future reminder when nothing remains
+  missing; an already delivered event remains a historical reminder.
+
+All comparisons use the existing Europe/Sofia shift intervals, including
+midnight, timezone-independent browser behavior and daylight-saving changes.
+No reminder is generated for a rest day or for cancelled pairs alone.
+
+### Implementation boundaries and acceptance checks
+
+Use one shared closeout calculation for the API and reminder scheduler so they
+agree on missing reports. Reuse `ShiftSchedule`, committed report validation,
+the permission model, durable notifications, clean server routes and the
+existing client connection/navigation patterns. Any new storage is additive
+notification state; preserve live report documents and their history.
+
+Verify exclusively with fictional fixtures:
+
+1. Working shifts require tonnage even without pairs; rest days do not.
+   Saved zero tonnage, multiple entries and a late entry have correct states.
+2. Planned pairs without results are missing; reported zero results count;
+   cancellation removes the obligation and retains its reason.
+3. Date, team and shift scopes do not mix records; pair output is never
+   added to production totals or used as a replacement production report.
+4. Night shifts keep their start date, Stickers has its own end time, and
+   pre-end/overdue thresholds work in Europe/Sofia from a UTC browser and
+   across daylight-saving boundaries.
+5. Combined reminders fire at the two defined thresholds, deduplicate across
+   repeated ticks/restarts, skip pre-activation history and respect the catch-up
+   window, late reports, disabled categories and revoked permissions.
+6. API, page, notification and destination access follow account/team/module
+   rights, including malformed scopes and direct navigation attempts.
+7. Screen filters, destination prefilling, background refresh, stale/error
+   handling, Bulgarian/English copy, keyboard access and mobile layout work.
+8. Existing report, pair, task, notification and permission behavior remains
+   covered by relevant regression tests. Run the publication check and relevant
+   tests before each commit and push; merge only when requested. Keep the
+   Trello card unfinished until the completed feature is merged and pushed.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license
