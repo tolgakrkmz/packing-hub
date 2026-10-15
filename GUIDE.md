@@ -2156,6 +2156,8 @@ reported/pending/cancelled pairs and cancellation reasons. Report links retain
 that exact scope. Current shift uses server-side Europe/Sofia intervals.
 The screen refreshes on report changes and every 30 seconds; a failed read
 marks retained values stale. Pair results never replace or add to tonnage.
+If an explicit pair link is invalid, selecting a valid date/shift, Current shift
+or a history record discards the rejected link context and restores reporting.
 
 Reminder activation and per-recipient phase state are stored additively in the
 existing notification-state table. Deploy the server and client together;
@@ -2493,17 +2495,17 @@ contexts for closeout tests without changing the other suites' timezone.
 **Files:** Update this guide with implemented behavior and validation evidence;
 review the entire branch and any affected existing tests.
 
-- [ ] Review each specification acceptance check against its actual test and
+- [x] Review each specification acceptance check against its actual test and
   implementation, including explicit permission denials, catch-up/activation,
   revoked reminder targets, empty pairs and mandatory tonnage. Correct gaps.
-- [ ] Run `node scripts/run-critical-tests.cjs` and the focused closeout,
+- [x] Run `node scripts/run-critical-tests.cjs` and the focused closeout,
   notifications, notification-targets, navigation, routes, report-operations
   and unsaved-navigation server browser suites. Confirm offline report-date
   behavior with its existing unit tests and offline quantity/browser workflow.
-- [ ] Document actual behavior and exact validation results; remove the
+- [x] Document actual behavior and exact validation results; remove the
   specification's "not implemented" notice only after implementation verifies.
   Run publication checks and relevant tests, then commit the delivery notes.
-- [ ] Review the outgoing diff and run the publication hook plus relevant tests
+- [x] Review the outgoing diff and run the publication hook plus relevant tests
   before pushing the dedicated branch. Report commit links and remaining work.
   Do not merge without the user's request or mark Trello done before main is
   updated with the verified complete feature.

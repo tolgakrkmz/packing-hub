@@ -30,6 +30,15 @@ async function exerciseShiftCloseout({admin,hub,base,device,expect,setTime}) {
   await expect(admin.locator('#msg')).toContainText('Невалидна');await expect(admin.locator('#saveBtn')).toBeDisabled();
   await admin.goto(base+'/pair-targets?'+new URLSearchParams({date:'2026-10-03',team,shiftCode:3,target:entry.id}));
   await expect(admin.locator('#pageError')).toContainText('Невалидна');
+  await admin.locator('#contextDate').fill(date);await admin.locator('#contextDate').dispatchEvent('change');
+  await expect(admin.locator('#pageError')).toBeEmpty();
+  await admin.locator('#pairsList [data-action=report]').click();
+  await expect(admin.locator('#pairDialog')).toBeVisible();await admin.locator('#cancelDialogBtn').click();
+  await admin.locator('#connPanel .conn-panel-toggle').click();
+  await admin.locator('#pairsRefreshBtn').click();
+  await expect(admin.locator('#contextDate')).toHaveValue(date);
+  await admin.locator('#pairsList [data-action=report]').click();
+  await expect(admin.locator('#pairDialog')).toBeVisible();await admin.locator('#cancelDialogBtn').click();
   console.log('PASS explicit report scopes: night dates, zero production, delayed pair load, result save and invalid links');
   const seed=(kind,value)=>hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(value),kind);
   const pairs={module:'pair-targets',schemaVersion:1,entries:[entry,{...entry,id:'demo-close-cancel',cancellation:{reasonKey:'cleaning',reasonText:'Demo cleaning reason',cancelledAt:'2026-10-04T20:00:00Z'},updatedAt:'2026-10-04T20:00:00Z'}]};
