@@ -14,6 +14,18 @@ const personnel = {schemaVersion:3,employees:[person],moveLog:[]};
 const instructions = {'DEMO-001':{number:'DEMO-001',name:'Demo profile',folderName:'demo-profile',images:['demo.png'],client:'Demo customer',category:'standard'}};
 const samples = {'production-log':production,'line-downtime':downtime,personnel,'package-instructions':instructions,'pair-targets':vm.runInContext('PairTargets.emptyData()',sandbox)};
 const clone = value => JSON.parse(JSON.stringify(value));
+const semantic = require('./semantic-fixtures.cjs');
+for(const {name,kind,data} of semantic.accepted) test('semantic validation preserves '+name,()=>{
+  const value=clone(data), before=JSON.stringify(value);
+  assert.equal(validation.parse(kind,before).entries.length,1);
+  assert.equal(validation.validate(kind,value),value);
+  assert.equal(JSON.stringify(value),before);
+});
+for(const {name,kind,data} of semantic.rejected) test('semantic validation rejects '+name,()=>{
+  const value=clone(data), before=JSON.stringify(value);
+  assert.throws(()=>validation.parse(kind,before),error=>error.code==='HUB_DATA'&&!error.message.includes(value.entries[0].id));
+  assert.equal(JSON.stringify(value),before);
+});
 test('module validation preserves accepted data and rejects files from other modules',()=>{
   for(const [kind,data] of Object.entries(samples)) {
     const before=JSON.stringify(data);
