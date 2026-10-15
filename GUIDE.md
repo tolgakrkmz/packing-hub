@@ -2142,6 +2142,383 @@ midnight in a UTC browser. Existing offline/server personnel, statistics,
 transfer/import and default workflows pass (10 offline scenarios and 14 online
 workflows in the default runners). No production data was used or published.
 
+## Shift closeout: design specification (2026-10-15)
+
+**Implemented.** The shared server-mode
+screen is `/shift-closeout`, available from a permanent toolbar button beside
+the module selector. It has no separate tile on the home page.
+Supervisors see their assigned team; administrators may select all teams.
+The account editor exposes its viewing permission and the two reminder flags;
+notification settings allow each recipient to disable either reminder category.
+An account without an assigned team receives a configuration message.
+
+The toolbar button is visible on every authenticated page with closeout access.
+It shows an amber count of missing tonnage plus pending pairs in the current
+account's shift, or green "All reports entered" when both permitted sections
+are complete. Rest/upcoming shifts, unavailable reads and incomplete module
+access stay neutral. A partial view never displays an overall missing count.
+The button refreshes every 30 seconds and on report/account changes,
+links to the exact scope and uses the existing unsaved-navigation guard.
+
+Choose the production date, team and shift to inspect entered/missing tonnage,
+reported/pending/cancelled pairs and cancellation reasons. Report links retain
+that exact scope. Current shift uses server-side Europe/Sofia intervals.
+The screen refreshes on report changes and every 30 seconds; a failed read
+marks retained values stale. Pair results never replace or add to tonnage.
+If an explicit pair link is invalid, selecting a valid date/shift, Current shift
+or a history record discards the rejected link context and restores reporting.
+
+Reminder activation and per-recipient phase state are stored additively in the
+existing notification-state table. Deploy the server and client together;
+existing production, pair and personnel documents need no conversion. The
+first activation skips historical reminder deadlines. Existing device opt-in
+and payload-free push delivery continue to apply.
+
+Validation with fictional fixtures: 738 unit/API tests passed (333 client/unit,
+405 server). Focused closeout, notifications, notification-targets, navigation,
+routes, report-operations, closeout-indicator and unsaved-navigation browser suites passed, as did
+the offline quantities flow. These include midnight/DST in a UTC browser,
+late zero-tonnage reports, cancellation, opt-out, scope races, stale reads,
+account/module restrictions, BG/EN and narrow-screen layout.
+
+The specification and implementation plan below retain the reviewed requirements.
+
+### Purpose and expected reports
+
+Shift supervisors and administrators need one screen showing whether a working
+shift has its mandatory production report and whether its planned pairs have
+results. This check is independent of task completion and never adds pair output
+to production totals.
+
+- A working shift is the existing dated team rotation in `ShiftSchedule`,
+  including the existing weekday Stickers schedule. The rotation determines
+  the shift number, start and end; no new per-line production plan is required.
+- Every working team shift requires at least one valid saved production entry
+  with the same production date and team (`shift` in production entries).
+  An explicitly saved zero-tonnage entry counts as entered. Several entries
+  still satisfy one obligation; their presence never creates extra obligations.
+- Every active planned pair in the exact date/team/shift scope needs a saved
+  result. A zero result counts as entered under the existing pair validation.
+  Cancelled pairs are not applicable and show their saved cancellation reason.
+  With no pairs planned, show "No pairs planned"; do not invent missing pairs.
+- A rest day is not applicable and identifies the rotation as its reason.
+  A missing production entry on a working shift is never excused by having no
+  planned pairs. Downtime records remain event-based and create no obligation.
+- Before the shift starts, identify it as upcoming rather than overdue.
+  During and after it, show entered/missing report states; overdue applies
+  only after the end plus the ten-minute grace period.
+
+### Shared screen and navigation
+
+Add a server-mode `shift-closeout` screen, linked from the work-module
+navigation. It has a production-date selector, a shift selector, a permitted
+team selector and a Current shift action. The default is the current shift
+in Europe/Sofia; an overnight shift retains the date on which it started.
+Stickers uses its separate 09:00-17:30 weekday interval.
+
+The summary shows mandatory tonnage as entered or missing, plus counts of
+planned, reported, pending and cancelled pairs. The list identifies each
+unreported pair using the existing pair presentation and offers a Report action.
+Keep cancelled pairs visible with their reason. A production action opens the
+production form; a pair action opens the relevant pair scope and record.
+Both destinations preserve the explicit date/team/shift, including delayed
+night reports, instead of replacing them with the destination's live defaults.
+
+The screen reads a dedicated authenticated API rather than downloading the
+personnel file. It refreshes on relevant server changes and periodically while
+open. A failed read shows an error and marks any retained display as stale;
+it cannot become an empty or completed shift. Read-only screen actions never
+write reports or change existing production, pair or personnel file schemas.
+Bulgarian and English copy, keyboard access and narrow-screen layout follow
+the existing application patterns. File-mode report forms keep working.
+
+### Access and report visibility
+
+Add an explicit closeout-view permission to the shared client/server permission
+model and account editor. Default access is for administrators and the existing
+shift-supervisor account profile; explicit denial takes precedence. Ordinary
+operators and observers receive no default access. Supervisors are scoped to
+their assigned team; administrators may select all teams. An account without
+an assigned supervisor team sees a clear configuration message, not all teams.
+
+The API validates dates, team, shift and account scope. Existing production and
+pair view permissions still apply to their respective sections and links.
+An inaccessible section is labelled unavailable and its records, counts and
+report status are omitted; inaccessible data never appears in reminder text.
+Reporting actions additionally require the destination's existing creation
+permission. Knowing an API URL or notification target cannot grant access.
+
+### Missing-report reminders
+
+Extend the durable local notification service, which already ticks without an
+open browser. Do not use a new external notification service. Existing optional
+device delivery remains subject to the user's opt-in and module permissions.
+
+For each working date/team/shift, calculate its closeout status from committed
+production and pair records. Send at most one combined pre-end reminder and
+one combined overdue reminder per eligible account:
+
+- Pre-end: from ten minutes before the end until the end, only while a visible
+  required report is missing.
+- Overdue: from ten minutes after the end, only while a visible required
+  report is still missing. After a server interruption this event may catch up
+  until 24 hours after that shift's end; older shifts remain inspectable on the
+  screen without producing a backlog of notifications.
+- Persist deduplication by reminder phase, production date, team, shift and
+  recipient. Repeated ticks, restarts and notification retention do not resend
+  the same event. A new missing pair or a deleted report does not reset it.
+- Persist the feature's first activation time. Do not replay reminder events
+  whose due time predates activation. Subsequent restarts preserve that time.
+- Notify the team's active supervisor accounts and entitled administrators.
+  Expose separate configurable pre-end/overdue categories in the existing
+  notification preferences and account permissions. Respect closeout access,
+  team scope, module visibility and preference changes before delivery.
+- Use generic reminder text and a validated link to the selected closeout
+  scope. Resolve the current status when opened. A late report clears its
+  current missing state and suppresses a future reminder when nothing remains
+  missing; an already delivered event remains a historical reminder.
+
+All comparisons use the existing Europe/Sofia shift intervals, including
+midnight, timezone-independent browser behavior and daylight-saving changes.
+No reminder is generated for a rest day or for cancelled pairs alone.
+
+### Implementation boundaries and acceptance checks
+
+Use one shared closeout calculation for the API and reminder scheduler so they
+agree on missing reports. Reuse `ShiftSchedule`, committed report validation,
+the permission model, durable notifications, clean server routes and the
+existing client connection/navigation patterns. Any new storage is additive
+notification state; preserve live report documents and their history.
+
+Verify exclusively with fictional fixtures:
+
+1. Working shifts require tonnage even without pairs; rest days do not.
+   Saved zero tonnage, multiple entries and a late entry have correct states.
+2. Planned pairs without results are missing; reported zero results count;
+   cancellation removes the obligation and retains its reason.
+3. Date, team and shift scopes do not mix records; pair output is never
+   added to production totals or used as a replacement production report.
+4. Night shifts keep their start date, Stickers has its own end time, and
+   pre-end/overdue thresholds work in Europe/Sofia from a UTC browser and
+   across daylight-saving boundaries.
+5. Combined reminders fire at the two defined thresholds, deduplicate across
+   repeated ticks/restarts, skip pre-activation history and respect the catch-up
+   window, late reports, disabled categories and revoked permissions.
+6. API, page, notification and destination access follow account/team/module
+   rights, including malformed scopes and direct navigation attempts.
+7. Screen filters, destination prefilling, background refresh, stale/error
+   handling, Bulgarian/English copy, keyboard access and mobile layout work.
+8. Existing report, pair, task, notification and permission behavior remains
+   covered by relevant regression tests. Run the publication check and relevant
+   tests before each commit and push; merge only when requested. Keep the
+   Trello card unfinished until the completed feature is merged and pushed.
+
+## Shift closeout implementation plan (2026-10-15)
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development or superpowers:executing-plans to
+> implement this plan task-by-task. Steps use checkbox syntax for tracking.
+
+**Goal:** Give shift supervisors and administrators one accurate missing-report
+screen and two durable reminders for mandatory tonnage and pending pair results.
+
+**Architecture:** A focused server module calculates one shift summary from
+committed production and pair entries. An authenticated read service applies
+account/team/module scope; both the screen and existing notification scheduler
+consume that service. Existing forms accept explicit closeout scope links.
+
+**Tech Stack:** Plain HTML/CSS/JavaScript, Node.js 24+, existing SQLite store,
+node:test and the existing Playwright browser harness; no new dependencies.
+
+**Spec:** The preceding "Shift closeout: design specification (2026-10-15)"
+section in this file. This plan uses the same publication-approved document.
+
+### Global constraints
+
+- Every working team shift requires at least one valid saved production entry.
+- Europe/Sofia; overnight shifts retain their start date; Stickers 09:00-17:30.
+- Pre-end: ten minutes before the end until the end. Overdue: ten minutes after
+  the end until 24 hours after the end. Persist the first activation time.
+- Respect existing report/module permissions and the assigned supervisor team.
+- Preserve live report documents and their history. Use fictional fixtures only.
+- Use this chat's `feature/shift-closeout-01a13dd6` branch. Before each commit
+  and push, run publication checks and relevant tests without bypassing hooks.
+- Merge only when requested; the Trello card stays unfinished until the feature
+  is complete, merged and pushed to main.
+
+### Review focus
+
+1. A late response for an old filter must not replace the newly selected shift
+   (Task 4 browser test).
+2. A date/team link must survive automatic night-date selection and asynchronous
+   pair data loading without changing the requested scope (Task 3 browser test).
+3. Revoking team or module access must hide old reminder targets in both inbox
+   listing and unread count (Task 2 notification test).
+4. Midnight and a daylight-saving night must produce the same scope in a UTC
+   browser and the server (Tasks 1 and 4 tests).
+5. Empty data, inaccessible data and failed reads must remain distinct; no
+   inaccessible report status or false success may appear (Tasks 1 and 4 tests).
+
+### Task 1: Closeout calculation and authenticated API
+
+**Files:** Create `server/shift-closeout.cjs` and
+`tests/server/shift-closeout.test.cjs`; modify `js/permission-model.js` and
+`server/server.cjs`. Existing account editing consumes permission groups.
+
+**Interfaces:** Export `summarizeShift(scope, sources)` and
+`createShiftCloseout(store, {now = Date.now} = {})`.
+`scope` is `{date, team, shiftCode}`; `sources` is
+`{productionEntries, pairEntries, now}`. Summary fields are `scope`,
+`interval: {start, end} | null`, `phase` (upcoming/working/ended/overdue/rest),
+`production: {state, entryCount}`, and `pairs: {planned, reported, pending,
+cancelled, entries}`. Production state is entered/missing/not-applicable.
+Each pair entry is `{id, members:[{id,name}], state, reasonKey, reasonText}`;
+state is reported/pending/cancelled. Pair counts satisfy
+planned=reported+pending+cancelled.
+The service exposes `read(input, user)` and `reminderCandidates(at, user)`.
+`read` also returns permitted teams, server time and section availability;
+inaccessible production/pair values are null. Reminder candidates contain only
+`{scope, phase: 'due' | 'overdue', dueAt, target}`; `target` is
+`date/team/shiftCode`, used as an opaque, encoded local notification target.
+
+- [x] Write failing tests: a scheduled team with no pairs still has missing
+  production; adding `{date, shift:team, tonnage:0, brak:0}` makes it entered;
+  duplicate reports leave one satisfied obligation. A wrong date/team report
+  does not satisfy it. Pair fixtures cover pending, zero result and cancellation.
+- [x] Add tests for rest days, upcoming shifts, Stickers weekends, start dates
+  before 06:00, and the night starting 2026-10-24 across Sofia's autumn clock
+  change. Test 400 for invalid dates/teams/codes and mismatched working scopes.
+- [x] Run `node --test tests/server/shift-closeout.test.cjs`; verify failure for
+  the missing implementation, then implement the two exports using the existing
+  `shiftSchedule` export and committed documents. Do not read personnel.
+- [x] Add `canViewShiftCloseout` to permission groups; inherit it for admin and
+  taskSupervisor profiles only, unless explicitly overridden. Restrict non-admin
+  supervisors to taskTeam; a missing team returns a configuration state. Check
+  existing production/pair view flags separately, and creation rights for links.
+- [x] Wire GET `/api/shift-closeout` to `read(url.searchParams, currentUser())`.
+  Test login, GET-only routing, explicit denials, cross-team requests, partial
+  module visibility and account updates without leaking hidden section counts.
+- [x] Run the new suite plus `tests/server/permissions.test.cjs` and
+  `tests/server/module-permissions.test.cjs`; run publication checks, then commit
+  as `feat: add scoped shift closeout status API`.
+
+### Task 2: Durable combined reminders
+
+**Files:** Modify `server/notifications.cjs` and `js/notification-model.js`;
+create `tests/server/shift-closeout-notifications.test.cjs`; extend
+`tests/server/notification-targets.test.cjs` where category iteration requires it.
+
+**Interfaces:** Consume Task 1's `reminderCandidates(at, user)` and `read`.
+Register `shiftCloseoutDue` and `shiftCloseoutOverdue` with module
+`shift-closeout` and flags `canReceiveShiftCloseoutDue` and
+`canReceiveShiftCloseoutOverdue`. Both use existing `href(type, target)`;
+the closeout page validates the encoded target before requesting its scope.
+
+- [x] Write failing controlled-clock tests for exactly end-10 minutes and
+  end+10 minutes, no event outside the defined windows, and one combined event
+  when both tonnage and several pairs are missing. Assert no event when all
+  visible obligations are satisfied or only cancelled pairs remain.
+- [x] Test repeated sync, service/database restart, retention, activation cutoff,
+  report deletion without resending, a late report before the second threshold,
+  and the 24-hour overdue catch-up limit. Pre-end delivery never catches up
+  after the end. Include night and Stickers intervals from Task 1.
+- [x] Run `node --test tests/server/shift-closeout-notifications.test.cjs` and
+  observe missing-category/behavior failures. Then extend the existing sync
+  transaction and notification_state with activation and per-recipient phase
+  keys. Reuse emit and push queue; do not create report or task records.
+- [x] Default reminder rights to admin/supervisor accounts with closeout access;
+  preserve explicit denials and category opt-out. Apply current target access
+  in inbox list, summary and delivery eligibility. Test team reassignment,
+  inactive/deleted accounts, module revocation and inaccessible-section-only
+  missing reports. Generic text contains no pair names or quantities.
+- [x] Run the new suite and existing notifications, notification-targets and
+  security-push-boundaries server suites; run publication checks, then commit
+  as `feat: remind supervisors about missing shift reports`.
+
+### Task 3: Explicit report destination context
+
+**Files:** Create `js/report-scope.js` and `tests/report-scope.test.cjs`;
+modify `js/production-log.js`, `production-log.html`, `js/pair-targets.js`,
+`pair-targets.html`, `scripts/run-server-browser-tests.cjs` and
+`scripts/run-critical-tests.cjs`; create `tests/browser/shift-closeout.cjs`.
+
+**Interfaces:** Export browser/CommonJS `HubReportScope.parse(search)` returning
+null when no closeout scope exists, or validated `{date,team,shiftCode}`.
+Links use `?date=YYYY-MM-DD&team=...&shiftCode=N`; a pair may append the existing
+`target` parameter. Invalid explicit scope returns a visible error and never
+falls back silently. Existing target-only notification links retain precedence
+for their actual record; the pair client rejects conflicting explicit scope
+after loading the target record rather than mixing it with the requested scope.
+Export `exerciseShiftCloseout({admin, hub, base, device, expect, setTime})` from
+the browser test. Add `--shift-closeout-only` to the existing server harness and
+critical-runner mode list; initially this exercises destination flows only.
+
+- [x] Write failing parser tests for real calendar dates, approved teams,
+  shift numbers and malformed/duplicate query values.
+  Run `node --test tests/report-scope.test.cjs`, then implement the parser.
+- [x] Apply explicit production context through the existing date/shift
+  selection flow after initialization, preserving automatic behavior when no
+  scope was supplied. Preserve a requested pair scope through live initialization
+  and async file loading; existing target revelation still selects its record.
+- [x] Add browser assertions: open yesterday's night scope before and after
+  06:00, open a pending pair after delayed loading, and save to the requested
+  context. No action automatically writes or discards a draft.
+- [x] Run parser and report-date-selection unit suites, existing report-operation
+  and notification-target browser flows, and the new destination flow through
+  `--shift-closeout-only` runner. Run publication checks, then commit as
+  `feat: preserve explicit shift context in report forms`.
+
+### Task 4: Shared closeout screen and browser coverage
+
+**Files:** Create `shift-closeout.html`, `css/shift-closeout.css` and
+`js/shift-closeout.js`; modify `index.html`, `js/server-connection.js`,
+`js/i18n-en.js` and `tests/browser/shift-closeout.cjs`.
+
+**Interfaces:** Consume GET `/api/shift-closeout` through `HubServer.json`,
+Task 3 destination links and the existing `HubServer.watch(module, refresh)`.
+Extend Task 3's `exerciseShiftCloseout` test with screen flows. Its harness uses
+only a temporary database and fictional accounts, and permits UTC browser
+contexts for closeout tests without changing the other suites' timezone.
+
+- [x] Add failing browser checks for supervisor/admin access, denied ordinary
+  accounts, assigned-team filters, entered/missing tonnage, pair counts and
+  cancellation reasons. Run the new harness and confirm missing-screen failure.
+- [x] Build the filter/summary/list screen using safe DOM text for record
+  content. Render unavailable sections without counts; offer reporting actions
+  only with creation rights. Keep requested filters in the URL; Current shift
+  derives Sofia time from the API rather than the browser's timezone.
+- [x] Add permission-filtered home/navigation entries. Refresh every 30 seconds
+  and on production, pair and account changes. Use request sequencing so old
+  responses cannot replace a newer scope. Show retained data as stale on read
+  failure; an initial failure displays no successful summary.
+- [x] Test race-controlled filter responses, a failed read/retry, late report
+  refresh, notification links, UTC browser midnight/DST, BG/EN, keyboard access
+  and 320/390/1440 px layouts. Preserve draft navigation guards in destinations.
+- [x] Run `node scripts/run-server-browser-tests.cjs --headless --shift-closeout-only`
+  plus navigation, notification-targets and report-operations focused browser
+  suites. Run routes and i18n unit/server suites and publication checks, then
+  commit as `feat: add supervisor shift closeout screen`.
+
+### Task 5: Integration review and delivery
+
+**Files:** Update this guide with implemented behavior and validation evidence;
+review the entire branch and any affected existing tests.
+
+- [x] Review each specification acceptance check against its actual test and
+  implementation, including explicit permission denials, catch-up/activation,
+  revoked reminder targets, empty pairs and mandatory tonnage. Correct gaps.
+- [x] Run `node scripts/run-critical-tests.cjs` and the focused closeout,
+  notifications, notification-targets, navigation, routes, report-operations
+  and unsaved-navigation server browser suites. Confirm offline report-date
+  behavior with its existing unit tests and offline quantity/browser workflow.
+- [x] Document actual behavior and exact validation results; remove the
+  specification's "not implemented" notice only after implementation verifies.
+  Run publication checks and relevant tests, then commit the delivery notes.
+- [x] Review the outgoing diff and run the publication hook plus relevant tests
+  before pushing the dedicated branch. Report commit links and remaining work.
+  Do not merge without the user's request or mark Trello done before main is
+  updated with the verified complete feature.
+
 ## Publication
 
 This repository contains a sanitized portfolio snapshot. No distribution license

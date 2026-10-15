@@ -6,6 +6,7 @@
 })(typeof globalThis === 'object' ? globalThis : this, () => {
   const notifications = typeof module === 'object' && module.exports ? require('./notification-model.js') : globalThis.HubNotificationModel;
   const groups = [
+    {title: 'Край на смяната', module: 'shift-closeout', view: 'canViewShiftCloseout', flags: {canViewShiftCloseout: 'Преглед на липсващите отчети за смяната'}},
     {title: 'Производство', module: 'production-log', view: 'canViewProduction', flags: {canViewProduction: 'Преглед на производството', canCreateProduction: 'Добавяне на производствени отчети', canEditProduction: 'Корекции и изтриване в производството', canManageProductionSettings: 'Промяна на производствената цел'}},
     {title: 'Престои', module: 'line-downtime', view: 'canViewDowntime', flags: {canViewDowntime: 'Преглед на престоите', canCreateDowntime: 'Добавяне на престои', canEditDowntime: 'Корекции и изтриване на престои', canManageDowntimeSettings: 'Управление на причините за престой'}},
     {title: 'Двойки', module: 'pair-targets', view: 'canViewPairs', flags: {canViewPairs: 'Преглед на двойките', canCreatePairs: 'Планиране и първи отчет на двойки', canEditPairs: 'Корекции на отчетени двойки'}},
@@ -44,6 +45,8 @@
     const explicit = key => Object.hasOwn(overrides, key);
     const result = Object.fromEntries(keys.map(key => [key, explicit(key) ? overrides[key] === true : base[key]]));
     if (!explicit('canReportTasks')) result.canReportTasks = user.taskSupervisor === true;
+    if (!explicit('canViewShiftCloseout')) result.canViewShiftCloseout = user.role === 'admin' || user.taskSupervisor === true;
+    for (const key of ['canReceiveShiftCloseoutDue','canReceiveShiftCloseoutOverdue']) if (!explicit(key)) result[key] = user.role === 'admin' || user.taskSupervisor === true;
     for (const report of Object.values(reports)) {
       for (const [action, legacy] of [['create', 'canCreateReports'], ['edit', 'canEditReports']]) {
         if (!explicit(report[action])) result[report[action]] = result[legacy];

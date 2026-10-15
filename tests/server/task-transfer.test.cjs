@@ -110,11 +110,17 @@ test('new owner receives the assignment and overdue reminder once after handover
   const f = await fixture(t), id = f.create();
   f.time('2026-12-04T12:00:00+02:00'); f.inbox.sync();
   f.transfer(id); f.inbox.sync(); f.inbox.sync();
-  const notifications = f.inbox.list(f.other).items;
+  // Shift-closeout notices coexist in the inbox; this verifies task handover.
+  const taskNotices = user => {
+    const items=[];let before;
+    do {const page=f.inbox.list(user,before);items.push(...page.items);before=page.nextBefore;}while(before);
+    return items.filter(item=>item.type.startsWith('task'));
+  };
+  const notifications = taskNotices(f.other);
   assert.equal(notifications.filter(item => item.type === 'taskAssigned').length, 1);
   assert.equal(notifications.filter(item => item.type === 'taskOverdue').length, 1);
   assert.ok(notifications.every(item => item.href === '/tasks?target=' + id));
-  assert.equal(f.inbox.list(f.owner).items.length, 0);
+  assert.equal(taskNotices(f.owner).length, 0);
 });
 
 test('eligible admin transferring a task to themselves still receives its assignment notification', async t => {

@@ -10,12 +10,20 @@
   let personnel = {employees:[]};
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
+  let explicitScope=null, scopeLinkError='';
+  try {if(typeof HubReportScope!=='undefined')explicitScope=HubReportScope.parse(location.search);}
+  catch(error){scopeLinkError=error.message;}
   const pairDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.($('pairDialog'),{isOpen:() => !!editing});
   if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy,
     hasDraft:() => pairDraft?.hasDraft() || !!editing?.attempt || !!editing?.needsConfirmation});
   const elements = prefix => Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key,$(prefix+key[0].toUpperCase()+key.slice(1))]));
   const acceptPairs = value => {
     data = PairTargets.validateData(value); pairsLoaded = true;
+    if(explicitScope) {
+      const id=new URLSearchParams(location.search).get('target'),entry=data.entries.find(e=>e.id===id);
+      if(entry && !PairTargets.inScope(entry,explicitScope))scopeLinkError='Невалидна връзка към смяна. Отворете модула от началната страница.';
+    }
+    if(scopeLinkError){$('pageError').textContent=scopeLinkError;return;}
     globalThis.HubNotificationTarget?.select(data.entries, entry => entry.id, entry => {
       context = {date: entry.date, team: entry.team, shiftCode: entry.shiftCode}; followLive = false;
       $('historyMonth').value = entry.date.slice(0,7); updateControls();
@@ -44,6 +52,11 @@
     context = {...live};
     followLive = true;
     updateControls();
+  }
+  function acceptChosenScope() {
+    explicitScope=null;scopeLinkError='';
+    // Consume a rejected deep-link target so a later refresh cannot reselect it.
+    globalThis.HubNotificationTarget?.select(data.entries,entry=>entry.id,()=>{});
   }
   function updateControls() {
     if(!context) return;
@@ -105,8 +118,8 @@
     ].map(([value,label]) => `<div class="stat"><strong>${value}</strong>${label}</div>`).join('');
     $('rosterSummary').textContent = `Състав · ${rosterLoaded ? people.length+' човека' : 'изберете Personnel'}${rosterLoaded ? ' · '+available.length+' неразпределени' : ''}`;
     $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
-    $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2;
-    $('pairsList').innerHTML = selected.map(entry => pairCard(entry,true)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
+    $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError;
+    $('pairsList').innerHTML = selected.map(entry => pairCard(entry,!scopeLinkError)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
     globalThis.HubNotificationTarget?.reveal($('pairsList'));
   }
@@ -136,7 +149,7 @@
     Array.from(two.options).forEach(option => { option.disabled = !!option.value && option.value === one.value; });
   }
   function openDialog(mode, entry = null) {
-    if(busy || !pairsLoaded || !rosterLoaded) return;
+    if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
     const scope = entry || context;
     editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null,
@@ -305,6 +318,7 @@
     const entry = button && data.entries.find(item => item.id === button.dataset.id);
     if(!entry) return;
     context = {date:entry.date,shiftCode:entry.shiftCode,team:entry.team};
+    acceptChosenScope();$('pageError').textContent='';
     followLive = false;
     updateControls(); render();
     $('contextDate').scrollIntoView({behavior:'smooth',block:'center'});
@@ -316,16 +330,18 @@
       const shiftCode = Number($('contextShift').value);
       const team = context.team === 'СТИКЕРИ' && shiftCode === 1 ? 'СТИКЕРИ' : ShiftSchedule.teamFor(ShiftSchedule.parseDate(date),shiftCode);
       context = {date,shiftCode,team}; followLive = false;
+      acceptChosenScope();
       $('pageError').textContent = ''; updateControls(); render();
     } catch(error) { updateControls(); $('pageError').textContent = error.message; }
   }));
   $('stickersShiftBtn').addEventListener('click',() => {
     if(busy) return;
     context = {date:ShiftSchedule.localDate(),shiftCode:1,team:'СТИКЕРИ'};
+    acceptChosenScope();
     followLive = false;
     $('pageError').textContent = ''; updateControls(); render();
   });
-  $('currentShiftBtn').addEventListener('click',() => { selectLive(); render(); });
+  $('currentShiftBtn').addEventListener('click',() => { acceptChosenScope();$('pageError').textContent='';selectLive(); render(); });
   $('addPairBtn').addEventListener('click',() => {
     if(followLive) { selectLive(); render(); }
     if(!$('addPairBtn').disabled) openDialog('plan');
@@ -338,7 +354,10 @@
   $('closeDialogBtn').addEventListener('click',closeDialog);
   $('cancelDialogBtn').addEventListener('click',closeDialog);
   $('pairDialog').addEventListener('cancel',event => { event.preventDefault(); closeDialog(); });
-  selectLive(); render();
+  if(explicitScope){context=explicitScope;followLive=false;updateControls();}
+  else selectLive();
+  if(scopeLinkError)$('pageError').textContent=scopeLinkError;
+  render();
   Promise.allSettled([sync.init(),rosterSync.init()]).then(render);
   function refreshLive(){
     if(document.hidden) return;

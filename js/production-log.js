@@ -6,6 +6,9 @@ let goalTons = 3000;
 let goalDraft = false;
 let reportDraft = false;
 let editingReport = null;
+let explicitReportScope=null, scopeLinkError='';
+try { if(typeof HubReportScope!=='undefined') explicitReportScope=HubReportScope.parse(location.search); }
+catch(error) { scopeLinkError=error.message; }
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
 
 const dateInput = document.getElementById('dateInput');
@@ -105,7 +108,7 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
 });
 
 function updateSaveEnabled(){
-  saveBtn.disabled = writer.busy || !selectedShift;
+  saveBtn.disabled = writer.busy || !selectedShift || !!scopeLinkError;
   saveBtn.textContent = writer.busy ? 'Записва се...' : editingReport ? 'Запази корекцията' : selectedShift ? 'Запиши смяна ' + selectedShift : 'Изберете смяна за запис';
   if(typeof HubServer !== 'undefined') saveBtn.hidden = !(editingReport ? canEditReports : HubServer.can('canCreateReports'));
   document.getElementById('cancelReportEdit').hidden = !editingReport;
@@ -419,4 +422,12 @@ grid.innerHTML = SHIFTS.map(s=>{
 }
 function escapeReportId(value) { return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 
+if(explicitReportScope) {
+  dateInput.value=explicitReportScope.date;
+  dateInput.dispatchEvent(new Event('input',{bubbles:true}));
+  selectedShift=explicitReportScope.team;
+  document.querySelectorAll('.shift-btn').forEach(button=>button.classList.toggle('sel-'+selectedShift,button.dataset.shift===selectedShift));
+  updateSaveEnabled();productionDraft?.accept();
+}
+if(scopeLinkError) {msg.textContent=scopeLinkError;msg.dataset.state='error';updateSaveEnabled();}
 sync.init();

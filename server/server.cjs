@@ -15,6 +15,7 @@ const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
+const {createShiftCloseout} = require('./shift-closeout.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
 function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
@@ -26,6 +27,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
+  const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
@@ -56,7 +58,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   });
   const staticAssets = createStaticAssets(assets,{transformHTML:(name,html) => {
     const content = pageLinks(html);
-    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
+    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
   }});
   const {version} = staticAssets;
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
@@ -137,6 +139,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if (pathname === '/api/shift-closeout') {
+          const user = authorized('canViewShiftCloseout');
+          if (request.method !== 'GET') throw problem(405,'METHOD_REJECTED');
+          return json(response,200,closeout.read(url.searchParams,user));
+        }
         if (pathname === '/api/admin/activity') {
           const user = authorized('canViewActivity');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');

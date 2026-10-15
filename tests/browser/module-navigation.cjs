@@ -10,6 +10,8 @@ async function exerciseModuleNavigation({admin, hub, base, device, expect}) {
   await expect(picker(admin)).toHaveValue('');
   await admin.locator('.server-links a[href^="/admin-panel"]').focus();
   await admin.keyboard.press('Shift+Tab');
+  await expect(admin.locator('#serverCloseoutLink')).toBeFocused();
+  await admin.keyboard.press('Shift+Tab');
   await expect(picker(admin)).toBeFocused();
   await picker(admin).selectOption('/');
   await expect(admin).toHaveURL(base + '/');
