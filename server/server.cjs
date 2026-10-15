@@ -15,6 +15,7 @@ const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
 const {createMaintenance} = require('./maintenance.cjs');
 const {createActivity} = require('./activity.cjs');
+const {createShiftCloseout} = require('./shift-closeout.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
 function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
@@ -26,6 +27,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
+  const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
   const imports = createImports(store, filename);
   const maintenance = createMaintenance({store, filename, socketPath: maintenanceSocket});
@@ -137,6 +139,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if (pathname === '/api/shift-closeout') {
+          const user = authorized('canViewShiftCloseout');
+          if (request.method !== 'GET') throw problem(405,'METHOD_REJECTED');
+          return json(response,200,closeout.read(url.searchParams,user));
+        }
         if (pathname === '/api/admin/activity') {
           const user = authorized('canViewActivity');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
