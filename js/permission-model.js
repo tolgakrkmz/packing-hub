@@ -46,6 +46,7 @@
     const result = Object.fromEntries(keys.map(key => [key, explicit(key) ? overrides[key] === true : base[key]]));
     if (!explicit('canReportTasks')) result.canReportTasks = user.taskSupervisor === true;
     if (!explicit('canViewShiftCloseout')) result.canViewShiftCloseout = user.role === 'admin' || user.taskSupervisor === true;
+    for (const key of ['canReceiveShiftCloseoutDue','canReceiveShiftCloseoutOverdue']) if (!explicit(key)) result[key] = user.role === 'admin' || user.taskSupervisor === true;
     for (const report of Object.values(reports)) {
       for (const [action, legacy] of [['create', 'canCreateReports'], ['edit', 'canEditReports']]) {
         if (!explicit(report[action])) result[report[action]] = result[legacy];

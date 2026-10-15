@@ -5,6 +5,7 @@ const permissions = require('./permissions.cjs');
 const {can} = permissions;
 const {types, available, href} = require('../js/notification-model.js');
 const {createWebPush, validateSubscription} = require('./web-push.cjs');
+const {createShiftCloseout,scopeFromTarget} = require('./shift-closeout.cjs');
 function createNotifications(store, {now = Date.now, push = {}, taskNow = now} = {}) {
   const {db} = store, transport = createWebPush({...push, now});
   db.exec(`CREATE TABLE IF NOT EXISTS notification_state(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -16,7 +17,9 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     CREATE TABLE IF NOT EXISTS push_queue(subscription_id TEXT PRIMARY KEY REFERENCES push_subscriptions(id) ON DELETE CASCADE, next_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, generation INTEGER NOT NULL DEFAULT 1);`);
   const state = key => db.prepare('SELECT value FROM notification_state WHERE key=?').get(key)?.value;
   const saveState = (key, value) => db.prepare('INSERT INTO notification_state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, String(value));
-  const userFrom = row => ({...row, taskSupervisor: !!row.task_supervisor, permissionOverrides: JSON.parse(row.permissions || '{}')});
+  const closeout=createShiftCloseout(store,{now:taskNow});
+  if(state('closeout:activation')===undefined)saveState('closeout:activation',taskNow());
+  const userFrom = row => ({...row, taskSupervisor: !!row.task_supervisor, taskTeam:row.task_team, permissionOverrides: JSON.parse(row.permissions || '{}')});
   const users = () => db.prepare('SELECT * FROM users WHERE active=1 AND deleted_at IS NULL').all().map(userFrom);
   const settings = user => JSON.parse(db.prepare('SELECT data FROM notification_preferences WHERE user_id=?').get(user.id)?.data || '{}');
   const allowed = (user, type) => available(type, user, permissions);
@@ -29,7 +32,13 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   function taskVisible(item, user) {
     return item && (!user.taskSupervisor || can(user, 'canManageTasks') || can(user, 'canReviewTasks') || item.owner.id === user.id || item.participants.some(p => p.id === user.id) || can(user, 'canAssignTasks') && item.events.some(e => e.action === 'created' && e.actor.id === user.id));
   }
-  const targetVisible = (type, target, user) => types[type]?.module !== 'tasks' || !target || taskVisible(task(target), user);
+  const targetVisible = (type, target, user) => {
+    if(types[type]?.module==='shift-closeout') {
+      try {const value=closeout.read(scopeFromTarget(target),user);return !!(value.availability?.production||value.availability?.pairs);}
+      catch {return false;}
+    }
+    return types[type]?.module !== 'tasks' || !target || taskVisible(task(target), user);
+  };
   const visible = (item, user) => allowed(user, item.type) && targetVisible(item.type, item.target, user);
   function emit(type, eventKey, targets, target = null, at = now()) {
     for (const user of targets) {
@@ -71,6 +80,17 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
         db.prepare('DELETE FROM notification_targets WHERE audit_id=?').run(change.id);
       }
       const at = taskNow();
+      for(const user of roster) {
+        if(!can(user,'canViewShiftCloseout') || user.role!=='admin' && !user.taskSupervisor)continue;
+        for(const candidate of closeout.reminderCandidates(at,user)) {
+          if(candidate.dueAt<Number(state('closeout:activation')))continue;
+          const type=candidate.phase==='due'?'shiftCloseoutDue':'shiftCloseoutOverdue';
+          const key='closeout:'+candidate.target+':'+candidate.phase+':'+user.id;
+          if(state(key)!==undefined || !enabled(user,type))continue;
+          emit(type,key,[user],candidate.target);
+          saveState(key,1);
+        }
+      }
       for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) {
         if (!Array.isArray(item.events) || !item.owner || !Array.isArray(item.participants)) continue;
         const cursor = Number(state('task:' + item.id) || 0);
@@ -123,9 +143,10 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
       WHERE user_id=? AND read_at IS NULL AND type IN (${permitted.map(() => '?').join(',')}) GROUP BY type,target`).all(user.id,...permitted);
     const targets = new Map();
     return {count:rows.reduce((count,row) => {
-      if (types[row.type]?.module !== 'tasks' || !row.target) return count + row.count;
-      if (!targets.has(row.target)) targets.set(row.target,taskVisible(task(row.target),user));
-      return count + (targets.get(row.target) ? row.count : 0);
+      if (!['tasks','shift-closeout'].includes(types[row.type]?.module) || !row.target) return count + row.count;
+      const key=row.type+':'+row.target;
+      if (!targets.has(key)) targets.set(key,targetVisible(row.type,row.target,user));
+      return count + (targets.get(key) ? row.count : 0);
     },0)};
   }
   function preferences(user) {
