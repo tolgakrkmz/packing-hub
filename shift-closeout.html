@@ -7,9 +7,29 @@
 <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
 <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg"><link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+<link rel="stylesheet" href="css/shift-closeout.css">
+<script src="js/report-scope.js" defer></script><script src="js/shift-closeout.js" defer></script>
 </head>
-<body><main class="wrap">
+<body><main class="wrap closeout-wrap">
 <a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a>
-<h1>Край на смяната</h1>
-<p>Тонаж и отчети на двойките за избраната смяна.</p>
+<header><p class="closeout-eyebrow">Проверка на отчетите</p><h1>Край на смяната</h1>
+<p>Тонаж и отчети на двойките за избраната смяна.</p></header>
+<div class="closeout-filters">
+<label>Дата на смяната<input id="closeoutDate" type="date"></label>
+<label>Екип<select id="closeoutTeam"></select></label>
+<label>Смяна<select id="closeoutShift"><option value="1">1-ва смяна</option><option value="2">2-ра смяна</option><option value="3">Нощна смяна</option></select></label>
+<button id="closeoutCurrent" type="button">Текуща смяна</button><button id="closeoutRefresh" type="button">Опресни</button>
+</div>
+<p id="closeoutMessage" role="status" aria-live="polite"></p>
+<section id="closeoutSummary" hidden aria-label="Обобщение на смяната">
+<p id="closeoutInterval" translate="no"></p><p id="closeoutPhase" class="closeout-phase"></p>
+<div class="closeout-metrics">
+<article class="closeout-card"><p class="closeout-eyebrow">Задължителен отчет</p><h2>Тонаж</h2><strong id="closeoutProductionStatus" class="closeout-status"></strong><a id="closeoutProductionLink">Въведи тонаж</a></article>
+<article class="closeout-card"><p class="closeout-eyebrow">Изпълнение на плана</p><h2>Двойки</h2>
+<dl class="closeout-counts"><div><dt>Планирани</dt><dd id="closeoutPlanned"></dd></div><div><dt>Отчетени</dt><dd id="closeoutReported"></dd></div><div><dt>Без отчет</dt><dd id="closeoutPending"></dd></div><div><dt>Отменени</dt><dd id="closeoutCancelled"></dd></div></dl>
+<p id="closeoutPairsNote"></p></article>
+</div>
+<h2>Отчети на двойките</h2><div id="closeoutPairs" class="closeout-pairs"></div>
+</section>
+<p class="closeout-help">Тонажът е задължителен за работната смяна. Резултатите на двойките се проверяват отделно и не се добавят към общия тонаж.</p>
 </main></body></html>

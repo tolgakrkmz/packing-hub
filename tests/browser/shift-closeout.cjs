@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const {shiftSchedule:schedule}=require('../../server/store.cjs');
-async function exerciseShiftCloseout({admin,hub,base,expect,setTime}) {
+async function exerciseShiftCloseout({admin,hub,base,device,expect,setTime}) {
   const date='2026-10-04',team=schedule.teamFor(schedule.parseDate(date),3);
   const query=new URLSearchParams({date,team,shiftCode:3});
   for(const at of ['2026-10-05T05:30:00+03:00','2026-10-05T08:30:00+03:00']) {
@@ -31,5 +31,58 @@ async function exerciseShiftCloseout({admin,hub,base,expect,setTime}) {
   await admin.goto(base+'/pair-targets?'+new URLSearchParams({date:'2026-10-03',team,shiftCode:3,target:entry.id}));
   await expect(admin.locator('#pageError')).toContainText('Невалидна');
   console.log('PASS explicit report scopes: night dates, zero production, delayed pair load, result save and invalid links');
+  const seed=(kind,value)=>hub.store.db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(value),kind);
+  const pairs={module:'pair-targets',schemaVersion:1,entries:[entry,{...entry,id:'demo-close-cancel',cancellation:{reasonKey:'cleaning',reasonText:'Demo cleaning reason',cancelledAt:'2026-10-04T20:00:00Z'},updatedAt:'2026-10-04T20:00:00Z'}]};
+  seed('pair-targets',pairs);seed('production-log',{entries:[],goalTons:3000});
+  await admin.goto(base+'/shift-closeout?'+query);
+  await expect(admin.locator('#closeoutProductionStatus')).toHaveText('Липсва');
+  await expect(admin.locator('#closeoutPending')).toHaveText('1');
+  await expect(admin.locator('#closeoutCancelled')).toHaveText('1');
+  await expect(admin.locator('#closeoutPairs')).toContainText('Demo cleaning reason');
+  await expect(admin.locator('#closeoutProductionLink')).toHaveAttribute('href','/production-log?'+query);
+  await expect(admin.locator('[data-closeout-pair="'+entry.id+'"] a')).toHaveAttribute('href','/pair-targets?'+query+'&target='+entry.id);
+  await admin.locator('[data-hub-language=en]').click();await expect(admin.locator('h1')).toHaveText('Shift closeout');
+  await expect(admin.locator('#closeoutProductionStatus')).toHaveText('Missing');
+  for(const width of [320,390,1440]) {await admin.setViewportSize({width,height:900});await require('./responsive.cjs').assertResponsive(admin,'closeout '+width);}
+  await admin.locator('[data-hub-language=bg]').click();
+  await admin.route('**/api/shift-closeout?*',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"UNAVAILABLE"}'}));
+  await admin.locator('#closeoutRefresh').click();await expect(admin.locator('#closeoutMessage')).toContainText('не са актуални');
+  await expect(admin.locator('#closeoutProductionStatus')).toHaveText('Липсва');
+  await admin.unroute('**/api/shift-closeout?*');
+  seed('production-log',{entries:[{id:'demo-late',date,shift:team,tonnage:0,brak:0}],goalTons:3000});
+  await admin.locator('#closeoutRefresh').click();await expect(admin.locator('#closeoutProductionStatus')).toHaveText('Въведен');
+  // A delayed response for an earlier date must not overwrite the newer filter.
+  let release,started;const waiting=new Promise(r=>{started=r;});
+  await admin.route('**/api/shift-closeout?*',async route=>{
+    if(new URL(route.request().url()).searchParams.get('date')==='2026-10-03') {
+      const response=await route.fetch();started();await new Promise(r=>{release=r;});await route.fulfill({response});
+    } else await route.continue();
+  });
+  await admin.locator('#closeoutDate').fill('2026-10-03');await admin.locator('#closeoutDate').dispatchEvent('change');await waiting;
+  await admin.locator('#closeoutDate').fill(date);await admin.locator('#closeoutDate').dispatchEvent('change');
+  await expect(admin.locator('#closeoutSummary')).toHaveAttribute('data-date',date);release();
+  await admin.unroute('**/api/shift-closeout?*',{behavior:'wait'});
+  await expect(admin.locator('#closeoutDate')).toHaveValue(date);
+  const actor=hub.auth.list()[0];
+  await hub.auth.create('demo-close-chief','Fictional-password-123','operator',actor,{},()=>{},{taskSupervisor:true,taskTeam:team});
+  const chief=await device('demo-close-chief',true);
+  await chief.goto(base+'/shift-closeout?'+query);await expect(chief.locator('#closeoutTeam option')).toHaveCount(1);
+  assert.equal(await chief.evaluate(async()=> (await fetch('/api/shift-closeout?team='+encodeURIComponent('СТИКЕРИ'))).status),403);
+  await hub.auth.create('demo-close-limited','Fictional-password-123','operator',actor,{canViewProduction:false},()=>{},{taskSupervisor:true,taskTeam:team});
+  const limited=await device('demo-close-limited');await limited.goto(base+'/shift-closeout?'+query);
+  await expect(limited.locator('#closeoutProductionStatus')).toHaveText('Нямате достъп');await expect(limited.locator('#closeoutProductionLink')).toBeHidden();
+  await hub.auth.create('demo-close-ordinary','Fictional-password-123','operator',actor);
+  const ordinary=await device('demo-close-ordinary');assert.equal(await ordinary.evaluate(async()=> (await fetch('/shift-closeout')).status),403);
+  await ordinary.context().close();await limited.context().close();await chief.context().close();
+  await admin.goto(base+'/shift-closeout?target='+encodeURIComponent(date+'/'+team+'/3'));
+  await expect(admin.locator('#closeoutDate')).toHaveValue(date);
+  // UTC devices still resolve the Sofia overnight production date, including DST.
+  const utc=await admin.context().browser().newContext({timezoneId:'UTC'});
+  await utc.addCookies(await admin.context().cookies());const page=await utc.newPage();
+  setTime('2026-10-25T04:00:00+02:00');await page.goto(base+'/shift-closeout');
+  await expect(page.locator('#closeoutDate')).toHaveValue('2026-10-24');
+  await expect(page.locator('#closeoutShift')).toHaveValue('3');await utc.close();
+  await admin.goto(base+'/shift-closeout?date=invalid');await expect(admin.locator('#closeoutMessage')).toContainText('заредят');await expect(admin.locator('#closeoutSummary')).toBeHidden();
+  console.log('PASS closeout screen: scope, permissions, pending/cancelled pairs, late report, stale errors, filter race, BG/EN, mobile, notification and UTC/DST');
 }
 module.exports={exerciseShiftCloseout};

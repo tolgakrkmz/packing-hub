@@ -467,7 +467,7 @@ const HubServer = (() => {
     const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
     const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';
     const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.disabled = true; placeholder.textContent = 'Избери модул'; moduleSelect.append(placeholder);
-    const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики']];
+    const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['shift-closeout','Край на смяната'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики']];
     for (const [name, title] of modules) {
       if (name !== 'index' && !canViewModule(name)) continue;
       const option = document.createElement('option'); option.value = name === 'index' ? '/' : '/' + name; option.textContent = title;
@@ -619,6 +619,8 @@ const HubServer = (() => {
       window.addEventListener('pageshow', event => { if (event.persisted) resume(); });
     }
     if (currentModule === 'index') {
+      const closeoutLink=document.querySelector('a[href="/shift-closeout"],a[href="shift-closeout.html"]');
+      if(closeoutLink)closeoutLink.hidden=!canViewModule('shift-closeout');
       const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
       if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
       document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
