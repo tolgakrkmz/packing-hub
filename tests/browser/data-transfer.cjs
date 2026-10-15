@@ -20,6 +20,26 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
   await admin.goto(base + '/production-import');
   await expect(admin).toHaveURL(base + '/data-import#production');
   await expect(admin.locator('#importFile')).toBeVisible();
+  // Invalid derived values never produce an actionable preview or change live data.
+  for (const {kind,data} of require('../semantic-fixtures.cjs').rejected) {
+    const file={name:kind+'.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))};
+    if(kind==='production-log') {
+      await admin.locator('[data-transfer-tab=production]').click();
+      await admin.locator('#importFile').setInputFiles(file);
+      await admin.locator('#previewImport').click();
+      await expect(admin.locator('#importMessage')).toContainText('Файлът не е валиден');
+      await expect(admin.locator('#applyImport')).toBeDisabled();
+      await expect(admin.locator('#importSummary')).toBeHidden();
+    }
+    await admin.locator('[data-transfer-tab=modules]').click();
+    await admin.locator('#moduleFiles').setInputFiles(file);
+    await admin.locator('#checkDataImport').click();
+    await expect(admin.locator('#dataImportMessage')).toContainText('Невалиден файл');
+    await expect(admin.locator('#confirmDataImport')).toBeDisabled();
+    await expect(admin.locator('#batchPreview')).toBeHidden();
+    for(const [index,module] of kinds.entries()) assert.deepEqual(hub.store.get(module).data,before[index]);
+  }
+  await admin.locator('[data-transfer-tab=production]').click();
   const history = {goalTons:9999, entries:[{id:'demo-transfer-history', date:'2026-10-04', shift:'А', tonnage:1600, brak:16, breakdown:null}]};
   const selected = {name:'production-log.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(history))};
   await admin.locator('#importFile').setInputFiles(selected);

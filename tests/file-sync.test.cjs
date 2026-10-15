@@ -61,6 +61,20 @@ test('Personnel connection asks only for read access and cannot write or create 
   await assert.rejects(env.sync.commitData(),/само за четене/);
   assert.equal(env.writes,0);
 });
+for(const {name,kind,data} of require('./semantic-fixtures.cjs').rejected) {
+  test('file refresh and writes preserve the last accepted snapshot for '+name,async () => {
+    const env=environment({suggestedFileName:kind+'.json',strictJson:true});
+    await env.elements.openFileBtn.click();
+    const accepted=env.accepted, renders=env.renders;
+    env.handle.text=JSON.stringify(data);
+    await assert.rejects(env.sync.refreshFromDisk(),{code:'HUB_DATA'});
+    assert.equal(env.accepted,accepted); assert.equal(env.renders,renders);
+    env.handle.text='{"entries":[]}'; await env.elements.openFileBtn.click();
+    env.setPayload(data);
+    await assert.rejects(env.sync.commitData(),{code:'HUB_DATA'});
+    assert.equal(env.writes,0); assert.equal(env.handle.text,'{"entries":[]}');
+  });
+}
 test('strict files reject invalid or empty JSON without replacing accepted data',async () => {
   const env = environment({strictJson:true});
   await env.elements.openFileBtn.click();

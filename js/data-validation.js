@@ -25,14 +25,24 @@ const HubDataValidation = (() => {
     return !('reasons' in data) && !('employees' in data) &&
       (data.goalTons === undefined || number(data.goalTons)) &&
       records(data.entries,row => date(row.date) && shifts.includes(row.shift) && number(row.tonnage) && number(row.brak) &&
-        (row.breakdown == null || object(row.breakdown) && ['autoKg','autoCrates','manKg','manCrates'].every(key => number(row.breakdown[key]))));
+        (row.breakdown == null || object(row.breakdown) && ['autoKg','autoCrates','manKg','manCrates'].every(key => number(row.breakdown[key])) &&
+          matchingTonnage(row)));
+  }
+  function matchingTonnage(row) {
+    const total = row.breakdown.autoKg + row.breakdown.manKg;
+    if(Number.isInteger(row.tonnage) && Number.isInteger(total)) return row.tonnage === total;
+    // Legacy files can contain fractional kg. Allow only floating-point roundoff.
+    return Number.isFinite(total) && Math.abs(row.tonnage - total) <= Number.EPSILON * Math.max(row.tonnage, total);
   }
   function downtime(data) {
     const time = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+    const minutes = value => Number(value.slice(0,2)) * 60 + Number(value.slice(3));
     return !('goalTons' in data) && !('employees' in data) &&
       (data.reasons === undefined || Array.isArray(data.reasons) && data.reasons.every(text)) &&
       records(data.entries,row => date(row.date) && shifts.includes(row.shift) && time(row.start) && time(row.end) &&
-        number(row.durationMin) && row.durationMin > 0 && row.durationMin < 1440 && text(row.reason) && optionalText(row.reasonNote) && optionalText(row.note));
+        number(row.durationMin) && row.durationMin > 0 && row.durationMin < 1440 &&
+        row.durationMin === (minutes(row.end) - minutes(row.start) + 1440) % 1440 &&
+        text(row.reason) && optionalText(row.reasonNote) && optionalText(row.note));
   }
   function personnel(data) {
     return !('entries' in data) && Array.isArray(data.employees) &&
