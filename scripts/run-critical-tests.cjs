@@ -28,6 +28,7 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
     // that reviewed feature is integrated, without requiring its branch here.
     if (script === 'run-server-browser-tests.cjs') {
       modes.push('unsaved-navigation');
+      modes.push('shift-closeout');
       if (fs.existsSync(path.join(root, 'tests/browser/report-history.cjs'))) modes.push('report-history');
     }
     for (const mode of modes) suites.push([script + ':' + (mode || 'default'), ['scripts/' + script, '--headless', ...(mode ? ['--' + mode + '-only'] : [])]]);

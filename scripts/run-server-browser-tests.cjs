@@ -71,6 +71,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if(process.argv.includes('--shift-closeout-only')) {
+      await require('../tests/browser/shift-closeout.cjs').exerciseShiftCloseout({admin,hub,base,device,expect,setTime:value=>{taskTime=Date.parse(value);}});
+      assert.deepEqual(errors,[]);return;
+    }
     if (process.argv.includes('--unsaved-navigation-only')) {
       await require('../tests/browser/unsaved-navigation.cjs').exerciseUnsavedNavigation({admin,hub,base,expect});
       assert.deepEqual(errors,[]); return;

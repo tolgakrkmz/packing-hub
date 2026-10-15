@@ -10,12 +10,20 @@
   let personnel = {employees:[]};
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
+  let explicitScope=null, scopeLinkError='';
+  try {if(typeof HubReportScope!=='undefined')explicitScope=HubReportScope.parse(location.search);}
+  catch(error){scopeLinkError=error.message;}
   const pairDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.($('pairDialog'),{isOpen:() => !!editing});
   if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => busy,
     hasDraft:() => pairDraft?.hasDraft() || !!editing?.attempt || !!editing?.needsConfirmation});
   const elements = prefix => Object.fromEntries(['connDot','connText','openFileBtn','createFileBtn','reconnectBtn','refreshBtn','connRow','connNote','importFallback'].map(key => [key,$(prefix+key[0].toUpperCase()+key.slice(1))]));
   const acceptPairs = value => {
     data = PairTargets.validateData(value); pairsLoaded = true;
+    if(explicitScope) {
+      const id=new URLSearchParams(location.search).get('target'),entry=data.entries.find(e=>e.id===id);
+      if(entry && !PairTargets.inScope(entry,explicitScope))scopeLinkError='Невалидна връзка към смяна. Отворете модула от началната страница.';
+    }
+    if(scopeLinkError){$('pageError').textContent=scopeLinkError;return;}
     globalThis.HubNotificationTarget?.select(data.entries, entry => entry.id, entry => {
       context = {date: entry.date, team: entry.team, shiftCode: entry.shiftCode}; followLive = false;
       $('historyMonth').value = entry.date.slice(0,7); updateControls();
@@ -136,7 +144,7 @@
     Array.from(two.options).forEach(option => { option.disabled = !!option.value && option.value === one.value; });
   }
   function openDialog(mode, entry = null) {
-    if(busy || !pairsLoaded || !rosterLoaded) return;
+    if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
     const scope = entry || context;
     editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null,
@@ -338,7 +346,10 @@
   $('closeDialogBtn').addEventListener('click',closeDialog);
   $('cancelDialogBtn').addEventListener('click',closeDialog);
   $('pairDialog').addEventListener('cancel',event => { event.preventDefault(); closeDialog(); });
-  selectLive(); render();
+  if(explicitScope){context=explicitScope;followLive=false;updateControls();}
+  else selectLive();
+  if(scopeLinkError)$('pageError').textContent=scopeLinkError;
+  render();
   Promise.allSettled([sync.init(),rosterSync.init()]).then(render);
   function refreshLive(){
     if(document.hidden) return;
