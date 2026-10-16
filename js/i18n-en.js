@@ -1,5 +1,17 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Временно отключване за закъснял отчет": "Temporary access for a late report",
+  "Отключването важи само за избраната дата и екип, за 30 минути от потвърждението. Запазват се правата на акаунтите.": "Access applies only to the selected date and team, for 30 minutes from confirmation. Account permissions still apply.",
+  "Причина за отключване или отмяна": "Reason for reopening or cancellation",
+  "Отключи за 30 минути": "Allow access for 30 minutes",
+  "Отмени отключването": "Revoke temporary access",
+  "Временно разрешено въвеждане до": "Temporary reporting access until",
+  "Отключено до": "Access open until",
+  "Няма активно временно отключване.": "No active temporary access.",
+  "Отключено за 30 минути.": "Access open for 30 minutes.",
+  "Временното отключване е отменено.": "Temporary access revoked.",
+  "Изберете приключила смяна с изтекъл срок и добавете причина. Отключването е за 30 минути.": "Select an ended shift whose deadline has passed and enter a reason. Access lasts 30 minutes.",
+  "Временно отключване или отмяна за закъснял тонаж": "Late production access or revocation",
   "Административно изключение за тонаж": "Administrative production exception",
   "Разрешаване или отмяна на извънредна смяна": "Extra shift authorization or revocation",
   "Очакват се отчети след смяната": "Reports are expected after the shift",

@@ -1222,6 +1222,17 @@ the Save button; the server checks again on every actual write. Rejected writes
 retain the form draft. A confirmed operation may be safely retried after the
 window closes to retrieve its receipt, without creating another report.
 
+For a late operator entry, an administrator with production settings permission
+can select the original date and team in Production, expand Temporary access for
+a late report, provide a reason and allow access for 30 minutes. This requires a
+scheduled shift (or an authorized extraordinary Stickers shift) whose normal
+one-hour grace period has ended. Assigned accounts report themselves with their
+existing module permissions; editing rights are not added. Access closes exactly
+30 minutes after the server accepts the grant and can be revoked early with a
+reason. The grant and reason are audited. SQLite retains the original expiry
+across restarts. Future or unscheduled shifts cannot be opened through this flow.
+Repeated approval explicitly starts a new 30-minute period for that same scope.
+
 ## Save recovery
 
 Production and downtime keep form input and restore the accepted history and totals

@@ -7,6 +7,9 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
   db.exec(`CREATE TABLE IF NOT EXISTS production_shift_authorizations(
     date TEXT PRIMARY KEY, start TEXT NOT NULL, end TEXT NOT NULL,
     enabled INTEGER NOT NULL, reason TEXT NOT NULL, user_id INTEGER, at INTEGER NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS production_reporting_extensions(
+    date TEXT NOT NULL, team TEXT NOT NULL, starts_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+    enabled INTEGER NOT NULL, reason TEXT NOT NULL, user_id INTEGER, at INTEGER NOT NULL, PRIMARY KEY(date,team))`);
   const validReason=value=>typeof value==='string'&&value.trim().length>0&&value.length<=1000;
   const instant=(date,time)=>{const [hour,minute]=time.split(':').map(Number);return schedule.sofiaInstant(date,hour,minute);};
   function scope(date,team) {
@@ -25,9 +28,13 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
   }
   function status(date,team,user,at=now()) {
     const value=interval(date,team), assigned=user.taskTeam===team;
-    const inWindow=!!value&&at>=value.start&&at<=value.end+3600000;
+    const scheduledDeadline=value?value.end+3600000:null;
+    const extension=db.prepare('SELECT starts_at,expires_at,enabled FROM production_reporting_extensions WHERE date=? AND team=?').get(date,team);
+    const lateAccess=extension?{expiresAt:extension.expires_at,active:!!extension.enabled&&at>=extension.starts_at&&at<extension.expires_at}:null;
+    const reopened=!!value&&at>scheduledDeadline&&!!lateAccess?.active;
+    const inWindow=!!value&&(at>=value.start&&at<=scheduledDeadline||reopened);
     const code=!teams.includes(user.taskTeam)?'PRODUCTION_TEAM_REQUIRED':!assigned?'PRODUCTION_TEAM_MISMATCH':!inWindow?'PRODUCTION_WINDOW_CLOSED':null;
-    return {date,team,now:at,interval:value,deadline:value?value.end+3600000:null,
+    return {date,team,now:at,interval:value,scheduledDeadline,lateAccess,reopened,deadline:reopened?lateAccess.expiresAt:scheduledDeadline,
       allowed:!code,code,adminException:user.role==='admin'&&!!code};
   }
   function currentScope(user,at=now()) {
@@ -45,7 +52,8 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
     const value=status(date,team,user);
     return {...value,canCreate:can(user,'canCreateProduction')&&(value.allowed||value.adminException),
       canEdit:can(user,'canEditProduction')&&(value.allowed||value.adminException),
-      canAuthorize:user.role==='admin'&&can(user,'canManageProductionSettings'),currentScope:current};
+      canAuthorize:user.role==='admin'&&can(user,'canManageProductionSettings'),
+      canReopen:user.role==='admin'&&can(user,'canManageProductionSettings')&&!!value.interval&&value.now>value.scheduledDeadline,currentScope:current};
   }
   function requireChanges(before,after,user,reason) {
     const prior=new Map(before.entries.map(e=>[e.id,e])),next=new Map(after.entries.map(e=>[e.id,e]));
@@ -66,6 +74,7 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
   }
   function configure(input,user) {
     if(user.role!=='admin'||!can(user,'canViewProduction')||!can(user,'canManageProductionSettings'))throw problem(403,'FORBIDDEN');
+    if(input?.mode==='late')return configureLate(input,user);
     if(!input||Object.keys(input).some(key=>!['date','start','end','enabled','reason'].includes(key))||typeof input.enabled!=='boolean'||typeof input.start!=='string'||typeof input.end!=='string'||!validReason(input.reason)||
       !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.end)||input.start>=input.end)throw problem(400,'INVALID_PRODUCTION_AUTHORIZATION');
     scope(input.date,'СТИКЕРИ');
@@ -78,6 +87,21 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
         .run(input.date,input.start,input.end,input.enabled?1:0,input.reason.trim(),user.id??null,now());
       store.audit(user,'production-shift-authorize','production-log',{date:input.date,start:input.start,end:input.end,enabled:input.enabled,reason:input.reason.trim()});
       return read({date:input.date,team:'СТИКЕРИ'},user);
+    });
+  }
+  function configureLate(input,user) {
+    if(Object.keys(input).some(key=>!['mode','date','team','enabled','reason'].includes(key))||typeof input.enabled!=='boolean'||!validReason(input.reason))throw problem(400,'INVALID_PRODUCTION_REOPEN');
+    scope(input.date,input.team);
+    const at=now(),value=interval(input.date,input.team);
+    if(input.enabled&&(!value||at<=value.end+3600000))throw problem(400,'INVALID_PRODUCTION_REOPEN');
+    return store.transaction(()=>{
+      const prior=db.prepare('SELECT starts_at,expires_at FROM production_reporting_extensions WHERE date=? AND team=?').get(input.date,input.team);
+      const startsAt=input.enabled?at:prior?.starts_at??at,expiresAt=input.enabled?at+30*60000:prior?.expires_at??at;
+      db.prepare(`INSERT INTO production_reporting_extensions VALUES(?,?,?,?,?,?,?,?)
+        ON CONFLICT(date,team) DO UPDATE SET starts_at=excluded.starts_at,expires_at=excluded.expires_at,enabled=excluded.enabled,reason=excluded.reason,user_id=excluded.user_id,at=excluded.at`)
+        .run(input.date,input.team,startsAt,expiresAt,input.enabled?1:0,input.reason.trim(),user.id??null,at);
+      store.audit(user,'production-window-reopen','production-log',{date:input.date,team:input.team,enabled:input.enabled,expiresAt,reason:input.reason.trim()});
+      return read({date:input.date,team:input.team},user);
     });
   }
   return {interval,status,read,currentScope,requireChanges,configure};

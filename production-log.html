@@ -156,7 +156,7 @@
     </div>
 
     <p id="productionAccessMessage" role="status" aria-live="polite" hidden></p>
-    <details id="productionExtraShift" hidden>
+    <details id="productionExtraShift" class="production-authorization" hidden>
       <summary>Извънредна смяна — Стикери</summary>
       <p>Разрешението важи само за избраната дата и часовете по-долу. Въвеждането е до 1 час след края.</p>
       <div class="row">
@@ -170,6 +170,19 @@
         <button type="button" class="conn-btn" id="productionExtraRevoke">Отмени разрешението</button>
       </div>
       <p id="productionExtraMessage" role="status" aria-live="polite"></p>
+    </details>
+    <details id="productionLateAccess" class="production-authorization" hidden>
+      <summary>Временно отключване за закъснял отчет</summary>
+      <p>Отключването важи само за избраната дата и екип, за 30 минути от потвърждението. Запазват се правата на акаунтите.</p>
+      <p id="productionLateScope" translate="no"></p>
+      <p id="productionLateUntil"></p>
+      <label for="productionLateReason">Причина за отключване или отмяна</label>
+      <textarea id="productionLateReason" maxlength="1000"></textarea>
+      <div class="row">
+        <button type="button" class="conn-btn" id="productionLateAllow">Отключи за 30 минути</button>
+        <button type="button" class="conn-btn" id="productionLateRevoke">Отмени отключването</button>
+      </div>
+      <p id="productionLateMessage" role="status" aria-live="polite"></p>
     </details>
     <button class="save-btn" id="saveBtn" disabled>Изберете смяна за запис</button>
     <button type="button" class="conn-btn" id="cancelReportEdit" hidden>Откажи редакцията</button>
