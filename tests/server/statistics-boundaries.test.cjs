@@ -9,7 +9,7 @@ test('leap-day and year-boundary projections retain exact fractional kg, zero re
     ['2024-03-01', 'Г', 2000.25, 4.5], ['2023-12-31', 'Б', 1000, 1],
     ['2024-02-29', 'СТИКЕРИ', 123.75, 0.5], ['2024-12-31', 'В', 4001, 2], ['2024-02-28', 'А', 0, 0]
   ].map(([date, shift, tonnage, brak], index) => ({id: 'demo-boundary-' + index, date, shift, tonnage, brak, breakdown: null}));
-  store.put('production-log', {entries: rows, goalTons: 10}, 1, actor);
+  store.put('production-log', {entries: rows, goalTons: 10}, 1, actor,'import');
   const reads = createStatisticsReads(store), february = reads.read('production-log', '2024-02');
   assert.deepEqual(february.data.entries.map(row => row.date), ['2024-02-29', '2024-02-28']);
   assert.deepEqual(february.data.summary.availableYears, ['2023', '2024']);

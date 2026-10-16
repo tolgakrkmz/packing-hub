@@ -12,12 +12,12 @@ const {createTasks} = require('../../server/tasks.cjs');
 const {accounts} = require('../../server/accounts.cjs');
 const {createHubServer} = require('../../server/server.cjs');
 const {photo} = require('./task-photo-fixture.cjs');
-const user = {id: 1, username: 'demo-input-admin', role: 'admin'};
+const user = {id: 1, username: 'demo-input-admin', role: 'admin',taskTeam:'А'};
 const image = Buffer.from(photo, 'base64');
 const emptyTables = Buffer.from('ffd8ffdb0002ffc40002ffc0000b080001000101011100ffda0008010100003f0000ffd9', 'hex').toString('base64');
 function setup(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-security-input-demo-'));
-  const filename = path.join(directory, 'demo.sqlite'), store = openStore(filename), imports = createImports(store, filename);
+  const filename = path.join(directory, 'demo.sqlite'), store = openStore(filename,{productionNow:()=>Date.parse('2026-10-04T16:00:00+03:00')}), imports = createImports(store, filename);
   t.after(() => { imports.close(); store.close(); fs.rmSync(directory, {recursive: true, force: true}); });
   return {directory, store, imports};
 }

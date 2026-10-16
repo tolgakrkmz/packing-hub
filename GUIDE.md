@@ -1178,10 +1178,49 @@ check before production deployment.
 
 ## Report dates
 
-Production and downtime reports use one date field. Before 10:00, rotating teams
+In authenticated server mode, production uses the assigned account team and
+the server's Europe/Sofia clock to select the current production date, including
+the previous date for an overnight shift and its one-hour grace period. This
+server selection is retained when choosing the team again. Manual dates and
+explicit shift links retain their selected date.
+
+Local-file production and downtime reports use one date field. Before 10:00, rotating teams
 default to yesterday for delayed night reports; selecting Stickers defaults to
 today. Changing the date or using Yesterday makes the choice manual and preserves
 it when switching teams. The visible date is the date saved in the report.
+
+## Production reporting window
+
+Assign each reporting account its team in Accounts, independently of the task
+supervisor checkbox. Team assignment does not grant task responsibilities or
+module permissions. Existing accounts without a team require configuration.
+Ordinary server production writes require the assigned team and dated rotation,
+from shift start through exactly one hour after shift end, inclusive. Night
+shifts keep their start date; daylight-saving changes use Sofia wall-clock shift
+boundaries. Create, correction, delete and restore operations, including legacy
+document replacements, check every changed source and destination scope. Goal
+changes alone retain their separate permission.
+
+Stickers normally works weekdays, 09:00–17:30. An administrator with production
+settings permission can select a rest-day date and Stickers in Production,
+expand Extra shift, and authorize its start/end times with a mandatory reason.
+The authorization applies only to that date; assigned staff then report
+themselves through one hour after its end. Revocation blocks subsequent writes.
+Authorization is stored in SQLite and its changes are audited. Times skipped
+by the spring clock change are rejected. Shift closeout uses the same interval
+and reports when a late entry needs an administrator.
+
+An administrator can make an exceptional out-of-window or other-team entry only
+with the normal module rights and a reason recorded with the report and audit
+event. Creating an administrator production record opens the explicit reason
+dialog. Administrative imports retain their separate, previewed import workflow
+and permission; they are not ordinary operator reporting. Local-file mode has no
+authenticated server enforcement.
+
+The form displays the server-checked deadline. A failed or expired check blocks
+the Save button; the server checks again on every actual write. Rejected writes
+retain the form draft. A confirmed operation may be safely retried after the
+window closes to retrieve its receipt, without creating another report.
 
 ## Save recovery
 

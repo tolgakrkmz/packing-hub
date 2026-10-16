@@ -63,7 +63,7 @@ async function exerciseNotificationTargets({admin, hub, base, device, expect, se
   const viewer = await hub.auth.create('demo-link-viewer', password, 'observer', actor, {canReceiveProductionAdded: true});
   const currentReports = hub.store.get('production-log');
   const report = {id: 'demo-link-mobile-report', date: '2026-09-05', shift: 'А', tonnage: 1000, brak: 0};
-  hub.store.put('production-log', {...currentReports.data, entries: [...currentReports.data.entries, report]}, currentReports.revision, actor); hub.notifications.sync();
+  hub.store.put('production-log', {...currentReports.data, entries: [...currentReports.data.entries, report]}, currentReports.revision, actor,'report',false,{reason:'Fictional historical report'}); hub.notifications.sync();
   const page = await device(viewer.username, true); await page.goto(base + '/notifications');
   const link = page.locator('.notification-open').first();
   await expect(link).toHaveAttribute('href', href('productionAdded', report.id));

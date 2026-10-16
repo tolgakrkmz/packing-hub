@@ -35,7 +35,7 @@ async function exerciseReconnectOverlay({admin, base, hub, expect, screenshotDir
   await admin.locator('#dateInput').fill('2026-10-05');
   await admin.locator('#tonInput').fill('417'); await admin.locator('#tonInput').focus();
   const data = hub.store.get('production-log');
-  hub.store.put('production-log', {...data.data,entries:[{id:'demo-reconnect-report',date:'2026-10-05',shift:'СТИКЕРИ',tonnage:1250,brak:10}]}, data.revision, hub.auth.list()[0]);
+  hub.store.put('production-log', {...data.data,entries:[{id:'demo-reconnect-report',date:'2026-10-05',shift:'СТИКЕРИ',tonnage:1250,brak:10}]}, data.revision, hub.auth.list()[0],'report',false,{reason:'Fictional historical report'});
   let release, reads = 0;
   const gate = new Promise(resolve => { release = resolve; });
   const holdSnapshot = async route => { reads++; await gate; await route.continue(); };

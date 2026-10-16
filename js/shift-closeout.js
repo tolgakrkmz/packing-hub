@@ -27,11 +27,14 @@
     $('closeoutTeam').value=value.scope.team;
     const format=new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',dateStyle:'short',timeStyle:'short'});
     $('closeoutInterval').textContent=value.interval?format.format(value.interval.start)+' – '+format.format(value.interval.end)+' · Europe/Sofia':value.scope.date+' · Europe/Sofia';
-    $('closeoutPhase').textContent={upcoming:'Предстояща смяна',working:'В ход',ended:'Приключила смяна',overdue:'Срокът за отчет е изтекъл',rest:'Почивка по график'}[value.phase];
+    $('closeoutPhase').textContent={upcoming:'Предстояща смяна',working:'В ход',ended:'Приключила смяна',overdue:'Очакват се отчети след смяната',rest:'Почивка по график'}[value.phase];
     const status=$('closeoutProductionStatus');status.textContent=value.production?{missing:'Липсва',entered:'Въведен','not-applicable':'Не е приложимо'}[value.production.state]:'Нямате достъп';
     status.dataset.state=value.production?.state||'unavailable';
     const productionLink=$('closeoutProductionLink');productionLink.hidden=!value.canReportProduction||!value.interval;
     link(productionLink,'/production-log',value.scope);
+    productionLink.textContent=value.productionAccess?.adminException?'Въведи с административна причина':'Въведи тонаж';
+    const access=value.productionAccess;
+    $('closeoutProductionWindow').textContent=!access?'':access.adminException?'Закъснелият отчет изисква административна причина.':access.allowed?'Разрешено въвеждане до '+format.format(access.deadline)+' · Europe/Sofia':access.interval?'Въвеждането е извън разрешения срок. Обърнете се към администратор.':'Няма разрешена смяна за този екип на избраната дата.';
     const pairs=value.pairs;
     for(const key of ['planned','reported','pending','cancelled'])$('closeout'+key[0].toUpperCase()+key.slice(1)).textContent=pairs?String(pairs[key]):'—';
     $('closeoutPairsNote').textContent=!pairs?'Нямате достъп':!pairs.planned?'Няма планирани двойки':pairs.pending?'Има двойки без отчет':'Всички активни двойки са отчетени';
@@ -66,7 +69,7 @@
   $('closeoutShift').addEventListener('change',()=>{selected.set('shiftCode',$('closeoutShift').value);if(HubServer.user.role==='admin')selected.delete('team');refresh();});
   $('closeoutCurrent').addEventListener('click',()=>{invalid=false;selected=new URLSearchParams();refresh();});
   $('closeoutRefresh').addEventListener('click',refresh);
-  for(const module of ['production-log','pair-targets','accounts'])HubServer.watch(module,refresh);
+  for(const module of ['production-log','pair-targets','accounts','production-access'])HubServer.watch(module,refresh);
   setInterval(()=>{if(!document.hidden)refresh();},30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   refresh();

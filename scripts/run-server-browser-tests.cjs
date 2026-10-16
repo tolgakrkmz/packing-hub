@@ -32,7 +32,8 @@ async function main() {
   let personnelTime=Date.parse(process.argv.includes('--personnel-transfers-only')?'2026-10-13T12:00:00+03:00':'2026-10-05T08:30:00+03:00');
   const notificationMode = process.argv.includes('--notifications-only');
   const notificationKey = notificationMode ? require('node:crypto').generateKeyPairSync('ec', {namedCurve: 'prime256v1'}).privateKey.export({format: 'jwk'}) : null;
-  const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, personnelNow:()=>personnelTime, maintenanceSocket: status?.socketPath});
+  const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, personnelNow:()=>personnelTime,
+    productionNow:()=>process.argv.includes('--production-access-only')||process.argv.includes('--shift-closeout-only')?taskTime:Date.parse('2026-10-05T12:00:00+03:00'),maintenanceSocket: status?.socketPath});
   let browser;
   const errors = [];
   try {
@@ -52,7 +53,7 @@ async function main() {
       await context.addInitScript(() => { window.showOpenFilePicker = () => { throw new Error('Online mode must not ask for a local JSON file'); }; });
       // Existing workflow suites supply a fictional correction reason. The
       // history suite exercises the visible mandatory-reason dialog itself.
-      if (!process.argv.includes('--report-history-only')) await context.addInitScript(() => {
+      if (!process.argv.includes('--report-history-only')&&!process.argv.includes('--production-access-only')) await context.addInitScript(() => {
         new MutationObserver(() => {
           const dialog = document.getElementById('reportCorrectionDialog');
           if (!dialog?.open) return;
@@ -71,6 +72,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if(process.argv.includes('--production-access-only')) {
+      await require('../tests/browser/production-access.cjs').exerciseProductionAccess({admin,hub,base,device,expect,setTime:value=>{taskTime=Date.parse(value);}});
+      assert.deepEqual(errors,[]);return;
+    }
     if(process.argv.includes('--closeout-indicator-only')) {
       await require('../tests/browser/closeout-indicator.cjs').exerciseCloseoutIndicator({admin,hub,base,device,expect,setTime:value=>{taskTime=Date.parse(value);}});
       assert.deepEqual(errors,[]);return;
@@ -313,7 +318,9 @@ async function main() {
     await openAdminModule(admin,'accounts');
     for (const [username, role] of [['demo-operator', 'operator'], ['demo-observer', 'observer']]) {
       await admin.locator('#newAccountButton').click();
-      await admin.locator('#accountUsername').fill(username); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption(role); await admin.locator('#accountForm button[type=submit]').click();
+      await admin.locator('#accountUsername').fill(username); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption(role);
+      if(role==='operator')await admin.locator('#accountForm [data-task-team]').selectOption('В');
+      await admin.locator('#accountForm button[type=submit]').click();
       await expect(admin.locator('#accountList')).toContainText(username);
     }
     const operator = await device('demo-operator', true), observer = await device('demo-observer', true);
@@ -401,7 +408,7 @@ async function main() {
     await observer.goto(base + '/statistics'); await expect(observer.locator('#statsContent')).toBeVisible();
     await operator.goto(base + '/production-log'); await expect(operator.locator('#connDot')).toHaveClass(/\bon\b/);
     await expect(operator.locator('#reportEntryPanel')).toBeVisible(); await expect(operator.locator('#dayFilter')).toBeHidden();
-    await operator.locator('[data-shift="А"]').click();
+    await operator.locator('[data-shift="В"]').click();
     await operator.locator('#dateInput').fill('2026-10-05');
     await operator.locator('#breakdownToggle').check();
     for (const [id, value] of Object.entries({autoKgInput: '2400', autoCrateInput: '96', manKgInput: '600', manCrateInput: '24', brakInput: '30'})) await operator.locator('#' + id).fill(value);
@@ -463,7 +470,11 @@ async function main() {
     for (const [kind, data] of Object.entries(migration.payload.documents)) fs.writeFileSync(path.join(migrationDir, kind + '.json'), JSON.stringify(data));
     for (const [index, file] of migration.payload.files.entries()) { const filename = path.join(migrationDir, file.path); fs.mkdirSync(path.dirname(filename), {recursive: true}); fs.writeFileSync(filename, migration.contents[index]); }
     fs.writeFileSync(path.join(migrationDir, 'unrelated-demo.txt'), 'Fictional unrelated file, must be skipped.');
-    await openAdminModule(admin,'data-import');
+    // The invalid preview above deliberately leaves a selected file. Exercise
+    // the real discard confirmation before starting the independent import.
+    await admin.locator('.server-links a[href^="/admin-panel"]').click();
+    await expect(admin.locator('#serverLeaveDialog')).toBeVisible();await admin.locator('#serverLeaveConfirm').click();
+    await admin.locator('.admin-card[data-module="data-import"]').click();
     await admin.locator('[data-transfer-tab=modules]').click();
     await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('h1')).toHaveText('Import & export'); await expect(admin.locator('#checkDataImport')).toHaveText('Check selected data');
     await admin.locator('[data-hub-language=bg]').click();
@@ -539,6 +550,7 @@ async function main() {
     console.log('RUN account permissions, mobile restrictions, authorized export and immediate revocation');
     await admin.locator('#newAccountButton').click();
     await admin.locator('#accountUsername').fill('demo-permissions'); await admin.locator('#accountPassword').fill(demoPassword); await admin.locator('#accountRole').selectOption('operator');
+    await admin.locator('#accountForm [data-task-team]').selectOption('В');
     await admin.locator('#accountForm [data-permission=canExportReports]').uncheck();
     await admin.locator('#accountForm [data-permission=canCreateReports]').uncheck();
     await admin.locator('#accountForm [data-permission=canEditReports]').check();
@@ -553,10 +565,10 @@ async function main() {
     const firstMonth = limited.locator('.history-month').first();
     if (!await firstMonth.evaluate(element => element.open)) await firstMonth.locator('summary').click();
     await expect(firstMonth.locator('.del-btn').first()).toBeVisible();
-    const correctedId = hub.store.get('production-log').data.entries.find(entry => !entry.breakdown).id;
+    const correctedId = hub.store.get('production-log').data.entries.find(entry => entry.shift==='В').id;
     const correctable = firstMonth.locator('.edit-report-btn[data-id="' + correctedId + '"]');
     await correctable.click(); await expect(limited.locator('#saveBtn')).toBeVisible();
-    await limited.locator('#tonInput').fill('1234'); await limited.locator('#saveBtn').click();
+    await limited.locator('#breakdownToggle').uncheck();await limited.locator('#tonInput').fill('1234'); await limited.locator('#saveBtn').click();
     // History-enabled releases require a reason before confirming a correction.
     // Both the dialog and a direct committed result are valid readiness signals.
     const correctionDialog = limited.locator('#reportCorrectionDialog');
@@ -617,6 +629,9 @@ async function main() {
     console.log('PASS observer controls, persistence and account revocation');
     console.log('Online browser E2E: 14 workflows passed.');
   } catch (error) {
+    if(browser)for(const context of browser.contexts())for(const page of context.pages()) {
+      console.error('Browser failure context',new URL(page.url()).pathname,await page.locator('dialog[open]').evaluateAll(nodes=>nodes.map(node=>node.id)).catch(()=>[]));
+    }
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
     if (screenshotDir && browser) {
       fs.mkdirSync(screenshotDir, {recursive: true});

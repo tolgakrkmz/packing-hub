@@ -18,7 +18,7 @@ async function exerciseNotifications({admin, hub, base, device, expect, screensh
   await page.goto(base + '/notifications');
   await expect(page.locator('#notificationList')).toContainText('Няма известия.');
   let current = hub.store.get('production-log');
-  hub.store.put('production-log', {...current.data, entries: [{id: 'demo-notice-row', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0}]}, current.revision, hub.auth.list()[0]);
+  hub.store.put('production-log', {...current.data, entries: [{id: 'demo-notice-row', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0}]}, current.revision, hub.auth.list()[0],'report',false,{reason:'Fictional historical report'});
   await page.reload(); await expect(page.locator('.notification-row')).toHaveCount(1); await expect(page.locator('.notification-count')).toHaveText('1');
   await assertResponsive(page, 'mobile inbox');
   await page.locator('[data-hub-language=en]').click(); await expect(page.locator('.notification-row')).toContainText('There is a new production report.');

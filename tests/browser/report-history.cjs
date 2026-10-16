@@ -8,7 +8,7 @@ async function exerciseReportHistory({admin,hub,base,device,expect,screenshotDir
   const row = {id:'demo-browser-history',date:'2026-10-05',shift:'СТИКЕРИ',tonnage:1000,brak:10};
   const current = () => hub.store.get('production-log');
   const operate = (action, extra = {}) => hub.store.reportOperation('production-log',{
-    operationId:randomUUID(),action,entryId:row.id,...extra
+    operationId:randomUUID(),action,entryId:row.id,reason:'Fictional historical report',...extra
   },action === 'create' ? undefined : current().versions[row.id],actor);
   async function reason(page, text) {
     await expect(page.locator('#reportCorrectionDialog')).toBeVisible();
@@ -154,7 +154,7 @@ async function exerciseReportHistory({admin,hub,base,device,expect,screenshotDir
   }
   await observer.context().close();
   const latest=current();
-  hub.store.put('production-log',{...latest.data,entries:[...latest.data.entries,...Array.from({length:30},(_,i)=>({...row,id:'demo-demand-page-'+String(i).padStart(2,'0')}))]},latest.revision,actor);
+  hub.store.put('production-log',{...latest.data,entries:[...latest.data.entries,...Array.from({length:30},(_,i)=>({...row,id:'demo-demand-page-'+String(i).padStart(2,'0')}))]},latest.revision,actor,'report',false,{reason:'Fictional history fixture'});
   await admin.goto(base+'/report-history');await admin.locator('#historyRefresh').click();
   await expect(admin.locator('#historyRecords button')).toHaveCount(25);
   await admin.locator('#historyRecords button').first().click();

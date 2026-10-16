@@ -19,6 +19,7 @@
     return {state:'complete',text:'Всичко е отчетено'};
   }
   function mount(hub) {
+    if(['/report-history','/report-history.html','/report-history/'].includes(location.pathname))return;
     if(!hub.canViewModule('shift-closeout'))return;
     const tools=document.querySelector('.server-tools');if(!tools)return;
     const link=document.createElement('a');link.id='serverCloseoutLink';link.className='server-closeout';link.href='/shift-closeout';
@@ -38,7 +39,7 @@
         if(value.scope)link.href='/shift-closeout?'+new URLSearchParams(value.scope);
       } catch {if(ticket===sequence)paint(present(null));}
     }
-    for(const module of ['production-log','pair-targets','accounts'])hub.watch(module,refresh);
+    for(const module of ['production-log','pair-targets','accounts','production-access'])hub.watch(module,refresh);
     setInterval(refresh,30000);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
     refresh();

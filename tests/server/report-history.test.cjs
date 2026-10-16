@@ -1,12 +1,13 @@
 /* Every report and account in these tests is fictional. */
 const test=require('node:test'), assert=require('node:assert/strict'), {randomUUID}=require('node:crypto');
 const {openStore}=require('../../server/store.cjs');
+const productionClock={productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')};
 const {createHubServer}=require('../../server/server.cjs');
-const admin={id:1,username:'demo-history-admin',role:'admin'}, editor={id:2,username:'demo-history-editor',role:'observer',permissions:{canEditProduction:true}}, observer={id:3,role:'observer'};
-const entry={id:'demo-history-report',date:'2026-10-05',shift:'А',tonnage:1000,brak:10};
+const admin={id:1,username:'demo-history-admin',role:'admin',taskTeam:'В'}, editor={id:2,username:'demo-history-editor',role:'observer',taskTeam:'В',permissions:{canEditProduction:true}}, observer={id:3,role:'observer'};
+const entry={id:'demo-history-report',date:'2026-10-05',shift:'В',tonnage:1000,brak:10};
 const operation=(action,extra={})=>({operationId:randomUUID(),action,entryId:entry.id,...(['create','update'].includes(action)?{entry}:{}),...extra});
 test('edit → delete → restore preserves snapshots, actors, reasons, versions and counts without leaking to audit',t=>{
- const store=openStore(':memory:');t.after(()=>store.close());
+ const store=openStore(':memory:',productionClock);t.after(()=>store.close());
  const first=store.reportOperation('production-log',operation('create'),undefined,admin);
  const edited=store.reportOperation('production-log',operation('update',{entry:{...entry,tonnage:1200},reason:'Fictional correction'}),first.versions[entry.id],editor);
  const removed=store.reportOperation('production-log',operation('delete',{reason:'Fictional deletion'}),edited.versions[entry.id],editor);
@@ -26,7 +27,7 @@ test('edit → delete → restore preserves snapshots, actors, reasons, versions
  assert.throws(()=>store.reportOperation('production-log',operation('restore',{sourceVersion:deleted.version,reason:'Fictional stale restore'}),deleted.version,editor),{code:'REPORT_CONFLICT'});
 });
 test('reasons, stale edits, deleted identity reuse, rollback and legacy PUT cannot bypass history',t=>{
- const store=openStore(':memory:');t.after(()=>store.close());const created=store.reportOperation('production-log',operation('create'),undefined,admin),version=created.versions[entry.id];
+ const store=openStore(':memory:',productionClock);t.after(()=>store.close());const created=store.reportOperation('production-log',operation('create'),undefined,admin),version=created.versions[entry.id];
  assert.throws(()=>store.reportOperation('production-log',operation('update'),version,admin),{code:'CORRECTION_REASON_REQUIRED'});
  assert.throws(()=>store.put('production-log',{...created.data,entries:[]},created.revision,admin),{code:'CORRECTION_REASON_REQUIRED'});
  store.db.exec("CREATE TRIGGER deny_demo_history BEFORE INSERT ON report_history BEGIN SELECT RAISE(ABORT,'Fictional failure'); END");
@@ -36,7 +37,7 @@ test('reasons, stale edits, deleted identity reuse, rollback and legacy PUT cann
  const deleted=store.get('production-log');assert.throws(()=>store.put('production-log',{...deleted.data,entries:[entry]},deleted.revision,admin),{code:'REPORT_CONFLICT'});
 });
 test('HTTP denies history and admin HTML to ordinary observers while preserving export',async t=>{
- const hub=createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true});t.after(()=>hub.close());
+ const hub=createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true,...productionClock});t.after(()=>hub.close());
  await hub.auth.create('demo-history-admin','Fictional-password-123','admin');await hub.auth.create('demo-history-observer','Fictional-password-123','observer');
  await new Promise(resolve=>hub.server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+hub.server.address().port;
  const session=await hub.auth.login('demo-history-observer','Fictional-password-123');const headers={Cookie:'hub-local-session='+session.token};
@@ -59,7 +60,7 @@ function pair(id, cancelled = false) {
 const op = (action, value, extra = {}) => ({operationId:randomUUID(),action,entryId:typeof value === 'string' ? value : value.id,...(['create','update'].includes(action) ? {entry:value} : {}),...extra});
 for (const kind of ['line-downtime','pair-targets']) {
   test(kind+': history, delete/restore and repeat receipts keep statistics exact',t => {
-    const store=openStore(':memory:');t.after(()=>store.close());
+    const store=openStore(':memory:',productionClock);t.after(()=>store.close());
     store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
     const value=kind === 'pair-targets' ? pair('demo-history-pair') : {id:'demo-history-downtime',date:scope.date,shift:'СТИКЕРИ',start:'09:00',end:'09:30',durationMin:30,reason:'Друго',reasonNote:'Fictional downtime',note:''};
     const first=store.reportOperation(kind,op('create',value),undefined,admin);
@@ -80,7 +81,7 @@ for (const kind of ['line-downtime','pair-targets']) {
   });
 }
 test('cancelled pair snapshots restore after roster changes; occupied active scope refuses restore atomically',t => {
-  const store=openStore(':memory:');t.after(()=>store.close());
+  const store=openStore(':memory:',productionClock);t.after(()=>store.close());
   const value=pair('demo-history-cancelled',true);
   require('../../server/store.cjs').validateData('pair-targets',{...store.get('pair-targets').data,entries:[value]});
   store.updateDocument('pair-targets',{...store.get('pair-targets').data,entries:[value]},admin);
@@ -101,7 +102,7 @@ test('cancelled pair snapshots restore after roster changes; occupied active sco
   assert.deepEqual(store.get('pair-targets'),before);assert.equal(store.db.prepare('SELECT count(*) AS n FROM report_history').get().n,count);
 });
 test('legacy rows without materialized versions remain readable; first correction captures the prior snapshot',t => {
-  const store=openStore(':memory:');t.after(()=>store.close());
+  const store=openStore(':memory:',productionClock);t.after(()=>store.close());
   store.db.prepare('UPDATE documents SET data=?,revision=77 WHERE kind=?').run(JSON.stringify({entries:[entry],goalTons:3000}),'production-log');
   assert.equal(store.reportHistoryList('production-log',admin).entries[0].version,77);
   const old=store.reportHistory('production-log',entry.id,admin);assert.equal(old.version,77);assert.deepEqual(old.current,entry);assert.deepEqual(old.events,[]);
@@ -111,15 +112,15 @@ test('legacy rows without materialized versions remain readable; first correctio
 });
 test('private history, deleted snapshots and restore receipts survive restart and a verified database backup',t => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'hub-history-persistence-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
-  const filename=path.join(directory,'demo.sqlite');let store=openStore(filename);
+  const filename=path.join(directory,'demo.sqlite');let store=openStore(filename,productionClock);
   require('../../server/tasks.cjs').createTasks(store);
   const created=store.reportOperation('production-log',operation('create'),undefined,admin);
   store.reportOperation('production-log',operation('delete',{reason:'Fictional durable deletion'}),created.versions[entry.id],admin);
-  const expected=store.reportHistory('production-log',entry.id,admin);store.close();store=openStore(filename);t.after(()=>store.close());
+  const expected=store.reportHistory('production-log',entry.id,admin);store.close();store=openStore(filename,productionClock);t.after(()=>store.close());
   assert.deepEqual(store.reportHistory('production-log',entry.id,admin),expected);
   const archive=path.join(directory,'demo-snapshot.sqlite');require('../../server/backups.cjs').snapshot(filename,archive);
   assert.equal(fs.statSync(archive).mode & 0o777,0o600);
-  const recovered=openStore(archive);try {
+  const recovered=openStore(archive,productionClock);try {
     assert.deepEqual(recovered.reportHistory('production-log',entry.id,admin),expected);
     const restore=operation('restore',{sourceVersion:expected.version,reason:'Fictional archived restore'});
     const restored=recovered.reportOperation('production-log',restore,expected.version,admin);
@@ -128,9 +129,9 @@ test('private history, deleted snapshots and restore receipts survive restart an
 });
 
 test('HTTP restore uses current permissions, CSRF, origin and versions; two restorers cannot count the report twice',async t => {
-  const hub=createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true});t.after(()=>hub.close());
-  const account=await hub.auth.create('demo-restore-admin','Fictional-password-123','admin');
-  const delegated=await hub.auth.create('demo-restore-editor','Fictional-password-123','observer',account,{canEditProduction:true});
+  const hub=createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true,...productionClock});t.after(()=>hub.close());
+  const account=await hub.auth.create('demo-restore-admin','Fictional-password-123','admin',null,{},()=>{},{taskTeam:'В'});
+  const delegated=await hub.auth.create('demo-restore-editor','Fictional-password-123','observer',account,{canEditProduction:true},()=>{},{taskTeam:'В'});
   await hub.auth.create('demo-restore-observer','Fictional-password-123','observer',account);
   await new Promise(resolve=>hub.server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+hub.server.address().port;
   const login=username=>hub.auth.login(username,'Fictional-password-123');
@@ -161,7 +162,7 @@ test('HTTP restore uses current permissions, CSRF, origin and versions; two rest
 });
 
 test('pair plan corrections require a reason; first reports and cancellation retain their existing reporting permissions',t => {
-  const store=openStore(':memory:');t.after(()=>store.close());store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
+  const store=openStore(':memory:',productionClock);t.after(()=>store.close());store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
   const planned=pair('demo-plan-reason');planned.result=null;planned.updatedAt=planned.createdAt;
   const reporter={id:5,username:'demo-history-reporter',role:'operator'};
   const saved=store.reportOperation('pair-targets',op('create',planned),undefined,reporter);

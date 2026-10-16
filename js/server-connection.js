@@ -111,6 +111,12 @@ const HubServer = (() => {
   messages.INVALID_PERIOD = 'Избери валиден месец и година.';
   messages.INVALID_HISTORY_FILTER = 'Провери датата и зареди записите отново.';
   Object.assign(messages, {
+    PRODUCTION_TEAM_REQUIRED:'Акаунтът няма зададен екип. Обърнете се към администратор.',
+    PRODUCTION_TEAM_MISMATCH:'Можете да въвеждате тонаж само за екипа на акаунта си. Черновата остава във формата.',
+    PRODUCTION_WINDOW_CLOSED:'Въвеждането е извън разрешената смяна и срока до 1 час след края. Черновата остава във формата.',
+    PRODUCTION_EXCEPTION_REASON_REQUIRED:'За административно изключение е задължителна причина. Черновата остава във формата.',
+    INVALID_PRODUCTION_SCOPE:'Изберете валидна дата и екип.',
+    INVALID_PRODUCTION_AUTHORIZATION:'Проверете почивния ден, началния и крайния час и причината.',
     REPORT_CONFLICT: 'Записът е променен или изтрит от друг потребител. Черновата остава във формата. Прегледай актуалния запис преди нов опит.',
     OPERATION_REUSED: 'Този опит вече е използван за друга промяна. Прегледай актуалния запис.',
     INVALID_OPERATION: 'Провери данните за записа.',
@@ -246,6 +252,11 @@ const HubServer = (() => {
       recordVersion: id => versions[id],
       async commitOperation(operation) {
         if (readOnly) throw new Error('Само за преглед.');
+        if(kind==='production-log'&&operation.action==='create'&&boot.user.role==='admin'&&!operation.reason) {
+          const reason=await correctionReason({exception:true});
+          if(!reason)throw Object.assign(new Error(messages.PRODUCTION_EXCEPTION_REASON_REQUIRED),{status:428,code:'PRODUCTION_EXCEPTION_REASON_REQUIRED'});
+          operation.reason=reason;
+        }
         ++sequence;
         pendingRead = null; acceptedText = null;
         const {version, ...input} = operation;
@@ -660,10 +671,11 @@ const HubServer = (() => {
     applyPermissions();
     new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
   });
-  function correctionReason() {
+  function correctionReason({exception=false}={}) {
     return new Promise(resolve => {
       const dialog = document.createElement('dialog'); dialog.id = 'reportCorrectionDialog'; dialog.className = 'report-reason'; dialog.setAttribute('aria-labelledby','reportCorrectionTitle');
       dialog.innerHTML = '<form><h2 id="reportCorrectionTitle">Причина за промяната</h2><label for="reportCorrectionReason">Опиши защо променяш записа</label><textarea id="reportCorrectionReason" required maxlength="1000"></textarea><button id="reportCorrectionConfirm" type="submit">Потвърди</button><button type="button" id="reportCorrectionCancel">Отказ</button></form>';
+      if(exception) {dialog.querySelector('h2').textContent='Административно изключение';dialog.querySelector('label').textContent='Опиши причината за административния запис на тонаж';}
       const reasonDraft = formDraft(dialog,{isOpen:() => dialog.open}), unguard = guardUpdate({hasDraft:reasonDraft.hasDraft});
       const previousFocus = document.activeElement;
       document.body.append(dialog);

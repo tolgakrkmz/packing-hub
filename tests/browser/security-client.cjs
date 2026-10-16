@@ -95,7 +95,7 @@ async function exerciseOfflineClientSecurity({browser,base,expect}) {
 async function exerciseServerClientSecurity({admin,hub,base,device,expect,setTime}) {
   const actor=hub.auth.list().find(user=>user.username==='demo-admin'),external=[];
   admin.on('request',request=>{if(new URL(request.url()).origin!==base)external.push('external request');});
-  for(const [kind,data] of Object.entries(documents())) hub.store.put(kind,data,hub.store.get(kind).revision,actor);
+  for(const [kind,data] of Object.entries(documents())) hub.store.put(kind,data,hub.store.get(kind).revision,actor,'report',false,{reason:'Fictional security fixture'});
   hub.store.createNode('data/profiles/'+folder,'directory',actor);
   for(const name of ['instruction.txt',attachment]) {
     const target='data/profiles/'+folder+'/'+name;

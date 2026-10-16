@@ -7,9 +7,9 @@ const {createHubServer} = require('../../server/server.cjs');
 const {openStore} = require('../../server/store.cjs');
 const fixturePassword = 'Fictional-password-123';
 async function setup(t, filename = ':memory:') {
-  const hub = createHubServer({filename, publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
+  const hub = createHubServer({filename, publicOrigin: 'http://127.0.0.1:0', allowHttp: true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
   await hub.auth.create('demo-admin', fixturePassword, 'admin');
-  await hub.auth.create('demo-operator', fixturePassword, 'operator');
+  await hub.auth.create('demo-operator', fixturePassword, 'operator',null,{},()=>{},{taskTeam:'В'});
   await hub.auth.create('demo-observer', fixturePassword, 'observer');
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
   t.after(() => hub.close());
@@ -101,7 +101,7 @@ test('HTTPS proxy configuration uses Secure host cookies and restrictive page he
 test('operator can append reports but cannot change goals, delete reports, manage personnel or accounts; observer cannot write', async t => {
   const {request, login} = await setup(t); const operator = await login('demo-operator'), observer = await login('demo-observer');
   const original = await (await request('/api/data/production-log', operator)).json();
-  const entry = {id: 'demo-online-1', date: '2026-10-05', shift: 'А', tonnage: 3000, brak: 30, breakdown: null};
+  const entry = {id: 'demo-online-1', date: '2026-10-05', shift: 'В', tonnage: 3000, brak: 30, breakdown: null};
   const data = {...original.data, entries: [entry]};
   const put = (kind, user, value, revision = 1) => request('/api/data/' + kind, user, {method: 'PUT', headers: {'If-Match': '"' + revision + '"'}, data: value});
   assert.equal((await put('production-log', observer, data)).status, 403);
@@ -137,7 +137,7 @@ test('a migrated history larger than the old request limit still accepts subsequ
   const entry = {id: 'demo-large-history', date: '2026-10-04', shift: 'А', tonnage: 1000, brak: 0, note: 'Demo'.repeat(600000)};
   const batch = hub.imports.create({documents: {'production-log': {entries: [entry]}}, files: [], includeSettings: false}, admin.user);
   hub.imports.apply(batch.id, hub.imports.preview(batch.id, admin.user).token, admin.user);
-  const current = hub.store.get('production-log'); current.data.entries.push({...entry, id: 'demo-next-report', note: ''});
+  const current = hub.store.get('production-log'); current.data.entries.push({...entry, id: 'demo-next-report',date:'2026-10-05',shift:'В', note: ''});
   const saved = await request('/api/data/production-log', operator, {method: 'PUT', data: current.data, headers: {'If-Match': '"' + current.revision + '"'}});
   assert.equal(saved.status, 200); assert.equal(hub.store.get('production-log').data.entries.length, 2);
 });
@@ -145,7 +145,7 @@ test('production import is admin-only, merges history without replacing live rec
   const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
   const entry = id => ({id, date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 10, breakdown: null});
   const current = {entries: [entry('demo-current')], goalTons: 4000};
-  hub.store.put('production-log', current, 1, admin.user);
+  hub.store.put('production-log', current, 1, admin.user,'report',false,{reason:'Fictional historical setup'});
   const source = {entries: [entry('demo-current'), {...entry('demo-history'), date: '2026-10-04'}], goalTons: 9000};
   const post = (action, data, revision, user = admin) => request('/api/import/production-log/' + action, user, {method: 'POST', data, headers: revision ? {'If-Match': '"' + revision + '"'} : {}});
   assert.equal((await post('preview', source, null, operator)).status, 403);
@@ -165,7 +165,7 @@ test('production import is admin-only, merges history without replacing live rec
 test('import conflicts, invalid history and intervening writes reject the whole import', async t => {
   const {hub, request, login} = await setup(t); const admin = await login();
   const entry = {id: 'demo-existing', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0};
-  hub.store.put('production-log', {entries: [entry], goalTons: 3000}, 1, admin.user);
+  hub.store.put('production-log', {entries: [entry], goalTons: 3000}, 1, admin.user,'report',false,{reason:'Fictional historical setup'});
   const post = (action, data, revision = 2) => request('/api/import/production-log/' + action, admin, {method: 'POST', data, headers: {'If-Match': '"' + revision + '"'}});
   const source = {entries: [{...entry, brak: 1}, {...entry, id: 'demo-missing'}]};
   assert.equal((await (await post('preview', source)).json()).conflicts, 1);
@@ -178,7 +178,7 @@ test('import conflicts, invalid history and intervening writes reject the whole 
   assert.equal((await (await post('preview', reordered)).json()).duplicates, 1);
   const fresh = {entries: [{...entry, id: 'demo-history'}]};
   assert.equal((await (await post('preview', fresh)).json()).revision, 2);
-  hub.store.put('production-log', {entries: [entry, {...entry, id: 'demo-other-device'}], goalTons: 3000}, 2, admin.user);
+  hub.store.put('production-log', {entries: [entry, {...entry, id: 'demo-other-device'}], goalTons: 3000}, 2, admin.user,'report',false,{reason:'Fictional other-device report'});
   assert.equal((await post('apply', fresh)).status, 409);
   assert.equal(hub.store.get('production-log').data.entries.length, 2);
 });
@@ -314,7 +314,7 @@ test('pair cancellation enforces reasons, history, permissions, revision and unc
 test('simultaneous saves accept one revision and a refreshed retry preserves both reports', async t => {
   const {request, login} = await setup(t); const operator = await login('demo-operator');
   const initial = await (await request('/api/data/production-log', operator)).json();
-  const entries = [1, 2].map(id => ({id: 'demo-race-' + id, date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0, breakdown: null}));
+  const entries = [1, 2].map(id => ({id: 'demo-race-' + id, date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0, breakdown: null}));
   const put = (data, revision) => request('/api/data/production-log', operator, {method: 'PUT', data, headers: {'If-Match': '"' + revision + '"'}});
   const responses = await Promise.all(entries.map(entry => put({...initial.data, entries: [entry]}, 1)));
   assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);

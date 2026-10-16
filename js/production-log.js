@@ -7,6 +7,7 @@ let goalDraft = false;
 let reportDraft = false;
 let editingReport = null;
 let explicitReportScope=null, scopeLinkError='';
+let productionAccess=null;
 try { if(typeof HubReportScope!=='undefined') explicitReportScope=HubReportScope.parse(location.search); }
 catch(error) { scopeLinkError=error.message; }
 const canEditReports = typeof HubServer === 'undefined' || HubServer.can('canEditReports');
@@ -108,7 +109,8 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
 });
 
 function updateSaveEnabled(){
-  saveBtn.disabled = writer.busy || !selectedShift || !!scopeLinkError;
+  productionAccess?.check();
+  saveBtn.disabled = writer.busy || !selectedShift || !!scopeLinkError || !!productionAccess&&!productionAccess.canSave(!!editingReport);
   saveBtn.textContent = writer.busy ? 'Записва се...' : editingReport ? 'Запази корекцията' : selectedShift ? 'Запиши смяна ' + selectedShift : 'Изберете смяна за запис';
   if(typeof HubServer !== 'undefined') saveBtn.hidden = !(editingReport ? canEditReports : HubServer.can('canCreateReports'));
   document.getElementById('cancelReportEdit').hidden = !editingReport;
@@ -430,4 +432,17 @@ if(explicitReportScope) {
   updateSaveEnabled();productionDraft?.accept();
 }
 if(scopeLinkError) {msg.textContent=scopeLinkError;msg.dataset.state='error';updateSaveEnabled();}
+const initialProductionDate=dateInput.value;
+if(typeof createProductionAccessControls!=='undefined')productionAccess=createProductionAccessControls({
+  scope:()=>({date:dateInput.value,team:selectedShift}),busy:()=>writer.busy,onState:updateSaveEnabled,
+  onDefault:scope=>{
+    if(explicitReportScope||scopeLinkError||selectedShift||reportDraft||editingReport||dateInput.value!==initialProductionDate||!HubServer.user.taskTeam)return;
+    dateInput.value=scope.date;selectedShift=scope.team;
+    dateInput.dispatchEvent(new Event('input',{bubbles:true}));
+    document.querySelectorAll('.shift-btn').forEach(button=>button.classList.toggle('sel-'+selectedShift,button.dataset.shift===selectedShift));
+    renderDayTotal();productionDraft?.accept();
+  }
+});
+dateInput.addEventListener('input',()=>productionAccess?.check());
+dateInput.addEventListener('change',()=>productionAccess?.check());
 sync.init();

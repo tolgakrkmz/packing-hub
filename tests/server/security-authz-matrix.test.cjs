@@ -181,7 +181,7 @@ test('forged task identity fields cannot let an unrelated supervisor report or m
 
 test('forged notification user IDs cannot read another inbox or change its preferences', async t => {
   const s = await setup(t), user = await s.account('inbox-other'), session = await s.login(user.username);
-  s.hub.store.put('production-log', {entries: [{id: 'demo-matrix-notice', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0}], goalTons: 3000}, 1, s.admin);
+  s.hub.store.put('production-log', {entries: [{id: 'demo-matrix-notice', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0}], goalTons: 3000}, 1, s.admin,'report',false,{reason:'Fictional historical report'});
   s.hub.notifications.sync();
   const foreign = s.hub.notifications.list(s.admin).items[0];
   assert.ok(foreign);

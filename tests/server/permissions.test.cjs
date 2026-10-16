@@ -10,10 +10,10 @@ const {openStore} = require('../../server/store.cjs');
 const {accounts} = require('../../server/accounts.cjs');
 const {defaults} = require('../../server/permissions.cjs');
 const password = 'Fictional-permissions-123';
-const entry = id => ({id, date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0});
+const entry = id => ({id, date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0});
 async function setup(t) {
-  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
-  for (const role of ['admin', 'operator', 'observer']) await hub.auth.create('demo-' + role, password, role);
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
+  for (const role of ['admin', 'operator', 'observer']) await hub.auth.create('demo-' + role, password, role,null,{},()=>{},{taskTeam:'В'});
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
   const base = 'http://127.0.0.1:' + hub.server.address().port;
   async function login(role = 'admin') {
@@ -32,8 +32,8 @@ test('role defaults and explicit restrictions survive a reopen; migration preser
   const filename = path.join(directory, 'demo.sqlite');
   const legacy = new DatabaseSync(filename);
   legacy.exec("CREATE TABLE users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, hash TEXT NOT NULL, role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1); PRAGMA user_version=1"); legacy.close();
-  let store = openStore(filename), auth = accounts(store);
-  const user = await auth.create('demo-legacy', password, 'operator'); const session = await auth.login(user.username, password);
+  let store = openStore(filename,{productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')}), auth = accounts(store);
+  const user = await auth.create('demo-legacy', password, 'operator',null,{},()=>{},{taskTeam:'В'}); const session = await auth.login(user.username, password);
   store.put('production-log', {entries: [entry('demo-preserved')], goalTons: 3000}, 1, user); store.close();
   const downgrade = new DatabaseSync(filename); downgrade.exec('ALTER TABLE users DROP COLUMN permissions; PRAGMA user_version=1'); downgrade.close();
   store = openStore(filename); auth = accounts(store);

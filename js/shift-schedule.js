@@ -79,5 +79,5 @@ const ShiftSchedule = (() => {
     const minutes = at.getHours()*60 + at.getMinutes();
     return context.date === localDate(at) && isScheduled(context) && minutes >= 9*60 && minutes < 17*60+30;
   }
-  return {TEAMS, LABELS, HOURS, STICKERS, localDate, parseDate, addDays, sofiaDate, shiftInterval, shiftCodeFor, teamFor, current, isScheduled, hoursFor, isCurrent};
+  return {TEAMS, LABELS, HOURS, STICKERS, localDate, parseDate, addDays, sofiaDate, sofiaInstant, shiftInterval, shiftCodeFor, teamFor, current, isScheduled, hoursFor, isCurrent};
 })();

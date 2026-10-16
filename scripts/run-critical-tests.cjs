@@ -29,6 +29,7 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
     if (script === 'run-server-browser-tests.cjs') {
       modes.push('unsaved-navigation');
       modes.push('shift-closeout');
+      modes.push('production-access');
       modes.push('closeout-indicator');
       if (fs.existsSync(path.join(root, 'tests/browser/report-history.cjs'))) modes.push('report-history');
     }

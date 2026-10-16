@@ -26,7 +26,7 @@ test('HTTP version summaries are bounded and snapshots are fetched separately wi
   await hub.auth.create('demo-page-admin','Fictional-password-123','admin');await hub.auth.create('demo-page-observer','Fictional-password-123','observer');
   const actor=hub.auth.list()[0], entry=row('demo-page-version');
   let version;
-  for(let i=0;i<43;i++) { const result=hub.store.reportOperation('production-log',{operationId:randomUUID(),action:i?'update':'create',entryId:entry.id,entry:{...entry,tonnage:1000+i},reason:i?'Fictional correction '+i:undefined},version,actor);version=result.versions[entry.id]; }
+  for(let i=0;i<43;i++) { const result=hub.store.reportOperation('production-log',{operationId:randomUUID(),action:i?'update':'create',entryId:entry.id,entry:{...entry,tonnage:1000+i},reason:'Fictional historical entry '+i},version,actor);version=result.versions[entry.id]; }
   await new Promise(resolve=>hub.server.listen(0,'127.0.0.1',resolve));
   const base='http://127.0.0.1:'+hub.server.address().port;
   const session=await hub.auth.login('demo-page-admin','Fictional-password-123'),headers={Cookie:'hub-local-session='+session.token};

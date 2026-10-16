@@ -7,7 +7,7 @@ const password = 'Fictional-permissions-123';
 const none = Object.fromEntries(keys.map(key => [key, false]));
 const all = Object.fromEntries(keys.map(key => [key, true]));
 async function setup(t) {
-  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
   const admin = await hub.auth.create('demo-manager', password, 'admin');
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
   const base = 'http://127.0.0.1:' + hub.server.address().port;
@@ -81,9 +81,9 @@ test('viewing denials gate direct pages, APIs, exports, roster, statistics and i
 });
 test('module report flags override legacy common grants and settings can be delegated independently', async t => {
   const {hub, admin, login, request} = await setup(t);
-  const user = await hub.auth.create('demo-selective', password, 'observer', admin, {canCreateReports: false, canCreateProduction: true, canEditReports: true, canEditProduction: false, canManageProductionSettings: true});
+  const user = await hub.auth.create('demo-selective', password, 'observer', admin, {canCreateReports: false, canCreateProduction: true, canEditReports: true, canEditProduction: false, canManageProductionSettings: true},()=>{},{taskTeam:'В'});
   const session = await login(user.username);
-  const entry = {id: 'demo-selective-entry', date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0};
+  const entry = {id: 'demo-selective-entry', date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0};
   const put = data => request('/api/data/production-log', session, 'PUT', data, hub.store.get('production-log').revision);
   assert.equal((await put({entries: [entry], goalTons: 3000})).status, 200);
   assert.equal((await put({entries: [{...entry, tonnage: 1100}], goalTons: 3000})).status, 403);

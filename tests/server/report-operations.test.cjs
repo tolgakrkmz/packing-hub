@@ -21,13 +21,13 @@ function entry(kind, id, group = 0) {
   if(kind === 'line-downtime') return {id,date:scope.date,shift:'СТИКЕРИ',start:'09:00',end:'09:30',durationMin:30,reason:'Друго',reasonNote:'Fictional downtime',note:''};
   return PairTargets.plan({data:PairTargets.emptyData(),employees,context:scope,memberIds:employees.slice(group*2,group*2+2).map(person => person.id),targetKg:1000,targetCrates:40,workAreas:['manual'],id,now:'2026-10-05T06:00:00.000Z'});
 }
-const create = value => ({operationId:randomUUID(),action:'create',entryId:value.id,entry:value});
+const create = value => ({operationId:randomUUID(),action:'create',entryId:value.id,entry:value,reason:'Fictional report setup'});
 const update = value => ({...create(value),action:'update',reason:'Fictional correction'});
 const remove = id => ({operationId:randomUUID(),action:'delete',entryId:id,reason:'Fictional deletion'});
 async function setup(t) {
-  const hub = createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true});
+  const hub = createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
   const admin = await hub.auth.create('demo-reports-admin',password,'admin');
-  await hub.auth.create('demo-reports-operator',password,'operator',admin);
+  await hub.auth.create('demo-reports-operator',password,'operator',admin,{},()=>{},{taskTeam:'СТИКЕРИ'});
   await hub.auth.create('demo-reports-observer',password,'observer',admin);
   hub.store.put('personnel',{...hub.store.get('personnel').data,employees},1,admin);
   await new Promise(resolve => hub.server.listen(0,'127.0.0.1',resolve)); t.after(() => hub.close());
@@ -117,7 +117,7 @@ for(const kind of Object.keys(reports)) {
     const version = accepted.versions[input.entryId];
     assert.equal((await request(kind,observer,update(input.entry),version)).status,403);
     assert.equal((await request(kind,operator,remove(input.entryId),version)).status,403);
-    await hub.auth.create('demo-reports-editor',password,'observer',admin,{[reports[kind].edit]:true});
+    await hub.auth.create('demo-reports-editor',password,'observer',admin,{[reports[kind].edit]:true},()=>{},{taskTeam:'СТИКЕРИ'});
     const editor = await login('demo-reports-editor');
     assert.equal((await request(kind,editor,create(entry(kind,'demo-editor-new',1)))).status,403);
     if(kind === 'pair-targets') {

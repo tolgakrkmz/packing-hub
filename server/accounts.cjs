@@ -30,7 +30,7 @@ function accounts(store) {
     const supervisor = values.taskSupervisor === undefined ? !!previous.task_supervisor : values.taskSupervisor;
     const team = values.taskTeam === undefined ? previous.task_team || '' : values.taskTeam;
     if (typeof supervisor !== 'boolean' || typeof team !== 'string' || !['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ'].includes(team) || supervisor && !team) throw problem(400, 'INVALID_TASK_PROFILE');
-    return {supervisor: supervisor ? 1 : 0, team: supervisor ? team : ''};
+    return {supervisor: supervisor ? 1 : 0, team};
   }
   async function create(username, password, role, actor, permissions = {}, authorize = () => {}, profile = {}) {
     if (typeof username !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username) || !['admin', 'operator', 'observer'].includes(role)) throw problem(400, 'INVALID_ACCOUNT');

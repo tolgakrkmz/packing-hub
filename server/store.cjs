@@ -5,6 +5,7 @@ const {randomUUID, createHash} = require('node:crypto');
 const {isDeepStrictEqual} = require('node:util');
 const {DatabaseSync} = require('node:sqlite');
 const {can, canViewModule, reports} = require('./permissions.cjs');
+const {createProductionAccess} = require('./production-access.cjs');
 const root = path.resolve(__dirname, '..');
 const sandbox = vm.createContext({});
 for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', 'personnel-model']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), sandbox);
@@ -62,7 +63,7 @@ function notificationTargets(before, after) {
   }
   return {addedIds, changedIds, profiles: [...profiles]};
 }
-function openStore(filename, {personnelNow = Date.now} = {}) {
+function openStore(filename, {personnelNow = Date.now, productionNow = Date.now} = {}) {
   if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), {recursive: true, mode: 0o700});
   const db = new DatabaseSync(filename, {timeout: 5000});
   if (filename !== ':memory:') fs.chmodSync(filename, 0o600);
@@ -187,6 +188,7 @@ function openStore(filename, {personnelNow = Date.now} = {}) {
         if (corrected && !can(user, report.edit) || added && !['restore','delete'].includes(context.action) && !can(user, report.create) || !isDeepStrictEqual(metadata(current.data), metadata(data)) && !can(user, report.settings || report.edit)) throw problem(403, 'FORBIDDEN');
       }
       if (!report && !importing && !can(user, kind === 'personnel' ? 'canManagePersonnel' : 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
+      if(kind==='production-log'&&!importing)productionAccess.requireChanges(current.data,data,user,context.reason);
       if (kind === 'pair-targets') {
         try {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -412,6 +414,7 @@ function openStore(filename, {personnelNow = Date.now} = {}) {
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  return {db, get, put, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  const productionAccess=createProductionAccess({db,audit,transaction},{schedule:shiftSchedule,problem,now:productionNow});
+  return {db, get, put, productionAccess, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

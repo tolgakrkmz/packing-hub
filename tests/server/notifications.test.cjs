@@ -13,7 +13,7 @@ const {createWebPush, endpointURL} = require('../../server/web-push.cjs');
 const {types, available} = require('../../js/notification-model.js');
 const permissions = require('../../server/permissions.cjs');
 const password = 'Fictional-notification-password-123';
-const report = id => ({id, date: '2026-10-05', shift: 'А', tonnage: 1000, brak: 0});
+const report = id => ({id, date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0});
 function pushConfig(fetcher = async () => ({status: 201})) {
   const {privateKey} = crypto.generateKeyPairSync('ec', {namedCurve: 'prime256v1'});
   return {privateKey: JSON.stringify(privateKey.export({format: 'jwk'})), subject: 'mailto:demo@example.test', fetcher};
@@ -24,9 +24,9 @@ function subscription(name = 'demo') {
 }
 async function model(t, options = {}) {
   let time = Date.parse('2026-10-10T12:00:00+03:00');
-  const store = openStore(options.filename || ':memory:'), auth = accounts(store), tasks = createTasks(store, {now: () => time});
+  const store = openStore(options.filename || ':memory:',{productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')}), auth = accounts(store), tasks = createTasks(store, {now: () => time});
   const inbox = createNotifications(store, {now: () => time, taskNow: () => time, ...options});
-  const admin = await auth.create('demo-admin', password, 'admin');
+  const admin = await auth.create('demo-admin', password, 'admin',null,{},()=>{},{taskTeam:'В'});
   const chief = await auth.create('demo-chief', password, 'operator', admin, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   const viewer = await auth.create('demo-viewer', password, 'observer', admin);
   t.after(async () => { await inbox.close(); store.close(); });
@@ -134,7 +134,7 @@ test('read ownership, durable event cursor, pagination and restart do not leak o
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-notice-demo-')); t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
   const filename = path.join(dir, 'demo.sqlite'); let store = openStore(filename), auth = accounts(store), tasks = createTasks(store), inbox = createNotifications(store);
   const admin = await auth.create('demo-admin', password, 'admin'), other = await auth.create('demo-other', password, 'admin');
-  store.put('production-log', {entries: [report('demo-row')], goalTons: 3000}, 1, admin); inbox.sync(); const id = inbox.list(admin).items[0].id;
+  store.put('production-log', {entries: [report('demo-row')], goalTons: 3000}, 1, admin,'report',false,{reason:'Fictional historical report'}); inbox.sync(); const id = inbox.list(admin).items[0].id;
   inbox.read({id}, other); assert.equal(inbox.list(admin).count, 1); store.close();
   store = openStore(filename); tasks = createTasks(store); inbox = createNotifications(store); inbox.sync(); assert.equal(inbox.list(admin).count, 1);
   for (let i = 0; i < 55; i++) store.audit(admin, 'write', 'production-log', {added: true}); inbox.sync();

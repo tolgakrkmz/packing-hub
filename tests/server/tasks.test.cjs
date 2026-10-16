@@ -261,7 +261,7 @@ test('removing supervisor status retains an explicit read-only grant but prevent
   const s = await setup(t), id = await s.create();
   await s.hub.auth.update(s.chief.user.id, {taskSupervisor: false, permissions: {canViewTasks: true}}, s.admin.user);
   const reader = await s.login('demo-chief-a');
-  assert.equal(reader.user.taskSupervisor, false); assert.equal(reader.user.taskTeam, '');
+  assert.equal(reader.user.taskSupervisor, false); assert.equal(reader.user.taskTeam, 'А');
   assert.equal((await s.list(reader)).items.length, 1);
   assert.equal((await s.change(id, reader, {action: 'report', status: 'completed', note: ''})).status, 403);
 });

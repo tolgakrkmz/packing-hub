@@ -191,7 +191,7 @@ async function exerciseReportOperations({admin,hub,base,device,expect}) {
   await expect(admin.locator('#targetKg')).toHaveValue('1300'); await admin.locator('#savePairBtn').click(); await expect(admin.locator('#pairDialog')).not.toBeVisible();
   assert.equal(current('pair-targets').data.entries.length,beforeRevisedPlan+1); assert.equal(current('pair-targets').data.entries.at(-1).targetKg,1300);
   console.log('PASS pair independent plans, conflicting reports, reviewed retry and interrupted create/report/cancel');
-  await hub.auth.create('demo-operation-editor','Fictional-password-123','observer',hub.auth.list()[0],{canCreateReports:false,canEditReports:true});
+  await hub.auth.create('demo-operation-editor','Fictional-password-123','observer',hub.auth.list()[0],{canCreateReports:false,canEditReports:true},()=>{},{taskTeam:'СТИКЕРИ'});
   const editor = await device('demo-operation-editor');
   for(const kind of ['production-log','line-downtime']) {
     await editor.goto(base+'/'+kind); await expect(editor.locator('#connDot')).toHaveClass(/\bon\b/); await expect(editor.locator('#saveBtn')).toBeHidden();

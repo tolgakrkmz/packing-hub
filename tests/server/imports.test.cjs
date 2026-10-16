@@ -32,7 +32,7 @@ test('personnel imports preserve shared custom role catalogues and imported cust
 });
 test('all modules and nested instruction files commit together, preserve live records, normalize legacy personnel and retain retired pair history', t => {
   const {directory, store, imports, stage} = setup(t), data = fixture();
-  store.put('production-log', {entries: [entry('demo-live-production')], goalTons: 3000}, 1, user);
+  store.put('production-log', {entries: [entry('demo-live-production')], goalTons: 3000}, 1, user,'import');
   const id = stage(data), preview = imports.preview(id, user);
   assert.equal(preview.canApply, true); assert.equal(preview.files.added, 3);
   for (const kind of Object.keys(data.payload.documents)) assert.equal(preview.documents[kind].added, kind === 'personnel' ? 2 : 1);
@@ -65,7 +65,7 @@ test('missing uploads or missing referenced attachments block every module until
 });
 test('changed database or attachments invalidate a preview and cannot partially import another module', t => {
   const {store, imports, stage} = setup(t), id = stage(), preview = imports.preview(id, user);
-  store.put('production-log', {entries: [entry('demo-concurrent')], goalTons: 3000}, 1, user);
+  store.put('production-log', {entries: [entry('demo-concurrent')], goalTons: 3000}, 1, user,'report',false,{reason:'Fictional concurrent report'});
   assert.throws(() => imports.apply(id, preview.token, user), error => error.code === 'CONFLICT');
   assert.equal(store.get('personnel').data.employees.length, 0);
   const checked = imports.preview(id, user); imports.apply(id, checked.token, user);
@@ -135,7 +135,7 @@ test('a failure while inserting an attachment rolls back every document, directo
 test('bulk import preserves existing report snapshots, records imported actors and refuses tombstone resurrection atomically',t => {
   const {store,imports,stage}=setup(t), data=fixture();
   const legacy={...entry('demo-existing-history')};delete legacy.breakdown;
-  store.put('production-log',{entries:[legacy],goalTons:3000},1,user);
+  store.put('production-log',{entries:[legacy],goalTons:3000},1,user,'import');
   const prior=store.reportHistory('production-log',legacy.id,user);
   const id=stage(data);imports.apply(id,imports.preview(id,user).token,user);
   assert.deepEqual(store.get('production-log').data.entries.find(row=>row.id===legacy.id),legacy);

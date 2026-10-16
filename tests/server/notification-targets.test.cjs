@@ -12,12 +12,12 @@ const {createNotifications} = require('../../server/notifications.cjs');
 const {types, href} = require('../../js/notification-model.js');
 const {fixture} = require('./import-fixture.cjs');
 const password = 'Fictional-notification-password-123';
-const report = id => ({id, date: '2026-09-05', shift: 'А', tonnage: 1000, brak: 0});
+const report = id => ({id, date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0});
 async function setup(t, persistent = false) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-notice-target-demo-'));
   const filename = persistent ? path.join(dir, 'demo.sqlite') : ':memory:';
-  const store = openStore(filename), auth = accounts(store); createTasks(store);
-  const inbox = createNotifications(store), admin = await auth.create('demo-admin', password, 'admin');
+  const store = openStore(filename,{productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')}), auth = accounts(store); createTasks(store);
+  const inbox = createNotifications(store), admin = await auth.create('demo-admin', password, 'admin',null,{},()=>{},{taskTeam:'В'});
   t.after(async () => { await inbox.close(); store.close(); fs.rmSync(dir, {recursive: true, force: true}); });
   return {store, auth, inbox, admin, filename};
 }

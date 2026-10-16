@@ -8,8 +8,8 @@ const {openStore} = require('../../server/store.cjs');
 const {createActivity} = require('../../server/activity.cjs');
 const password = 'Fictional-password-123';
 async function setup(t) {
-  const hub = createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true});
-  for (const role of ['admin','operator','observer']) await hub.auth.create('demo-'+role,password,role);
+  const hub = createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
+  for (const role of ['admin','operator','observer']) await hub.auth.create('demo-'+role,password,role,null,{},()=>{},{taskTeam:'В'});
   await new Promise(resolve => hub.server.listen(0,'127.0.0.1',resolve));
   t.after(() => hub.close());
   const base = 'http://127.0.0.1:'+hub.server.address().port;
@@ -53,7 +53,7 @@ test('successful navigation and logout are logged; polling, assets, denied pages
   await request('/api/data/production-log',operator,'PUT',{entries:[],goalTons:1},{'If-Match':'"1"'});
   assert.equal(hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE user_id=? AND action='visit'").get(operator.user.id).n,1);
   assert.equal(hub.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE user_id=? AND action='write'").get(operator.user.id).n,0);
-  const report = {id:'demo-activity-report',date:'2026-10-10',shift:'А',tonnage:10,brak:0,breakdown:null};
+  const report = {id:'demo-activity-report',date:'2026-10-05',shift:'В',tonnage:10,brak:0,breakdown:null};
   assert.equal((await request('/api/data/production-log',operator,'PUT',{entries:[report],goalTons:3000},{'If-Match':'"1"'})).status,200);
   assert.equal((await request('/api/export/production-log',operator)).status,200);
   const response = await request('/api/admin/activity?userId='+operator.user.id,admin), result = await response.json();

@@ -20,18 +20,18 @@
     const label = element('label'); label.append(element('span', '', text), input); return label;
   }
   function taskProfileControls(form, role, initial = {}) {
-    const group = element('fieldset', 'account-permissions'); group.append(element('legend', '', 'Отговорност за задачи'));
+    const group = element('fieldset', 'account-permissions'); group.append(element('legend', '', 'Екип и отговорност за задачи'));
     const flag = element('input'); flag.type = 'checkbox'; flag.dataset.taskSupervisor = ''; flag.checked = !!initial.taskSupervisor;
     const label = element('label', 'account-active'); label.append(flag, element('span', '', 'Началник смяна (задачи)'));
-    const team = element('select'); team.setAttribute('aria-label', 'Екип за задачи'); team.dataset.taskTeam = '';
+    const team = element('select'); team.setAttribute('aria-label', 'Екип за отчети и задачи'); team.dataset.taskTeam = '';
     for (const value of ['', 'А', 'Б', 'В', 'Г', 'СТИКЕРИ']) { const option = element('option', '', value || 'Избери екип'); option.value = value; team.append(option); }
     team.value = initial.taskTeam || '';
-    group.append(label, field('Екип за задачи', team), element('small', '', 'Личният акаунт определя кой отчита задачите. Промяната на екипа не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи и възложените от него, ако има право за възлагане. Самото право за преглед не разрешава промени. Изключеният преглед или отчитане блокира възлагането към този акаунт.'));
-    const refresh = () => { team.disabled = !flag.checked; team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
+    group.append(label, field('Екип за отчети и задачи', team), element('small', '', 'Екипът определя разрешената смяна за тонаж. Не дава права за задачи. Промяната не променя вече възложените смени.'), element('small', '', 'Началникът вижда своите задачи и възложените от него, ако има право за възлагане. Самото право за преглед не разрешава промени. Изключеният преглед или отчитане блокира възлагането към този акаунт.'));
+    const refresh = () => { team.required = flag.checked; form.dispatchEvent(new Event('taskprofilechange')); };
     role.addEventListener('change', refresh); flag.addEventListener('change', refresh);
     form.addEventListener('reset', () => setTimeout(() => { flag.checked = false; team.value = ''; refresh(); }, 0));
     form.insertBefore(group, form.querySelector('.account-actions')); refresh();
-    return () => ({taskSupervisor: flag.checked, taskTeam: flag.checked ? team.value : ''});
+    return () => ({taskSupervisor: flag.checked, taskTeam: team.value});
   }
   function permissionControls(form, role, initialOverrides = {}) {
     let overrides = {...initialOverrides};
@@ -97,7 +97,8 @@
     const name = element('h2', '', user.username); name.setAttribute('translate', 'no');
     const badges = element('div', 'account-badges');
     badges.append(element('span', 'account-role-badge', roles[user.role]), element('span', user.active ? 'account-status is-active' : 'account-status', user.active ? 'Активен' : 'Неактивен'));
-    if (user.taskSupervisor) badges.append(element('span', 'account-role-badge', 'Началник смяна'), element('span', 'account-role-badge', 'Екип: ' + user.taskTeam));
+    if (user.taskSupervisor) badges.append(element('span', 'account-role-badge', 'Началник смяна'));
+    if (user.taskTeam) badges.append(element('span', 'account-role-badge', 'Екип: ' + user.taskTeam));
     identity.append(name, badges); summary.append(identity, element('span', 'account-manage', 'Управление')); details.append(summary);
     const form = element('form', 'account-card'); form.dataset.id = user.id;
     const fields = element('div', 'account-fields account-edit-fields');
