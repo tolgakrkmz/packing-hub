@@ -47,9 +47,9 @@ const PairTargets = (() => {
     if(!entry.result) return 'pending';
     return entry.result.kg >= entry.targetKg && entry.result.crates >= entry.targetCrates ? 'achieved' : 'missed';
   }
-  function plan({data, employees, context, memberIds, targetKg, targetCrates, workAreas, existingId = null, id, now}) {
+  function plan({data, employees, context, memberIds, targetKg, targetCrates, workAreas, existingId = null, id, now, extraordinary = false}) {
     ShiftSchedule.parseDate(context.date);
-    if(![1,2,3].includes(Number(context.shiftCode)) || !TEAMS.includes(context.team) || !ShiftSchedule.isScheduled(context)) {
+    if(![1,2,3].includes(Number(context.shiftCode)) || !TEAMS.includes(context.team) || !ShiftSchedule.isScheduled(context) && !(extraordinary && context.team === 'СТИКЕРИ' && Number(context.shiftCode) === 1)) {
       throw new Error('Избраният екип не работи тази смяна според ротацията.');
     }
     const existing = existingId ? data.entries.find(entry => entry.id === existingId) : null;

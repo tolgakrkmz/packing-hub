@@ -164,7 +164,7 @@ test('HTTP restore uses current permissions, CSRF, origin and versions; two rest
 test('pair plan corrections require a reason; first reports and cancellation retain their existing reporting permissions',t => {
   const store=openStore(':memory:',productionClock);t.after(()=>store.close());store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
   const planned=pair('demo-plan-reason');planned.result=null;planned.updatedAt=planned.createdAt;
-  const reporter={id:5,username:'demo-history-reporter',role:'operator'};
+  const reporter={id:5,username:'demo-history-reporter',role:'operator',taskTeam:scope.team};
   const saved=store.reportOperation('pair-targets',op('create',planned),undefined,reporter);
   assert.throws(()=>store.reportOperation('pair-targets',op('update',{...planned,targetKg:1100}),saved.versions[planned.id],reporter),{code:'CORRECTION_REASON_REQUIRED'});
   const corrected=store.reportOperation('pair-targets',op('update',{...planned,targetKg:1100},{reason:'Fictional plan correction'}),saved.versions[planned.id],reporter);

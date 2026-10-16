@@ -1,5 +1,9 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Тонажът за тази смяна вече е въведен. Втори запис не е разрешен.": "Production for this shift has already been entered. A second entry is not allowed.",
+  "Можете да въвеждате двойки и таргети само за екипа на акаунта си.": "You can enter pairs and targets only for your assigned team.",
+  "Двойки и таргети могат да се въвеждат от началото на назначената смяна до 4 часа след края ѝ. Черновата остава във формата.": "Pairs and targets can be entered from the assigned shift start until four hours after its end. Your draft remains in the form.",
+  "Административен достъп според правата на акаунта.": "Administrative access follows the account permissions.",
   "Административно изключение за тонаж": "Administrative production exception",
   "Разрешаване или отмяна на извънредна смяна": "Extra shift authorization or revocation",
   "Очакват се отчети след смяната": "Reports are expected after the shift",
@@ -18,7 +22,7 @@ const HUB_EN_MESSAGES = {
   "Административно изключение: при запис е задължителна причина в журнала.": "Administrative exception: saving requires a reason in the audit log.",
   "Разрешено въвеждане до": "Reporting allowed until",
   "Извънредна смяна — Стикери": "Extra shift — Stickers",
-  "Разрешението важи само за избраната дата и часовете по-долу. Тонаж се въвежда само докато смяната е в ход.": "Authorization applies only to the selected date and hours below. Production can be entered only while the shift is in progress.",
+  "Разрешението важи за избраната смяна. Срокът за въвеждане е до 4 часа след края ѝ.": "Authorization applies to the selected shift. Reporting closes four hours after its end.",
   "Причина за разрешаване или отмяна": "Reason for authorization or cancellation",
   "Разреши за избраната дата": "Authorize for the selected date",
   "Отмени разрешението": "Revoke authorization",
@@ -28,7 +32,7 @@ const HUB_EN_MESSAGES = {
   "Административно изключение": "Administrative exception",
   "Опиши причината за административния запис на тонаж": "Explain the reason for the administrative production entry",
   "Въведи с административна причина": "Enter with an administrative reason",
-  "Тонаж може да се въвежда само докато назначената смяна е в ход. Черновата остава във формата.": "Production can be entered only while the assigned shift is in progress. Your draft remains in the form.",
+  "Тонаж може да се въвежда от началото на назначената смяна до 4 часа след края ѝ. Черновата остава във формата.": "Production can be entered from the assigned shift start until four hours after its end. Your draft remains in the form.",
   "За административно изключение е задължителна причина. Черновата остава във формата.": "An administrative exception requires a reason. Your draft remains in the form.",
   "Изберете валидна дата и екип.": "Select a valid date and team.",
   "Проверете почивния ден, началния и крайния час и причината.": "Check the rest day, start and end times, and reason.",

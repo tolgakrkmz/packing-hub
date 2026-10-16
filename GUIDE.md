@@ -1180,7 +1180,7 @@ check before production deployment.
 
 In authenticated server mode, production uses the assigned account team and
 the server's Europe/Sofia clock to select the current production date, including
-the previous date while an overnight shift is in progress. This
+the previous date while an overnight shift or its four-hour reporting window is active. This
 server selection is retained when choosing the team again. Manual dates and
 explicit shift links retain their selected date.
 
@@ -1189,45 +1189,53 @@ default to yesterday for delayed night reports; selecting Stickers defaults to
 today. Changing the date or using Yesterday makes the choice manual and preserves
 it when switching teams. The visible date is the date saved in the report.
 
-## Production reporting window
+## Assigned-shift reporting window
 
 Assign each reporting account its team in Accounts, independently of the task
 supervisor checkbox. Team assignment does not grant task responsibilities or
 module permissions. Existing accounts without a team require configuration.
-Ordinary server production writes require the assigned team and dated rotation,
-from shift start until shift end; writes stop at the exact end boundary. Only
-the current assigned shift may be reported, without a limit on the number of
-entries while that shift is active. Earlier or future production dates are
-not permitted for ordinary reporting. Night
-shifts keep their start date; daylight-saving changes use Sofia wall-clock shift
-boundaries. Create, correction, delete and restore operations, including legacy
-document replacements, check every changed source and destination scope. Goal
+
+Ordinary server production, pair planning, targets and pair results require the
+assigned team and dated rotation, from shift start until **four hours after its
+end**. The deadline is exclusive and uses the server's Europe/Sofia shift
+boundaries plus four elapsed hours. Before the shift starts, on a rest day, for
+another team or outside the dated reporting window, writes are rejected.
+A 06:00–14:00 shift can report until 18:00; a 22:00–06:00 shift retains its starting
+date and can report until 10:00 the next day, including daylight-saving changes.
+
+Ordinary staff can create only **one tonnage record per team and production
+date**. Another operation, a concurrent device or a whole-document replacement
+cannot add a duplicate. An existing tonnage record does not lock pair planning,
+target changes or pair results: those continue independently within the same
+reporting window and normal permissions. A completed pair result still requires
+correction rights to change. Existing historical duplicates are preserved.
+Create, correction, delete and restore operations, including legacy document
+replacements, check every changed source and destination scope. Production goal
 changes alone retain their separate permission.
 
 Stickers normally works weekdays, 09:00–17:30. An administrator with production
 settings permission can select a rest-day date and Stickers in Production,
 expand Extra shift, and authorize its start/end times with a mandatory reason.
-The authorization applies only to that date; assigned staff then report
-themselves only while that shift is in progress. Revocation blocks subsequent writes.
-Authorization is stored in SQLite and its changes are audited. Times skipped
-by the spring clock change are rejected. Shift closeout uses the same interval
-and reports when a late entry needs an administrator.
+The dated authorization applies to tonnage, pairs and targets with the same
+four-hour deadline; revocation
+blocks subsequent ordinary writes. Authorization is stored in SQLite and its
+changes are audited. Times skipped by the spring clock change are rejected.
+Pair planning still validates the dated roster; an extraordinary shift requires
+the stored administrator authorization and regular shift code.
 
-An administrator can make an exceptional out-of-window or other-team entry only
-with the normal module rights and a reason recorded with the report and audit
-event. Creating an administrator production record opens the explicit reason
-dialog. Administrative imports retain their separate, previewed import workflow
-and permission; they are not ordinary operator reporting. Local-file mode has no
-authenticated server enforcement.
+Administrators retain their existing workflows and normal module rights.
+Exceptional out-of-window or other-team production needs a reason recorded with
+the report and audit event. Creating an administrator production record opens
+the explicit reason dialog. Administrative imports retain their separate,
+previewed import workflow and permission. Local-file mode has no authenticated
+server enforcement.
 
-There is no additional reporting hour or temporary late-report unlock. Existing
-authorization data from an earlier app version is retained locally but cannot
-authorize an off-shift write. Pairs retain their separate reporting workflow.
-
-The form displays the server-checked shift end. A failed or expired check blocks
-the Save button; the server checks again on every actual write. Rejected writes
-retain the form draft. A confirmed operation may be safely retried after the
-window closes to retrieve its receipt, without creating another report.
+There is no manual temporary late-report unlock. Old authorization data remains
+local but cannot extend the automatic four-hour window. Both forms display the
+server-checked deadline; an unavailable check disables saving. The server checks
+again on every actual write and rejected writes retain the form draft. A
+confirmed operation may be safely retried after the deadline or after the one
+allowed tonnage entry, retrieving its receipt without another report.
 
 ## Save recovery
 

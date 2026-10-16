@@ -188,7 +188,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         if (corrected && !can(user, report.edit) || added && !['restore','delete'].includes(context.action) && !can(user, report.create) || !isDeepStrictEqual(metadata(current.data), metadata(data)) && !can(user, report.settings || report.edit)) throw problem(403, 'FORBIDDEN');
       }
       if (!report && !importing && !can(user, kind === 'personnel' ? 'canManagePersonnel' : 'canManageInstructions')) throw problem(403, 'FORBIDDEN');
-      if(kind==='production-log'&&!importing)productionAccess.requireChanges(current.data,data,user,context.reason);
+      if(['production-log','pair-targets'].includes(kind)&&!importing)productionAccess.requireChanges(current.data,data,user,context.reason,kind);
       if (kind === 'pair-targets') {
         try {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -212,7 +212,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
               continue;
             }
             if (!previous || planFields.some(field => !same(previous[field], entry[field]))) {
-              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt});
+              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.interval(entry.date,entry.team)?.extraordinary===true});
               if (planFields.some(field => !same(planned[field], entry[field]))) throw new Error();
             }
             if (previous?.result && !entry.result) throw new Error();
@@ -414,7 +414,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  const productionAccess=createProductionAccess({db,audit,transaction},{schedule:shiftSchedule,problem,now:productionNow});
+  const productionAccess=createProductionAccess({db,audit,transaction,get},{schedule:shiftSchedule,problem,now:productionNow});
   return {db, get, put, productionAccess, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

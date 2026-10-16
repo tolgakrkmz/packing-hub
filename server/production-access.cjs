@@ -3,6 +3,7 @@ const {isDeepStrictEqual}=require('node:util');
 const {can}=require('./permissions.cjs');
 function createProductionAccess(store,{schedule,problem,now=Date.now}) {
   const {db}=store, teams=[...schedule.TEAMS,'СТИКЕРИ'];
+  const GRACE=4*60*60*1000;
   const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Sofia',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   db.exec(`CREATE TABLE IF NOT EXISTS production_shift_authorizations(
     date TEXT PRIMARY KEY, start TEXT NOT NULL, end TEXT NOT NULL,
@@ -23,44 +24,59 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
     if(!extra)return null;
     return {start:instant(date,extra.start),end:instant(date,extra.end),code:1,extraordinary:true};
   }
-  function status(date,team,user,at=now()) {
+  function status(date,team,user,at=now(),kind='production-log',shiftCode=null) {
     const value=interval(date,team), assigned=user.taskTeam===team;
-    const inWindow=!!value&&at>=value.start&&at<value.end;
-    const code=!teams.includes(user.taskTeam)?'PRODUCTION_TEAM_REQUIRED':!assigned?'PRODUCTION_TEAM_MISMATCH':!inWindow?'PRODUCTION_WINDOW_CLOSED':null;
-    return {date,team,now:at,interval:value,deadline:value?value.end:null,
+    const inWindow=!!value&&at>=value.start&&at<value.end+GRACE&&(shiftCode===null||Number(shiftCode)===value.code);
+    const prefix=kind==='pair-targets'?'PAIR':'PRODUCTION';
+    const code=!teams.includes(user.taskTeam)?prefix+'_TEAM_REQUIRED':!assigned?prefix+'_TEAM_MISMATCH':!inWindow?prefix+'_WINDOW_CLOSED':null;
+    return {date,team,now:at,interval:value,deadline:value?value.end+GRACE:null,
       allowed:!code,code,adminException:user.role==='admin'&&!!code};
   }
   function currentScope(user,at=now()) {
     const team=teams.includes(user.taskTeam)?user.taskTeam:teams[0], today=schedule.sofiaDate(new Date(at));
     const candidates=[schedule.addDays(today,-1),today].map(date=>({date,team,value:interval(date,team)}));
-    const current=candidates.find(({value})=>value&&at>=value.start&&at<value.end);
+    const current=candidates.find(({value})=>value&&at>=value.start&&at<value.end+GRACE);
     if(current)return {date:current.date,team};
     return {date:today,team};
   }
-  function read(input,user) {
-    if(!can(user,'canViewProduction'))throw problem(403,'FORBIDDEN');
+  function read(input,user,kind='production-log') {
+    const pairs=kind==='pair-targets',view=pairs?'canViewPairs':'canViewProduction';
+    if(!can(user,view))throw problem(403,'FORBIDDEN');
     const params=input instanceof URLSearchParams?input:new URLSearchParams(input);
-    if([...params.keys()].some(key=>!['date','team'].includes(key)||params.getAll(key).length!==1))throw problem(400,'INVALID_PRODUCTION_SCOPE');
+    if([...params.keys()].some(key=>!(pairs?['date','team','shiftCode']:['date','team']).includes(key)||params.getAll(key).length!==1))throw problem(400,'INVALID_PRODUCTION_SCOPE');
     const current=currentScope(user), date=params.get('date')??current.date,team=params.get('team')??current.team;
-    const value=status(date,team,user);
-    return {...value,canCreate:can(user,'canCreateProduction')&&(value.allowed||value.adminException),
-      canEdit:can(user,'canEditProduction')&&(value.allowed||value.adminException),
-      canAuthorize:user.role==='admin'&&can(user,'canManageProductionSettings'),currentScope:current};
+    const shiftCode=params.get('shiftCode');
+    if(shiftCode!==null&&!/^[123]$/.test(shiftCode))throw problem(400,'INVALID_PRODUCTION_SCOPE');
+    const value=status(date,team,user,now(),kind,shiftCode);
+    const reported=!pairs&&store.get('production-log').data.entries.some(entry=>entry.date===date&&entry.shift===team);
+    return {...value,reported,canCreate:(!reported||pairs||user.role==='admin')&&can(user,pairs?'canCreatePairs':'canCreateProduction')&&(value.allowed||value.adminException),
+      canEdit:can(user,pairs?'canEditPairs':'canEditProduction')&&(value.allowed||value.adminException),
+      canAuthorize:!pairs&&user.role==='admin'&&can(user,'canManageProductionSettings'),currentScope:pairs?{...current,shiftCode:interval(current.date,current.team)?.code||1}:current};
   }
-  function requireChanges(before,after,user,reason) {
+  function requireChanges(before,after,user,reason,kind='production-log') {
+    const pairs=kind==='pair-targets';
+    // Pair administrators retain their existing correction workflow.
+    if(pairs&&user.role==='admin')return;
     const prior=new Map(before.entries.map(e=>[e.id,e])),next=new Map(after.entries.map(e=>[e.id,e]));
     const checked=new Map();
     for(const id of new Set([...prior.keys(),...next.keys()])) {
       if(isDeepStrictEqual(prior.get(id),next.get(id)))continue;
-      for(const entry of [prior.get(id),next.get(id)].filter(Boolean))checked.set(entry.date+'/'+entry.shift,entry);
+      for(const entry of [prior.get(id),next.get(id)].filter(Boolean))checked.set(entry.date+'/'+(pairs?entry.team+'/'+entry.shiftCode:entry.shift),entry);
     }
     const exceptions=[];
     for(const entry of checked.values()) {
-      const value=status(entry.date,entry.shift,user);
+      const value=status(entry.date,pairs?entry.team:entry.shift,user,now(),kind,pairs?entry.shiftCode:null);
       if(value.allowed)continue;
       if(!value.adminException)throw problem(403,value.code);
       if(!validReason(reason))throw problem(428,'PRODUCTION_EXCEPTION_REASON_REQUIRED');
       exceptions.push({date:entry.date,team:entry.shift});
+    }
+    if(!pairs&&user.role!=='admin') {
+      for(const entry of after.entries) {
+        const old=prior.get(entry.id);
+        if(old&&old.date===entry.date&&old.shift===entry.shift)continue;
+        if(before.entries.some(other=>other.id!==entry.id&&other.date===entry.date&&other.shift===entry.shift)||after.entries.some(other=>other.id!==entry.id&&other.date===entry.date&&other.shift===entry.shift))throw problem(403,'PRODUCTION_ALREADY_REPORTED');
+      }
     }
     if(exceptions.length)store.audit(user,'production-exception','production-log',{scopes:exceptions,reason:reason.trim()});
   }

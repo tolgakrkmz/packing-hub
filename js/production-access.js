@@ -12,7 +12,7 @@ function createProductionAccessControls({scope,busy,onState,onDefault}) {
     else {
       const reasons={PRODUCTION_TEAM_REQUIRED:'Акаунтът няма зададен екип. Обърнете се към администратор.',PRODUCTION_TEAM_MISMATCH:'Можете да въвеждате тонаж само за екипа на акаунта си.',PRODUCTION_WINDOW_CLOSED:state.interval?'Въвеждането е извън разрешения срок. Черновата остава във формата.':'Няма разрешена смяна за този екип на избраната дата.'};
       const format=new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',dateStyle:'short',timeStyle:'short'});
-      message.textContent=state.allowed?'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':state.adminException?'Административно изключение: при запис е задължителна причина в журнала.':reasons[state.code];
+      message.textContent=state.allowed&&state.reported&&!state.canCreate?'Тонажът за тази смяна вече е въведен. Втори запис не е разрешен.':state.allowed?'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':state.adminException?'Административно изключение: при запис е задължителна причина в журнала.':reasons[state.code];
     }
     const selected=scope();
     const weekend=/^\d{4}-\d{2}-\d{2}$/.test(selected.date)&&[0,6].includes(new Date(selected.date+'T12:00:00Z').getUTCDay());
@@ -54,7 +54,7 @@ function createProductionAccessControls({scope,busy,onState,onDefault}) {
   $('productionExtraAllow').addEventListener('click',()=>configure(true));
   $('productionExtraRevoke').addEventListener('click',()=>configure(false));
   HubServer.guardUpdate?.({isBusy:()=>configuring,hasDraft:()=>!!authorizationDraft?.hasDraft()||$('productionExtraReason').value.trim().length>0});
-  HubServer.watch('production-access',refresh);HubServer.watch('accounts',refresh);
+  HubServer.watch('production-log',refresh);HubServer.watch('production-access',refresh);HubServer.watch('accounts',refresh);
   setInterval(()=>{if(!document.hidden)refresh();},30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   HubServer.json('/api/production-access').then(value=>{onDefault(value.currentScope);check();}).catch(()=>{check();});

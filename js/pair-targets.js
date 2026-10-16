@@ -11,6 +11,7 @@
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
   let explicitScope=null, scopeLinkError='';
+  let pairAccess=null,serverScope=null;
   try {if(typeof HubReportScope!=='undefined')explicitScope=HubReportScope.parse(location.search);}
   catch(error){scopeLinkError=error.message;}
   const pairDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.($('pairDialog'),{isOpen:() => !!editing});
@@ -48,7 +49,7 @@
   });
 
   function selectLive() {
-    const live = ShiftSchedule.current();
+    const live = serverScope||ShiftSchedule.current();
     context = {...live};
     followLive = true;
     updateControls();
@@ -65,7 +66,7 @@
     $('contextTeam').value = context.team;
   }
   function validScope() {
-    try { return !!context && ShiftSchedule.isScheduled(context); } catch(error) { return false; }
+    try { return !!context && (ShiftSchedule.isScheduled(context)||pairAccess?.extraordinary()); } catch(error) { return false; }
   }
   function selectedEntries() { return data.entries.filter(entry => PairTargets.inScope(entry,context)); }
   function pairCard(entry, actions = false) {
@@ -80,11 +81,12 @@
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
       ${state === 'missed' || state === 'cancelled' ? `<p class="cause"><strong>${state === 'cancelled' ? 'Причина за отмяната:' : 'Причина:'}</strong> ${cause}</p>` : ''}
       ${entry.cancellation ? `<p class="muted">Отменена на: <time datetime="${escape(entry.cancellation.cancelledAt)}">${escape(new Date(entry.cancellation.cancelledAt).toLocaleString('bg-BG'))}</time></p>` : ''}
-      ${actions && !entry.cancellation ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="cancel" data-id="${escape(entry.id)}">Отмени</button>`}</div>` : ''}
+      ${actions && !entry.cancellation && (!pairAccess||pairAccess.canSave(!!entry.result)) ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="cancel" data-id="${escape(entry.id)}">Отмени</button>`}</div>` : ''}
     </article>`;
   }
   function render() {
     if(!context) return;
+    pairAccess?.check();
     const live = ShiftSchedule.current();
     $('liveShift').textContent = `Екип ${live.team} · ${ShiftSchedule.LABELS[live.shiftCode]}`;
     $('stickersShiftBtn').setAttribute('aria-pressed',String(context.team === 'СТИКЕРИ'));
@@ -118,7 +120,8 @@
     ].map(([value,label]) => `<div class="stat"><strong>${value}</strong>${label}</div>`).join('');
     $('rosterSummary').textContent = `Състав · ${rosterLoaded ? people.length+' човека' : 'изберете Personnel'}${rosterLoaded ? ' · '+available.length+' неразпределени' : ''}`;
     $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
-    $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError;
+    $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false);
+    if(editing)$('savePairBtn').disabled=busy||!!pairAccess&&!pairAccess.canSave(!!JSON.parse(editing.original||'null')?.result);
     $('pairsList').innerHTML = selected.map(entry => pairCard(entry,!scopeLinkError)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
     globalThis.HubNotificationTarget?.reveal($('pairsList'));
@@ -149,7 +152,7 @@
     Array.from(two.options).forEach(option => { option.disabled = !!option.value && option.value === one.value; });
   }
   function openDialog(mode, entry = null) {
-    if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError) return;
+    if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError || pairAccess&&!pairAccess.canSave(!!entry?.result)) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
     const scope = entry || context;
     editing = {mode,id:entry?.id || null,context:{date:scope.date,shiftCode:scope.shiftCode,team:scope.team},followLive,original:entry ? JSON.stringify(entry) : null,
@@ -195,6 +198,7 @@
     $('areaAuto').checked = (entry?.areas || []).includes('auto');
     $('areaManual').checked = (entry?.areas || []).includes('manual');
     updateResultPreview();
+    render();
     pairDraft?.accept(); $('pairDialog').showModal();
   }
   function updateResultPreview() {
@@ -248,10 +252,9 @@
         if(!edit.id && editing.attempt && data.entries.some(entry => entry.id === edit.newId)) {
           const error = new Error('Черновата е променена след непотвърден опит. Прегледай актуалния запис.'); error.code = 'REPORT_CONFLICT'; error.status = 409; throw error;
         }
-        if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
         await rosterSync.refreshFromDisk({fresh:true});
         const entry = edit.original ? JSON.parse(edit.original) : null;
-        const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId});
+        const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId,extraordinary:pairAccess?.extraordinary()});
         const reason = entry && (entry.result || edit.mode === 'plan') ? await HubServer.correctionReason() : undefined;
         if(reason === null) return false;
         editing.attempt = {key,operation:{...(reason ? {reason} : {}),operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
@@ -357,6 +360,15 @@
   if(explicitScope){context=explicitScope;followLive=false;updateControls();}
   else selectLive();
   if(scopeLinkError)$('pageError').textContent=scopeLinkError;
+  if(typeof createPairAccessControls!=='undefined')pairAccess=createPairAccessControls({
+    scope:()=>editing?.context||context,onState:value=>{
+      if(value?.currentScope&&HubServer.user.taskTeam) {
+        serverScope=value.currentScope;
+        if(followLive&&!editing&&!busy){context={...serverScope};updateControls();}
+      }
+      render();
+    }
+  });
   render();
   Promise.allSettled([sync.init(),rosterSync.init()]).then(render);
   function refreshLive(){

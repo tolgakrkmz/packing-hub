@@ -422,6 +422,11 @@ async function main() {
     await expect(operator.locator('#msg')).toContainText('Записано'); await expect(observer.locator('#avKpiRow')).toContainText('0,5 ч');
     console.log('PASS operator entry → shared SQLite → observer report updates without reload');
     console.log('RUN personnel, Stickers pair planning/reporting and live pair statistics');
+    // This scenario reports for Stickers; ordinary accounts cannot report for a foreign team.
+    await hub.auth.update(operatorId,{taskTeam:'СТИКЕРИ'},hub.auth.list()[0]);
+    await operator.goto(base+'/login');
+    await operator.locator('#username').fill('demo-operator');await operator.locator('#password').fill(demoPassword);
+    await operator.locator('#loginForm button[type=submit]').click();await expect(operator).toHaveURL(base+'/');
     await admin.goto(base + '/personnel'); await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
     for (const name of ['Demo Online Packer One', 'Demo Online Packer Two']) {
       await admin.locator('#addPersonBtn').click(); await admin.locator('#personName').fill(name); await admin.locator('#personCategory').selectOption('stickers'); await admin.locator('#personRole').selectOption('Опаковчик'); await admin.locator('#personForm button[type=submit]').click(); await expect(admin.locator('#personModal')).not.toHaveClass(/open/);
@@ -486,6 +491,7 @@ async function main() {
     await admin.locator('#legacyFolder').setInputFiles(migrationDir);
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toHaveText('Данните са проверени. Потвърди общото добавяне.');
     await admin.locator('#cancelDataImport').click();
+    await expect(admin.locator('#dataImportMessage')).toHaveText('Импортът е отказан. Данните в сайта не са променени.');
     fs.writeFileSync(duplicateFile, JSON.stringify({...production, entries: production.entries.map(entry => ({...entry, tonnage: 1}))}));
     await admin.locator('#legacyFolder').setInputFiles(migrationDir);
     await admin.locator('#checkDataImport').click(); await expect(admin.locator('#dataImportMessage')).toContainText('Избрани са различни копия на JSON файл.');

@@ -139,6 +139,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if(pathname==='/api/pair-access') {
+          if(request.method!=='GET')throw problem(405,'METHOD_REJECTED');
+          return json(response,200,store.productionAccess.read(url.searchParams,authorized('canViewPairs'),'pair-targets'));
+        }
         if(pathname==='/api/production-access') {
           if(request.method==='GET')return json(response,200,store.productionAccess.read(url.searchParams,authorized('canViewProduction')));
           if(request.method==='POST') {

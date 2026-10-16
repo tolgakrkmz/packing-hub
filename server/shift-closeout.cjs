@@ -40,6 +40,10 @@ function createShiftCloseout(store,{now=Date.now}={}) {
       const interval=intervalFor(team,date);
       if(interval && at>=interval.start && at<interval.end)return {date,team,shiftCode:interval.code};
     }
+    for(const date of [schedule.addDays(today,-1),today]) for(const team of teams) {
+      const interval=intervalFor(team,date);
+      if(interval&&store.productionAccess.status(date,team,user,at).allowed)return {date,team,shiftCode:interval.code};
+    }
     const team=teams[0];
     return team?{date:today,team,shiftCode:intervalFor(team,today)?.code||1}:null;
   }
@@ -64,7 +68,7 @@ function createShiftCloseout(store,{now=Date.now}={}) {
     if(!availability.pairs)summary.pairs=null;
     const productionAccess=availability.production?store.productionAccess.status(date,team,user,at):null;
     return {...summary,availability,teams,now:at,currentScope:current,configurationRequired:false,productionAccess,
-      canReportProduction:availability.production&&can(user,'canCreateProduction')&&(productionAccess.allowed||productionAccess.adminException),canReportPairs:availability.pairs&&can(user,'canCreatePairs')};
+      canReportProduction:availability.production&&can(user,'canCreateProduction')&&(user.role==='admin'||summary.production.entryCount===0)&&(productionAccess.allowed||productionAccess.adminException),canReportPairs:availability.pairs&&can(user,'canCreatePairs')&&(user.role==='admin'||store.productionAccess.status(date,team,user,at,'pair-targets',Number(shiftCode)).allowed)};
   }
   function reminderCandidates(at,user) {
     const teams=teamsFor(user), today=schedule.sofiaDate(new Date(at)), candidates=[];

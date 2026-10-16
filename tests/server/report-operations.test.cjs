@@ -44,7 +44,8 @@ async function setup(t) {
 for(const kind of Object.keys(reports)) {
   test(kind+': simultaneous independent creates and updates retain both reports without a module refresh',async t => {
     const {hub,login,request} = await setup(t);
-    const sessions = await Promise.all([login('demo-reports-operator'),login('demo-reports-operator')]);
+    const concurrentUser=kind==='production-log'?'demo-reports-admin':'demo-reports-operator';
+    const sessions = await Promise.all([login(concurrentUser),login(concurrentUser)]);
     const inputs = [create(entry(kind,'demo-operation-a')),create(entry(kind,'demo-operation-b',1))];
     const responses = await Promise.all(inputs.map((input,i) => request(kind,sessions[i],input)));
     assert.deepEqual(responses.map(response => response.status),[200,200]);

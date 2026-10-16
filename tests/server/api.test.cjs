@@ -6,10 +6,10 @@ const path = require('node:path');
 const {createHubServer} = require('../../server/server.cjs');
 const {openStore} = require('../../server/store.cjs');
 const fixturePassword = 'Fictional-password-123';
-async function setup(t, filename = ':memory:') {
+async function setup(t, filename = ':memory:',team='В') {
   const hub = createHubServer({filename, publicOrigin: 'http://127.0.0.1:0', allowHttp: true,productionNow:()=>Date.parse('2026-10-05T10:00:00+03:00')});
   await hub.auth.create('demo-admin', fixturePassword, 'admin');
-  await hub.auth.create('demo-operator', fixturePassword, 'operator',null,{},()=>{},{taskTeam:'В'});
+  await hub.auth.create('demo-operator', fixturePassword, 'operator',null,{},()=>{},{taskTeam:team});
   await hub.auth.create('demo-observer', fixturePassword, 'observer');
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
   t.after(() => hub.close());
@@ -250,7 +250,7 @@ test('login failures are generic and repeated attempts are throttled', async t =
   assert.equal((await request('/api/login', null, {method: 'POST', data: {username: 'demo-unknown', password: fixturePassword}})).status, 429);
 });
 test('pair writes enforce the active packer roster and preserve reported plans while retaining historical members', async t => {
-  const {hub, request, login} = await setup(t); const admin = await login(), operator = await login('demo-operator');
+  const {hub, request, login} = await setup(t,':memory:','СТИКЕРИ'); const admin = await login(), operator = await login('demo-operator');
   const put = (kind, data, revision, user = admin) => request('/api/data/' + kind, user, {method: 'PUT', data:{data,reason:'Fictional pair correction'}, headers: {'If-Match': '"' + revision + '"'}});
   const roster = await (await request('/api/data/personnel', admin)).json();
   roster.data.employees = [1, 2, 3].map(number => ({id: 'demo-person-' + number, name: 'Demo API Person ' + number, category: 'stickers', team: '1 смяна', role: number === 3 ? 'Отговорник' : 'Опаковчик', active: true, note: ''}));
@@ -274,7 +274,7 @@ test('pair writes enforce the active packer roster and preserve reported plans w
   assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, kg: 1200, crates: 48}}]}, 3, corrector)).status, 200);
 });
 test('pair cancellation enforces reasons, history, permissions, revision and unchanged plans', async t => {
-  const {hub, request, login} = await setup(t);
+  const {hub, request, login} = await setup(t,':memory:','СТИКЕРИ');
   const admin = await login(), operator = await login('demo-operator'), observer = await login('demo-observer');
   const roster = hub.store.get('personnel').data;
   roster.employees = [1,2].map(id => ({id:'demo-cancel-person-'+id,name:'Demo Cancellation Person '+id,category:'stickers',team:'1 смяна',role:'Опаковчик',active:true}));
@@ -312,16 +312,16 @@ test('pair cancellation enforces reasons, history, permissions, revision and unc
   assert.equal((await put([cancelled,{...reported,cancellation:cancelled.cancellation,updatedAt:cancelledAt}],5,admin)).status,400);
 });
 test('simultaneous saves accept one revision and a refreshed retry preserves both reports', async t => {
-  const {request, login} = await setup(t); const operator = await login('demo-operator');
-  const initial = await (await request('/api/data/production-log', operator)).json();
+  const {request, login} = await setup(t); const actor = await login();
+  const initial = await (await request('/api/data/production-log', actor)).json();
   const entries = [1, 2].map(id => ({id: 'demo-race-' + id, date: '2026-10-05', shift: 'В', tonnage: 1000, brak: 0, breakdown: null}));
-  const put = (data, revision) => request('/api/data/production-log', operator, {method: 'PUT', data, headers: {'If-Match': '"' + revision + '"'}});
+  const put = (data, revision) => request('/api/data/production-log', actor, {method: 'PUT', data:{data,reason:'Fictional concurrent setup'}, headers: {'If-Match': '"' + revision + '"'}});
   const responses = await Promise.all(entries.map(entry => put({...initial.data, entries: [entry]}, 1)));
   assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
-  const current = await (await request('/api/data/production-log', operator)).json();
+  const current = await (await request('/api/data/production-log', actor)).json();
   const missing = entries.find(entry => !current.data.entries.some(prior => prior.id === entry.id));
   assert.equal((await put({...current.data, entries: [...current.data.entries, missing]}, current.revision)).status, 200);
-  assert.equal((await (await request('/api/data/production-log', operator)).json()).data.entries.length, 2);
+  assert.equal((await (await request('/api/data/production-log', actor)).json()).data.entries.length, 2);
 });
 test('live events announce committed revisions and immediately revoke disabled readers on the next notification', async t => {
   const {request, login} = await setup(t); const admin = await login(), observer = await login('demo-observer');
