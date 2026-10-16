@@ -1180,7 +1180,7 @@ check before production deployment.
 
 In authenticated server mode, production uses the assigned account team and
 the server's Europe/Sofia clock to select the current production date, including
-the previous date for an overnight shift and its one-hour grace period. This
+the previous date while an overnight shift is in progress. This
 server selection is retained when choosing the team again. Manual dates and
 explicit shift links retain their selected date.
 
@@ -1195,7 +1195,10 @@ Assign each reporting account its team in Accounts, independently of the task
 supervisor checkbox. Team assignment does not grant task responsibilities or
 module permissions. Existing accounts without a team require configuration.
 Ordinary server production writes require the assigned team and dated rotation,
-from shift start through exactly one hour after shift end, inclusive. Night
+from shift start until shift end; writes stop at the exact end boundary. Only
+the current assigned shift may be reported, without a limit on the number of
+entries while that shift is active. Earlier or future production dates are
+not permitted for ordinary reporting. Night
 shifts keep their start date; daylight-saving changes use Sofia wall-clock shift
 boundaries. Create, correction, delete and restore operations, including legacy
 document replacements, check every changed source and destination scope. Goal
@@ -1205,7 +1208,7 @@ Stickers normally works weekdays, 09:00–17:30. An administrator with productio
 settings permission can select a rest-day date and Stickers in Production,
 expand Extra shift, and authorize its start/end times with a mandatory reason.
 The authorization applies only to that date; assigned staff then report
-themselves through one hour after its end. Revocation blocks subsequent writes.
+themselves only while that shift is in progress. Revocation blocks subsequent writes.
 Authorization is stored in SQLite and its changes are audited. Times skipped
 by the spring clock change are rejected. Shift closeout uses the same interval
 and reports when a late entry needs an administrator.
@@ -1217,21 +1220,14 @@ dialog. Administrative imports retain their separate, previewed import workflow
 and permission; they are not ordinary operator reporting. Local-file mode has no
 authenticated server enforcement.
 
-The form displays the server-checked deadline. A failed or expired check blocks
+There is no additional reporting hour or temporary late-report unlock. Existing
+authorization data from an earlier app version is retained locally but cannot
+authorize an off-shift write. Pairs retain their separate reporting workflow.
+
+The form displays the server-checked shift end. A failed or expired check blocks
 the Save button; the server checks again on every actual write. Rejected writes
 retain the form draft. A confirmed operation may be safely retried after the
 window closes to retrieve its receipt, without creating another report.
-
-For a late operator entry, an administrator with production settings permission
-can select the original date and team in Production, expand Temporary access for
-a late report, provide a reason and allow access for 30 minutes. This requires a
-scheduled shift (or an authorized extraordinary Stickers shift) whose normal
-one-hour grace period has ended. Assigned accounts report themselves with their
-existing module permissions; editing rights are not added. Access closes exactly
-30 minutes after the server accepts the grant and can be revoked early with a
-reason. The grant and reason are audited. SQLite retains the original expiry
-across restarts. Future or unscheduled shifts cannot be opened through this flow.
-Repeated approval explicitly starts a new 30-minute period for that same scope.
 
 ## Save recovery
 

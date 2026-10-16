@@ -197,9 +197,9 @@ tbody tr:last-child td{border-bottom:none;}
   font-size:18px;font-weight:700;text-align:center;
 }
 /* Extra-shift controls use the same panel, including narrow phone screens. */
-.production-authorization{margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:10px}
-.production-authorization summary{cursor:pointer}
-.production-authorization .row{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
-.production-authorization label{display:block}
-.production-authorization textarea{box-sizing:border-box;width:100%;min-height:72px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px}
+#productionExtraShift{margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:10px}
+#productionExtraShift summary{cursor:pointer}
+#productionExtraShift .row{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
+#productionExtraShift label{display:block}
+#productionExtraShift textarea{box-sizing:border-box;width:100%;min-height:72px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px}
 #productionAccessMessage{font-size:14px;line-height:1.5}

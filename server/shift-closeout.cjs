@@ -40,10 +40,6 @@ function createShiftCloseout(store,{now=Date.now}={}) {
       const interval=intervalFor(team,date);
       if(interval && at>=interval.start && at<interval.end)return {date,team,shiftCode:interval.code};
     }
-    for(const date of [schedule.addDays(today,-1),today]) for(const team of teams) {
-      const interval=intervalFor(team,date);
-      if(interval&&at>=interval.end&&at<=interval.end+3600000)return {date,team,shiftCode:interval.code};
-    }
     const team=teams[0];
     return team?{date:today,team,shiftCode:intervalFor(team,today)?.code||1}:null;
   }
