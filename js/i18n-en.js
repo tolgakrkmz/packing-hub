@@ -1688,3 +1688,19 @@ Object.assign(HUB_EN_MESSAGES, {
   "Премахване на профилна снимка": "Profile photo removal",
   "Моят акаунт · Package Hub": "My account · Package Hub"
 });
+Object.assign(HUB_EN_MESSAGES, {
+  "Няма тонажни отчети за избрания период.": "No production reports for the selected period.",
+  "Няма тонажни отчети за избраната година.": "No production reports for the selected year.",
+  "Още няма тонажни отчети.": "No production reports yet.",
+  "Няма тонажни записи. Свържете файла от „Тонаж и брак“, за да видите годишния резултат.": "No production records. Connect the Production & Scrap file to view the annual result.",
+  "Въведи тонажен отчет": "Enter a production report",
+  "Изчисти филтрите": "Clear filters",
+  "Няма задачи, които отговарят на търсенето или избрания отговорник.": "No tasks match the search or the selected owner.",
+  "Няма активни сменни задачи.": "No active shift tasks.",
+  "Няма активни глобални задачи.": "No active global tasks.",
+  "Задачите не могат да се заредят.": "Tasks could not be loaded.",
+  "Показани са последно заредените данни.": "Showing the last loaded data.",
+  "Няма профили, които отговарят на търсенето или избраната категория.": "No profiles match the search or the selected category.",
+  "Още няма профили с инструкции.": "No instruction profiles yet.",
+  "Профилите се добавят от акаунт с право за управление на инструкциите.": "Profiles are added by an account with permission to manage instructions."
+});

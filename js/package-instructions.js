@@ -373,6 +373,31 @@ function getFilteredProfiles() {
   });
 }
 
+// An empty project gets a create step (when permitted); filters without matches can be cleared.
+function emptyProfilesState(filtered) {
+  const box = document.createElement('div'), text = document.createElement('p'), actions = document.createElement('div');
+  box.className = 'empty instruction-empty'; actions.className = 'instruction-empty-actions';
+  text.textContent = filtered ? 'Няма профили, които отговарят на търсенето или избраната категория.'
+    : 'Още няма профили с инструкции.';
+  box.append(text);
+  const action = (label, cls, fn) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'instruction-btn ' + cls; button.textContent = label;
+    button.addEventListener('click', fn); actions.appendChild(button);
+  };
+  if (filtered) action('Изчисти филтрите', 'instruction-btn--quiet', () => {
+    el.searchInput.value = ''; activeCategoryFilter = ''; profilePage = 1;
+    categoryChips.forEach(chip => chip.classList.toggle('active', !chip.dataset.cat));
+    renderSearch(); el.searchInput.focus();
+  });
+  else if (el.addBtn.style.display !== 'none') {
+    action('Нов профил', 'instruction-btn--primary', () => el.addBtn.click());
+    action('Bulk импорт', 'instruction-btn--import', () => bulkEl.bulkBtn.click());
+  } else text.textContent += ' Профилите се добавят от акаунт с право за управление на инструкциите.';
+  if (actions.childElementCount) box.appendChild(actions);
+  return box;
+}
+
 function renderSearch() {
   clearTimeout(profileSearchTimer);
   profileSearchTimer = null;
@@ -398,7 +423,8 @@ function renderSearch() {
     : '';
 
   if (!profiles.length) {
-    el.resultsWrap.innerHTML = '<div class="empty">Няма намерени профили.</div>';
+    el.resultsWrap.innerHTML = '';
+    el.resultsWrap.appendChild(emptyProfilesState(Object.keys(dbIndex).length > 0));
     return;
   }
 

@@ -11,6 +11,7 @@ const expect = baseExpect.configure({timeout: 10000});
 const {fixture: migrationFixture} = require('../tests/server/import-fixture.cjs');
 const {assertResponsive} = require('../tests/browser/responsive.cjs');
 const {exerciseTasks} = require('../tests/browser/tasks.cjs');
+const {exerciseEmptyStates} = require('../tests/browser/empty-states.cjs');
 const {exerciseTaskHistory} = require('../tests/browser/task-history.cjs');
 const {exerciseTaskPhotos} = require('../tests/browser/task-photos.cjs');
 const {exerciseTaskPhotoOptions} = require('../tests/browser/task-photo-options.cjs');
@@ -307,6 +308,14 @@ async function main() {
     }
     if (process.argv.includes('--admin-task-completion-only')) {
       await exerciseAdminTaskCompletion({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
+      assert.deepEqual(errors, []); return;
+    }
+    const createObserver = async (username, permissions) => {
+      await hub.auth.create(username, demoPassword, 'observer', hub.auth.list().find(user => user.username === 'demo-admin'), permissions);
+      return device(username);
+    };
+    if (process.argv.includes('--empty-states-only')) {
+      await exerciseEmptyStates({admin, hub, base, device, expect, createObserver, setTime: value => { taskTime = Date.parse(value); }});
       assert.deepEqual(errors, []); return;
     }
     if (process.argv.includes('--tasks-only')) {
@@ -636,6 +645,7 @@ async function main() {
     assert.equal(await admin.evaluate(async () => (await fetch('/data-import')).status), 200);
     assert.equal(await admin.evaluate(async () => (await fetch('/production-import')).status), 403);
     console.log('PASS account permissions, mobile restrictions, authorized export and immediate revocation');
+    await exerciseEmptyStates({admin, hub, base, device, expect, createObserver, setTime: value => { taskTime = Date.parse(value); }});
     console.log('RUN shift and global tasks, approvals, missed reports and responsive task screens');
     const screenshotDir = process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length);
     await exerciseTasks({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }, screenshotDir});
@@ -652,7 +662,7 @@ async function main() {
     await exerciseTaskTransfer({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
     assert.deepEqual(errors, []);
     console.log('PASS observer controls, persistence and account revocation');
-    console.log('Online browser E2E: 14 workflows passed.');
+    console.log('Online browser E2E: 15 workflows passed.');
   } catch (error) {
     if(browser)for(const context of browser.contexts())for(const page of context.pages()) {
       console.error('Browser failure context',new URL(page.url()).pathname,await page.locator('dialog[open]').evaluateAll(nodes=>nodes.map(node=>node.id)).catch(()=>[]));

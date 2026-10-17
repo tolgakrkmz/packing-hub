@@ -15,7 +15,7 @@ function environment({saved, storageFailure = false} = {}) {
   const names = ['overview', 'production', 'pairs', 'downtime', 'workforce'];
   const tabs = names.map(statsTab => new Control({statsTab}));
   const panels = names.map(statsPanel => new Control({statsPanel}));
-  const controls = Object.fromEntries(['statsBreakdownControls','connPanel','statsFilesBtn','monthlyConnectBtn','openFileBtn','statsFilesStatus'].map(id => [id, new Control()]));
+  const controls = Object.fromEntries(['statsBreakdownControls','connPanel','statsFilesBtn','monthlyConnectBtn','productionConnectBtn','openFileBtn','statsFilesStatus'].map(id => [id, new Control()]));
   const body = new Control(), toggle = new Control();
   body.hidden = true;
   const dots = Array.from({length:4}, () => ({connected:false, classList:{contains() { return this.dot.connected; }}}));
@@ -81,6 +81,11 @@ test('files stay closed until requested; toggle closes them and connecting focus
   assert.equal(env.controls.statsFilesBtn.attributes['aria-expanded'], 'false');
   assert.equal(env.controls.connPanel.style.display, 'none');
   env.controls.monthlyConnectBtn.click();
+  assert.equal(env.controls.connPanel.style.display, 'block');
+  assert.equal(env.controls.openFileBtn.focused, true);
+  env.controls.statsFilesBtn.click(); env.controls.openFileBtn.focused = false;
+  assert.equal(env.controls.connPanel.style.display, 'none');
+  env.controls.productionConnectBtn.click();
   assert.equal(env.controls.connPanel.style.display, 'block');
   assert.equal(env.controls.openFileBtn.focused, true);
 });

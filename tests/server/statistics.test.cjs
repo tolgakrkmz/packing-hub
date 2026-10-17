@@ -17,6 +17,8 @@ test('monthly projections omit other reports, retain every year and exact annual
     [['2025',5000,900,5000,0],['2026',4000,150,3000,1000]]);
   assert.deepEqual(result.data.summary.months.map(row => [row.key,row.tonnage,row.brak]),
     [['2025-10',5000,900],['2026-09',1000,0],['2026-10',3000,150]]);
+  assert.deepEqual(result.data.summary.months.map(row => row.count),[1,1,2]);
+  assert.deepEqual(result.data.summary.years.map(row => row.count),[1,3]);
   assert.ok(!JSON.stringify(result).includes('demo-period-previous-october'));
   assert.equal(reads.read('production-log','2026-11').data.entries.length,0);
 });
@@ -75,4 +77,11 @@ test('period and counter endpoints enforce module access, reject invalid queries
   assert.deepEqual(await counter.json(),{count:0});
   assert.equal((await request('/api/notifications/summary',user,'POST')).status,405);
   assert.equal((await request('/api/notifications/summary',denied)).status,403);
+});
+test('a saved zero report remains a counted result in the production summary',t => {
+  const store = openStore(':memory:'); t.after(() => store.close());
+  seed(store,{'production-log':{goalTons:10,entries:[{id:'demo-zero-result',date:'2026-10-04',shift:'А',tonnage:0,brak:0,breakdown:null}]}});
+  const summary = createStatisticsReads(store).read('production-log','2026-10').data.summary;
+  assert.deepEqual(summary.months.map(row => [row.key,row.tonnage,row.count]),[['2026-10',0,1]]);
+  assert.deepEqual(summary.years.map(row => [row.key,row.tonnage,row.count]),[['2026',0,1]]);
 });
