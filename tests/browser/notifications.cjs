@@ -1,4 +1,5 @@
 /* The only push provider used here is simulated; all records/accounts are fictional. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -156,7 +157,7 @@ async function exercisePersistence({hub, base, device, expect}) {
   await page.locator('#notificationTest').click(); await expect(page.locator('#notificationMessage')).toContainText('Тестовото известие е изпратено.');
   // Explicit logout still revokes the device. A granted OS permission cannot
   // silently revive it, nor a subscription revoked by an administrator.
-  await page.locator('.server-logout').click(); await expect(page).toHaveURL(base + '/login');
+  await openAccountMenu(page); await page.locator('.server-logout').click(); await expect(page).toHaveURL(base + '/login');
   assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id=?').get(user.id).n, 0);
   assert.equal((await browserState()).subscribed, false);
   await login(); await settings(); await expect(page.locator('#notificationDeviceState')).toHaveText('Известията на това устройство са изключени.');

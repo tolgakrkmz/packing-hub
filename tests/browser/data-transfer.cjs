@@ -1,4 +1,5 @@
 /* Every account, selected file and download belongs to the isolated demo server. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -126,8 +127,8 @@ async function exerciseDataTransfer({admin, hub, base, device, expect, screensho
       await expect(page.locator('.server-links a[href^="/data-import"]')).toHaveCount(0);
       assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 403);
     } else {
-      if (await page.locator('.server-links a[href^="/admin-panel"]').isVisible()) await openAdminModule(page,'data-import');
-      else await page.locator('.server-links a[href^="/data-import"]').click();
+      if (await page.locator('.server-links a[href^="/admin-panel"]').count()) await openAdminModule(page,'data-import');
+      else { await openAccountMenu(page); await page.locator('.server-links a[href^="/data-import"]').click(); }
       await page.goto(base + '/data-import#' + (canImport ? 'export' : 'modules'));
       await expect(page.locator(`[data-transfer-tab=${canExport ? 'export' : 'production'}]`)).toHaveAttribute('aria-selected', 'true');
       assert.equal(await page.evaluate(async () => (await fetch('/data-import')).status), 200);

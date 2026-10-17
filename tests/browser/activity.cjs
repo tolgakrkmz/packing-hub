@@ -1,3 +1,4 @@
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 const {openAdminModule} = require('./admin-panel.cjs');
@@ -13,7 +14,7 @@ async function exerciseActivity({admin,hub,base,device,expect,screenshotDir}) {
   await page.goto(base+'/pair-targets');
   await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
   const lastVisit = hub.store.db.prepare("SELECT at FROM audit WHERE user_id=? AND action='visit' ORDER BY id DESC LIMIT 1").get(operator.id).at;
-  await page.locator('.server-logout').click(); await expect(page).toHaveURL(base+'/login');
+  await openAccountMenu(page); await page.locator('.server-logout').click(); await expect(page).toHaveURL(base+'/login');
   // Known fictional metadata lets the UI exercise more than one page and an old period.
   for (let i=0;i<58;i++) hub.store.audit(operator,'export','production-log');
   const old = Date.now()-100*86400000;

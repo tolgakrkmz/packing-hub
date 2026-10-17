@@ -1,4 +1,5 @@
 /* Isolated server + SQLite + real visible browsers. Every account and record is fictional. */
+const {openAccountMenu} = require('../tests/browser/account-menu.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -111,6 +112,10 @@ async function main() {
     }
     if (process.argv.includes('--connection-copy-only')) {
       await require('../tests/browser/connection-copy.cjs').exerciseConnectionCopy({admin,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
+    if (process.argv.includes('--account-center-only')) {
+      await require('../tests/browser/account-center.cjs').exerciseAccountCenter({admin,hub,base,device,expect});
       assert.deepEqual(errors,[]); return;
     }
     if (process.argv.includes('--account-password-only')) {
@@ -485,7 +490,7 @@ async function main() {
     fs.writeFileSync(path.join(migrationDir, 'unrelated-demo.txt'), 'Fictional unrelated file, must be skipped.');
     // The invalid preview above deliberately leaves a selected file. Exercise
     // the real discard confirmation before starting the independent import.
-    await admin.locator('.server-links a[href^="/admin-panel"]').click();
+    await openAccountMenu(admin); await admin.locator('.server-links a[href^="/admin-panel"]').click();
     await expect(admin.locator('#serverLeaveDialog')).toBeVisible();await admin.locator('#serverLeaveConfirm').click();
     await admin.locator('.admin-card[data-module="data-import"]').click();
     await admin.locator('[data-transfer-tab=modules]').click();

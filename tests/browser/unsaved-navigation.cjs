@@ -1,4 +1,5 @@
 /* All drafts and imports here are fictional and live in the temporary test database. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 async function exerciseUnsavedNavigation({admin, base, hub, expect}) {
@@ -122,7 +123,7 @@ async function exerciseUnsavedNavigation({admin, base, hub, expect}) {
   try { await admin.reload({timeout:3000}).catch(()=>{}); } finally { admin.off('dialog',decline); }
   assert.equal(dialogs,1); await expect(admin.locator('#tonInput')).toHaveValue('123');
   // Logout cancellation must retain the authenticated session as well as the draft.
-  await admin.locator('.server-logout').click(); await expect(admin.locator('#serverLeaveDialog')).toBeVisible();
+  await openAccountMenu(admin); await admin.locator('.server-logout').click(); await expect(admin.locator('#serverLeaveDialog')).toBeVisible();
   await admin.locator('#serverLeaveCancel').click();
   assert.equal(await admin.evaluate(async()=> (await fetch('/api/tasks/summary')).status),200);
   let release,writes=0; const gate=new Promise(resolve=>{release=resolve;});
@@ -157,7 +158,7 @@ async function exerciseUnsavedNavigation({admin, base, hub, expect}) {
   const holdLogout=async route=>{logouts++;await logoutGate;await route.continue().catch(()=>{});};
   await admin.route('**/api/logout',holdLogout);
   try {
-    await admin.locator('.server-logout').click(); await admin.locator('#serverLeaveConfirm').click(); await expect.poll(()=>logouts).toBe(1);
+    await openAccountMenu(admin); await admin.locator('.server-logout').click(); await admin.locator('#serverLeaveConfirm').click(); await expect.poll(()=>logouts).toBe(1);
     await expect(admin.locator('body')).toHaveAttribute('inert','');
     assert.equal(await admin.evaluate(()=>!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))),true);
     releaseLogout(); await expect(admin).toHaveURL(base+'/login');

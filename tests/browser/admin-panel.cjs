@@ -1,13 +1,14 @@
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 async function openAdminModule(page, module) {
-  await page.locator('.server-links a[href^="/admin-panel"]').click();
+  await openAccountMenu(page); await page.locator('.server-links a[href^="/admin-panel"]').click();
   await page.locator('.admin-card[data-module="'+module+'"]').click();
 }
 async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) {
   await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveCount(1);
   await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveText('Админ панел');
-  await admin.locator('.server-links a[href^="/admin-panel"]').click();
+  await openAccountMenu(admin); await admin.locator('.server-links a[href^="/admin-panel"]').click();
   await expect(admin.locator('h1')).toHaveText('Админ панел');
   await expect(admin.locator('.admin-card:visible')).toHaveCount(5);
   await expect(admin.locator('.server-links a[href^="/admin-panel"]')).toHaveAttribute('aria-current','page');
@@ -58,7 +59,7 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
       for (const width of [320,390,768,1440]) { await page.setViewportSize({width,height:1000}); await assertResponsive(page,'Admin denial '+language+' '+width); }
     }
     await page.locator('[data-hub-language=bg]').click();
-    await page.locator('.server-links a[href^="/data-import"]').click();
+    await openAccountMenu(page); await page.locator('.server-links a[href^="/data-import"]').click();
     await expect(page.locator('#reportExport')).toBeVisible();
     await page.context().close();
   }
@@ -70,7 +71,7 @@ async function exerciseAdminPanel({admin,hub,base,device,expect,screenshotDir}) 
     const username='demo-panel-'+suffix;
     await hub.auth.create(username,'Fictional-password-123','admin',undefined,permissions);
     const page=await device(username,true);
-    await page.locator('.server-links a[href^="/admin-panel"]').click();
+    await openAccountMenu(page); await page.locator('.server-links a[href^="/admin-panel"]').click();
     await expect(page.locator('.admin-card:visible')).toHaveCount(description ? 5 : 4);
     if (description) {
       await expect(page.locator('#adminTransferDescription')).toHaveText(description);

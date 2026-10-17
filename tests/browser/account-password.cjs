@@ -1,4 +1,5 @@
 /* Temporary password, self-service change and sign-out from all devices. Every account is fictional. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 const temporary = 'Fictional-temporary-123';
@@ -49,13 +50,16 @@ async function exerciseAccountPassword({admin, hub, base, browser, expect}) {
   await page.locator('#currentPassword').fill(temporary);
   await page.locator('#currentPassword').press('Enter');
   await expect(page).toHaveURL(base + '/');
-  await expect(page.locator('.server-links a[href="/account-password"]')).toHaveText('Смяна на парола');
+  await expect(page.locator('.server-links a[href="/account"]')).toHaveText('Моят акаунт');
   console.log('PASS temporary password blocks modules until a keyboard-submitted change, BG/EN and 320–1440 px');
 
   const second = await signIn(chosen);
   await expect(second.page).toHaveURL(base + '/');
-  await page.locator('.server-links a[href="/account-password"]').click();
+  await openAccountMenu(page); await page.locator('.server-links a[href="/account"]').click();
+  await expect(page).toHaveURL(base + '/account');
+  await page.locator('.account-security').click();
   await expect(page).toHaveURL(base + '/account-password');
+  await expect(page.locator('#accountLink')).toBeVisible();
   await expect(page.locator('#temporaryNotice')).toBeHidden();
   await expect(page.locator('#homeLink')).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
