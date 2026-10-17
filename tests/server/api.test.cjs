@@ -339,3 +339,22 @@ test('live events announce committed revisions and immediately revoke disabled r
     assert.match(Buffer.from((await reader.read()).value).toString(), /event: logout/);
   } finally { await reader.cancel(); }
 });
+test('page loads and saves extend the session cookie; polling and live updates do not', async t => {
+  const {hub, request, login} = await setup(t);
+  const user = await login('demo-observer');
+  const soon = () => hub.store.db.prepare('UPDATE sessions SET expires=?').run(Date.now() + 60000);
+  const expiry = () => hub.store.db.prepare('SELECT expires FROM sessions').get().expires;
+  soon();
+  const poll = await request('/api/session', user);
+  assert.equal(poll.status, 200); assert.equal(poll.headers.get('set-cookie'), null);
+  const live = new AbortController(), events = await request('/api/events', user, {signal: live.signal});
+  assert.equal(events.status, 200); assert.equal(events.headers.get('set-cookie'), null); live.abort();
+  assert.ok(expiry() < Date.now() + 120000);
+  for (const [route, options] of [['/server-session.js', {}], ['/api/account/avatar', {method: 'DELETE'}]]) {
+    soon();
+    const used = await request(route, user, options);
+    assert.equal(used.status, 200);
+    assert.match(used.headers.get('set-cookie'), /Max-Age=1209600/);
+    assert.ok(expiry() > Date.now() + 13 * 24 * 3600000);
+  }
+});

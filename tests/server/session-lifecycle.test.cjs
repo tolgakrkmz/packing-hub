@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {openStore} = require('../../server/store.cjs');
-const {accounts} = require('../../server/accounts.cjs');
+const {accounts, SESSION_IDLE} = require('../../server/accounts.cjs');
 const password = 'Fictional-lifecycle-password-123';
 function setup(t) {
   const store = openStore(':memory:');
@@ -69,4 +69,19 @@ test('password replacement revokes every old session and accepts only the replac
   for (const session of [first, second]) assert.equal(auth.session(session.token), null);
   await assert.rejects(auth.login(user.username, password), {code: 'INVALID_LOGIN'});
   assert.ok(auth.session((await auth.login(user.username, replacement)).token));
+});
+test('use slides the idle deadline at most hourly and never revives an expired session', async t => {
+  const {auth} = setup(t);
+  await auth.create('demo-idle', password, 'observer');
+  const issued = await auth.login('demo-idle', password);
+  t.mock.timers.enable({apis: ['Date'], now: Date.now()});
+  t.mock.timers.tick(30 * 60000);
+  assert.equal(auth.touch(issued.token), false);
+  t.mock.timers.tick(31 * 60000);
+  assert.equal(auth.touch(issued.token), true);
+  assert.equal(auth.session(issued.token).expires, Date.now() + SESSION_IDLE);
+  t.mock.timers.tick(SESSION_IDLE);
+  assert.equal(auth.touch(issued.token), false);
+  assert.equal(auth.session(issued.token), null);
+  for (const token of [undefined, 'fictional-invalid-token', 'x'.repeat(101)]) assert.equal(auth.touch(token), false);
 });

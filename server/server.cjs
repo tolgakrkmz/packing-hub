@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
-const {accounts} = require('./accounts.cjs');
+const {accounts, SESSION_IDLE} = require('./accounts.cjs');
 const {createAccountInstructions} = require('./account-instructions.cjs');
 const {createAccountAvatars, REQUEST_BYTES: avatarRequestBytes} = require('./account-avatars.cjs');
 const {can} = require('./permissions.cjs');
@@ -136,11 +136,13 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         attempts.delete(keys[1]);
         const ipAttempts = attempts.get(keys[0]);
         if (ipAttempts) ipAttempts.count = Math.max(0, ipAttempts.count - 1);
-        return json(response, 200, {user: accountInstructions.userView(loggedIn.user), csrf: loggedIn.csrf}, {'Set-Cookie': cookie(loggedIn.token, 12 * 3600)});
+        return json(response, 200, {user: accountInstructions.userView(loggedIn.user), csrf: loggedIn.csrf}, {'Set-Cookie': cookie(loggedIn.token, SESSION_IDLE / 1000)});
       }
       if (pathname.startsWith('/api/') || pathname === '/server-session.js') {
         if (!session) throw problem(401, 'LOGIN_REQUIRED');
         if (mutation && request.headers['x-csrf-token'] !== session.csrf) throw problem(403, 'CSRF_REJECTED');
+        // Page loads and saves count as use; background polls and /api/events do not.
+        if ((mutation || pathname === '/server-session.js') && auth.touch(token)) response.setHeader('Set-Cookie', cookie(token, SESSION_IDLE / 1000));
         // A temporary password opens only the password change and sign-out endpoints.
         if (session.user.mustChangePassword && !['/api/session', '/api/account/password', '/api/logout', '/api/logout-all'].includes(pathname)) throw problem(403, 'PASSWORD_CHANGE_REQUIRED');
         if (pathname === '/api/account/password') {
@@ -155,7 +157,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           try {
             const changed = await auth.changePassword(token, input.currentPassword, input.password);
             attempts.delete(key); closeRevoked();
-            return json(response, 200, {user: accountInstructions.userView(changed.user), csrf: changed.csrf}, {'Set-Cookie': cookie(changed.token, 12 * 3600)});
+            return json(response, 200, {user: accountInstructions.userView(changed.user), csrf: changed.csrf}, {'Set-Cookie': cookie(changed.token, SESSION_IDLE / 1000)});
           } catch (error) {
             const entry = attempts.get(key);
             if (entry && error.code !== 'CURRENT_PASSWORD_INVALID') entry.count = Math.max(0, entry.count - 1);

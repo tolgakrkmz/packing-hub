@@ -3,6 +3,8 @@ const {promisify} = require('node:util');
 const {problem} = require('./store.cjs');
 const {validateOverrides, permissionsFor, can} = require('./permissions.cjs');
 const scrypt = promisify(crypto.scrypt);
+// Personal phones stay signed in while used; an unused session ends after this idle period.
+const SESSION_IDLE = 14 * 24 * 3600000;
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const publicUser = row => {
   const permissionOverrides = validateOverrides(JSON.parse(row.permissions || '{}'));
@@ -62,7 +64,7 @@ function accounts(store) {
   function issue(row) {
     const token = crypto.randomBytes(32).toString('base64url');
     const csrf = crypto.randomBytes(32).toString('base64url');
-    const expires = Date.now() + 12 * 3600000;
+    const expires = Date.now() + SESSION_IDLE;
     db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());
     db.prepare('INSERT INTO sessions(hash,user_id,csrf,expires) VALUES(?,?,?,?)').run(digest(token), row.id, csrf, expires);
     return {token, csrf, expires};
@@ -71,6 +73,12 @@ function accounts(store) {
     if (typeof token !== 'string' || token.length > 100) return null;
     const row = db.prepare('SELECT u.*,s.csrf,s.expires FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires>? AND u.active=1 AND u.deleted_at IS NULL').get(digest(token), Date.now());
     return row ? {user: publicUser(row), csrf: row.csrf, expires: row.expires} : null;
+  }
+  // Slides the idle deadline at most once an hour, so active use writes rarely.
+  function touch(token) {
+    if (typeof token !== 'string' || token.length > 100) return false;
+    const now = Date.now();
+    return db.prepare('UPDATE sessions SET expires=? WHERE hash=? AND expires>? AND expires<?').run(now + SESSION_IDLE, digest(token), now, now + SESSION_IDLE - 3600000).changes > 0;
   }
   async function update(id, values, actor, authorize = () => {}, {temporaryPassword = false} = {}) {
     const row = db.prepare('SELECT * FROM users WHERE id=?').get(id);
@@ -156,6 +164,6 @@ function accounts(store) {
       return result;
     });
   }
-  return {create, login, session, update, remove, logout, logoutAll, changePassword, list: () => db.prepare('SELECT id,username,role,active,permissions,task_supervisor,task_team FROM users WHERE deleted_at IS NULL ORDER BY username').all().map(publicUser)};
+  return {create, login, session, touch, update, remove, logout, logoutAll, changePassword, list: () => db.prepare('SELECT id,username,role,active,permissions,task_supervisor,task_team FROM users WHERE deleted_at IS NULL ORDER BY username').all().map(publicUser)};
 }
-module.exports = {accounts};
+module.exports = {accounts, SESSION_IDLE};
