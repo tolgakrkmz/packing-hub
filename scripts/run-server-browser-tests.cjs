@@ -67,6 +67,10 @@ async function main() {
       await page.locator('#username').fill(username); await page.locator('#password').fill(demoPassword);
       await page.locator('[data-hub-language=en]').click(); await expect(page.locator('#loginForm button[type=submit]')).toHaveText('Sign in'); await expect(page.locator('#username')).toHaveValue(username); await expect(page.locator('#password')).toHaveValue(demoPassword);
       await page.locator('[data-hub-language=bg]').click(); await page.locator('#loginForm button[type=submit]').click();
+      await page.waitForURL(url => ['/', '/account-password'].includes(new URL(url).pathname));
+      // Accounts created through the Accounts screen start with a temporary password.
+      // Unrelated suites keep the fictional password; account-password covers the real change.
+      if (new URL(page.url()).pathname === '/account-password') { hub.store.db.prepare('UPDATE users SET must_change_password=0 WHERE username=?').run(username); await page.goto(base + '/'); }
       await expect(page).toHaveURL(base + '/');
       return page;
     }
@@ -107,6 +111,10 @@ async function main() {
     }
     if (process.argv.includes('--connection-copy-only')) {
       await require('../tests/browser/connection-copy.cjs').exerciseConnectionCopy({admin,base,expect});
+      assert.deepEqual(errors,[]); return;
+    }
+    if (process.argv.includes('--account-password-only')) {
+      await require('../tests/browser/account-password.cjs').exerciseAccountPassword({admin,hub,base,browser,expect});
       assert.deepEqual(errors,[]); return;
     }
     if (process.argv.includes('--login-only')) {

@@ -102,7 +102,7 @@ const HubServer = (() => {
     const go = () => leavePage(() => location.assign(href));
     requestLeave(before ? async () => { await before(); go(); } : go, trigger);
   }
-  const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
+  const messages = {CONFLICT: 'Данните са променени от друг потребител. Опресни и опитай отново.', FORBIDDEN: 'Акаунтът няма право за тази промяна.', INVALID_DATA: 'Данните не са валидни.', LAST_ADMIN: 'Последният активен администратор трябва да остане активен.', PASSWORD_LENGTH: 'Паролата трябва да съдържа 12–128 знака.', PASSWORD_CHANGE_REQUIRED: 'Смени временната парола, за да продължиш.', ACCOUNT_EXISTS: 'Потребителското име вече се използва.', INVALID_ACCOUNT: 'Провери името и ролята на акаунта.', RATE_LIMITED: 'Твърде много опити. Опитай отново след 15 минути.'};
   messages.INVALID_PAIR_CHANGE = 'Двойката е променена или съставът вече не е валиден. Опресни и опитай отново.';
   messages.LAST_ACCOUNT_MANAGER = 'Трябва да остане поне един активен акаунт с право за управление на акаунти.';
   messages.INVALID_PERMISSIONS = 'Провери правата на акаунта.';
@@ -139,6 +139,7 @@ const HubServer = (() => {
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 && !signingOut) location.assign('/login');
+      if (data.error === 'PASSWORD_CHANGE_REQUIRED') location.assign('/account-password');
       const error = new Error(messages[data.error] || 'Връзката със сървъра е прекъсната. Опитай отново.');
       error.code = response.status === 409 && data.error === 'CONFLICT' ? 'REPORT_CONFLICT' : data.error;
       error.status = response.status;
@@ -478,6 +479,7 @@ const HubServer = (() => {
       if (['system-status','accounts','activity-log','data-import','production-import','report-history'].includes(current)) link.setAttribute('aria-current', 'location');
     }
     if (!canViewModule('admin-panel') && canViewModule('data-import')) addLink('/data-import'+query,'Експорт на отчети');
+    addLink('/account-password', 'Смяна на парола');
     const moduleNav = document.createElement('div'); moduleNav.className = 'server-module-nav';
     const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
     const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';

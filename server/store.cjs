@@ -86,6 +86,10 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
   if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'deleted_at')) {
     db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER');
   }
+  // Existing accounts keep working; only new administrative passwords are temporary.
+  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'must_change_password')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
   if (!db.prepare('PRAGMA table_info(audit)').all().some(column => column.name === 'detail')) db.exec("ALTER TABLE audit ADD COLUMN detail TEXT NOT NULL DEFAULT '{}'");
   db.exec(`CREATE TABLE IF NOT EXISTS account_instruction_sets(
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL, revision INTEGER NOT NULL);

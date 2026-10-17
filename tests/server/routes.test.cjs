@@ -29,7 +29,7 @@ test('all approved screens serve clean GET/HEAD routes and redirect legacy bookm
       if (method === 'HEAD') assert.equal(html, '');
       else {
         assert.doesNotMatch(html, /href="\/?[a-z-]+\.html(?:[?#"][^"]*)?/);
-        assert.equal(html.includes('/server-session.js'), file !== 'login.html');
+        assert.equal(html.includes('/server-session.js'), !['login.html', 'account-password.html'].includes(file));
       }
       const legacy = await request('/' + file + '?module=pair-targets&lang=en', undefined, method);
       assert.equal(legacy.status, 308, file);
