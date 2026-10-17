@@ -5,6 +5,8 @@
   <p>A lightweight production dashboard for shift teams, reports and packing workflows.</p>
   <p>
     <img src="assets/readme-badges.svg" width="470" height="28" alt="Vanilla JavaScript · Node.js 24+ · SQLite · BG / EN">
+    <br>
+    <a href="https://github.com/tolgakrkmz/packing-hub/actions/workflows/ci.yml"><img src="https://github.com/tolgakrkmz/packing-hub/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
   </p>
   <p>
     <a href="GUIDE.md">📖 Documentation</a> ·
@@ -55,6 +57,10 @@ node scripts/install-hooks.cjs
 node --test tests/*.test.cjs
 node --test tests/server/*.test.cjs
 ```
+
+GitHub Actions runs the publication check and `node scripts/run-critical-tests.cjs`
+on every push and pull request, plus the browser scenarios nightly. CI has no
+private reference, so it adds to the local hooks rather than replacing them.
 
 [Browser testing](GUIDE.md#visible-browser-tests) · [System status](SYSTEM-STATUS-SCENARIOS.md) · [Full technical guide](GUIDE.md)
 

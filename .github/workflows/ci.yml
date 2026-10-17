@@ -1,0 +1,90 @@
+# Additional protection only: the local pre-commit/pre-push hooks stay required.
+# Fictional demo data only; no secrets, no deployment and no production access.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  # The private reference never leaves the local machine. CI therefore runs the
+  # path, mode, fixture-hash and credential rules without private names.
+  PACKAGE_HUB_PRIVATE_SOURCE: ${{ github.workspace }}/.ci-no-private-reference
+
+jobs:
+  publication:
+    name: Publication check
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Check every published commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_REF: ${{ github.ref }}
+          PUSH_AFTER: ${{ github.event.after }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          zero=0000000000000000000000000000000000000000
+          case "$EVENT_NAME" in
+            push) local_sha="$PUSH_AFTER"; remote_sha="${PUSH_BEFORE:-$zero}" ;;
+            pull_request) local_sha="$PR_HEAD"; remote_sha="$PR_BASE" ;;
+            *) local_sha="$(git rev-parse HEAD)"; remote_sha="$zero" ;;
+          esac
+          # Same input format as the pre-push hook: the outgoing range is checked commit by commit.
+          printf '%s %s %s %s\n' "$PUSH_REF" "$local_sha" "$PUSH_REF" "$remote_sha" | node scripts/check-publication.cjs --push
+
+  critical:
+    name: Critical tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Model, client and server tests
+        run: node scripts/run-critical-tests.cjs
+
+  browser:
+    name: Browser scenarios
+    # Long-running Chrome flows: nightly and on demand, not on every push.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install the browser-test dependency
+        run: npm install --no-save --package-lock=false playwright@1.62.1
+      - name: Offline and server browser scenarios
+        run: node scripts/run-critical-tests.cjs --browser-only

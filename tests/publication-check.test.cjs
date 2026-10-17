@@ -99,6 +99,13 @@ test('only the named maintenance adapter, units, override and fictional Python t
   for (const file of ['scripts/maintenance-host.py', 'scripts/install-maintenance.sh', 'scripts/package-hub-maintenance.socket', 'scripts/package-hub-maintenance.service', 'compose.maintenance.yaml', 'tests/maintenance-host-test.py']) assert.doesNotThrow(() => inspect(file, Buffer.from('Reviewed source')));
   for (const file of ['scripts/private.py', 'scripts/package-hub-maintenance.conf', 'maintenance/status.json', 'maintenance/control.sock', 'compose.maintenance-private.yaml', 'tests/private.py']) assert.throws(() => inspect(file, Buffer.from('Fictional private state')), /Unapproved/);
 });
+test('only the reviewed CI workflow is approved; other workflows and actions stay blocked', () => {
+  assert.doesNotThrow(() => inspect('.github/workflows/ci.yml', Buffer.from('name: CI')));
+  assert.throws(() => inspect('.github/workflows/ci.yml', Buffer.from('name: CI'), [], '120000'), /Unapproved/);
+  for (const other of ['.github/workflows/deploy.yml', '.github/workflows/ci.yaml', '.github/actions/setup/action.yml', '.github/dependabot.yml', 'private/.github/workflows/ci.yml']) assert.throws(() => inspect(other, Buffer.from('name: Synthetic')), /Unapproved/);
+  const token = ['ghp', '_', 'z'.repeat(30)].join('');
+  assert.throws(() => inspect('.github/workflows/ci.yml', Buffer.from(token)), /Credential/);
+});
 test('private reference matches stop publication without revealing the value',() => {
   const syntheticToken = 'Synthetic Restricted Example';
   assert.throws(() => inspect('js/example.js',Buffer.from(syntheticToken),[syntheticToken.toLowerCase()]),error => {

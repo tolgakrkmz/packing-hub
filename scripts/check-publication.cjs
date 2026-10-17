@@ -63,7 +63,9 @@ function allowedFile(file) {
       'scripts/package-hub-auto-update.service','scripts/package-hub-auto-update.timer',
       'scripts/backup.sh','scripts/install-backups.sh','scripts/restore-rehearsal.sh',
       'scripts/maintenance-host.py','scripts/install-maintenance.sh','scripts/package-hub-maintenance.socket','scripts/package-hub-maintenance.service','tests/maintenance-host-test.py',
-      'scripts/package-hub-backup.service','scripts/package-hub-backup.timer'].includes(file) ||
+      'scripts/package-hub-backup.service','scripts/package-hub-backup.timer',
+      // The single reviewed CI workflow; other workflows and actions stay blocked.
+      '.github/workflows/ci.yml'].includes(file) ||
     /^[a-z][a-z0-9-]*\.html$/.test(file) ||
     /^(css|js|tests|scripts|server)\/[a-z0-9][a-z0-9./-]*\.(css|js|cjs)$/.test(file) ||
     /^\.githooks\/(pre-commit|pre-push)$/.test(file);
@@ -191,6 +193,8 @@ function commitsForPush(input,cwd=root) {
 function main() {
   const sourceRoot = process.env.PACKAGE_HUB_PRIVATE_SOURCE || path.resolve(root,'../..');
   const tokens = privateTokens(sourceRoot);
+  // CI has no private reference by design; say so instead of implying a full check.
+  if(!tokens.length) console.log('No private reference available: path, fixture and credential rules only.');
   if(process.argv[2] === '--push') {
     const commits = commitsForPush(fs.readFileSync(0,'utf8'));
     checkSnapshots(commits,tokens);
