@@ -530,8 +530,9 @@ monthly progress, team totals and history remain visible. This includes observer
 and operators restricted to viewing or correcting existing reports.
 
 The server checks authorization on every API write. Passwords use salted scrypt
-hashes. Sessions use HttpOnly, SameSite cookies, expire after 12 hours and are
-revoked when an account is changed or disabled. HTTPS also uses Secure cookies.
+hashes. Sessions use HttpOnly, SameSite cookies, expire after 14 days without use and are
+revoked when an account is changed or disabled. Page loads and saves extend
+the session; background polling and live updates do not. HTTPS also uses Secure cookies.
 Writes require the configured origin, a session CSRF token and the latest
 document/file revision. Stale writes return a conflict instead of replacing
 someone else's changes. Pair planning checks the current packer roster and
