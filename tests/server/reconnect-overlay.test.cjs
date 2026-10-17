@@ -25,6 +25,7 @@ function client(module = 'production-log') {
     EventSource:class { constructor() { this.readyState = 0; this.events = new Map(); streams.push(this); } addEventListener(name, callback) { this.events.set(name, callback); } close() { this.readyState = 2; } },
     setTimeout(callback, delay) { const entry = {id:++timerId, at:time + delay, delay, callback}; timers.set(entry.id, entry); history.push(entry); return entry.id; },
     clearTimeout:id => timers.delete(id), setInterval:() => 0});
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../../js/server-shell.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../js/server-connection.js'), 'utf8'), context);
   for (const callback of events.get('DOMContentLoaded')) callback();
   const hub = vm.runInContext('HubServer', context);
