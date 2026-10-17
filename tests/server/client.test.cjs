@@ -19,6 +19,7 @@ function client({module = 'production-log', period} = {}) {
     registerConnectionPanel: () => () => {},
     fetch: (...args) => fetchData(...args), setTimeout:(callback,ms) => { const timer = setTimeout(callback,ms); if ([2300,8000].includes(ms)) timer.unref(); return timer; }, clearTimeout
   });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../../js/server-shell.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../js/server-connection.js'), 'utf8'), context);
   const hub = vm.runInContext('HubServer', context);
   const accepted = [];

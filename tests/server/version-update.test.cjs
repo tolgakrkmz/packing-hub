@@ -29,6 +29,7 @@ function client({pathname = '/production-log'} = {}) {
     location:{pathname,href:'http://localhost'+pathname,origin:'http://localhost',assign:value => assigned.push(value),reload() { reloads++; }}, URL, MutationObserver:class { observe() {} },
     EventSource:class { constructor() { stream = this; this.events = new Map(); } addEventListener(name,fn) { this.events.set(name,fn); } },
     fetch:(...args) => fetcher(...args), setTimeout:() => 1, clearTimeout() {}, setInterval:() => 1});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../../js/server-shell.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../../js/server-connection.js'),'utf8'),context);
   for (const callback of events.get('DOMContentLoaded')) callback();
   return {hub:vm.runInContext('HubServer',context), node:id => document.getElementById(id), get reloads() { return reloads; },
