@@ -339,6 +339,7 @@
   }));
   $('stickersShiftBtn').addEventListener('click',() => {
     if(busy) return;
+    if(context.team === 'СТИКЕРИ') { acceptChosenScope(); $('pageError').textContent = ''; selectLive(); render(); return; }
     context = {date:ShiftSchedule.localDate(),shiftCode:1,team:'СТИКЕРИ'};
     acceptChosenScope();
     followLive = false;

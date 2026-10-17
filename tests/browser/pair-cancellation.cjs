@@ -24,6 +24,10 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
     await expect(page.locator('#pairDialog')).not.toBeVisible();
   }
   await page.locator('#stickersShiftBtn').click();
+  await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','true');
+  await page.locator('#stickersShiftBtn').click();
+  await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','false');
+  await page.locator('#stickersShiftBtn').click();
   await plan(1);
   await checkReadOnly();
   const original = (await read()).entries[0];
