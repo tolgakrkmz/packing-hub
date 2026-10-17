@@ -354,12 +354,18 @@ async function main() {
     await expect(operatorForm.locator('[data-permission=canImportData]')).toBeEnabled();
     await operatorForm.locator('[data-permission=canEditReports]').check();
     await operatorForm.locator('button[type=submit]').click();
-    await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
+    await expect(operatorForm.locator('..')).not.toHaveAttribute('open', '');
+    await expect(operatorForm.locator('..').locator('summary').first()).toBeFocused();
+    await operatorForm.locator('..').locator('summary').first().click();
     assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {canEditReports: true});
     await operatorForm.getByRole('button', {name: 'Върни правата по роля', exact: true}).click();
     await expect(operatorForm.locator('[data-permission=canEditReports]')).not.toBeChecked();
     await operatorForm.locator('button[type=submit]').click();
-    await expect(operatorForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
+    await expect(operatorForm.locator('..')).not.toHaveAttribute('open', '');
+    await expect(operatorForm.locator('..').locator('summary').first()).toBeFocused();
+    await operatorForm.locator('..').locator('summary').first().click();
     assert.deepEqual(hub.auth.list().find(user => user.id === operatorId).permissionOverrides, {});
     await operatorForm.locator('select[aria-label="Роля"]').selectOption('observer');
     await expect(operatorForm.locator('[data-permission=canCreateReports]')).toBeEnabled();
@@ -377,11 +383,11 @@ async function main() {
     const observerForm = admin.locator(`.account-card[data-id="${observerId}"]`);
     await observerForm.locator('..').locator('summary').first().click();
     await observerForm.locator('button[type=submit]').click();
-    await expect(observerForm.locator('.account-feedback')).toHaveText('Акаунтът е обновен.');
+    await expect(admin.locator('#accountMessage')).toHaveText('Акаунтът е обновен.');
+    await expect(observerForm.locator('..')).not.toHaveAttribute('open', '');
     await expect(operatorForm.locator('input[type=password]')).toHaveValue('Fictional-unsaved-123');
     await operatorForm.locator('input[type=password]').fill('');
     await operatorForm.locator('.account-password summary').click();
-    await observerForm.locator('..').locator('summary').first().click();
     for (const language of ['bg', 'en']) {
       await admin.locator(`[data-hub-language=${language}]`).click();
       for (const width of [320, 390, 768, 1440]) {

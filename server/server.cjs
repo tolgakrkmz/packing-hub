@@ -231,22 +231,34 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           request.on('close', () => clients.delete(client));
           return;
         }
+        if (/^\/api\/accounts\/\d+\/avatar$/.test(pathname)) {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          authorized('canViewAccounts');
+          // Deleted accounts are not listed, so their photo is never served.
+          const owner = auth.list().find(user => user.id === Number(pathname.split('/')[3]));
+          if (!owner) throw problem(404, 'NOT_FOUND');
+          const content = avatars.get(owner);
+          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length, 'Content-Disposition': 'inline'});
+          return response.end(content);
+        }
         if (pathname === '/api/accounts' || /^\/api\/accounts\/\d+$/.test(pathname)) {
           if (!can(session.user, request.method === 'GET' ? 'canViewAccounts' : 'canManageAccounts')) throw problem(403, 'FORBIDDEN');
-          if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list()});
+          // Only the photo version is listed; the image itself needs its own authorized request.
+          const withAvatar = user => ({...user, avatar: avatars.version(user.id)});
+          if (pathname === '/api/accounts' && request.method === 'GET') return json(response, 200, {users: auth.list().map(withAvatar)});
           const input = await jsonBody(request);
           if (request.method === 'DELETE' && pathname !== '/api/accounts') {
             const result = auth.remove(Number(pathname.split('/').pop()), authorized('canManageAccounts'), () => authorized('canManageAccounts'));
             broadcast('accounts', 0);
             return json(response, 200, result);
           }
-          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, authorized('canManageAccounts'), input.permissions, () => authorized('canManageAccounts'), input, {temporary: true})});
+          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: withAvatar(await auth.create(input.username, input.password, input.role, authorized('canManageAccounts'), input.permissions, () => authorized('canManageAccounts'), input, {temporary: true}))});
           if (request.method === 'PATCH') {
             const id = Number(pathname.split('/').pop());
             // A reset for someone else is temporary; the owner chooses the lasting password.
             const user = await auth.update(id, input, authorized('canManageAccounts'), () => authorized('canManageAccounts'), {temporaryPassword: id !== session.user.id});
             broadcast('accounts', 0);
-            return json(response, 200, {user});
+            return json(response, 200, {user: withAvatar(user)});
           }
           throw problem(405, 'METHOD_REJECTED');
         }

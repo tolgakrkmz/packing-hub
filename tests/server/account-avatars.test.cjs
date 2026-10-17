@@ -97,3 +97,26 @@ test('the account page is available to every signed-in account', async t => {
   assert.match(await page.text(), /server-connection\.js/);
   assert.equal((await request('/account', null)).status, 302);
 });
+test('account managers see listed photo versions and read photos only with the view-accounts right', async t => {
+  const {hub, login, request} = await setup(t);
+  const admin = await login('demo-admin'), reader = await login('demo-reader');
+  assert.equal((await request('/api/account/avatar', reader, {method: 'PUT', data: {photo}})).status, 200);
+  const readerId = hub.store.db.prepare("SELECT id FROM users WHERE username='demo-reader'").get().id;
+  const adminId = hub.store.db.prepare("SELECT id FROM users WHERE username='demo-admin'").get().id;
+  const {users} = await (await request('/api/accounts', admin)).json();
+  assert.ok(Number.isSafeInteger(users.find(user => user.id === readerId).avatar));
+  assert.equal(users.find(user => user.id === adminId).avatar, null);
+  const image = await request('/api/accounts/' + readerId + '/avatar', admin);
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/jpeg');
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), Buffer.from(photo, 'base64'));
+  assert.equal((await request('/api/accounts/' + adminId + '/avatar', admin)).status, 404);
+  assert.equal((await request('/api/accounts/999/avatar', admin)).status, 404);
+  assert.equal((await request('/api/accounts/' + readerId + '/avatar', reader)).status, 403);
+  assert.equal((await request('/api/accounts/' + readerId + '/avatar', null)).status, 401);
+  assert.equal((await request('/api/accounts/' + readerId + '/avatar', admin, {method: 'DELETE'})).status, 405);
+  const patched = await (await request('/api/accounts/' + readerId, admin, {method: 'PATCH', data: {active: true}})).json();
+  assert.ok(Number.isSafeInteger(patched.user.avatar));
+  assert.equal((await request('/api/accounts/' + readerId, admin, {method: 'DELETE', data: {}})).status, 200);
+  assert.equal((await request('/api/accounts/' + readerId + '/avatar', admin)).status, 404);
+});

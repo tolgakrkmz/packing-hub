@@ -43,6 +43,12 @@ async function exerciseAccountCenter({admin, hub, base, device, expect}) {
   await expect(button.locator('.hub-avatar img')).toBeVisible();
   const owner = hub.auth.list().find(user => user.username === 'demo-photo-owner');
   assert.equal(hub.store.db.prepare('SELECT COUNT(*) AS n FROM user_avatars WHERE user_id=?').get(owner.id).n, 1);
+  // Account managers see the photo in the accounts list.
+  await admin.goto(base + '/accounts');
+  const entry = admin.locator('.account-entry', {has: admin.locator(`.account-card[data-id="${owner.id}"]`)});
+  await expect(entry.locator('summary .hub-avatar img')).toBeVisible();
+  expect(await entry.locator('summary .hub-avatar img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+  await admin.goto(base + '/');
   // The photo survives navigation and appears in every header.
   await page.goto(base + '/');
   await expect(button.locator('.hub-avatar img')).toBeVisible();

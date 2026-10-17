@@ -99,7 +99,7 @@
     badges.append(element('span', 'account-role-badge', roles[user.role]), element('span', user.active ? 'account-status is-active' : 'account-status', user.active ? 'Активен' : 'Неактивен'));
     if (user.taskSupervisor) badges.append(element('span', 'account-role-badge', 'Началник смяна'));
     if (user.taskTeam) badges.append(element('span', 'account-role-badge', 'Екип: ' + user.taskTeam));
-    identity.append(name, badges); summary.append(identity, element('span', 'account-manage', 'Управление')); details.append(summary);
+    identity.append(name, badges); summary.append(HubServer.avatar('account-entry-avatar', user), identity, element('span', 'account-manage', 'Управление')); details.append(summary);
     const form = element('form', 'account-card'); form.dataset.id = user.id;
     const fields = element('div', 'account-fields account-edit-fields');
     const role = element('select'); role.setAttribute('aria-label', 'Роля');
@@ -124,11 +124,12 @@
     form.insertBefore(passwordDetails, actions);
     const status = element('p', 'account-feedback', feedback); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); form.append(status);
     form.addEventListener('submit', async event => {
-      event.preventDefault(); button.disabled = true; deleteButton.disabled = true; status.textContent = '';
+      event.preventDefault(); button.disabled = true; deleteButton.disabled = true; status.textContent = ''; message.textContent = '';
       try {
         const result = await HubServer.send('/api/accounts/' + user.id, 'PATCH', {role: role.value, active: active.checked, permissions: permissions(), ...taskProfile(), ...(password.value ? {password: password.value} : {})});
-        renderUser(result.user, true, 'Акаунтът е обновен.'); message.textContent = 'Акаунтът е обновен.';
-        cards.get(user.id).details.querySelector('button[type=submit]').focus({preventScroll: true});
+        // A confirmed save closes the editor; errors keep it open with the entered values.
+        renderUser(result.user); message.textContent = 'Акаунтът е обновен.';
+        cards.get(user.id).details.querySelector('summary').focus({preventScroll: true});
       } catch (error) { status.textContent = error.message; } finally { button.disabled = false; deleteButton.disabled = ownAccount; }
     });
     deleteButton.addEventListener('click', async () => {
