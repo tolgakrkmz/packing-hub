@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
-function client() {
+function client({pathname = '/production-log'} = {}) {
   const nodes = [], events = new Map(), assigned = []; let stream, reloads = 0, fetcher = async () => ({ok:true,json:async () => ({})});
   const listen = (name,fn) => { if (!events.has(name)) events.set(name,[]); events.get(name).push(fn); };
   function element(tag = 'div') {
@@ -26,7 +26,7 @@ function client() {
     createElement:element, querySelector:() => null, querySelectorAll:() => [], getElementById:id => nodes.find(node => node.id === id) || null};
   const context = vm.createContext({URLSearchParams, HubPermissions:require('../../js/permission-model.js'), document,
     window:{HUB_SERVER_BOOT:{user:{username:'demo-observer',role:'observer',permissions:require('../../server/permissions.cjs').defaults.observer},csrf:'fictional-csrf',version:'demo-current'},addEventListener:listen},
-    location:{pathname:'/production-log',href:'http://localhost/production-log',origin:'http://localhost',assign:value => assigned.push(value),reload() { reloads++; }}, URL, MutationObserver:class { observe() {} },
+    location:{pathname,href:'http://localhost'+pathname,origin:'http://localhost',assign:value => assigned.push(value),reload() { reloads++; }}, URL, MutationObserver:class { observe() {} },
     EventSource:class { constructor() { stream = this; this.events = new Map(); } addEventListener(name,fn) { this.events.set(name,fn); } },
     fetch:(...args) => fetcher(...args), setTimeout:() => 1, clearTimeout() {}, setInterval:() => 1});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../../js/server-connection.js'),'utf8'),context);
@@ -35,7 +35,7 @@ function client() {
     assigned, unload() { const event = {prevented:false,preventDefault() { this.prevented = true; }}; for(const fn of events.get('beforeunload') || []) fn(event); return event; },
     restore() { for(const fn of events.get('pageshow') || []) fn({persisted:true}); },
     get inert() { return document.body.inert === true; },
-    fetching:fn => { fetcher = fn; }, version:value => stream.events.get('version')({data:JSON.stringify({version:value})})};
+    fetching:fn => { fetcher = fn; }, open:() => stream.onopen(), fail:() => stream.onerror(), version:value => stream.events.get('version')({data:JSON.stringify({version:value})})};
 }
 test('the update notice shows both versions, tracks the latest version and reloads a clean page', () => {
   const c = client(); c.version('demo-current'); assert.equal(c.node('serverUpdate'),null);
@@ -43,6 +43,40 @@ test('the update notice shows both versions, tracks the latest version and reloa
   assert.equal(c.node('serverAvailableVersion').textContent,'demo-next');
   c.version('demo-latest'); assert.equal(c.node('serverAvailableVersion').textContent,'demo-latest');
   c.node('serverUpdate').click(); assert.equal(c.reloads,1);
+});
+test('version details stay available and an unconfirmed server version is never shown as current', () => {
+  const c = client(), status = () => c.node('serverVersionStatus').getAttribute('data-update-state');
+  assert.equal(c.node('serverClientVersion').textContent,'demo-current');
+  assert.equal(status(),'checking'); assert.equal(c.node('serverConfirmedVersion').textContent,'Не е потвърдена');
+  assert.equal(c.node('serverVersionChecked').textContent,'Още няма'); assert.equal(c.node('serverVersionUpdate').hidden,true);
+  c.open(); assert.equal(status(),'checking');
+  c.version('demo-current'); assert.equal(status(),'current'); assert.equal(c.node('serverVersionStatus').textContent,'Актуална версия');
+  assert.equal(c.node('serverConfirmedVersion').textContent,'demo-current'); assert.match(c.node('serverVersionChecked').textContent,/^\d\d\.\d\d \d\d:\d\d$/);
+  assert.equal(c.node('serverVersionUpdate').hidden,true); assert.equal(c.node('serverVersionHint').hidden,true);
+});
+test('a lost connection keeps the last confirmed version and reconnect checks again before reporting current', () => {
+  const c = client(), status = () => c.node('serverVersionStatus').getAttribute('data-update-state');
+  c.fail(); assert.equal(status(),'offline'); assert.equal(c.node('serverConfirmedVersion').textContent,'Не е потвърдена');
+  c.open(); c.version('demo-current'); const checked = c.node('serverVersionChecked').textContent;
+  c.fail(); assert.equal(status(),'offline'); assert.equal(c.node('serverVersionHint').hidden,false);
+  assert.equal(c.node('serverConfirmedVersion').textContent,'demo-current'); assert.equal(c.node('serverVersionChecked').textContent,checked);
+  c.open(); assert.equal(status(),'checking'); c.version('demo-current'); assert.equal(status(),'current');
+  c.fail(); c.open(); c.version('demo-next'); assert.equal(status(),'update'); assert.equal(c.node('serverConfirmedVersion').textContent,'demo-next');
+  c.fail(); assert.equal(status(),'offline'); assert.equal(c.node('serverVersionUpdate').hidden,true);
+});
+test('the menu update reuses the guarded flow without reloading on its own', () => {
+  const c = client(); let draft = 'Fictional menu draft', busy = false;
+  c.hub.guardUpdate({hasDraft:() => !!draft,isBusy:() => busy}); c.open(); c.version('demo-next');
+  assert.equal(c.reloads,0); assert.equal(c.node('serverVersionStatus').textContent,'Има нова версия'); assert.equal(c.node('serverVersionUpdate').hidden,false);
+  busy = true; c.node('serverVersionUpdate').click(); assert.equal(c.reloads,0); assert.match(c.node('serverUpdateFeedback').textContent,/Изчакай/);
+  busy = false; c.node('serverVersionUpdate').click(); assert.equal(c.node('serverUpdateDialog').open,true); assert.equal(c.reloads,0);
+  c.node('serverUpdateCancel').click(); assert.equal(draft,'Fictional menu draft'); assert.equal(c.reloads,0);
+  draft = ''; c.node('serverVersionUpdate').click(); assert.equal(c.reloads,1);
+});
+test('report history states that it has no automatic version check', () => {
+  const c = client({pathname:'/report-history'});
+  assert.equal(c.node('serverVersionStatus').getAttribute('data-update-state'),'manual');
+  assert.equal(c.node('serverVersionHint').hidden,false); assert.equal(c.node('serverVersionUpdate').hidden,true);
 });
 test('a withdrawn version notice cannot reload the page', () => {
   const c = client(); c.version('demo-next'); c.version('demo-current');

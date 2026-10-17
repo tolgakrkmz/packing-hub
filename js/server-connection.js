@@ -542,7 +542,38 @@ const HubServer = (() => {
     }, logout);
     const leaveFeedback = document.createElement('span'); leaveFeedback.id = 'serverLeaveFeedback'; leaveFeedback.setAttribute('role', 'status');
     tools.append(leaveFeedback);
-    menu.append(menuHead, links, logout); account.append(accountButton, menu);
+    // Version details stay reachable while current; an unconfirmed server version is never shown as up to date.
+    const versionInfo = document.createElement('section'); versionInfo.id = 'serverVersionInfo'; versionInfo.className = 'server-version-info';
+    versionInfo.setAttribute('aria-labelledby', 'serverVersionTitle');
+    const versionTitle = document.createElement('h2'); versionTitle.id = 'serverVersionTitle'; versionTitle.textContent = 'Версия и обновяване';
+    const versionList = document.createElement('dl');
+    const versionRow = (label, id, value) => {
+      const term = document.createElement('dt'); term.textContent = label;
+      const detail = document.createElement('dd'); detail.id = id; detail.textContent = value;
+      versionList.append(term, detail); return detail;
+    };
+    versionRow('Заредена версия', 'serverClientVersion', boot.version).setAttribute('translate', 'no');
+    const serverVersion = versionRow('Версия на сървъра', 'serverConfirmedVersion', 'Не е потвърдена');
+    const versionStatus = versionRow('Състояние', 'serverVersionStatus', 'Проверка…'); versionStatus.setAttribute('data-update-state', 'checking');
+    const versionChecked = versionRow('Последна проверка', 'serverVersionChecked', 'Още няма');
+    const versionHint = document.createElement('p'); versionHint.id = 'serverVersionHint'; versionHint.hidden = true;
+    const versionUpdate = document.createElement('button'); versionUpdate.type = 'button'; versionUpdate.id = 'serverVersionUpdate'; versionUpdate.textContent = 'Обнови до новата версия'; versionUpdate.hidden = true;
+    versionInfo.append(versionTitle, versionList, versionHint, versionUpdate);
+    const versionLabels = {checking: 'Проверка…', current: 'Актуална версия', update: 'Има нова версия', offline: 'Няма връзка със сървъра', manual: 'Без автоматична проверка'};
+    const versionHints = {offline: 'Показана е последната потвърдена версия. Тя може да е остаряла.', manual: 'Тази страница не проверява за нови версии. Отвори друг модул за проверка.'};
+    const checkedTime = value => {
+      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone: 'Europe/Sofia', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(value).map(part => [part.type, part.value]));
+      return parts.day + '.' + parts.month + ' ' + parts.hour + ':' + parts.minute;
+    };
+    function renderVersion(state, confirmed = null, checkedAt = null) {
+      versionStatus.setAttribute('data-update-state', state);
+      if (versionStatus.textContent !== versionLabels[state]) versionStatus.textContent = versionLabels[state];
+      if (confirmed && serverVersion.textContent !== confirmed) { serverVersion.setAttribute('translate', 'no'); serverVersion.textContent = confirmed; }
+      if (checkedAt) { versionChecked.setAttribute('translate', 'no'); versionChecked.textContent = checkedTime(checkedAt); }
+      versionHint.hidden = !versionHints[state]; versionHint.textContent = versionHints[state] || '';
+      versionUpdate.hidden = state !== 'update';
+    }
+    menu.append(menuHead, links, versionInfo, logout); account.append(accountButton, menu);
     const backdrop = document.createElement('div'); backdrop.className = 'server-account-backdrop'; backdrop.hidden = true;
     session.append(state, account); bar.append(top, tools, backdrop);
     function toggleMenu(open, {focus = false} = {}) {
@@ -572,6 +603,7 @@ const HubServer = (() => {
     setTimeout(() => { const language = document.querySelector('.hub-language'); if (language) tools.append(language); }, 0);
     if (currentModule === 'report-history') {
       state.setAttribute('data-connection', 'ready'); state.textContent = 'Ръчно обновяване';
+      renderVersion('manual');
     } else {
       const overlay = document.createElement('div'); overlay.id = 'serverReconnectOverlay'; overlay.className = 'server-reconnect-overlay'; overlay.hidden = true;
       const card = document.createElement('div'); card.className = 'server-reconnect-card';
@@ -601,9 +633,10 @@ const HubServer = (() => {
       }
       beginRecovery('Възстановяване на връзката…');
       const eventSource = new EventSource('/api/events');
-      eventSource.onopen = () => { transportReady = true; transportEpoch++; state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
+      eventSource.onopen = () => { transportReady = true; transportEpoch++; versionLive = false; transportLost = false; showVersion(); state.setAttribute('data-connection', 'ready'); state.textContent = 'Свързан'; refreshTaskCount(); };
       eventSource.onerror = () => {
         beginRecovery('Възстановяване на връзката…', {restart: transportReady}); transportReady = false;
+        versionLive = false; transportLost = true; showVersion();
         state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…';
       };
       eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
@@ -611,6 +644,11 @@ const HubServer = (() => {
       // opt-in; account revocation already removes its subscriptions server-side.
       eventSource.addEventListener('logout', () => { finishRecovery(recovery.id); eventSource.close(); if (!signingOut) location.assign('/login'); });
       let availableVersion = boot.version, updateNotice = null, updateDialog = null;
+      // A version is confirmed only by the server's version event on the current connection.
+      let confirmedVersion = null, checkedAt = null, versionLive = false, transportLost = false;
+      function showVersion() {
+        renderVersion(!versionLive ? (transportLost ? 'offline' : 'checking') : availableVersion === boot.version ? 'current' : 'update', confirmedVersion, checkedAt);
+      }
       const busyUpdateMessage = 'Изчакай текущия запис и опитай обновяването отново. Формата остава отворена.';
       function updateElement(tag, id, text) {
         const node = document.createElement(tag); node.id = id; node.textContent = text; return node;
@@ -647,9 +685,11 @@ const HubServer = (() => {
         document.getElementById('serverUpdateCancel').focus();
       }
       let button;
+      // The menu entry reuses the notice's guarded update flow and its feedback.
+      versionUpdate.addEventListener('click', () => { toggleMenu(false); button?.focus(); requestUpdate(); });
       eventSource.addEventListener('version', event => {
         const version = JSON.parse(event.data).version;
-        if (typeof version === 'string' && version) availableVersion = version;
+        if (typeof version === 'string' && version) { availableVersion = confirmedVersion = version; checkedAt = Date.now(); versionLive = true; }
         if (availableVersion !== boot.version && !updateNotice) {
           updateNotice = updateElement('div', 'serverUpdateNotice', ''); updateNotice.className = 'server-update-notice';
           const versions = document.createElement('span');
@@ -667,6 +707,7 @@ const HubServer = (() => {
           document.getElementById('serverAvailableVersion').textContent = availableVersion;
           if (updateNotice.hidden && updateDialog?.open) updateDialog.close();
         }
+        showVersion();
         const current = recovery.id, connection = transportEpoch;
         refreshVisibleWatchers().then(() => {
           if (transportReady && connection === transportEpoch) {

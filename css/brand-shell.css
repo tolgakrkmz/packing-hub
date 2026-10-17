@@ -221,6 +221,18 @@ body.login-page {
 .server-account-menu .server-links a { justify-content: flex-start; padding: 10px 12px; color: var(--text); font-size: 14px; }
 .server-account-menu .server-logout { width: 100%; min-height: 44px; }
 .server-account-backdrop { display: none; }
+.server-version-info { display: grid; gap: 8px; min-width: 0; padding: 12px 2px 2px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.server-version-info h2 { margin: 0; color: var(--text); font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.server-version-info dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+.server-version-info dt, .server-version-info dd { margin: 0; min-width: 0; }
+.server-version-info dd { color: var(--text); overflow-wrap: anywhere; }
+#serverVersionStatus { display: flex; align-items: center; gap: 6px; }
+#serverVersionStatus::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+#serverVersionStatus:is([data-update-state=update], [data-update-state=offline])::before { background: var(--amber); }
+#serverVersionStatus[data-update-state=current]::before { background: var(--teal); }
+.server-version-info p { margin: 0; overflow-wrap: anywhere; }
+.server-version-info p[hidden], .server-version-info button[hidden] { display: none; }
+.server-version-info button { min-height: 44px; width: 100%; }
 .server-bar .notification-bell { justify-content: center; min-width: 44px; border-radius: 999px; color: var(--text-muted); }
 .server-bar .notification-bell[aria-current] { color: var(--amber); }
 @media (max-width: 600px) {
