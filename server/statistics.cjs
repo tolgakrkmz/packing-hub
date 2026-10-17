@@ -15,16 +15,17 @@ function createStatisticsReads(store) {
       rows.get(key).push(entry);
     }
     const availableYears = [...new Set(data.entries.map(entry => entry.date.slice(0,4)))].sort();
-    const empty = key => kind === 'production-log' ? {key,tonnage:0,brak:0,byShift:Object.fromEntries(shifts.map(shift => [shift,0]))} : {key,durationMin:0,count:0};
+    const empty = key => kind === 'production-log' ? {key,tonnage:0,brak:0,count:0,byShift:Object.fromEntries(shifts.map(shift => [shift,0]))} : {key,durationMin:0,count:0};
     if (kind !== 'pair-targets') for (const entry of data.entries) {
       for (const [rows,key] of [[months,entry.date.slice(0,7)],[years,entry.date.slice(0,4)]]) {
         if (!rows.has(key)) rows.set(key,empty(key));
         const row = rows.get(key);
+        row.count++;
         if (kind === 'production-log') {
           const tonnage = Number(entry.tonnage) || 0;
           row.tonnage += tonnage; row.brak += Number(entry.brak) || 0;
           if (Object.hasOwn(row.byShift,entry.shift)) row.byShift[entry.shift] += tonnage;
-        } else { row.durationMin += Number(entry.durationMin) || 0; row.count++; }
+        } else row.durationMin += Number(entry.durationMin) || 0;
       }
     }
     const result = {revision:current.revision,data,byMonth,byYear,summary:{availableYears,

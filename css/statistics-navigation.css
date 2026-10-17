@@ -19,7 +19,8 @@
 .stats-month-filters .year-select-row{margin:0;gap:8px}
 .stats-month-filters .year-select-row label{font-size:11px}
 .stats-empty-month{padding:20px 22px;color:var(--text-muted);font-size:12px;line-height:1.6}
-.stats-empty-month button{margin-top:10px}
+.stats-empty-month button,.stats-empty-month a{margin-top:10px}
+.stats-empty-month a{display:inline-flex;align-items:center;text-decoration:none;margin-right:8px}
 #statsBreakdownControls .view-toggle{margin-bottom:14px}
 .pair-stats .stats-details>h3,.pair-stats .stats-details>p{margin-left:12px;margin-right:12px}
 .wf-calc .stats-details .wf-calc-note{padding:0 12px 12px}

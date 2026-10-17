@@ -46,7 +46,7 @@ function createStatisticsNavigation({storageKey, onChange}) {
     }
   }
   $('statsFilesBtn').addEventListener('click', () => showFiles(!filesOpen));
-  $('monthlyConnectBtn').addEventListener('click', () => { showFiles(true); $('openFileBtn').focus(); });
+  for (const id of ['monthlyConnectBtn', 'productionConnectBtn']) $(id).addEventListener('click', () => { showFiles(true); $('openFileBtn').focus(); });
   function updateConnections() {
     const dots = Array.from($('connPanel').querySelectorAll('.conn-dot'));
     const connected = dots.filter(dot => dot.classList.contains('on')).length;

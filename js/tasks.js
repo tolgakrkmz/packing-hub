@@ -44,7 +44,31 @@
   function shiftLabel(shift) { return shift.team === 'СТИКЕРИ' ? 'Редовна смяна' : {1: '1-ва смяна', 2: '2-ра смяна', 3: 'Нощна смяна'}[shift.code]; }
   function button(label, fn, cls = 'secondary') { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', fn); return node; }
   function selectedOwner(item) { return !$('ownerFilter').value || String(item.owner.id) === $('ownerFilter').value; }
-  function empty(text) { return el('p', text, 'task-empty'); }
+  function empty(text, ...actions) {
+    if (!actions.length) return el('p', text, 'task-empty');
+    const node = el('div', '', 'task-empty'), row = el('div', '', 'task-actions task-empty-actions');
+    row.append(...actions); node.append(el('p', text), row); return node;
+  }
+  const filtersActive = () => !!$('ownerFilter').value || !!$('taskSearch').value.trim();
+  function clearFilters() {
+    $('ownerFilter').value = ''; $('taskSearch').value = ''; listPage = 1; render();
+    $('taskSearch').focus();
+  }
+  // Separate an empty database from filters without matches; only assigners get a create action.
+  function noResults(filtered, baseText) {
+    if (filtered) return empty('Няма задачи, които отговарят на търсенето или избрания отговорник.', button('Изчисти филтрите', clearFilters));
+    return assigner && view !== 'history' ? empty(baseText, button('+ Възложи задача', () => { if (state) openEditor(); }, '')) : empty(baseText);
+  }
+  function loadFailed(error) {
+    const retry = button('Опитай отново', () => refresh({fresh: true}));
+    if (!state) {
+      $('taskMessage').textContent = '';
+      $('taskContent').removeAttribute('aria-busy');
+      $('taskContent').replaceChildren(empty('Задачите не могат да се заредят. ' + error.message, retry));
+      return;
+    }
+    $('taskMessage').replaceChildren(el('span', error.message + ' Показани са последно заредените данни. '), retry);
+  }
   function withoutMetadata(dataURL) {
     // Some browsers add an ICC profile to canvas JPEGs. Strip optional metadata
     // segments as well as camera tags; compressed pixels stay unchanged.
@@ -171,13 +195,13 @@
     wrap.append(el('p', 'Броят се само приключили смени след гратисния период. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.', 'task-muted'));
     return wrap;
   }
-  function renderHistory(items) {
+  function renderHistory(items, allItems = items) {
     const wrap = el('div', '', 'task-history');
     const controls = el('div', '', 'task-tabs task-history-tabs');
     controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
     wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
     const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
-    for (const [key, label, description, noResults] of [
+    for (const [key, label, description, noMatch] of [
       ['reported', 'Отчетени', 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
       ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние. Показани са всички дати.', 'Няма неотчетени задачи по тези критерии.'],
       ['cancelled', 'Отменени', 'Задачи с отменено възлагане.', 'Няма отменени задачи по тези критерии.']
@@ -197,7 +221,7 @@
       heading.append(el('span', label), el('span', String(values.length), 'task-badge', true));
       section.setAttribute('aria-labelledby', heading.id);
       section.append(heading, el('p', description, 'task-muted'));
-      if (!values.length) { listPage = 1; section.append(empty(noResults)); }
+      if (!values.length) { listPage = 1; section.append(filtersActive() && allItems.some(item => historyIncludes(item, key)) ? noResults(true) : empty(noMatch)); }
       else appendPage(section, values);
       wrap.append(section);
     }
@@ -260,10 +284,15 @@
     try {
     if (usesPeriod && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
     if (view === 'stats') { content.append(renderStats(items)); return; }
-    if (view === 'history') { content.append(renderHistory(items)); return; }
-    const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item));
+    if (view === 'history') { content.append(renderHistory(items, state.items)); return; }
+    const inView = item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item);
+    const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(inView);
     values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
-    if (!values.length) { listPage = 1; content.append(empty(view === 'schedules' ? 'Няма повтарящи се задачи.' : 'Няма задачи по тези критерии.')); }
+    if (!values.length) {
+      listPage = 1;
+      const filtered = filtersActive() && (view === 'schedules' ? state.schedules.length > 0 : state.items.some(inView));
+      content.append(noResults(filtered, {schedules: 'Няма повтарящи се задачи.', shift: 'Няма активни сменни задачи.', global: 'Няма активни глобални задачи.'}[view] || 'Няма задачи по тези критерии.'));
+    }
     else appendPage(content, values, view === 'schedules');
     } finally {
       // History builds its section off-DOM. Restore focus and reveal the target
@@ -324,7 +353,7 @@
       });
       $('taskSubtitle').textContent = reviewer ? assigner ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : 'Следи отчетите и потвърждавай решените проблеми.' : admin ? 'Редактирай задачи и проследявай изпълнението им.' : assigner ? 'Възлагай сменни и глобални задачи и проследявай изпълнението им.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
       render();
-    } catch (error) { if (current === sequence && !draftOpen()) $('taskMessage').textContent = error.message; }
+    } catch (error) { if (current === sequence && !draftOpen()) loadFailed(error); }
     })();
     pendingRead = operation;
     operation.finally(() => { if (pendingRead === operation) pendingRead = null; }).catch(() => {});

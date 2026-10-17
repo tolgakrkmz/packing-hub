@@ -534,6 +534,12 @@
     <div class="stats-section" id="statsProduction" data-stats-panel="production" role="tabpanel" aria-labelledby="statsTabProduction" hidden>
     <h2 id="productionScopeTitle"></h2>
 
+    <div class="stats-empty-month" id="productionEmpty" role="status" hidden>
+      <span id="productionEmptyText">Няма тонажни отчети за избрания период.</span><br>
+      <a class="conn-btn" id="productionAddLink" href="production-log.html">Въведи тонажен отчет</a>
+      <button class="conn-btn" id="productionConnectBtn" type="button">Свържи тонажен дневник</button>
+    </div>
+    <div id="productionBody">
     <div class="kpi-row" id="kpiRow"></div>
 
     <div class="chart-wrap">
@@ -560,6 +566,7 @@
     </div>
 
     </details>
+    </div>
     </div>
     <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">

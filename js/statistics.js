@@ -440,6 +440,7 @@ function calculateProductionMonths(
 
         tonnage: 0,
         brak: 0,
+        count: 0,
 
         byShift:
           emptyShiftMap()
@@ -476,6 +477,8 @@ function calculateProductionMonths(
     const brak =
       Number(e.brak) || 0;
 
+    months[idx].count++;
+
     months[idx].tonnage +=
       ton;
 
@@ -500,7 +503,7 @@ function aggregateByYear() {
   return statisticsCache.get('production-years', [productionSummary || entries, downtimeSummary || avEntries], '', calculateProductionYears);
 }
 function calculateProductionYears() {
-  if(productionSummary) return getReportYears().map(year => ({key:year,label:year,tonnage:0,brak:0,byShift:emptyShiftMap(),
+  if(productionSummary) return getReportYears().map(year => ({key:year,label:year,tonnage:0,brak:0,count:0,byShift:emptyShiftMap(),
     ...productionSummary.years.find(item => item.key === year)}));
   return getReportYears()
     .map(year => {
@@ -510,6 +513,7 @@ function calculateProductionYears() {
 
         tonnage: 0,
         brak: 0,
+        count: 0,
 
         byShift:
           emptyShiftMap()
@@ -534,6 +538,8 @@ function calculateProductionYears() {
           Number(
             e.brak
           ) || 0;
+
+        row.count++;
 
         row.tonnage +=
           ton;
@@ -2476,13 +2482,7 @@ function renderTable(
   el.tableTitle.textContent =
     `Разбивка по ${periodLabel}`;
 
-  if (
-    !rows.some(
-      r =>
-        r.tonnage > 0 ||
-        r.brak > 0
-    )
-  ) {
+  if (!hasProductionReports(rows)) {
     el.tableContainer.innerHTML =
       '<div class="empty">Няма данни за този период.</div>';
 
@@ -2630,6 +2630,11 @@ function renderTable(
 
   el.tableContainer.innerHTML =
     html;
+}
+
+// A saved report with 0 t is a real result; only rows without reports are empty.
+function hasProductionReports(rows) {
+  return rows.some(row => row.count > 0);
 }
 
 function renderKpis(
@@ -3391,10 +3396,17 @@ function renderAll() {
 
   const annual = currentView === 'month';
   const scope = annual ? selectedYear : 'all';
-  statisticsCache.update('production-breakdown', annual ? [productionSummary || entries] : [productionSummary || entries, downtimeSummary || avEntries], scope, () => {
+  statisticsCache.update('production-breakdown', annual ? [productionSummary || entries, el.connDot.classList.contains('on')] : [productionSummary || entries, downtimeSummary || avEntries, el.connDot.classList.contains('on')], scope, () => {
     const scopeLabel = annual ? `Годишен преглед ${selectedYear}` : 'Всички години';
     document.getElementById('productionScopeTitle').textContent = `Тонаж и брак — ${scopeLabel}`;
     const rows = annual ? aggregateByMonth(selectedYear) : aggregateByYear();
+    const hasReports = hasProductionReports(rows), connected = el.connDot.classList.contains('on');
+    document.getElementById('productionBody').hidden = !hasReports;
+    document.getElementById('productionEmpty').hidden = hasReports;
+    document.getElementById('productionEmptyText').textContent = !connected ? 'Няма тонажни записи. Свържете файла от „Тонаж и брак“, за да видите годишния резултат.'
+      : annual ? 'Няма тонажни отчети за избраната година.' : 'Още няма тонажни отчети.';
+    document.getElementById('productionConnectBtn').hidden = connected;
+    document.getElementById('productionAddLink').hidden = !connected || typeof HubServer !== 'undefined' && !HubServer.can('canCreateReports');
     renderKpis(rows, annual ? 'месец' : 'година');
     renderStackedBarChart(el.chartContainer, rows);
     renderLegend();
