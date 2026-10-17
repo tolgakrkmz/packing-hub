@@ -22,7 +22,7 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
   // assignment and photo options. Focused suites below add distinct scenarios.
   for (const [script, modes] of [
     ['run-browser-tests.cjs', ['', 'personnel', 'personnel-transfers', 'statistics', 'transfer', 'pair-cancellation', 'lists', 'i18n', 'security', 'security-client', 'responsive', 'quantities']],
-    ['run-server-browser-tests.cjs', ['', 'personnel', 'personnel-transfers', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'navigation', 'login', 'connection-copy', 'lists', 'static', 'admin-panel', 'task-history', 'task-performance', 'security', 'security-client', 'reconnect', 'quantities', 'version-update', 'account-password', 'account-center']]
+    ['run-server-browser-tests.cjs', ['', 'personnel', 'personnel-transfers', 'report-operations', 'statistics', 'transfer', 'packing', 'routes', 'notifications', 'notification-targets', 'activity', 'pair-cancellation', 'status', 'branding', 'navigation', 'login', 'connection-copy', 'lists', 'static', 'admin-panel', 'task-history', 'task-performance', 'security', 'security-client', 'reconnect', 'quantities', 'version-update', 'version-status', 'account-password', 'account-center']]
   ]) {
     // The report-history feature has its own focused flow. Include it once
     // that reviewed feature is integrated, without requiring its branch here.

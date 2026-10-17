@@ -84,9 +84,20 @@ warning when a draft or pending save exists. Browser support and user interactio
 determine whether that warning appears; it cannot guarantee recovery after the
 browser or operating system terminates the page. No draft content is persisted.
 
+The account menu always contains **Version and updates**: the loaded page
+version, the last server version confirmed over the live connection, the time
+of that check (Europe/Sofia) and one state — checking, up to date, update
+available or no connection. A reconnect shows "checking" until the server
+confirms its version again, and a lost connection keeps the last confirmed
+version with a note that it may be out of date. Report history has no live
+connection and states that it does not check automatically. When an update is
+available, the menu button uses the same guarded update as the notice; it never
+reloads on its own.
+
 ```sh
 node --test tests/server/version-update.test.cjs tests/report-save-recovery.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --version-update-only
+node scripts/run-server-browser-tests.cjs --headless --version-status-only
 node scripts/run-server-browser-tests.cjs --headless --unsaved-navigation-only
 ```
 
