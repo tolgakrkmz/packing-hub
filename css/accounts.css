@@ -84,3 +84,6 @@
 .account-permission-module>summary small{color:var(--text-muted);font-variant-numeric:tabular-nums;font-weight:400}
 .account-permission-module .account-permission-grid{grid-template-columns:minmax(0,1fr);padding:0 10px 10px}
 @media(max-width:600px){.account-permission-modules{grid-template-columns:minmax(0,1fr)}}
+.account-summary .account-entry-avatar{width:44px;height:44px;font-size:15px}
+.account-summary .account-identity{flex:1}
+@media(max-width:600px){.account-summary .account-entry-avatar{width:40px;height:40px;font-size:14px}}

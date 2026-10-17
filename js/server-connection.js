@@ -421,19 +421,23 @@ const HubServer = (() => {
     const parts = String(name).split(/[._-]+/).filter(Boolean);
     return (parts.length > 1 ? parts[0][0] + parts[1][0] : String(name).slice(0, 2)).toUpperCase();
   }
-  function paintAvatar(node) {
+  function paintAvatar(node, user = boot.user) {
     node.textContent = '';
-    node.setAttribute('data-tone', String([...boot.user.username].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5));
-    if (boot.user.avatar) {
-      const image = document.createElement('img'); image.alt = ''; image.src = '/api/account/avatar?v=' + encodeURIComponent(boot.user.avatar);
-      image.onerror = () => { image.remove(); node.textContent = initials(boot.user.username); };
+    node.setAttribute('data-tone', String([...user.username].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5));
+    if (user.avatar) {
+      // Other accounts' photos go through the account-management route and its permission check.
+      const route = user.id === boot.user.id ? '/api/account/avatar' : '/api/accounts/' + encodeURIComponent(user.id) + '/avatar';
+      const image = document.createElement('img'); image.alt = ''; image.src = route + '?v=' + encodeURIComponent(user.avatar);
+      image.onerror = () => { image.remove(); node.textContent = initials(user.username); };
       node.append(image);
-    } else node.textContent = initials(boot.user.username);
+    } else node.textContent = initials(user.username);
   }
-  function avatar(className = '') {
+  // Without a user the avatar follows the signed-in account, including later photo changes.
+  function avatar(className = '', user) {
     const node = document.createElement('span'); node.className = ('hub-avatar ' + className).trim();
     node.setAttribute('aria-hidden', 'true'); node.setAttribute('translate', 'no');
-    avatars.add(node); paintAvatar(node); return node;
+    if (!user) avatars.add(node);
+    paintAvatar(node, user); return node;
   }
   function setAvatar(version) { boot.user.avatar = version || null; for (const node of avatars) paintAvatar(node); }
   function applyPermissions() {
