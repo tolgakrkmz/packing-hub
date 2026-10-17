@@ -125,7 +125,7 @@ body{padding:24px 16px 64px;}
 
 .modal-backdrop{position:fixed;inset:0;background:rgba(7,8,10,.76);display:none;align-items:center;justify-content:center;padding:18px;z-index:1000;}
 .modal-backdrop.open{display:flex;}
-.modal-card{width:min(620px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid #3b404a;border-radius:14px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.42);}
+.modal-card{width:min(620px,100%);max-height:92vh;overflow:hidden auto;background:var(--panel);border:1px solid #3b404a;border-radius:14px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.42);}
 .modal-card.small{width:min(470px,100%);}
 .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px;}
 .modal-head h3{margin:0;font-size:18px;}
