@@ -34,6 +34,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--teal); }
 .result-name, .result-text, .gallery figcaption, .upload-hint, .account-wrap small { overflow-wrap: anywhere; }
 .history-month-table, .sched-scroll, .stats-table-scroll, .import-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
 .modal-card, dialog { max-height: 90dvh; overscroll-behavior: contain; overflow-x: hidden; }
+/* Phones otherwise pan the page behind an open modal or the reconnect overlay. */
+html:has(dialog[open], .modal-backdrop.open, .lightbox.open, .server-reconnect-overlay:not([hidden])) { overflow: hidden; overscroll-behavior: none; }
 /* iOS Safari sizes date inputs and fieldsets to their content, which made modals pan sideways. */
 :is(.modal-card, dialog) :is(fieldset, input, select, textarea) { min-width: 0; max-width: 100%; }
 :is(.modal-card, dialog) input:is([type=date], [type=time], [type=month]) { -webkit-appearance: none; appearance: none; }
