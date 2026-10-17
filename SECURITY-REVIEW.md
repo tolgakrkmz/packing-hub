@@ -258,7 +258,7 @@ security assertions.
 | --- | --- | --- |
 | Identity and login limits | `api`, `security-http`, `session-lifecycle` | malformed bodies, generic credentials errors, case/account/socket-IP limits; bounded attempts |
 | Account/role/ID authorization | `permissions`, `module-permissions`, `security-authz-matrix` | all roles/overrides, forged URL/body/query IDs, viewing versus management, unchanged denied state |
-| Session lifecycle | `accounts-delete`, `session-lifecycle`, new auth matrix | disable/delete/password/permissions revoke old sessions; re-enable does not revive a token; hashed storage |
+| Session lifecycle | `accounts-delete`, `session-lifecycle`, `self-service-password`, new auth matrix | disable/delete/password/permissions revoke old sessions; re-enable does not revive a token; hashed storage; temporary passwords block APIs until changed; own change rotates this session and ends others; sign-out from all devices |
 | Async revocation | `security-authz-matrix`, `maintenance`, existing import/API races | current identity checked after partial bodies, password hashing and pending host/import work |
 | CSRF and exact Origin | `api`, `security-http`, module API suites | missing/null/foreign/prefix Origin, absent/wrong/cross-session CSRF, valid same-origin flow |
 | Ownership and IDOR | tasks, photos, notifications/import suites plus new auth matrix | unrelated task supervisor, inbox/device owner and administrator staging boundaries |

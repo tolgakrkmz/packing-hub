@@ -119,7 +119,7 @@
     const taskProfile = taskProfileControls(form, role, user);
     const password = element('input'); password.type = 'password'; password.placeholder = 'Нова парола (по избор)'; password.autocomplete = 'new-password'; password.setAttribute('aria-label', 'Нова парола'); password.minLength = 12; password.maxLength = 128;
     const passwordDetails = element('details', 'account-password');
-    passwordDetails.append(element('summary', '', 'Смяна на парола'), field('Нова парола', password), element('small', '', 'Поне 12 знака. Остави празно, за да запазиш текущата парола.'));
+    passwordDetails.append(element('summary', '', 'Смяна на парола'), field('Нова парола', password), element('small', '', 'Поне 12 знака. Остави празно, за да запазиш текущата парола. Парола, зададена за друг потребител, е временна до следващия му вход.'));
     password.addEventListener('invalid', () => { passwordDetails.open = true; });
     form.insertBefore(passwordDetails, actions);
     const status = element('p', 'account-feedback', feedback); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); form.append(status);

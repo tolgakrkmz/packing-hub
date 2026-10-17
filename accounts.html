@@ -25,7 +25,7 @@
         <h2 id="accountCreateTitle">Нов акаунт</h2>
         <div class="account-fields">
           <label>Потребителско име<input id="accountUsername" pattern="[a-z0-9][a-z0-9._-]{2,31}" required autocomplete="off"><small>3–32 знака: латински малки букви, цифри, точка, тире и долна черта.</small></label>
-          <label>Начална парола<input id="accountPassword" type="password" required minlength="12" maxlength="128" autocomplete="new-password"><small>Поне 12 знака.</small></label>
+          <label>Начална парола<input id="accountPassword" type="password" required minlength="12" maxlength="128" autocomplete="new-password"><small>Поне 12 знака. Временна е: потребителят я сменя при първия вход.</small></label>
           <label>Роля<select id="accountRole"><option value="operator">Оператор</option><option value="observer">Наблюдател</option><option value="admin">Администратор</option></select></label>
         </div>
         <div class="account-actions"><button type="submit">Създай акаунт</button><button id="cancelCreate" class="account-secondary" type="button">Отказ</button></div>

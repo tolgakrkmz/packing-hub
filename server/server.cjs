@@ -58,7 +58,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   });
   const staticAssets = createStaticAssets(assets,{transformHTML:(name,html) => {
     const content = pageLinks(html);
-    return name === '/login.html' ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
+    return ['/login.html', '/account-password.html'].includes(name) ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
   }});
   const {version} = staticAssets;
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
@@ -87,6 +87,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     catch (error) { if (error.status) throw error; throw problem(400, 'INVALID_DATA'); }
   }
   function syncNotifications() { try { tasks.tick(); notifications.sync(); } catch { /* Retry on the next tick without exposing local content. */ } }
+  // Revoked tokens lose their live updates at once instead of at the next heartbeat.
+  function closeRevoked() {
+    for (const client of clients) if (!auth.session(client.token)) { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
+  }
   function broadcast(module, revision) {
     syncNotifications();
     const payload = `event: change\ndata: ${JSON.stringify({module, revision})}\n\n`;
@@ -108,6 +112,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const currentUser = () => {
         const fresh = auth.session(token);
         if (!fresh) throw problem(401, 'LOGIN_REQUIRED');
+        if (fresh.user.mustChangePassword) throw problem(403, 'PASSWORD_CHANGE_REQUIRED');
         return accountInstructions.userView(fresh.user);
       };
       const authorized = key => {
@@ -134,6 +139,32 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (pathname.startsWith('/api/') || pathname === '/server-session.js') {
         if (!session) throw problem(401, 'LOGIN_REQUIRED');
         if (mutation && request.headers['x-csrf-token'] !== session.csrf) throw problem(403, 'CSRF_REJECTED');
+        // A temporary password opens only the password change and sign-out endpoints.
+        if (session.user.mustChangePassword && !['/api/session', '/api/account/password', '/api/logout', '/api/logout-all'].includes(pathname)) throw problem(403, 'PASSWORD_CHANGE_REQUIRED');
+        if (pathname === '/api/account/password') {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const input = await jsonBody(request, 4096);
+          if (typeof input.currentPassword !== 'string' || typeof input.password !== 'string') throw problem(400, 'INVALID_DATA');
+          const key = 'password:' + session.user.id, now = Date.now(), prior = attempts.get(key);
+          if (prior && prior.until < now) attempts.delete(key);
+          if ((attempts.get(key)?.count || 0) >= 10) throw problem(429, 'RATE_LIMITED');
+          // Count before hashing so parallel guesses cannot pass the limit; only wrong passwords keep the count.
+          const last = attempts.get(key); attempts.set(key, {count: (last?.count || 0) + 1, until: last?.until || now + 15 * 60000});
+          try {
+            const changed = await auth.changePassword(token, input.currentPassword, input.password);
+            attempts.delete(key); closeRevoked();
+            return json(response, 200, {user: accountInstructions.userView(changed.user), csrf: changed.csrf}, {'Set-Cookie': cookie(changed.token, 12 * 3600)});
+          } catch (error) {
+            const entry = attempts.get(key);
+            if (entry && error.code !== 'CURRENT_PASSWORD_INVALID') entry.count = Math.max(0, entry.count - 1);
+            throw error;
+          }
+        }
+        if (pathname === '/api/logout-all') {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const result = auth.logoutAll(token); closeRevoked();
+          return json(response, 200, result, {'Set-Cookie': cookie('', 0)});
+        }
         if (pathname === '/server-session.js' && request.method === 'GET') {
           response.writeHead(200, {'Content-Type': 'text/javascript; charset=utf-8'});
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
@@ -193,9 +224,11 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
             broadcast('accounts', 0);
             return json(response, 200, result);
           }
-          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, authorized('canManageAccounts'), input.permissions, () => authorized('canManageAccounts'), input)});
+          if (pathname === '/api/accounts' && request.method === 'POST') return json(response, 201, {user: await auth.create(input.username, input.password, input.role, authorized('canManageAccounts'), input.permissions, () => authorized('canManageAccounts'), input, {temporary: true})});
           if (request.method === 'PATCH') {
-            const user = await auth.update(Number(pathname.split('/').pop()), input, authorized('canManageAccounts'), () => authorized('canManageAccounts'));
+            const id = Number(pathname.split('/').pop());
+            // A reset for someone else is temporary; the owner chooses the lasting password.
+            const user = await auth.update(id, input, authorized('canManageAccounts'), () => authorized('canManageAccounts'), {temporaryPassword: id !== session.user.id});
             broadcast('accounts', 0);
             return json(response, 200, {user});
           }
@@ -350,8 +383,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
+      if (assetName.endsWith('.html') && session?.user.mustChangePassword && !['/login.html', '/account-password.html'].includes(assetName)) { response.writeHead(302, {Location: '/account-password'}); return response.end(); }
       const moduleName = assetName.slice(1, -5);
-      if (assetName.endsWith('.html') && !['index', 'login', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
+      if (assetName.endsWith('.html') && !['index', 'login', 'account-password', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
         if (moduleName === 'admin-panel') { staticAssets.send('/admin-denied.html',request,response,403); return; }
         throw problem(403,'FORBIDDEN');
       }

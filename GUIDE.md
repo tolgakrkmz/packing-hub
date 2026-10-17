@@ -1162,6 +1162,25 @@ The identity and username remain reserved to preserve task/report history; its
 password is discarded. Deleted accounts cannot be restored through account edits.
 The signed-in account, last active administrator and last effective account manager cannot be deleted.
 
+### Own password and devices
+
+Every signed-in account has **Change password** in the shared toolbar
+(`/account-password`). The owner confirms the current password and enters the new
+one twice (12–128 characters, different from the current one). A successful change
+signs out every other device and its push subscriptions; this device receives a new
+session. Wrong current passwords are limited to 10 attempts per account in 15 minutes.
+
+Passwords set by an account manager are temporary: a new account and a reset of
+another account's password require a change at the next sign-in. Until then pages
+redirect to `/account-password`, and every other API returns
+`PASSWORD_CHANGE_REQUIRED`. A manager changing their own password on the Accounts
+screen sets a lasting password. Existing accounts are not forced to change.
+
+**Sign out of all devices** ends every session and push subscription of the account,
+including the current device. Other accounts stay signed in. Rights, roles and the
+last-administrator protections are unchanged. Passwords never reach the audit
+journal; it records only `password-change` and `logout-all`.
+
 ## Responsive interface
 
 The shared layout preserves the dark palette and each module's accent color.
@@ -1448,7 +1467,7 @@ correction-only account form, toolbar readiness/navigation and versioned icons.
 
 | Important behavior | Existing behavioral coverage | Audit additions / remaining boundary |
 | --- | --- | --- |
-| Authentication, module permissions, CSRF, origin, active sessions | `server/api`, `permissions`, `module-permissions`, `routes`, browser permissions/account revocation | `server/session-lifecycle`: exact expiry, independent logout, login racing disable/delete, stale password update, all-session password revocation |
+| Authentication, module permissions, CSRF, origin, active sessions | `server/api`, `permissions`, `module-permissions`, `routes`, browser permissions/account revocation | `server/session-lifecycle`: exact expiry, independent logout, login racing disable/delete, stale password update, all-session password revocation; `server/self-service-password` and browser `--account-password-only`: temporary password gate, own change, rate limit, sign-out from all devices |
 | Durable reports, conflicts, retries and atomic rollback | `server/report-operations`, `client`, `report-save-recovery`, `file-sync`, browser report operations | Existing coverage retained; lost responses, competing edits and receipt persistence already tested |
 | Import/export validation and isolation | `data-validation`, `server/imports`, `api`, `permissions`, browser data transfer | `server/import-lifecycle`: newest approval only, complete upload replacement, owner quota/expiry, changed create retry; browser import card selection survives a pending search and authorized transfer navigation uses the admin panel or direct export entry |
 | Backup/restore and refusal of unsafe recovery | `server/backups`, `restore`, host/install/CLI tests; `BACKUP-RECOVERY-SCENARIOS.md` | Existing failure injection and complete recovery coverage retained; physical target-host recovery remains a separate deployment check |

@@ -16,7 +16,7 @@ document.getElementById('loginForm').addEventListener('submit', async event => {
   button.disabled = true; message.textContent = 'Влизане…';
   try {
     const response = await fetch('/api/login', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: document.getElementById('username').value.trim().toLowerCase(), password: document.getElementById('password').value})});
-    if (response.ok) { location.assign('/'); return; }
+    if (response.ok) { const result = await response.json().catch(() => ({})); location.assign(result.user?.mustChangePassword ? '/account-password' : '/'); return; }
     message.textContent = response.status === 401 ? 'Невалидно потребителско име или парола.'
       : response.status === 429 ? 'Твърде много опити. Опитай отново след 15 минути.'
       : 'Входът временно не е достъпен. Опитай отново.';
