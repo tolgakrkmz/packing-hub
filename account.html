@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Моят акаунт · Package Hub</title>
+  <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/package-hub-icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/server.css">
+  <link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/account.css">
+  <link rel="stylesheet" href="css/brand.css"><link rel="stylesheet" href="css/brand-shell.css">
+  <script src="js/account.js" defer></script>
+</head>
+<body>
+  <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script><link rel="stylesheet" href="css/i18n.css">
+  <main class="account-wrap account-page">
+    <header class="account-heading"><p class="account-eyebrow">Акаунт</p><h1>Моят акаунт</h1><p>Профилна снимка, парола и известия на едно място.</p></header>
+    <p id="accountOffline" class="account-notice" hidden>Акаунтът е наличен само в сървърния режим.</p>
+    <section id="accountProfile" class="account-section account-profile" aria-labelledby="accountProfileTitle" hidden>
+      <div id="accountAvatar" class="account-avatar"></div>
+      <div class="account-profile-body">
+        <h2 id="accountProfileTitle"><span id="accountUsername" translate="no"></span></h2>
+        <p id="accountRole" class="account-role"></p>
+        <div class="account-photo-actions">
+          <label class="account-upload" for="accountPhoto">Качи снимка<input id="accountPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label>
+          <button id="accountPhotoRemove" class="account-secondary" type="button" hidden>Премахни снимката</button>
+        </div>
+        <p class="account-hint">JPEG, PNG или WebP. Снимката се изрязва до квадрат и се пази само на сървъра.</p>
+        <p id="accountPhotoMessage" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <nav id="accountLinks" class="account-links" aria-label="Настройки на акаунта" hidden>
+      <a class="account-link account-security" href="account-password.html"><span class="account-link-icon" aria-hidden="true">◈</span><span><strong>Парола и сигурност</strong><small>Смяна на паролата и изход от всички устройства.</small></span><span class="account-link-open" aria-hidden="true">↗</span></a>
+      <a id="accountNotifications" class="account-link account-alerts" href="notifications.html#settings" hidden><span class="account-link-icon" aria-hidden="true">◉</span><span><strong>Известия</strong><small>Какво да получаваш и известия на това устройство.</small></span><span class="account-link-open" aria-hidden="true">↗</span></a>
+    </nav>
+  </main>
+</body>
+</html>

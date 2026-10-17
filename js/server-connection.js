@@ -130,6 +130,7 @@ const HubServer = (() => {
   const receiptMessages = {REPORT_SAVED: 'Сървърът потвърди записа.', REPORT_DELETED: 'Сървърът потвърди изтриването.', REPORT_RESTORED: 'Сървърът потвърди възстановяването.'};
   const receiptCodes = {create:'REPORT_SAVED', update:'REPORT_SAVED', delete:'REPORT_DELETED', restore:'REPORT_RESTORED'};
   Object.assign(messages, {TASK_PHOTO_REQUIRED: 'Добави снимка преди запис.', TASK_PHOTO_INVALID: 'Снимката не е валидна. Избери я отново.', TASK_PHOTO_STORAGE: 'Няма достатъчно място за снимката. Свържи се с администратор; отчетът не е записан.', TASK_PHOTO_EXPIRED: 'Снимката е изтрита след срока за съхранение.'});
+  Object.assign(messages, {AVATAR_INVALID: 'Снимката не е валидна. Избери друга снимка.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
   async function request(url, options = {}) {
@@ -414,6 +415,27 @@ const HubServer = (() => {
     return {init: () => refresh().catch(() => {}), refreshFromDisk: refresh, get dirHandle() { return initialized ? handle : null; }};
   }
   const roleLabels = {admin: 'Администратор', operator: 'Оператор', observer: 'Наблюдател'};
+  // Avatars show the owner's photo, or initials on a stable colour derived from the username.
+  const avatars = new Set();
+  function initials(name) {
+    const parts = String(name).split(/[._-]+/).filter(Boolean);
+    return (parts.length > 1 ? parts[0][0] + parts[1][0] : String(name).slice(0, 2)).toUpperCase();
+  }
+  function paintAvatar(node) {
+    node.textContent = '';
+    node.setAttribute('data-tone', String([...boot.user.username].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5));
+    if (boot.user.avatar) {
+      const image = document.createElement('img'); image.alt = ''; image.src = '/api/account/avatar?v=' + encodeURIComponent(boot.user.avatar);
+      image.onerror = () => { image.remove(); node.textContent = initials(boot.user.username); };
+      node.append(image);
+    } else node.textContent = initials(boot.user.username);
+  }
+  function avatar(className = '') {
+    const node = document.createElement('span'); node.className = ('hub-avatar ' + className).trim();
+    node.setAttribute('aria-hidden', 'true'); node.setAttribute('translate', 'no');
+    avatars.add(node); paintAvatar(node); return node;
+  }
+  function setAvatar(version) { boot.user.avatar = version || null; for (const node of avatars) paintAvatar(node); }
   function applyPermissions() {
     const module = currentModule;
     let selector = '';
@@ -458,9 +480,18 @@ const HubServer = (() => {
     const wordmark = document.createElement('span'); wordmark.className = 'hub-wordmark'; wordmark.textContent = 'Package ';
     const hubName = document.createElement('span'); hubName.className = 'brand-hub'; hubName.textContent = 'Hub'; wordmark.append(hubName); brand.append(mark, wordmark);
     const session = document.createElement('div'); session.className = 'server-session';
+    const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
+    const account = document.createElement('div'); account.className = 'server-account';
+    const accountButton = document.createElement('button'); accountButton.type = 'button'; accountButton.id = 'serverAccountButton'; accountButton.className = 'server-account-button';
+    accountButton.setAttribute('aria-expanded', 'false'); accountButton.setAttribute('aria-controls', 'serverAccountMenu'); accountButton.setAttribute('aria-label', 'Меню на акаунта'); accountButton.title = 'Меню на акаунта';
+    const accountName = document.createElement('span'); accountName.className = 'server-account-name'; accountName.setAttribute('translate', 'no'); accountName.textContent = boot.user.username;
+    accountButton.append(avatar(), accountName);
+    const menu = document.createElement('div'); menu.id = 'serverAccountMenu'; menu.className = 'server-account-menu'; menu.hidden = true;
+    const menuHead = document.createElement('div'); menuHead.className = 'server-account-head';
     const identity = document.createElement('div'); identity.className = 'server-identity';
     const who = document.createElement('span'); who.className = 'server-user'; who.setAttribute('translate', 'no'); who.textContent = boot.user.username;
     const role = document.createElement('span'); role.className = 'server-role'; role.textContent = roleLabels[boot.user.role]; identity.append(who, role);
+    menuHead.append(avatar('hub-avatar-large'), identity);
     top.append(brand, session);
     const tools = document.createElement('div'); tools.className = 'server-tools';
     const links = document.createElement('div'); links.className = 'server-links';
@@ -474,12 +505,12 @@ const HubServer = (() => {
     const reports = ['production-log', 'line-downtime', 'pair-targets'];
     const module = reports.includes(current) ? current : new URLSearchParams(location.search).get('module');
     const query = reports.includes(module) ? '?module=' + module : '';
+    addLink('/account', 'Моят акаунт');
     if (canViewModule('admin-panel')) {
       const link = addLink('/admin-panel' + query, 'Админ панел');
       if (['system-status','accounts','activity-log','data-import','production-import','report-history'].includes(current)) link.setAttribute('aria-current', 'location');
     }
     if (!canViewModule('admin-panel') && canViewModule('data-import')) addLink('/data-import'+query,'Експорт на отчети');
-    addLink('/account-password', 'Смяна на парола');
     const moduleNav = document.createElement('div'); moduleNav.className = 'server-module-nav';
     const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
     const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';
@@ -497,8 +528,7 @@ const HubServer = (() => {
       const target = moduleSelect.value; moduleSelect.value = originalSelection;
       if (target && target !== currentRoute) navigate(target, moduleSelect);
     });
-    moduleNav.append(moduleLabel, moduleSelect); tools.append(moduleNav, links);
-    const state = document.createElement('span'); state.id = 'serverState'; state.setAttribute('role', 'status'); state.setAttribute('aria-live', 'polite'); state.setAttribute('data-connection', 'pending'); state.textContent = 'Свързване…';
+    moduleNav.append(moduleLabel, moduleSelect); tools.append(moduleNav);
     const logout = document.createElement('button'); logout.className = 'server-logout'; logout.type = 'button'; logout.textContent = 'Изход';
     logout.onclick = () => requestLeave(async () => {
       logout.disabled = true; signingOut = true;
@@ -508,7 +538,23 @@ const HubServer = (() => {
     }, logout);
     const leaveFeedback = document.createElement('span'); leaveFeedback.id = 'serverLeaveFeedback'; leaveFeedback.setAttribute('role', 'status');
     tools.append(leaveFeedback);
-    session.append(identity, state, logout); bar.append(top, tools);
+    menu.append(menuHead, links, logout); account.append(accountButton, menu);
+    const backdrop = document.createElement('div'); backdrop.className = 'server-account-backdrop'; backdrop.hidden = true;
+    session.append(state, account); bar.append(top, tools, backdrop);
+    function toggleMenu(open, {focus = false} = {}) {
+      if (menu.hidden === !open) return;
+      menu.hidden = !open; backdrop.hidden = !open; accountButton.setAttribute('aria-expanded', String(open)); bar.classList.toggle('server-menu-open', open);
+      if (open && focus) (links.querySelector('a') || logout).focus();
+      if (!open && focus) accountButton.focus();
+    }
+    accountButton.addEventListener('click', () => toggleMenu(menu.hidden, {focus: accountButton.matches(':focus-visible')}));
+    account.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !menu.hidden) { event.stopPropagation(); toggleMenu(false, {focus: true}); }
+      if (event.key === 'ArrowDown' && event.target === accountButton) { event.preventDefault(); toggleMenu(true, {focus: true}); }
+    });
+    account.addEventListener('focusout', event => { if (!menu.hidden && event.relatedTarget && !account.contains(event.relatedTarget)) toggleMenu(false); });
+    document.addEventListener('pointerdown', event => { if (!menu.hidden && !account.contains(event.target)) toggleMenu(false); });
+    menu.addEventListener('click', event => { if (event.target.closest('a[href]')) toggleMenu(false); });
     document.body.prepend(bar);
     document.addEventListener('click', event => {
       if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -692,5 +738,5 @@ const HubServer = (() => {
       dialog.showModal(); dialog.querySelector('textarea').focus();
     });
   }
-  return {correctionReason, guardUpdate, formDraft, navigate, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord};
+  return {correctionReason, guardUpdate, formDraft, navigate, user: boot.user, can, canViewModule, fileSync, directorySync, json, send, watch, reviewRecord, avatar, setAvatar};
 })();

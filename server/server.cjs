@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const {openStore, problem} = require('./store.cjs');
 const {accounts} = require('./accounts.cjs');
 const {createAccountInstructions} = require('./account-instructions.cjs');
+const {createAccountAvatars, REQUEST_BYTES: avatarRequestBytes} = require('./account-avatars.cjs');
 const {can} = require('./permissions.cjs');
 const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cjs');
 const {createImports, limits: importLimits} = require('./imports.cjs');
@@ -24,6 +25,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const store = openStore(filename,{personnelNow,productionNow});
   const auth = accounts(store);
   const accountInstructions = createAccountInstructions(store);
+  const avatars = createAccountAvatars(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
@@ -107,7 +109,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const pathname = url.pathname;
       const token = tokenFor(request);
       const session = auth.session(token);
-      if (session) session.user = accountInstructions.userView(session.user);
+      if (session) session.user = {...accountInstructions.userView(session.user), avatar: avatars.version(session.user.id)};
       // Request bodies and password hashing may outlive an account change.
       const currentUser = () => {
         const fresh = auth.session(token);
@@ -170,6 +172,20 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           return response.end('window.HUB_SERVER_BOOT=' + JSON.stringify({user: session.user, csrf: session.csrf, version}).replace(/</g, '\\u003c') + ';');
         }
         if (pathname === '/api/session' && request.method === 'GET') return json(response, 200, {user: session.user, csrf: session.csrf, version});
+        if (pathname === '/api/account/avatar') {
+          if (request.method === 'GET') {
+            const content = avatars.get(currentUser());
+            response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length, 'Content-Disposition': 'inline'});
+            return response.end(content);
+          }
+          if (request.method === 'PUT') {
+            const input = await jsonBody(request, avatarRequestBytes);
+            if (Object.keys(input).some(key => key !== 'photo')) throw problem(400, 'INVALID_DATA');
+            return json(response, 200, avatars.set(currentUser(), input.photo));
+          }
+          if (request.method === 'DELETE') return json(response, 200, avatars.remove(currentUser()));
+          throw problem(405, 'METHOD_REJECTED');
+        }
         if(pathname==='/api/pair-access') {
           if(request.method!=='GET')throw problem(405,'METHOD_REJECTED');
           return json(response,200,store.productionAccess.read(url.searchParams,authorized('canViewPairs'),'pair-targets'));
@@ -385,7 +401,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
       if (assetName.endsWith('.html') && session?.user.mustChangePassword && !['/login.html', '/account-password.html'].includes(assetName)) { response.writeHead(302, {Location: '/account-password'}); return response.end(); }
       const moduleName = assetName.slice(1, -5);
-      if (assetName.endsWith('.html') && !['index', 'login', 'account-password', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
+      if (assetName.endsWith('.html') && !['index', 'login', 'account', 'account-password', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
         if (moduleName === 'admin-panel') { staticAssets.send('/admin-denied.html',request,response,403); return; }
         throw problem(403,'FORBIDDEN');
       }

@@ -108,6 +108,7 @@ function accounts(store) {
       if (id === actor.id) throw problem(409, 'SELF_DELETE');
       // Keep the identity reserved so historical assignments cannot pass to a new account.
       db.prepare('UPDATE users SET active=0,deleted_at=?,hash=? WHERE id=?').run(Date.now(), dummy, id);
+      if (db.prepare("SELECT 1 FROM sqlite_schema WHERE name='user_avatars'").get()) db.prepare('DELETE FROM user_avatars WHERE user_id=?').run(id);
       revokePush('user_id', id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
       store.audit(actor, 'account-delete', 'accounts');

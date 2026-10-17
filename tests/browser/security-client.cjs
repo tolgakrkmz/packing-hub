@@ -1,4 +1,5 @@
 /* Isolated fictional content; never execute markup or contact an external host. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const {randomUUID} = require('node:crypto');
 const {installStorage} = require('./storage.cjs');
@@ -179,7 +180,7 @@ async function exerciseServerClientSecurity({admin,hub,base,device,expect,setTim
     assert.equal(status,403);
     assert.deepEqual(hub.store.get('production-log'),deniedBefore);
     await sibling.goto(base+'/production-log');await expect(sibling.locator('#serverState')).toHaveAttribute('data-connection','ready');
-    await page.locator('.server-logout').click();await expect(page).toHaveURL(base+'/login');
+    await openAccountMenu(page); await page.locator('.server-logout').click();await expect(page).toHaveURL(base+'/login');
     await sibling.evaluate(async()=>{try{await HubServer.json('/api/data/production-log');}catch{}});
     await expect(sibling).toHaveURL(base+'/login');
     await sibling.goBack();await expect(sibling).toHaveURL(base+'/login');

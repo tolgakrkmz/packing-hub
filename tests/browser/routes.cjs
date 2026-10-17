@@ -1,4 +1,5 @@
 /* Real browser navigation against the isolated fictional server. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 async function exerciseRoutes({admin, hub, base, device, expect}) {
   console.log('RUN clean navigation, reloads, legacy fragments and permission-aware data reads');
@@ -45,7 +46,7 @@ async function exerciseRoutes({admin, hub, base, device, expect}) {
   assert.ok(!reads.includes('/api/statistics/data/production-log'));
   assert.ok(!reads.includes('/api/data/personnel'));
   assert.equal((await reader.request.get(base + '/personnel')).status(), 403);
-  await reader.locator('.server-logout').click();
+  await openAccountMenu(reader); await reader.locator('.server-logout').click();
   await expect(reader).toHaveURL(base + '/login');
   await reader.context().close();
   console.log('PASS clean routes, legacy query/fragment preservation, reloads, shared reads, permissions and logout');

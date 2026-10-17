@@ -7,12 +7,12 @@ const MAX_PHOTOS = 10, REQUEST_BYTES = Math.ceil(MAX_BYTES / 3) * 4 * MAX_PHOTOS
 const FINAL = ['completed', 'cancelled', 'not-done', 'not-applicable'];
 
 // Accept bounded, metadata-free JPEGs produced by the browser canvas encoder.
-function jpeg(input) {
+function jpeg(input, {maxBytes = MAX_BYTES, maxEdge = MAX_EDGE} = {}) {
   if (!input) throw problem(400, 'TASK_PHOTO_REQUIRED');
-  if (typeof input !== 'string' || input.length > Math.ceil(MAX_BYTES / 3) * 4) throw problem(413, 'TASK_PHOTO_INVALID');
+  if (typeof input !== 'string' || input.length > Math.ceil(maxBytes / 3) * 4) throw problem(413, 'TASK_PHOTO_INVALID');
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input)) throw problem(400, 'TASK_PHOTO_INVALID');
   const content = Buffer.from(input, 'base64');
-  if (content.length > MAX_BYTES || content.length < 20 || content.readUInt16BE(0) !== 0xffd8) throw problem(400, 'TASK_PHOTO_INVALID');
+  if (content.length > maxBytes || content.length < 20 || content.readUInt16BE(0) !== 0xffd8) throw problem(400, 'TASK_PHOTO_INVALID');
   let offset = 2, width = 0, height = 0, scan = false, quantization = false, huffman = false;
   const invalid = () => { throw problem(400, 'TASK_PHOTO_INVALID'); };
   while (offset < content.length) {
@@ -59,7 +59,7 @@ function jpeg(input) {
       if (width || length < 11 || content[offset + 2] !== 8) invalid();
       height = content.readUInt16BE(offset + 3); width = content.readUInt16BE(offset + 5);
       const components = content[offset + 7];
-      if (![1, 3].includes(components) || length !== 8 + 3 * components || !width || !height || width > MAX_EDGE || height > MAX_EDGE) invalid();
+      if (![1, 3].includes(components) || length !== 8 + 3 * components || !width || !height || width > maxEdge || height > maxEdge) invalid();
     }
     offset = end;
     if (marker === 0xda) {

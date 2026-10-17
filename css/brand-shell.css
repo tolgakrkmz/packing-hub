@@ -29,7 +29,7 @@
   flex-shrink: 0;
 }
 .server-bar .hub-brand img { width: 44px; height: 44px; }
-.server-session { gap: 14px 22px; justify-content: flex-end; }
+.server-session { gap: 10px 14px; justify-content: flex-end; flex-wrap: nowrap; }
 .server-identity { display: grid; min-width: 0; font-size: 13px; line-height: 1.4; }
 .server-user { flex-basis: auto; }
 .server-role { font-size: 11px; margin-top: 3px; }
@@ -180,9 +180,9 @@ body.login-page {
   .server-bar { padding: 0 14px; margin-bottom: 24px; border-radius: 0 0 14px 14px; }
   .server-top { padding: 16px 0; gap: 18px; }
   .server-bar .hub-brand { font-size: 20px; }
-  .server-session { width: 100%; justify-content: space-between; gap: 12px; }
-  .server-identity { flex: 1 1 120px; }
-  .server-bar #serverState { max-width: 145px; font-size: 11px; }
+  .server-top { flex-wrap: nowrap; gap: 12px; }
+  .server-session { gap: 8px; }
+  .server-bar #serverState { gap: 0; font-size: 0; }
   .server-bar .server-logout { padding: 8px 12px; }
   .server-tools { gap: 12px; }
   .server-module-nav { flex-basis: 100%; }
@@ -196,8 +196,44 @@ body.login-page {
   .login-brand img { width: 52px; height: 52px; }
 }
 @media (max-width: 380px) {
-  .server-session #serverState { order: 3; width: 100%; max-width: none; }
-  .server-links a { flex: 1 1 auto; }
+  .server-bar .hub-brand { font-size: 18px; gap: 10px; }
+  .server-bar .hub-brand img { width: 38px; height: 38px; }
   .login-page .login-wrap { padding: 20px 18px; }
   .login-page .login-brand { font-size: 23px; }
+}
+
+/* Account menu: the toolbar keeps the brand, connection, notifications and one avatar button. */
+.server-account { position: relative; }
+.server-bar .server-account-button { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; max-width: 220px; padding: 4px 14px 4px 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-2); color: var(--text); font-size: 13px; font-weight: 700; }
+.server-bar .server-account-button[aria-expanded=true] { border-color: #f5a62366; background: #f5a62312; }
+.server-account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-avatar { --avatar: var(--amber); display: inline-grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; overflow: hidden; border-radius: 50%; background: var(--avatar); color: #16181c; font-size: 13px; font-weight: 800; letter-spacing: .02em; line-height: 1; user-select: none; }
+.hub-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hub-avatar[data-tone="1"] { --avatar: var(--teal); }
+.hub-avatar[data-tone="2"] { --avatar: var(--blue); }
+.hub-avatar[data-tone="3"] { --avatar: var(--purple); }
+.hub-avatar[data-tone="4"] { --avatar: var(--coral); }
+.hub-avatar-large { width: 52px; height: 52px; font-size: 18px; }
+.server-account-menu { position: absolute; z-index: 60; top: calc(100% + 10px); right: 0; display: grid; gap: 10px; width: min(300px, calc(100vw - 24px)); padding: 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); box-shadow: 0 18px 48px #0007; }
+.server-account-head { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 2px 2px 12px; border-bottom: 1px solid var(--border); }
+.server-account-head .server-user { font-size: 15px; }
+.server-account-menu .server-links { display: grid; gap: 2px; }
+.server-account-menu .server-links a { justify-content: flex-start; padding: 10px 12px; color: var(--text); font-size: 14px; }
+.server-account-menu .server-logout { width: 100%; min-height: 44px; }
+.server-account-backdrop { display: none; }
+.server-bar .notification-bell { justify-content: center; min-width: 44px; border-radius: 999px; color: var(--text-muted); }
+.server-bar .notification-bell[aria-current] { color: var(--amber); }
+@media (max-width: 600px) {
+  .server-account-name { display: none; }
+  .server-bar .server-account-button { padding: 3px; }
+  .server-account-menu { position: fixed; top: auto; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; width: auto; max-height: calc(100dvh - 24px); overflow: auto; padding: 18px; border-radius: 20px; }
+  .server-account-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 59; background: #0009; }
+  .server-account-menu .server-links a { min-height: 48px; font-size: 15px; }
+  /* Module picker and language share one row; the label stays available to screen readers. */
+  .server-tools { gap: 10px 8px; }
+  .server-bar .server-module-nav { flex: 1 1 0; min-width: 0; }
+  .server-module-nav label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .server-bar .hub-language { margin-left: 0; }
+  .server-bar .server-closeout { order: 3; }
+  .server-update-notice { order: 4; flex-basis: 100%; }
 }

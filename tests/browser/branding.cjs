@@ -1,4 +1,5 @@
 /* Brand checks use only isolated fictional accounts; production records are never loaded. */
+const {openAccountMenu} = require('./account-menu.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -29,7 +30,7 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
   await admin.locator('#password').fill(password);
   await admin.locator('#loginForm button[type=submit]').click();
   await expect(admin).toHaveURL(base + '/');
-  await admin.locator('.server-logout').click();
+  await openAccountMenu(admin); await admin.locator('.server-logout').click();
   await expect(admin).toHaveURL(base + '/login');
   assert.equal(await admin.evaluate(async () => (await fetch('/api/session')).status), 401);
 
@@ -139,11 +140,11 @@ async function exerciseBranding({admin, hub, base, device, expect, screenshotDir
     await hub.auth.create(username, password, role);
     const page = await device(username, true);
     await expect(page.locator('.server-links a[href="/accounts"]')).toHaveCount(0);
-    await expect(page.locator('.server-links a[href="/data-import"]')).toBeVisible();
+    await openAccountMenu(page); await expect(page.locator('.server-links a[href="/data-import"]')).toBeVisible();
     await expect(page.locator('.server-links a[href="/admin-panel"]')).toHaveCount(0);
     await expect(page.locator('.server-links a[href="/tasks"]')).toHaveCount(0);
     await expect(page.locator('.server-bar #reportExportKind')).toHaveCount(0);
-    await page.locator('.server-links a[href^="/data-import"]').click();
+    await openAccountMenu(page); await page.locator('.server-links a[href^="/data-import"]').click();
     await expect(page.locator('#reportExportKind')).toBeVisible();
     await expect(page.locator('[data-transfer-tab=modules]')).toBeHidden();
     await expect(page.locator('.server-user')).toHaveText(username);

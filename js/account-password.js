@@ -36,6 +36,7 @@
     temporary = value;
     document.getElementById('temporaryNotice').hidden = !value;
     home.hidden = value;
+    document.getElementById('accountLink').hidden = value;
   }
   reveal.addEventListener('change', () => { for (const field of [current, next, confirmation]) field.type = reveal.checked ? 'text' : 'password'; });
   if (location.protocol === 'file:') {
