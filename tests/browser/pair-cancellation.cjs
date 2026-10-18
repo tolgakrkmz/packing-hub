@@ -32,7 +32,7 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
       await expect(page.locator('#equalizeBtn')).toBeHidden();
     } else {
       await page.locator('#equalizeCancelBtn').click();
-      await expect(page.locator('#shiftGoalText')).toContainText(/липсват 29 т · 30 т ÷ 1 двойки = 30 т на двойка/);
+      await expect(page.locator('#shiftGoalText')).toContainText(/липсват 29 т · средно 30 т на двойка/);
       await expect(page.locator('#equalizeBtn')).toBeVisible();
     }
     await expect(page.locator('#equalizeDialog')).not.toBeVisible();

@@ -126,7 +126,7 @@
     $('shiftGoal').hidden = !pairsLoaded || !scheduled || !entries.length;
     $('shiftGoal').classList.toggle('reached',gap <= 0);
     $('shiftGoalText').textContent = gap > 0
-      ? `Сбор на таргетите: ${fmt(totalKg/1000)} т от ${fmt(goal/1000)} т · липсват ${fmt(gap/1000)} т · ${fmt(goal/1000)} т ÷ ${entries.length} двойки = ${fmt(PairTargets.pairNorm(entries.length)/1000)} т на двойка`
+      ? `Сбор на таргетите: ${fmt(totalKg/1000)} т от ${fmt(goal/1000)} т · липсват ${fmt(gap/1000)} т · средно ${fmt(PairTargets.pairNorm(entries.length)/1000)} т на двойка`
       : `Целта от ${fmt(goal/1000)} т за смяната е достигната · сбор ${fmt(totalKg/1000)} т`;
     $('equalizeBtn').hidden = !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false) || !PairTargets.equalize(entries,'').length;
     $('equalizeBtn').disabled = busy;
@@ -320,14 +320,15 @@
   const raisedKey = entries => JSON.stringify(entries.map(entry => [entry.id,entry.targetKg]));
   function openEqualize(reminder) {
     if(busy || editing || scopeLinkError || pairAccess&&!pairAccess.canSave(false)) return;
-    const selected = selectedEntries(), raised = PairTargets.equalize(selected,new Date().toISOString());
+    const selected = selectedEntries(), raised = PairTargets.equalize(selected,new Date().toISOString(),data.entries);
     if(!raised.length) return;
     const before = new Map(selected.map(entry => [entry.id,entry.targetKg]));
     const goal = PairTargets.SHIFT_GOAL_KG;
     equalizing = {context:{...context},raised};
     $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Повишение до 30 т';
-    $('equalizeIntro').textContent = (reminder ? 'Всички свободни хора са разпределени. ' : '')+`Всяка неотчетена двойка получава +${fmt(raised[0].targetKg-before.get(raised[0].id))} кг, за да стигне смяната ${fmt(goal/1000)} т.`;
-    $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг</li>`).join('');
+    $('equalizeIntro').textContent = (reminder ? 'Всички свободни хора са разпределени. ' : '')+`Липсващото до ${fmt(goal/1000)} т се разпределя според средния резултат на хората за последните ${PairTargets.HISTORY_SHIFTS} смени, без смените с престой или липса на материал.`;
+    const strength = PairTargets.pairStrengths(selected.filter(entry => !entry.cancellation && !entry.result),data.entries);
+    $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг <small class="muted">(${strength.get(entry.id).known ? 'средно '+fmt(strength.get(entry.id).kg/1000)+' т на смяна' : 'без пълна история · средно за смяната'})</small></li>`).join('');
     $('equalizeError').textContent = '';
     $('equalizeDialog').showModal();
   }
@@ -341,7 +342,7 @@
     const {context:scope,raised} = equalizing;
     // Recompute on fresh data so a pair changed by someone else is never overwritten from a stale preview.
     const fresh = () => {
-      const next = PairTargets.equalize(data.entries.filter(entry => PairTargets.inScope(entry,scope)),raised[0].updatedAt);
+      const next = PairTargets.equalize(data.entries.filter(entry => PairTargets.inScope(entry,scope)),raised[0].updatedAt,data.entries);
       if(raisedKey(next) !== raisedKey(raised)) throw new Error('Двойките са променени междувременно. Затвори и опитай отново.');
       return next;
     };
