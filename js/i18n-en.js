@@ -1016,7 +1016,7 @@ const HUB_EN_MESSAGES = {
   "Тонаж по периоди": "Output by period",
   "Всяка колона е разделена по екипи.": "Each column is split by team.",
   "Дял по екипи": "Share by team",
-  "Колко от общия тонаж е произвел всеки екип.": "How much of the total output each team produced.",
+  "Колко от тонажа за избрания общ месец е произвел всеки екип.": "How much of the selected shared month's output each team produced.",
   "Покажи линиите по смени": "Show lines by shift",
   "Тонаж, брак и екипи за всеки период.": "Output, scrap and teams for each period.",
   "отчета за смени": "shift reports",

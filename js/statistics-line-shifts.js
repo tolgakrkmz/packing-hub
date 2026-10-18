@@ -75,6 +75,10 @@ function calculateLineShifts(
 }
 
 function renderLineShiftForSelectedMonth() {
+  const byShift = emptyShiftMap();
+  productionMonthEntries().forEach(e => { if (byShift[e.shift] !== undefined) byShift[e.shift] += Number(e.tonnage) || 0; });
+  document.getElementById('prodTeamShareTitle').textContent = `Дял по екипи — ${selectedPeriodLabel()}`;
+  renderTeamShare([{byShift}]);
   renderLineShiftTable(
     productionMonthEntries(),
     selectedPeriodLabel()
