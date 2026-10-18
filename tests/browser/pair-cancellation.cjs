@@ -22,17 +22,17 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
     await page.locator('#savePairBtn').click();
     await saved(data => data.entries.length === count);
     await expect(page.locator('#pairDialog')).not.toBeVisible();
-    // The last free people were paired below the 1-pair goal of 5 t, so the reminder offers to raise the target.
+    // The last free people were paired below the 30 t shift goal, so the reminder offers to raise the target.
     await expect(page.locator('#equalizeDialog')).toBeVisible();
-    await expect(page.locator('#equalizeList')).toContainText(/1\s?000 → 5\s?000 кг/);
+    await expect(page.locator('#equalizeList')).toContainText(/1\s?000 → 30\s?000 кг/);
     if(raise) {
       await page.locator('#equalizeSaveBtn').click();
-      await saved(data => data.entries[count-1].targetKg === 5000 && data.entries[count-1].targetCrates === 40);
-      await expect(page.locator('#shiftGoal')).toContainText('целта е покрита');
+      await saved(data => data.entries[count-1].targetKg === 30000 && data.entries[count-1].targetCrates === 40);
+      await expect(page.locator('#shiftGoal')).toContainText('Целта от 30 т за смяната е достигната');
       await expect(page.locator('#equalizeBtn')).toBeHidden();
     } else {
       await page.locator('#equalizeCancelBtn').click();
-      await expect(page.locator('#shiftGoalText')).toContainText(/непълен състав: 1 от 6 двойки · липсват 4/);
+      await expect(page.locator('#shiftGoalText')).toContainText(/липсват 29 т · 30 т ÷ 1 двойки = 30 т на двойка/);
       await expect(page.locator('#equalizeBtn')).toBeVisible();
     }
     await expect(page.locator('#equalizeDialog')).not.toBeVisible();

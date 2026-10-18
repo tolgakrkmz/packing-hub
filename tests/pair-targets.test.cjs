@@ -184,16 +184,16 @@ test('cancelled pairs release members for reassignment but cannot be edited or r
   assert.throws(() => model.validateData({...data,entries:[{...entry,members:[entry.members[0],entry.members[0]]}]}));
   assert.throws(() => model.validateData({...data,entries:[{...entry,result:report().result}]}));
 });
-test('shift goal scales with pairs and equalize raises only unreported pairs equally',() => {
-  assert.equal(model.shiftGoal(6),30000);
-  assert.equal(model.shiftGoal(8),30000);
-  assert.equal(model.shiftGoal(4),20000);
+test('shift goal is always 30 t and equalize raises only unreported pairs equally',() => {
+  assert.equal(model.SHIFT_GOAL_KG,30000);
+  assert.equal(model.pairNorm(4),7500);
+  assert.equal(model.pairNorm(0),0);
   const pair = (id,targetKg,extra = {}) => ({id,targetKg,result:null,...extra});
   const entries = [pair('a',4000),pair('b',3000),pair('c',5000,{result:{kg:5000}}),pair('d',9000,{cancellation:{}}),pair('e',3050)];
-  // 4 active pairs -> goal 20000, sum 15050, gap 4950 over 3 open pairs -> 1650, rounded up to 1700 each.
+  // Active sum 15050, gap 14950 over 3 open pairs -> 4983.3, rounded up to 5000 each.
   const raised = model.equalize(entries,'2026-10-04T08:00:00Z');
-  assert.deepEqual(plain(raised.map(entry => [entry.id,entry.targetKg])),[['a',5700],['b',4700],['e',4750]]);
+  assert.deepEqual(plain(raised.map(entry => [entry.id,entry.targetKg])),[['a',9000],['b',8000],['e',8050]]);
   assert.ok(raised.every(entry => entry.updatedAt === '2026-10-04T08:00:00Z'));
-  assert.deepEqual(plain(model.equalize([pair('a',5000),pair('b',5000)],'x')),[]);
+  assert.deepEqual(plain(model.equalize([pair('a',15000),pair('b',15000)],'x')),[]);
   assert.deepEqual(plain(model.equalize([pair('a',1000,{result:{kg:1}})],'x')),[]);
 });
