@@ -97,18 +97,19 @@ function afterMonths(at, months) {
   const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
   date.setUTCDate(Math.min(day, last)); return date.getTime();
 }
-function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 * 1024, freeBytes} = {}) {
+// `table` lets other modules keep their photos apart from task retention cleanup; it is never user input.
+function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 * 1024, freeBytes, table = 'task_photos'} = {}) {
   if (!Number.isInteger(retentionMonths) || retentionMonths < 1 || retentionMonths > 24 || !Number.isSafeInteger(limitBytes) || limitBytes < MAX_BYTES || limitBytes > 4096 * 1024 * 1024) throw new Error('Invalid task photo storage configuration.');
   const {db} = store, filename = db.prepare('PRAGMA database_list').all().find(row => row.name === 'main').file;
-  db.exec('CREATE TABLE IF NOT EXISTS task_photos(id TEXT PRIMARY KEY, content BLOB NOT NULL, created_at INTEGER NOT NULL);');
-  const usedBytes = () => db.prepare('SELECT COALESCE(SUM(length(content)),0) AS bytes FROM task_photos').get().bytes;
+  db.exec(`CREATE TABLE IF NOT EXISTS ${table}(id TEXT PRIMARY KEY, content BLOB NOT NULL, created_at INTEGER NOT NULL);`);
+  const usedBytes = () => db.prepare(`SELECT COALESCE(SUM(length(content)),0) AS bytes FROM ${table}`).get().bytes;
   function add(input, at) {
     const value = jpeg(input);
     if (usedBytes() + value.content.length > limitBytes) throw problem(507, 'TASK_PHOTO_STORAGE');
     const available = freeBytes ? freeBytes() : filename ? (() => { const stat = fs.statfsSync(path.dirname(filename)); return stat.bavail * stat.bsize; })() : Infinity;
     if (available < 128 * 1024 * 1024 + value.content.length * 4) throw problem(507, 'TASK_PHOTO_STORAGE');
     const id = randomUUID();
-    db.prepare('INSERT INTO task_photos(id,content,created_at) VALUES(?,?,?)').run(id, value.content, at);
+    db.prepare(`INSERT INTO ${table}(id,content,created_at) VALUES(?,?,?)`).run(id, value.content, at);
     return {id, at, bytes: value.content.length, width: value.width, height: value.height};
   }
   function addMany(inputs, at, existing = []) {
@@ -120,7 +121,7 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
       seen.add(previous.id); return previous;
     });
   }
-  const exists = id => !!db.prepare('SELECT 1 FROM task_photos WHERE id=?').get(id);
+  const exists = id => !!db.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(id);
   // Call inside the task transaction, after recurring shifts have materialized.
   function cleanup(items, schedules, at, scheduleEnd) {
     const keep = new Set();
@@ -136,11 +137,11 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
       const expires = afterMonths(endedAt, retentionMonths);
       if (expires > at) { nextCleanupAt = Math.min(nextCleanupAt, expires); for (const photo of evidence) keep.add(photo.id); }
     }
-    const remove = db.prepare('DELETE FROM task_photos WHERE id=?');
-    for (const photo of db.prepare('SELECT id FROM task_photos').all()) if (!keep.has(photo.id)) remove.run(photo.id);
+    const remove = db.prepare(`DELETE FROM ${table} WHERE id=?`);
+    for (const photo of db.prepare(`SELECT id FROM ${table}`).all()) if (!keep.has(photo.id)) remove.run(photo.id);
     return nextCleanupAt;
   }
-  function decorate(item, available = new Set(db.prepare('SELECT id FROM task_photos').all().map(row => row.id))) {
+  function decorate(item, available = new Set(db.prepare(`SELECT id FROM ${table}`).all().map(row => row.id))) {
     const mark = photo => ({...photo, available: available.has(photo.id)});
     const problems = value => { const list = photoList(value, 'problemPhotos', 'problemPhoto').map(mark); return {...value, problemPhotos: list, problemPhoto: list[0] || null}; };
     const solutions = value => { const list = photoList(value, 'photos', 'photo').map(mark); return {...value, photos: list, photo: list[0] || null}; };
@@ -150,7 +151,7 @@ function createTaskPhotos(store, {retentionMonths = 6, limitBytes = 512 * 1024 *
   }
   function get(item, id) {
     if (!references(item).some(photo => photo.id === id)) throw problem(404, 'NOT_FOUND');
-    const photo = db.prepare('SELECT content FROM task_photos WHERE id=?').get(id);
+    const photo = db.prepare(`SELECT content FROM ${table} WHERE id=?`).get(id);
     if (!photo) throw problem(410, 'TASK_PHOTO_EXPIRED');
     return Buffer.from(photo.content);
   }

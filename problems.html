@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Глобални проблеми · Package Hub</title>
+<link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/tasks.css"><link rel="stylesheet" href="css/problems.css"><link rel="stylesheet" href="css/i18n.css">
+<script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
+<script src="js/task-photos.js" defer></script><script src="js/problems.js" defer></script>
+<link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/package-hub-icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/brand.css">
+<link rel="stylesheet" href="css/brand-shell.css">
+</head>
+<body>
+<main class="wrap tasks-wrap problems-wrap">
+<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Глобални проблеми</h1><p>Проблеми извън нашия контрол и решенията, които предлагаме.</p></div><button id="newProblem" type="button" hidden>+ Запиши проблем</button></header>
+<p id="problemMessage" role="status" aria-live="polite"></p>
+<div class="task-toolbar"><label>Търсене<input id="problemSearch" type="search" placeholder="Търси проблем…"></label><button id="refreshProblems" type="button" class="secondary">Опресни</button></div>
+<section id="problemBoard" class="problem-board" aria-live="polite"></section>
+<dialog id="problemEditor" class="task-dialog">
+<form id="problemForm"><div class="dialog-heading"><h2 id="editorTitle">Запиши проблем</h2><button type="button" data-close="problemEditor" class="secondary" aria-label="Затвори">×</button></div>
+<label>Заглавие<input id="problemTitle" required maxlength="180"></label>
+<label>Описание<textarea id="problemDescription" maxlength="4000" rows="4"></textarea></label>
+<div class="task-fields"><label>Въздействие<select id="problemImpactLevel" required><option value="low">Ниско</option><option value="medium" selected>Средно</option><option value="high">Високо</option></select></label><label>От кого зависи<input id="problemDependsOn" maxlength="160" placeholder="отдел или външна страна"></label></div>
+<label>Въздействие с цифри<input id="problemImpact" maxlength="1000" placeholder="напр. минути престой, брак, засегнати смени"></label>
+<fieldset class="task-photo-picker"><legend>Снимки (по желание)</legend><p>Добави една или повече снимки на проблема.</p><div class="task-fields"><label>Избери снимка<input id="problemPhoto" type="file" accept="image/*" multiple></label><label>Снимай<input id="problemCamera" type="file" accept="image/*" capture="environment"></label></div><p id="problemPhotoCount" class="task-muted" role="status" translate="no"></p><div id="problemPhotoPreview" class="task-photo-choices"></div><p id="problemPhotoInfo" class="task-muted" role="status"></p><button id="problemPhotoClear" type="button" class="secondary" hidden>Премахни избора</button></fieldset>
+<p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Запази</button><button type="button" data-close="problemEditor" class="secondary">Отказ</button></div>
+</form></dialog>
+<dialog id="problemDetail" class="task-dialog problem-detail"><div class="dialog-heading"><h2 id="detailTitle" translate="no"></h2><button type="button" data-close="problemDetail" class="secondary" aria-label="Затвори">×</button></div><div id="detailContent"></div>
+<form id="proposalForm"><label>Предложи решение<textarea id="proposalText" required maxlength="2000" rows="3"></textarea></label><fieldset class="task-photo-picker"><legend>Снимки към решението (по желание)</legend><p>Добави снимки, които показват решението.</p><div class="task-fields"><label>Избери снимка<input id="solutionPhoto" type="file" accept="image/*" multiple></label><label>Снимай<input id="solutionCamera" type="file" accept="image/*" capture="environment"></label></div><p id="solutionPhotoCount" class="task-muted" role="status" translate="no"></p><div id="solutionPhotoPreview" class="task-photo-choices"></div><p id="solutionPhotoInfo" class="task-muted" role="status"></p><button id="solutionPhotoClear" type="button" class="secondary" hidden>Премахни избора</button></fieldset><p id="actionFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Добави предложение</button></div></form>
+</dialog>
+<dialog id="taskPhotoViewer" class="task-dialog task-photo-viewer"><div class="dialog-heading"><h2 id="photoViewerTitle"></h2><button type="button" data-close="taskPhotoViewer" class="secondary" aria-label="Затвори">×</button></div><img id="photoViewerImage" alt=""><p id="photoViewerFeedback" role="status"></p></dialog>
+</main></body></html>

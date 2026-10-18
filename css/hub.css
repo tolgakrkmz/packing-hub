@@ -28,6 +28,7 @@ background:var(--tile-bg);color:var(--tile-accent);font-size:18px;font-weight:80
 .tile.tonazh{--tile-accent:var(--amber);--tile-bg:#3a2c10;}
 .tile.hora{--tile-accent:var(--teal);--tile-bg:#0f2c26;}
 .tile.tasks{--tile-accent:var(--blue);--tile-bg:var(--blue-dark);}
+.tile.problems{--tile-accent:var(--coral);--tile-bg:var(--coral-dark);}
 .tile.instructions{--tile-accent:var(--purple);--tile-bg:#251c38;}
 footer{margin-top:28px;font-size:11px;color:var(--text-muted);text-align:center;}
 

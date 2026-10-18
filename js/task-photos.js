@@ -1,5 +1,5 @@
 /* Task photos: metadata stripping, evidence thumbnails and the problem/solution pickers. tasks.js passes its helpers and live state. */
-function createTaskPhotos({$, el, button, photoObserver, observePhotos, forgetPhotos, getState, isBusy}) {
+function createTaskPhotos({$, el, button, photoObserver, observePhotos, forgetPhotos, getState, isBusy, photoUrl = (item, photo, recurring) => '/api/tasks/' + (recurring ? 'schedules/' : 'items/') + item.id + '/photos/' + photo.id}) {
 function withoutMetadata(dataURL) {
   // Some browsers add an ICC profile to canvas JPEGs. Strip optional metadata
   // segments as well as camera tags; compressed pixels stay unchanged.
@@ -19,7 +19,7 @@ function photoView(item, photo, label, recurring = false, index = 0, total = 1) 
   label = (HubI18n.language === 'en' ? label === 'Проблем' ? 'Problem' : 'Solution' : label) + (total > 1 ? ' ' + (index + 1) : '');
   const figure = el('figure', '', 'task-photo'); figure.append(el('figcaption', label, '', true));
   if (!photo?.available) { figure.append(el('p', photo ? 'Снимката е изтрита след срока за съхранение.' : 'Няма снимка от предишната версия.', 'task-muted')); return figure; }
-  const url = '/api/tasks/' + (recurring ? 'schedules/' : 'items/') + item.id + '/photos/' + photo.id;
+  const url = photoUrl(item, photo, recurring);
   const control = button('Отвори снимката', () => {
     $('photoViewerTitle').textContent = label; $('photoViewerFeedback').textContent = '';
     $('photoViewerImage').alt = label; $('photoViewerImage').src = url; $('taskPhotoViewer').showModal();
