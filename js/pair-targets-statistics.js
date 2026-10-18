@@ -67,7 +67,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     const success = tone(result.successPct);
     $('pairStatsStatus').className = 'status-chip ' + success;
     $('pairStatsStatus').textContent = result.reported ? `${result.achieved} от ${result.reported} постигнати` : 'Няма отчети';
-    const {worstPairs, worstPeople, bestPairs} = result.rankings;
+    const {worstPairs, worstPeople, bestPairs, bestPeople} = result.rankings;
     $('pairStatsBody').innerHTML = `<div class="wf-kpis pair-stats-kpis">
       ${card('Планирани двойки', fmt(result.planned), `Отчетени: ${result.reported} · Очакват отчет: ${result.pending}${result.cancelled ? `<br>Отменени двойки: ${result.cancelled}` : ''}`)}
       ${card('Постигнати таргети', pct(result.successPct), `Постигнати: ${result.achieved} · Непостигнати: ${result.missed}<br>И двете цели трябва да са изпълнени.`, 'emphasis ' + success)}
@@ -79,8 +79,9 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     <div class="ps-content">
     <div class="ps-grid ps-rankings">
       ${rankingCard('Топ 5 несправили се двойки', 'Най-ниска успеваемост, после най-нисък тонаж спрямо целта.', worstPairs, 'bad')}
-      ${rankingCard('Топ 5 несправили се хора', 'Всеки човек поотделно, по всички двойки, в които е участвал.', worstPeople, 'bad')}
       ${rankingCard('Топ 5 най-добри двойки', 'Най-висока успеваемост, после най-висок тонаж спрямо целта.', bestPairs, 'good', 'Няма други двойки с постигнат таргет.')}
+      ${rankingCard('Топ 5 несправили се хора', 'Всеки човек поотделно, по всички двойки, в които е участвал.', worstPeople, 'bad')}
+      ${rankingCard('Топ 5 най-добри хора', 'Всеки човек поотделно, по всички двойки, в които е участвал.', bestPeople, 'good', 'Няма други хора с постигнат таргет.')}
     </div>
     <div class="ps-grid ps-analysis">
       <div class="wf-card"><div class="wf-card-title">Сравнение по екипи</div><div class="wf-card-sub">Успеваемост и изпълнение по тонаж за всеки екип.</div>

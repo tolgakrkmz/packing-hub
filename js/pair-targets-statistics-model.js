@@ -56,14 +56,11 @@ const PairTargetsStatistics = (() => {
     const rows = map => Array.from(map.values(), group => ({...group, ...summarize(group.entries)}));
     const worse = (a, b) => a.successPct - b.successPct || a.kgPct - b.kgPct || b.reported - a.reported || a.name.localeCompare(b.name);
     const worst = map => rows(map).filter(row => row.missed).sort(worse).slice(0, limit);
-    const worstPairs = worst(groups), shown = new Set(worstPairs.map(row => row.key));
-    // A pair is never listed as both worst and best when there are few pairs.
-    return {
-      worstPairs,
-      worstPeople: worst(people),
-      bestPairs: rows(groups).filter(row => row.achieved && !shown.has(row.key))
-        .sort((a, b) => b.successPct - a.successPct || b.kgPct - a.kgPct || b.reported - a.reported || a.name.localeCompare(b.name)).slice(0, limit)
-    };
+    // Nobody is listed as both worst and best when there are few pairs or people.
+    const best = (map, worstRows) => rows(map).filter(row => row.achieved && !worstRows.some(item => item.key === row.key))
+      .sort((a, b) => b.successPct - a.successPct || b.kgPct - a.kgPct || b.reported - a.reported || a.name.localeCompare(b.name)).slice(0, limit);
+    const worstPairs = worst(groups), worstPeople = worst(people);
+    return {worstPairs, bestPairs: best(groups, worstPairs), worstPeople, bestPeople: best(people, worstPeople)};
   }
   return {summarize, aggregate, rankings};
 })();
