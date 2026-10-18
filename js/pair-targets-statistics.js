@@ -105,6 +105,7 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     refresh:() => sync.refreshFromDisk(),
     get isCurrent() { return sync.isCurrent; },
     getYears() { return cache.get('years', [data], '', () => typeof HubServer !== 'undefined' && data.availableYears ? data.availableYears : data.entries.map(entry => entry.date.slice(0, 4))); },
-    getVersion() { return version; }
+    getVersion() { return version; },
+    getEntries() { return data.entries; }
   };
 }

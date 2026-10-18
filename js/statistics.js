@@ -397,7 +397,23 @@ function renderAll() {
     renderAvKpis(rows, annual ? 'месец' : 'година');
     renderAvTable(rows, annual ? `месец (${selectedYear})` : 'година');
   });
+  renderOverview();
 }
+
+function renderOverview() {
+  const period = `${selectedYear}-${selectedDashboardMonth}`, today = statisticsDay(), shift = ShiftSchedule.current();
+  // The current shift is part of the key so "missing report" items appear once a shift ends.
+  statisticsCache.update('overview', [entries, avEntries, pairStatistics.getVersion(), personnelEmployees, personnelCounts, goalTons, el.connDot.classList.contains('on')], `${period}|${today}|${shift.date}|${shift.shiftCode}`, () => {
+    const day = StatisticsOverview.pickDay(period, today, entries);
+    renderStatisticsOverview({today, connected:el.connDot.classList.contains('on'),
+      summary:StatisticsOverview.summarize({day, production:entries, downtime:avEntries, pairs:pairStatistics.getEntries()})});
+  });
+}
+document.getElementById('overviewBody').addEventListener('click', event => {
+  const tab = event.target.closest('[data-overview-tab]')?.dataset.overviewTab;
+  if (tab) document.querySelector(`[data-stats-tab="${tab}"]`).click();
+});
+setInterval(() => { if (!document.hidden && !periodPending) renderOverview(); }, 60000);
 
 let renderedStatisticsDay=statisticsDay(),statisticsDayRefreshing=false;
 async function refreshStatisticsDay(){

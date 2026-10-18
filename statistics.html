@@ -400,7 +400,17 @@
       <button id="statsTabWorkforce" role="tab" data-stats-tab="workforce" aria-controls="statsWorkforce" aria-selected="false" tabindex="-1">Състав и капацитет</button>
     </nav>
     <div class="stats-section" id="statsOverview" data-stats-panel="overview" role="tabpanel" aria-labelledby="statsTabOverview">
-      <p class="stats-overview-note">Изберете раздел за подробна статистика. Месечният резултат остава над всеки раздел.</p>
+      <section class="workforce-dashboard overview-stats" aria-labelledby="overviewTitle">
+        <div class="wf-head">
+          <div>
+            <div class="dashboard-eyebrow">Обзор</div>
+            <h2 class="wf-title" id="overviewTitle">Тонаж за денонощието</h2>
+            <div class="wf-subtitle" id="overviewDay"></div>
+          </div>
+          <div class="wf-head-right"><span class="status-chip neutral" id="overviewStatus">Няма данни</span></div>
+        </div>
+        <div id="overviewBody"></div>
+      </section>
     </div>
     <div id="statsBreakdownControls" hidden>
       <div class="view-toggle" aria-label="Разбивка по период">
@@ -619,6 +629,7 @@
 <script src="js/statistics-units.js"></script>
 <script src="js/statistics-cache.js"></script>
 <script src="js/pair-targets-statistics.js"></script>
+<script src="js/statistics-overview.js"></script>
 <script src="js/statistics-navigation.js"></script>
 <script src="js/statistics-helpers.js"></script>
 <script src="js/statistics-production.js"></script>
