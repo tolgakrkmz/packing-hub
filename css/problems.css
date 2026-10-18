@@ -1,0 +1,23 @@
+.problems-wrap{max-width:1500px}
+.problem-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:14px;overflow-x:auto;padding-bottom:12px;align-items:start}
+.problem-column{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.problem-column h2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;margin:2px 4px 4px}
+.problem-column>.task-muted{margin:4px}
+.tasks-wrap button.problem-card{display:block;width:100%;text-align:left;background:var(--panel);color:var(--text);font-weight:400;padding:14px}
+.problem-card:hover{border-color:var(--teal)}
+.problem-card h3{font-size:15px;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.problem-card .task-badges{margin:10px 0 0}
+.problem-card .task-meta{margin:8px 0 0;overflow-wrap:anywhere}
+.problem-detail{width:min(760px,calc(100% - 24px))}
+.problem-detail h3{font-size:16px;margin:22px 0 10px}
+.problem-fields{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:8px 16px;margin:16px 0}
+.problem-fields dt{color:var(--text-muted);font-size:13px}
+.problem-fields dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.problem-entry{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.problem-entry.is-accepted{border-color:var(--teal)}
+.problem-entry p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.problem-entry .task-badges{margin:0}
+.problem-entry .task-badges button{padding:5px 10px;min-height:32px;font-size:12px}
+.problem-history{margin-top:22px}
+.problem-history summary{cursor:pointer;font-weight:650;margin-bottom:10px}
+@media(max-width:650px){.problem-board{grid-auto-flow:row;grid-auto-columns:auto}.problem-fields{grid-template-columns:1fr;gap:2px}.problem-fields dd{margin-bottom:10px}}

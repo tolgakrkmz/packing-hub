@@ -55,6 +55,8 @@ function verifyDatabase(filename) {
       if (!row) throw failure('INVALID_ARCHIVE');
       validateData(kind, JSON.parse(row.data));
     }
+    // Problems are additive: older archives without the table still restore.
+    if (tables.has('problem_items')) for (const row of db.prepare('SELECT data FROM problem_items').iterate()) JSON.parse(row.data);
     for (const table of ['task_items', 'task_schedules']) {
       for (const row of db.prepare(`SELECT data FROM ${table}`).iterate()) JSON.parse(row.data);
     }

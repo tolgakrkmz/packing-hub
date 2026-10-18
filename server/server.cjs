@@ -11,6 +11,7 @@ const {canViewModule, pairRoster, workforceCounts} = require('./module-access.cj
 const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
+const {createProblems} = require('./problems.cjs');
 const {createStatisticsReads} = require('./statistics.cjs');
 const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
@@ -28,6 +29,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const avatars = createAccountAvatars(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const problems = createProblems(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
   const statistics = createStatisticsReads(store);
   const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
@@ -311,6 +313,19 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           }
           throw problem(405, 'METHOD_REJECTED');
         }
+        const problemRoute = pathname.match(/^\/api\/problems(?:\/([0-9a-f-]{36}))?$/);
+        if (problemRoute) {
+          if (!problemRoute[1] && request.method === 'GET') return json(response, 200, problems.list(currentUser()));
+          if (!problemRoute[1] && request.method === 'POST') {
+            const result = problems.create(await jsonBody(request, 65536), currentUser());
+            broadcast('problems', 0); return json(response, 201, result);
+          }
+          if (problemRoute[1] && request.method === 'PATCH') {
+            const input = await jsonBody(request, 65536), result = problems.change(problemRoute[1], input, revisionFor(request), currentUser());
+            broadcast('problems', 0); return json(response, 200, result);
+          }
+          throw problem(405, 'METHOD_REJECTED');
+        }
         if (pathname === '/api/pair-roster' || pathname === '/api/statistics/workforce') {
           if (!canViewModule(session.user, pathname === '/api/pair-roster' ? 'pair-targets' : 'statistics')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
@@ -455,7 +470,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(() => {}); }, 30000); notificationTick.unref();
   const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
   const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, tasks, maintenance, notifications, close};
+  return {server, store, auth, imports, tasks, problems, maintenance, notifications, close};
 }
 if (require.main === module) {
   process.umask(0o077);

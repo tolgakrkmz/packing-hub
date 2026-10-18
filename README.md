@@ -23,6 +23,7 @@
 - ⏱️ **Downtime** — causes, durations and line breakdowns.
 - 👥 **Teams & targets** — rotating shifts, packer pairs, goals and actual results.
 - ✅ **Shift tasks** — assignments, recurring plans, progress and approvals.
+- ✅ **Global problems** — board for issues outside the team's control: escalation, contact log, reply follow-up and accepted solutions.
 - 📦 **Packing instructions** — searchable profiles, folders and attachments.
 - 🔔 **Shared workspace** — live updates, account permissions and optional Web Push.
 

@@ -14,6 +14,7 @@
     {title: 'Инструкции', module: 'package-instructions', view: 'canViewInstructions', flags: {canViewInstructions: 'Преглед на инструкциите', canManageInstructions: 'Управление на инструкции и приложения'}},
     {title: 'Статистика', module: 'statistics', view: 'canViewStatistics', flags: {canViewStatistics: 'Преглед на статистиката'}},
     {title: 'Задачи', module: 'tasks', view: 'canViewTasks', flags: {canViewTasks: 'Преглед на „Задачи“', canAssignTasks: 'Може да възлага задачи', canReportTasks: 'Отчитане на собствени задачи', canManageTasks: 'Редакция, отмяна и повторно отваряне', canReviewTasks: 'Потвърждаване и връщане за работа'}},
+    {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Описване на проблеми и предложения', canManageProblems: 'Статус, ескалация, отговорник и приемане на решение'}},
     {title: 'Акаунти', module: 'accounts', view: 'canViewAccounts', flags: {canViewAccounts: 'Преглед на акаунтите и правата', canManageAccounts: 'Управление на акаунти и права'}},
     {title: 'Потребителска активност', module: 'activity-log', view: 'canViewActivity', flags: {canViewActivity: 'Преглед на потребителската активност'}},
     {title: 'Статус на системата', module: 'system-status', view: 'canViewSystemStatus', flags: {canViewSystemStatus: 'Преглед на статуса на системата', canBackupSystem: 'Създаване на архив'}},
@@ -27,8 +28,8 @@
     'line-downtime': {view: 'canViewDowntime', create: 'canCreateDowntime', edit: 'canEditDowntime', settings: 'canManageDowntimeSettings'},
     'pair-targets': {view: 'canViewPairs', create: 'canCreatePairs', edit: 'canEditPairs'}
   };
-  const shared = new Set(['canViewNotifications', ...Object.entries(notifications.types).filter(([key]) => key.startsWith('task')).map(([, type]) => type.flag), 'canExportReports', 'canViewProduction', 'canViewDowntime', 'canViewPairs', 'canViewInstructions']);
-  const creation = new Set(['canCreateReports', ...Object.values(reports).map(report => report.create)]);
+  const shared = new Set(['canViewNotifications', ...Object.entries(notifications.types).filter(([key]) => key.startsWith('task')).map(([, type]) => type.flag), 'canExportReports', 'canViewProduction', 'canViewDowntime', 'canViewPairs', 'canViewInstructions', 'canViewProblems']);
+  const creation = new Set(['canCreateReports', 'canCreateProblems', ...Object.values(reports).map(report => report.create)]);
   function initialRight(role, key) {
     if (key === 'canReportTasks') return false; // Inherited from the task profile below.
     if (role === 'admin' || shared.has(key)) return true;
