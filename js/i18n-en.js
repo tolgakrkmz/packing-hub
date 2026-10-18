@@ -1762,7 +1762,7 @@ Object.assign(HUB_EN_MESSAGES, {
   "Снимки към решението (по желание)": "Solution photos (optional)",
   "Добави снимки, които показват решението.": "Add photos that show the solution.",
   "Показва се, когато езикът е EN. Ако поле е празно, се показва българският текст.": "Shown when the language is EN. Empty fields fall back to the Bulgarian text.",
-  "На английски за срещите": "In English for meetings",
+  "Английски текст": "English text",
   "Заглавие (EN)": "Title (EN)",
   "Описание (EN)": "Description (EN)",
   "От кого зависи (EN)": "Depends on (EN)",
