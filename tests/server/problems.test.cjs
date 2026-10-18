@@ -82,3 +82,21 @@ test('problem and proposal photos are stored apart from tasks, readable by viewe
   assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: ['not-a-photo']}))).status, 400);
   assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: Array(11).fill(photo)}))).status, 400);
 });
+test('optional English versions are stored with the problem and proposals; only authors and managers translate proposals', async t => {
+  const s = await setup(t);
+  const id = await s.create(s.operator, s.payload({titleEn: 'Fictional pallet gap EN', descriptionEn: 'Fictional EN description', impactEn: 'Fictional 120 min', dependsOnEn: 'Fictional logistics EN'}));
+  let item = await s.find(id, s.observer);
+  assert.deepEqual([item.titleEn, item.descriptionEn, item.impactEn, item.dependsOnEn], ['Fictional pallet gap EN', 'Fictional EN description', 'Fictional 120 min', 'Fictional logistics EN']);
+  assert.equal((await s.change(id, s.other, {action: 'propose', text: 'Fictional BG idea', textEn: 'Fictional EN idea'}, 1)).status, 200);
+  assert.equal((await s.change(id, s.other, {action: 'propose', text: 'Fictional second idea'}, 2)).status, 200);
+  item = await s.find(id);
+  assert.deepEqual(item.proposals.map(entry => entry.textEn), ['Fictional EN idea', '']);
+  const second = item.proposals[1].id;
+  assert.equal((await s.change(id, s.operator, {action: 'translate', proposalId: second, textEn: 'Fictional'}, 3)).status, 403, 'problem author is not the proposal author');
+  assert.equal((await s.change(id, s.other, {action: 'translate', proposalId: second, textEn: 'Fictional second EN'}, 3)).status, 200);
+  assert.equal((await s.change(id, s.admin, {action: 'resolve'}, 4)).status, 200);
+  assert.equal((await s.change(id, s.admin, {action: 'translate', proposalId: second, textEn: 'Fictional admin EN'}, 5)).status, 200, 'resolved problems can still be prepared for meetings');
+  assert.equal((await s.change(id, s.admin, {action: 'translate', proposalId: 'missing', textEn: 'Fictional'}, 6)).status, 400);
+  assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({titleEn: 'x'.repeat(181)}))).status, 400);
+  assert.equal((await s.find(id)).proposals[1].textEn, 'Fictional admin EN');
+});

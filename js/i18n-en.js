@@ -1760,5 +1760,18 @@ Object.assign(HUB_EN_MESSAGES, {
   "Снимки (по желание)": "Photos (optional)",
   "Добави една или повече снимки на проблема.": "Add one or more photos of the problem.",
   "Снимки към решението (по желание)": "Solution photos (optional)",
-  "Добави снимки, които показват решението.": "Add photos that show the solution."
+  "Добави снимки, които показват решението.": "Add photos that show the solution.",
+  "На английски за срещите (по желание)": "In English for meetings (optional)",
+  "Показва се, когато езикът е EN. Ако поле е празно, се показва българският текст.": "Shown when the language is EN. Empty fields fall back to the Bulgarian text.",
+  "Заглавие (EN)": "Title (EN)",
+  "Описание (EN)": "Description (EN)",
+  "От кого зависи (EN)": "Depends on (EN)",
+  "Въздействие с цифри (EN)": "Impact in numbers (EN)",
+  "Предложение на английски (по желание)": "Proposal in English (optional)",
+  "Предложение на английски": "Proposal in English",
+  "Текст на английски": "English text",
+  "Само на български": "Bulgarian only",
+  "Промени английския текст": "Edit English text",
+  "+ Английски текст": "+ English text",
+  "Английски текст на предложение": "Proposal English text"
 });
