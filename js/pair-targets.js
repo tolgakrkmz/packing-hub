@@ -122,12 +122,12 @@
     $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false);
     if(editing)$('savePairBtn').disabled=busy||!!pairAccess&&!pairAccess.canSave(!!JSON.parse(editing.original||'null')?.result);
-    const goal = PairTargets.shiftGoal(entries.length), gap = goal-totalKg;
+    const goal = PairTargets.SHIFT_GOAL_KG, gap = goal-totalKg;
     $('shiftGoal').hidden = !pairsLoaded || !scheduled || !entries.length;
     $('shiftGoal').classList.toggle('reached',gap <= 0);
-    $('shiftGoalText').textContent = `Сбор на таргетите: ${fmt(totalKg/1000)} т / цел ${fmt(goal/1000)} т`+
-      (entries.length < PairTargets.FULL_SHIFT_PAIRS ? ` · непълен състав: ${entries.length} от ${PairTargets.FULL_SHIFT_PAIRS} двойки` : '')+
-      (gap > 0 ? ` · липсват ${fmt(gap/1000)} т` : ' · целта е покрита');
+    $('shiftGoalText').textContent = gap > 0
+      ? `Сбор на таргетите: ${fmt(totalKg/1000)} т от ${fmt(goal/1000)} т · липсват ${fmt(gap/1000)} т · ${fmt(goal/1000)} т ÷ ${entries.length} двойки = ${fmt(PairTargets.pairNorm(entries.length)/1000)} т на двойка`
+      : `Целта от ${fmt(goal/1000)} т за смяната е достигната · сбор ${fmt(totalKg/1000)} т`;
     $('equalizeBtn').hidden = !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false) || !PairTargets.equalize(entries,'').length;
     $('equalizeBtn').disabled = busy;
     $('pairsList').innerHTML = selected.map(entry => pairCard(entry,!scopeLinkError)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
@@ -323,9 +323,9 @@
     const selected = selectedEntries(), raised = PairTargets.equalize(selected,new Date().toISOString());
     if(!raised.length) return;
     const before = new Map(selected.map(entry => [entry.id,entry.targetKg]));
-    const goal = PairTargets.shiftGoal(selected.filter(entry => !entry.cancellation).length);
+    const goal = PairTargets.SHIFT_GOAL_KG;
     equalizing = {context:{...context},raised};
-    $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Изравняване до целта';
+    $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Повишение до 30 т';
     $('equalizeIntro').textContent = (reminder ? 'Всички свободни хора са разпределени. ' : '')+`Всяка неотчетена двойка получава +${fmt(raised[0].targetKg-before.get(raised[0].id))} кг, за да стигне смяната ${fmt(goal/1000)} т.`;
     $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг</li>`).join('');
     $('equalizeError').textContent = '';
@@ -361,7 +361,7 @@
     try {
       await sync.refreshFromDisk({fresh:true});
       for(const entry of fresh()) {
-        const result = await sync.commitOperation({reason:'Изравняване до целта на смяната',operationId:crypto.randomUUID(),action:'update',entryId:entry.id,entry,version:sync.recordVersion?.(entry.id)});
+        const result = await sync.commitOperation({reason:'Повишение до 30 т за смяната',operationId:crypto.randomUUID(),action:'update',entryId:entry.id,entry,version:sync.recordVersion?.(entry.id)});
         acceptPairs(result.data); done++;
       }
       busy = false; closeEqualize();
