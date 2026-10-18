@@ -12,7 +12,7 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
       throw error;
     }
   }).toBe(true);
-  async function plan(count, raise = false) {
+  async function plan(count) {
     await page.locator('#addPairBtn').click();
     await page.locator('#memberOne').selectOption(employees[0].id);
     await page.locator('#memberTwo').selectOption(employees[1].id);
@@ -22,27 +22,16 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
     await page.locator('#savePairBtn').click();
     await saved(data => data.entries.length === count);
     await expect(page.locator('#pairDialog')).not.toBeVisible();
-    // The last free people were paired below the 30 t shift goal, so the reminder offers to raise the target.
-    await expect(page.locator('#equalizeDialog')).toBeVisible();
-    await expect(page.locator('#equalizeList')).toContainText(/1\s?000 → 30\s?000 кг/);
-    if(raise) {
-      await page.locator('#equalizeSaveBtn').click();
-      await saved(data => data.entries[count-1].targetKg === 30000 && data.entries[count-1].targetCrates === 40);
-      await expect(page.locator('#shiftGoal')).toContainText('Целта от 30 т за смяната е достигната');
-      await expect(page.locator('#equalizeBtn')).toBeHidden();
-    } else {
-      await page.locator('#equalizeCancelBtn').click();
-      await expect(page.locator('#shiftGoalText')).toContainText(/липсват 29 т · средно 30 т на двойка/);
-      await expect(page.locator('#equalizeBtn')).toBeVisible();
-    }
+    // Стикери have no 30 t shift goal: no bar and no raise reminder.
     await expect(page.locator('#equalizeDialog')).not.toBeVisible();
+    await expect(page.locator('#shiftGoal')).toBeHidden();
   }
   await page.locator('#stickersShiftBtn').click();
   await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','true');
   await page.locator('#stickersShiftBtn').click();
   await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','false');
   await page.locator('#stickersShiftBtn').click();
-  await plan(1,true);
+  await plan(1);
   await checkReadOnly();
   const original = (await read()).entries[0];
   await page.locator('#pairsList [data-action=cancel]').click();

@@ -123,7 +123,7 @@
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false);
     if(editing)$('savePairBtn').disabled=busy||!!pairAccess&&!pairAccess.canSave(!!JSON.parse(editing.original||'null')?.result);
     const goal = PairTargets.SHIFT_GOAL_KG, gap = goal-totalKg;
-    $('shiftGoal').hidden = !pairsLoaded || !scheduled || !entries.length;
+    $('shiftGoal').hidden = !pairsLoaded || !scheduled || !entries.length || !PairTargets.hasShiftGoal(context.team);
     $('shiftGoal').classList.toggle('reached',gap <= 0);
     $('shiftGoalText').textContent = gap > 0
       ? `Сбор на таргетите: ${fmt(totalKg/1000)} т от ${fmt(goal/1000)} т · липсват ${fmt(gap/1000)} т · средно ${fmt(PairTargets.pairNorm(entries.length)/1000)} т на двойка`

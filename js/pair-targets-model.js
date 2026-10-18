@@ -128,11 +128,13 @@ const PairTargets = (() => {
       return [entry.id,{kg:entry.members.reduce((sum,person) => sum+(averages.get(person.id)?.kg > 0 ? averages.get(person.id).kg : fallback),0),known}];
     }));
   }
+  // Стикери work to their own plan, so the 30 t shift goal does not apply to them.
+  function hasShiftGoal(team) { return team !== 'СТИКЕРИ'; }
   // Splits what reported pairs leave of 30 t across the unreported pairs in proportion to their history.
   // A target the supervisor set higher is never lowered; the rest is shared by the others. Rounded up to 100 kg.
   function equalize(entries, now, history = []) {
     const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
-    if(active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG || !open.length) return [];
+    if(!open.length || !hasShiftGoal(open[0].team) || active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG) return [];
     const strength = pairStrengths(open,history);
     let remaining = SHIFT_GOAL_KG-active.filter(entry => entry.result).reduce((sum,entry) => sum+entry.targetKg,0), free = open, kept;
     do {
@@ -181,5 +183,5 @@ const PairTargets = (() => {
     });
     return data;
   }
-  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, HISTORY_SHIFTS, pairNorm, personAverages, pairStrengths, equalize};
+  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, HISTORY_SHIFTS, hasShiftGoal, pairNorm, personAverages, pairStrengths, equalize};
 })();
