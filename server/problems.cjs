@@ -89,7 +89,7 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
       } else if (input.action === 'translate') {
         const entry = item.proposals.find(value => value.id === input.proposalId);
         if (!entry) throw problem(400, 'INVALID_PROBLEM');
-        if (!manager(user) && entry.actor.id !== user.id) throw problem(403, 'FORBIDDEN');
+        if (!manager(user) && !(entry.actor.id === user.id && can(user, 'canCreateProblems'))) throw problem(403, 'FORBIDDEN');
         entry.textEn = text(input.textEn ?? '', 2000);
       } else if (input.action === 'resolve' || input.action === 'reopen') {
         if (!manager(user) && !author) throw problem(403, 'FORBIDDEN');
