@@ -105,13 +105,45 @@ const PairTargets = (() => {
   // Every shift aims for 30 t, split across the pairs the supervisor entered.
   const SHIFT_GOAL_KG = 30000;
   function pairNorm(pairCount) { return pairCount ? SHIFT_GOAL_KG/pairCount : 0; }
-  // Raises every unreported pair by the same amount, rounded up to 100 kg, so the shift sum reaches the goal.
-  function equalize(entries, now) {
+  const HISTORY_SHIFTS = 10, NOT_PEOPLE_REASONS = ['downtime','materials'];
+  // Average kg per person over their last 10 reported shifts; a pair result is split equally between its two people.
+  // Shifts lost to downtime or missing material are skipped because the people could not influence them.
+  function personAverages(history, scope) {
+    const shifts = new Map();
+    history.filter(entry => entry.result && !entry.cancellation && !NOT_PEOPLE_REASONS.includes(entry.result.reasonKey) && !(scope && inScope(entry,scope)))
+      .sort((a,b) => (b.date+b.shiftCode).localeCompare(a.date+a.shiftCode))
+      .forEach(entry => entry.members.forEach(person => {
+        const list = shifts.get(person.id) || [];
+        if(list.length < HISTORY_SHIFTS) shifts.set(person.id,[...list,entry.result.kg/entry.members.length]);
+      }));
+    return new Map([...shifts].map(([id,list]) => [id,{kg:list.reduce((sum,kg) => sum+kg,0)/list.length,shifts:list.length}]));
+  }
+  // Expected kg of each pair; people without history get the average of the known people in the same shift.
+  function pairStrengths(entries, history) {
+    const averages = personAverages(history,entries[0]);
+    const people = entries.flatMap(entry => entry.members.map(person => averages.get(person.id)?.kg)).filter(kg => kg > 0);
+    const fallback = people.length ? people.reduce((sum,kg) => sum+kg,0)/people.length : 1;
+    return new Map(entries.map(entry => {
+      const known = entry.members.every(person => averages.get(person.id)?.kg > 0);
+      return [entry.id,{kg:entry.members.reduce((sum,person) => sum+(averages.get(person.id)?.kg > 0 ? averages.get(person.id).kg : fallback),0),known}];
+    }));
+  }
+  // Splits what reported pairs leave of 30 t across the unreported pairs in proportion to their history.
+  // A target the supervisor set higher is never lowered; the rest is shared by the others. Rounded up to 100 kg.
+  function equalize(entries, now, history = []) {
     const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
-    const gap = SHIFT_GOAL_KG-active.reduce((sum,entry) => sum+entry.targetKg,0);
-    if(gap <= 0 || !open.length) return [];
-    const step = Math.ceil(gap/open.length/100)*100;
-    return open.map(entry => ({...entry, targetKg:entry.targetKg+step, updatedAt:now}));
+    if(active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG || !open.length) return [];
+    const strength = pairStrengths(open,history);
+    let remaining = SHIFT_GOAL_KG-active.filter(entry => entry.result).reduce((sum,entry) => sum+entry.targetKg,0), free = open, kept;
+    do {
+      const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
+      kept = free.filter(entry => remaining*strength.get(entry.id).kg/total <= entry.targetKg);
+      remaining -= kept.reduce((sum,entry) => sum+entry.targetKg,0);
+      free = free.filter(entry => !kept.includes(entry));
+    } while(kept.length && free.length);
+    const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
+    return free.map(entry => ({...entry, targetKg:Math.ceil(remaining*strength.get(entry.id).kg/total/100)*100, updatedAt:now}))
+      .filter(entry => entry.targetKg > open.find(item => item.id === entry.id).targetKg);
   }
   function validateData(data) {
     if(!data || data.module !== 'pair-targets' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) {
@@ -149,5 +181,5 @@ const PairTargets = (() => {
     });
     return data;
   }
-  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, pairNorm, equalize};
+  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, HISTORY_SHIFTS, pairNorm, personAverages, pairStrengths, equalize};
 })();

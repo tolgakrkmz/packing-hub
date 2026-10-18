@@ -184,16 +184,34 @@ test('cancelled pairs release members for reassignment but cannot be edited or r
   assert.throws(() => model.validateData({...data,entries:[{...entry,members:[entry.members[0],entry.members[0]]}]}));
   assert.throws(() => model.validateData({...data,entries:[{...entry,result:report().result}]}));
 });
-test('shift goal is always 30 t and equalize raises only unreported pairs equally',() => {
+test('shift goal is always 30 t and without history the rest is split equally across unreported pairs',() => {
   assert.equal(model.SHIFT_GOAL_KG,30000);
   assert.equal(model.pairNorm(4),7500);
   assert.equal(model.pairNorm(0),0);
-  const pair = (id,targetKg,extra = {}) => ({id,targetKg,result:null,...extra});
+  const pair = (id,targetKg,extra = {}) => ({id,date,shiftCode:1,team,members:[{id:id+'1'},{id:id+'2'}],targetKg,result:null,...extra});
   const entries = [pair('a',4000),pair('b',3000),pair('c',5000,{result:{kg:5000}}),pair('d',9000,{cancellation:{}}),pair('e',3050)];
-  // Active sum 15050, gap 14950 over 3 open pairs -> 4983.3, rounded up to 5000 each.
+  // 30000 - 5000 reported = 25000 over 3 open pairs -> 8333.3, rounded up to 8400 each.
   const raised = model.equalize(entries,'2026-10-04T08:00:00Z');
-  assert.deepEqual(plain(raised.map(entry => [entry.id,entry.targetKg])),[['a',9000],['b',8000],['e',8050]]);
+  assert.deepEqual(plain(raised.map(entry => [entry.id,entry.targetKg])),[['a',8400],['b',8400],['e',8400]]);
   assert.ok(raised.every(entry => entry.updatedAt === '2026-10-04T08:00:00Z'));
   assert.deepEqual(plain(model.equalize([pair('a',15000),pair('b',15000)],'x')),[]);
   assert.deepEqual(plain(model.equalize([pair('a',1000,{result:{kg:1}})],'x')),[]);
+});
+test('history raises each pair in proportion to its people, keeps higher targets and skips downtime',() => {
+  const shift = (day,shiftCode,ids,kg,reasonKey = '') => ({id:'h'+day+shiftCode+ids,date:'2026-09-'+String(day).padStart(2,'0'),shiftCode,team,members:ids.map(id => ({id})),targetKg:1,result:{kg,reasonKey}});
+  const history = [shift(1,1,['p1','p2'],8000),shift(2,1,['p3','p4'],4000),shift(3,1,['p3','p4'],0,'downtime'),shift(4,1,['p3','p4'],0,'materials'),shift(5,1,['p3','p4'],4000,'quality')];
+  const now = (members,targetKg) => ({id:members.join(''),date,shiftCode:1,team,members:members.map(id => ({id})),targetKg,result:null});
+  const kg = list => plain(list.map(entry => [entry.id,entry.targetKg]));
+  // Strengths 8000 and 4000 -> 30 t split 2:1.
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000)],'x',history)),[['p1p2',20000],['p3p4',10000]]);
+  // Newcomers get the average of the known people in the shift (3000 each) -> strengths 8000, 4000, 6000.
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000),now(['p5','p6'],1000)],'x',history)),[['p1p2',13400],['p3p4',6700],['p5p6',10000]]);
+  const strengths = model.pairStrengths([now(['p1','p2'],1),now(['p1','p6'],1)],history);
+  assert.deepEqual(plain([...strengths.values()]),[{kg:8000,known:true},{kg:8000,known:false}]);
+  // A supervisor target above the share stays; the others share the rest 8:6.
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],12000),now(['p5','p6'],1000)],'x',history)),[['p1p2',10300],['p5p6',7800]]);
+  // Only the latest 10 shifts count, and the current shift is never history.
+  const many = [...Array(12)].map((_,index) => shift(index+1,2,['p7','p8'],index < 2 ? 20000 : 2000));
+  assert.deepEqual(plain(model.personAverages(many).get('p7')),{kg:1000,shifts:10});
+  assert.equal(model.personAverages([{...many[0],date,shiftCode:1}],{date,shiftCode:1,team}).size,0);
 });
