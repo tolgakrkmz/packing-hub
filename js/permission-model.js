@@ -14,7 +14,7 @@
     {title: 'Инструкции', module: 'package-instructions', view: 'canViewInstructions', flags: {canViewInstructions: 'Преглед на инструкциите', canManageInstructions: 'Управление на инструкции и приложения'}},
     {title: 'Статистика', module: 'statistics', view: 'canViewStatistics', flags: {canViewStatistics: 'Преглед на статистиката'}},
     {title: 'Задачи', module: 'tasks', view: 'canViewTasks', flags: {canViewTasks: 'Преглед на „Задачи“', canAssignTasks: 'Може да възлага задачи', canReportTasks: 'Отчитане на собствени задачи', canManageTasks: 'Редакция, отмяна и повторно отваряне', canReviewTasks: 'Потвърждаване и връщане за работа'}},
-    {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Описване на проблеми и предложения', canManageProblems: 'Статус, ескалация, отговорник и приемане на решение'}},
+    {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Записване на проблеми и предложения', canManageProblems: 'Редакция и решаване на всички проблеми'}},
     {title: 'Акаунти', module: 'accounts', view: 'canViewAccounts', flags: {canViewAccounts: 'Преглед на акаунтите и правата', canManageAccounts: 'Управление на акаунти и права'}},
     {title: 'Потребителска активност', module: 'activity-log', view: 'canViewActivity', flags: {canViewActivity: 'Преглед на потребителската активност'}},
     {title: 'Статус на системата', module: 'system-status', view: 'canViewSystemStatus', flags: {canViewSystemStatus: 'Преглед на статуса на системата', canBackupSystem: 'Създаване на архив'}},

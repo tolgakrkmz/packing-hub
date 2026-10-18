@@ -133,7 +133,7 @@ const HubServer = (() => {
   Object.assign(messages, {AVATAR_INVALID: 'Снимката не е валидна. Избери друга снимка.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
-  Object.assign(messages, {INVALID_PROBLEM: 'Провери полетата на проблема.', INVALID_PROBLEM_DATE: 'Избери валидна дата. Контактът не може да е в бъдещето.', INVALID_PROBLEM_OWNER: 'Избери активен акаунт с достъп до „Глобални проблеми“.', PROBLEM_ESCALATION_INCOMPLETE: 'За ескалация са нужни: от кого зависи, нашето искане, наш отговорник и следващ контакт.', PROBLEM_REASON: 'Добави причина или бележка.', PROBLEM_STATE: 'Проблемът е затворен. Отвори го отново със смяна на статус.'});
+  Object.assign(messages, {INVALID_PROBLEM: 'Провери полетата на проблема.', PROBLEM_STATE: 'Проблемът е променен. Опресни таблото.'});
   async function request(url, options = {}) {
     const headers = {...options.headers};
     if (options.method && options.method !== 'GET') headers['X-CSRF-Token'] = boot.csrf;

@@ -29,7 +29,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const avatars = createAccountAvatars(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
-  const problems = createProblems(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {})});
+  const problems = createProblems(store, taskNow ? {now: taskNow} : {});
   const statistics = createStatisticsReads(store);
   const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();

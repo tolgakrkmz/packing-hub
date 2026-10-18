@@ -14,32 +14,19 @@
 </head>
 <body>
 <main class="wrap tasks-wrap problems-wrap">
-<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Глобални проблеми</h1><p>Проблеми извън нашия контрол: описваме, ескалираме и следим до доказано решение.</p></div><button id="newProblem" type="button" hidden>+ Опиши проблем</button></header>
+<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Глобални проблеми</h1><p>Проблеми извън нашия контрол и решенията, които предлагаме.</p></div><button id="newProblem" type="button" hidden>+ Запиши проблем</button></header>
 <p id="problemMessage" role="status" aria-live="polite"></p>
-<section id="problemOverview" class="task-overview" aria-label="Обобщение"></section>
-<div class="task-toolbar"><label>Търсене<input id="problemSearch" type="search" placeholder="Търси проблем…"></label><label>Категория<select id="categoryFilter"><option value="">Всички категории</option></select></label><label>Показване<select id="focusFilter"><option value="">Всички отворени</option><option value="attention">Изискват внимание</option><option value="mine">Моите за проследяване</option><option value="closed">Отложени и отхвърлени</option></select></label><button id="refreshProblems" type="button" class="secondary">Опресни</button></div>
+<div class="task-toolbar"><label>Търсене<input id="problemSearch" type="search" placeholder="Търси проблем…"></label><button id="refreshProblems" type="button" class="secondary">Опресни</button></div>
 <section id="problemBoard" class="problem-board" aria-live="polite"></section>
-<p class="task-help">„Изискват внимание“: минал е денят за следващ контакт или обещаният от отговорните срок. Дните без контакт се броят от последния запис в дневника или от ескалацията.</p>
 <dialog id="problemEditor" class="task-dialog">
-<form id="problemForm"><div class="dialog-heading"><h2 id="editorTitle">Опиши проблем</h2><button type="button" data-close="problemEditor" class="secondary" aria-label="Затвори">×</button></div>
+<form id="problemForm"><div class="dialog-heading"><h2 id="editorTitle">Запиши проблем</h2><button type="button" data-close="problemEditor" class="secondary" aria-label="Затвори">×</button></div>
 <label>Заглавие<input id="problemTitle" required maxlength="180"></label>
-<div class="task-fields"><label>Линия / зона<input id="problemArea" maxlength="120"></label><label>Категория<select id="problemCategory" required></select></label></div>
-<label>Описание: какво, къде, от кога, колко често<textarea id="problemDescription" maxlength="4000" rows="4"></textarea></label>
-<div class="task-fields"><label>Въздействие<select id="problemImpactLevel" required><option value="low">Ниско</option><option value="medium" selected>Средно</option><option value="high">Високо</option></select></label><label>Въздействие с цифри<input id="problemImpact" maxlength="1000" placeholder="напр. минути престой, брак, засегнати смени"></label></div>
-<label>Основна причина<textarea id="problemRootCause" maxlength="2000" rows="2"></textarea></label>
-<fieldset><legend>Ескалация</legend>
-<div class="task-fields"><label>Зависи от (отдел / външна страна)<input id="problemDependsOn" maxlength="160"></label><label>Лице за контакт<input id="problemContact" maxlength="160"></label></div>
-<label>Нашето искане към тях<textarea id="problemRequest" maxlength="2000" rows="2"></textarea></label>
-</fieldset>
-<p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button id="saveProblem" type="submit">Запази</button><button type="button" data-close="problemEditor" class="secondary">Отказ</button></div>
+<label>Описание<textarea id="problemDescription" maxlength="4000" rows="4"></textarea></label>
+<div class="task-fields"><label>Въздействие<select id="problemImpactLevel" required><option value="low">Ниско</option><option value="medium" selected>Средно</option><option value="high">Високо</option></select></label><label>От кого зависи<input id="problemDependsOn" maxlength="160" placeholder="отдел или външна страна"></label></div>
+<label>Въздействие с цифри<input id="problemImpact" maxlength="1000" placeholder="напр. минути престой, брак, засегнати смени"></label>
+<p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Запази</button><button type="button" data-close="problemEditor" class="secondary">Отказ</button></div>
 </form></dialog>
-<dialog id="problemDetail" class="task-dialog problem-detail"><div class="dialog-heading"><h2 id="detailTitle" translate="no"></h2><button type="button" data-close="problemDetail" class="secondary" aria-label="Затвори">×</button></div><div id="detailContent"></div></dialog>
-<dialog id="problemAction" class="task-dialog">
-<form id="actionForm"><div class="dialog-heading"><h2 id="actionTitle"></h2><button type="button" data-close="problemAction" class="secondary" aria-label="Затвори">×</button></div><p id="actionProblemTitle" translate="no"></p>
-<section id="statusFields"><label>Статус<select id="actionStatus"></select></label><div class="task-fields"><label>Наш отговорник за проследяване<select id="actionOwner"></select></label><label>Следващ контакт<input id="actionNextContact" type="date"></label></div><p>За „Ескалиран“ са нужни: от кого зависи, нашето искане, отговорник и следващ контакт.</p></section>
-<section id="proposalFields"><label>Предложено решение<textarea id="proposalText" maxlength="2000" rows="4"></textarea></label><label>Усилие<select id="proposalEffort"><option value="S">Малко (S)</option><option value="M">Средно (M)</option><option value="L">Голямо (L)</option></select></label></section>
-<section id="contactFields"><div class="task-fields"><label>Дата на контакта<input id="contactDate" type="date"></label><label>С кого<input id="contactWith" maxlength="160"></label></div><div class="task-fields"><label>Обещан срок от тях<input id="contactPromised" type="date"></label><label>Следващ контакт<input id="contactNext" type="date"></label></div></section>
-<label id="actionNoteLabel">Бележка<textarea id="actionNote" maxlength="4000" rows="3"></textarea></label>
-<p id="actionFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Запази</button><button type="button" data-close="problemAction" class="secondary">Отказ</button></div>
-</form></dialog>
+<dialog id="problemDetail" class="task-dialog problem-detail"><div class="dialog-heading"><h2 id="detailTitle" translate="no"></h2><button type="button" data-close="problemDetail" class="secondary" aria-label="Затвори">×</button></div><div id="detailContent"></div>
+<form id="proposalForm"><label>Предложи решение<textarea id="proposalText" required maxlength="2000" rows="3"></textarea></label><p id="proposalFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Добави предложение</button></div></form>
+</dialog>
 </main></body></html>
