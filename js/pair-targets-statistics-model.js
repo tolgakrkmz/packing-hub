@@ -41,7 +41,29 @@ const PairTargetsStatistics = (() => {
         (PairTargets.REASONS.some(item => item.key === entry.result.reasonKey) ? entry.result.reasonKey : 'other') === reason.key);
       return {...reason, entries: records, count: records.length};
     }).filter(group => group.count).sort((a, b) => b.count - a.count);
-    return {entries: selected, teams, reasons, ...summarize(selected)};
+    return {entries: selected, teams, reasons, rankings: rankings(selected), ...summarize(selected)};
   }
-  return {summarize, aggregate};
+  // Top 5 lists for analysis: worst first by success rate, then by tonnage execution.
+  function rankings(entries, limit = 5) {
+    const groups = new Map(), people = new Map();
+    const add = (map, key, name, entry) => { if (!map.has(key)) map.set(key, {key, name, entries: []}); map.get(key).entries.push(entry); };
+    for (const entry of entries) {
+      if (entry.cancellation || PairTargets.status(entry) === 'pending') continue;
+      const members = entry.members.slice().sort((a, b) => a.id.localeCompare(b.id));
+      add(groups, members.map(person => person.id).join('+'), members.map(person => person.name).join(' + '), entry);
+      for (const person of entry.members) add(people, person.id, person.name, entry);
+    }
+    const rows = map => Array.from(map.values(), group => ({...group, ...summarize(group.entries)}));
+    const worse = (a, b) => a.successPct - b.successPct || a.kgPct - b.kgPct || b.reported - a.reported || a.name.localeCompare(b.name);
+    const worst = map => rows(map).filter(row => row.missed).sort(worse).slice(0, limit);
+    const worstPairs = worst(groups), shown = new Set(worstPairs.map(row => row.key));
+    // A pair is never listed as both worst and best when there are few pairs.
+    return {
+      worstPairs,
+      worstPeople: worst(people),
+      bestPairs: rows(groups).filter(row => row.achieved && !shown.has(row.key))
+        .sort((a, b) => b.successPct - a.successPct || b.kgPct - a.kgPct || b.reported - a.reported || a.name.localeCompare(b.name)).slice(0, limit)
+    };
+  }
+  return {summarize, aggregate, rankings};
 })();

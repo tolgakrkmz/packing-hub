@@ -186,7 +186,7 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
     await expect(cards.nth(5).locator('.val')).toHaveText('1,2 ' + unit);
     await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(2)).toHaveText('1,2 / 1,3');
     await expect(page.locator('#pairStatsBody details[data-group="team-А"] td').nth(3)).toHaveText('44 / 40');
-    await expect(page.locator('#pairStatsBody details[data-group=analysis] > .pair-stats-scroll td').nth(4)).toHaveText('1,2');
+    await expect(page.locator('#pairStatsBody .ps-team[data-team="А"]')).toContainText('1,2 ' + unit);
     await expect(page.locator('#pairStatsHint')).not.toContainText(/килограм|kilogram/i);
 
     await page.locator('[data-stats-tab=workforce]').click();

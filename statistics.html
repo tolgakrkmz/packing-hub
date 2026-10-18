@@ -515,18 +515,19 @@
 
     </div>
     <div class="stats-section" id="statsPairs" data-stats-panel="pairs" role="tabpanel" aria-labelledby="statsTabPairs" hidden>
-    <section class="panel pair-stats" aria-labelledby="pairStatsTitle">
-      <div class="pair-stats-head">
+    <section class="workforce-dashboard pair-stats" aria-labelledby="pairStatsTitle">
+      <div class="wf-head">
         <div>
-          <h2 id="pairStatsTitle">Двойки и таргети — месечен отчет</h2>
-          <p class="conn-note" id="pairStatsPeriod"></p>
-          <a href="pair-targets.html">Отвори „Двойки и таргети“ →</a>
+          <div class="dashboard-eyebrow">Двойки и таргети</div>
+          <h2 class="wf-title" id="pairStatsTitle">Изпълнение на таргетите по двойки</h2>
+          <div class="wf-subtitle"><span id="pairStatsPeriod"></span> · <a href="pair-targets.html">Отвори „Двойки и таргети“ →</a></div>
         </div>
-        <div class="pair-stats-filters">
+        <div class="wf-head-right pair-stats-filters">
           <label for="pairStatsTeam">Екип<select class="dashboard-select" id="pairStatsTeam"></select></label>
+          <span class="status-chip neutral" id="pairStatsStatus">Няма данни</span>
         </div>
       </div>
-      <p class="conn-note" id="pairStatsHint"></p>
+      <p class="wf-subtitle pair-stats-hint" id="pairStatsHint"></p>
       <div id="pairStatsBody"></div>
     </section>
 

@@ -30,6 +30,18 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     }).join('')}</tbody></table></div>`;
   }
 
+  const tone = value => value === null ? 'neutral' : value >= 80 ? 'good' : value >= 50 ? 'warn' : 'bad';
+  const bar = (value, cls) => `<div class="ps-bar ${cls}" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, value || 0))}%"></span></div>`;
+  function rankingCard(title, sub, rows, cls, empty = 'Няма отчети за класиране.') {
+    const list = rows.length ? `<ol class="ps-rank">${rows.map((row, index) => `<li>
+      <span class="ps-rank-no ${cls}">${index + 1}</span>
+      <div class="ps-rank-main"><div class="ps-rank-name" translate="no">${escape(row.name)}</div>
+      <div class="ps-rank-meta">Постигнати: ${row.achieved} / ${row.reported} · Тонаж ${pct(row.kgPct)} (${fmtTons(row.actualKg)} / ${fmtTons(row.reportedTargetKg)} т)</div>
+      ${bar(row.successPct, tone(row.successPct))}</div>
+      <div class="ps-rank-val ${cls}">${pct(row.successPct)}<small>успеваемост</small></div></li>`).join('')}</ol>` : `<div class="ps-empty">${empty}</div>`;
+    return `<div class="wf-card"><div class="wf-card-title">${title}</div><div class="wf-card-sub">${sub}</div>${list}</div>`;
+  }
+
   function render() {
     cache.update('dashboard', [data, loaded], getPeriod() + '|' + $('pairStatsTeam').value, renderDashboard);
   }
@@ -45,30 +57,46 @@ function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onData
     const team = $('pairStatsTeam').value;
     const result = cache.get('pairs', [data], selectedMonth + '|' + team, () => PairTargetsStatistics.aggregate(data.entries, selectedMonth, team));
     if (!result.planned && !result.cancelled) {
+      $('pairStatsStatus').className = 'status-chip neutral';
+      $('pairStatsStatus').textContent = 'Няма данни';
       $('pairStatsBody').innerHTML = `<div class="empty">${!loaded ? globalThis.HUB_SERVER_BOOT ? 'Данните за двойките още не са заредени.' : 'Няма свързан файл за двойките.' : 'Няма двойки за избрания месец и екип.'}</div>`;
       return;
     }
-    const card = (label, value, sub) => `<div class="kpi-card"><div class="lab">${label}</div><div class="val">${value}</div><div class="sub">${sub}</div></div>`;
+    const card = (label, value, sub, cls = '') => `<div class="wf-kpi kpi-card ${cls}"><div class="lab">${label}</div><div class="val">${value}</div><div class="sub">${sub}</div></div>`;
     const details = (key, summary, body) => `<details data-group="${escape(key)}"${openGroups.has(key) ? ' open' : ''}><summary>${summary}</summary>${body}</details>`;
-    $('pairStatsBody').innerHTML = `<div class="pair-stats-kpis">
-      ${card('Планирани двойки', fmt(result.planned), `Отчетени: ${result.reported} · Очакват отчет: ${result.pending}`)}
-      ${result.cancelled ? card('Отменени двойки', fmt(result.cancelled), 'Отменените таргети не участват в плана и изпълнението.') : ''}
-      ${card('Постигнати таргети', pct(result.successPct), `Постигнати: ${result.achieved} · Непостигнати: ${result.missed}<br>И двете цели трябва да са изпълнени.`)}
-      ${card('Изпълнение · тонове', pct(result.kgPct), `${fmtTons(result.actualKg)} / ${fmtTons(result.reportedTargetKg)} т по отчетените двойки<br>Общ план: ${fmtTons(result.plannedKg)} т`)}
-      ${card('Изпълнение · каси', pct(result.cratesPct), `${fmt(result.actualCrates)} / ${fmt(result.reportedTargetCrates)} каси по отчетените двойки<br>Общ план: ${fmt(result.plannedCrates)} каси`)}
-      ${card('Недостиг по отчетите', fmtTons(result.deficitKg) + ' т', `${fmt(result.deficitCrates)} каси<br>Сбор на недостига на всяка двойка; преизпълнението не го компенсира.`)}
+    const success = tone(result.successPct);
+    $('pairStatsStatus').className = 'status-chip ' + success;
+    $('pairStatsStatus').textContent = result.reported ? `${result.achieved} от ${result.reported} постигнати` : 'Няма отчети';
+    const {worstPairs, worstPeople, bestPairs} = result.rankings;
+    $('pairStatsBody').innerHTML = `<div class="wf-kpis pair-stats-kpis">
+      ${card('Планирани двойки', fmt(result.planned), `Отчетени: ${result.reported} · Очакват отчет: ${result.pending}${result.cancelled ? `<br>Отменени двойки: ${result.cancelled}` : ''}`)}
+      ${card('Постигнати таргети', pct(result.successPct), `Постигнати: ${result.achieved} · Непостигнати: ${result.missed}<br>И двете цели трябва да са изпълнени.`, 'emphasis ' + success)}
+      ${card('Изпълнение · тонове', pct(result.kgPct), `${fmtTons(result.actualKg)} / ${fmtTons(result.reportedTargetKg)} т по отчетените двойки<br>Общ план: ${fmtTons(result.plannedKg)} т`, tone(result.kgPct))}
+      ${card('Изпълнение · каси', pct(result.cratesPct), `${fmt(result.actualCrates)} / ${fmt(result.reportedTargetCrates)} каси по отчетените двойки<br>Общ план: ${fmt(result.plannedCrates)} каси`, tone(result.cratesPct))}
+      ${card('Недостиг по отчетите', fmtTons(result.deficitKg) + ' т', `${fmt(result.deficitCrates)} каси · преизпълнението не го компенсира.`, result.deficitKg ? 'bad' : 'good')}
       ${card('Средно / отчетена двойка', result.averageKg === null ? '—' : fmtTons(result.averageKg) + ' т', 'Средно количество за отчетена двойка и смяна.')}
     </div>
-    <details class="stats-details" data-group="analysis"${openGroups.has('analysis') ? ' open' : ''}>
-    <summary>Покажи сравнение по екипи и причини</summary>
-    <h3>Сравнение по екипи</h3>
-    <div class="pair-stats-scroll"><table class="stats-table"><thead><tr><th>Екип</th><th>План / отчети / чакащи</th><th>Постигнати / отчети</th><th>Успеваемост</th><th>Реално (т)</th><th>Изпълнение по тонаж</th><th>Реално каси</th><th>Изпълнение каси</th></tr></thead><tbody>${result.teams.map(group => `<tr><td>${escape(group.team)}</td><td class="num">${group.planned} / ${group.reported} / ${group.pending}</td><td class="num">${group.achieved} / ${group.reported}</td><td class="num">${pct(group.successPct)}</td><td class="num">${fmtTons(group.actualKg)}</td><td class="num">${pct(group.kgPct)}</td><td class="num">${fmt(group.actualCrates)}</td><td class="num">${pct(group.cratesPct)}</td></tr>`).join('')}</tbody></table></div>
-    <h3>Причини за неизпълнение</h3>
-    <p class="conn-note">Дял от ${result.missed} непостигнати отчета. Това са посочените причини, а не измерени минути престой.</p>
-    ${result.reasons.length ? result.reasons.map(reason => details('reason-' + reason.key, `<div class="pair-reason-title"><span>${escape(reason.label)}</span><strong>${reason.count} · ${pct(reason.count / result.missed * 100)}</strong></div><div class="pair-reason-bar" aria-hidden="true"><span style="width:${reason.count / result.missed * 100}%"></span></div>`, reportsTable(reason.entries))).join('') : '<div class="conn-note">Няма отчетени непостигнати таргети.</div>'}
-    </details>
-    <h3>Двойки и отчети</h3>
-    ${result.teams.map(group => details('team-' + group.team, `Екип ${escape(group.team)} · ${group.planned} двойки · ${group.pending} очакват отчет${group.cancelled ? ' · '+group.cancelled+' отменени' : ''}`, reportsTable(group.entries))).join('')}`;
+    <div class="ps-content">
+    <div class="ps-grid ps-rankings">
+      ${rankingCard('Топ 5 несправили се двойки', 'Най-ниска успеваемост, после най-нисък тонаж спрямо целта.', worstPairs, 'bad')}
+      ${rankingCard('Топ 5 несправили се хора', 'Всеки човек поотделно, по всички двойки, в които е участвал.', worstPeople, 'bad')}
+      ${rankingCard('Топ 5 най-добри двойки', 'Най-висока успеваемост, после най-висок тонаж спрямо целта.', bestPairs, 'good', 'Няма други двойки с постигнат таргет.')}
+    </div>
+    <div class="ps-grid ps-analysis">
+      <div class="wf-card"><div class="wf-card-title">Сравнение по екипи</div><div class="wf-card-sub">Успеваемост и изпълнение по тонаж за всеки екип.</div>
+        <div class="ps-teams">${result.teams.map(group => `<div class="ps-team" data-team="${escape(group.team)}">
+          <div class="ps-team-head"><b>Екип ${escape(group.team)}</b><span class="status-chip ${tone(group.successPct)}">${pct(group.successPct)}</span></div>
+          <div class="ps-team-meta">Постигнати: ${group.achieved} / ${group.reported} · Очакват отчет: ${group.pending}</div>
+          ${bar(group.successPct, tone(group.successPct))}
+          <div class="ps-team-nums"><span>Тонаж <b>${fmtTons(group.actualKg)} т · ${pct(group.kgPct)}</b></span><span>Каси <b>${fmt(group.actualCrates)} · ${pct(group.cratesPct)}</b></span></div>
+        </div>`).join('')}</div></div>
+      <div class="wf-card"><div class="wf-card-title">Причини за неизпълнение</div><div class="wf-card-sub">Дял от ${result.missed} непостигнати отчета. Това са посочените причини, а не измерени минути престой.</div>
+        ${result.reasons.length ? result.reasons.map(reason => details('reason-' + reason.key, `<div class="pair-reason-title"><span>${escape(reason.label)}</span><strong>${reason.count} · ${pct(reason.count / result.missed * 100)}</strong></div>${bar(reason.count / result.missed * 100, 'warn')}`, reportsTable(reason.entries))).join('') : '<div class="ps-empty">Няма отчетени непостигнати таргети.</div>'}
+      </div>
+    </div>
+    <div class="wf-card"><div class="wf-card-title">Двойки и отчети</div><div class="wf-card-sub">Всички отчети по екипи. Отвори екип, за да видиш всяка двойка и причината.</div>
+    ${result.teams.map(group => details('team-' + group.team, `Екип ${escape(group.team)} · ${group.planned} двойки · ${group.pending} очакват отчет${group.cancelled ? ' · '+group.cancelled+' отменени' : ''}`, reportsTable(group.entries))).join('')}
+    </div></div>`;
   }
   return {
     init() { if (!started) { started = true; sync.init(); } render(); },

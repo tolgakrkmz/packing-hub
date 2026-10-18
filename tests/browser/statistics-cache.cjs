@@ -36,13 +36,13 @@ async function exerciseStatisticsCache({page, expect, replaceSource}) {
     if (getMonthlyDashboardData() !== window.__statisticsMemo.monthly || aggregateByMonth('2026') !== window.__statisticsMemo.annual) throw new Error('Fictional calculations were not reused');
   });
   await page.locator('[data-stats-tab=pairs]').click();
-  await page.locator('#pairStatsBody [data-group=analysis] > summary').click();
+  await page.locator('#pairStatsBody details[data-group^="team-"] > summary').first().click();
   const production = data['production-log'];
   production.entries[0] = {...production.entries[0], tonnage:3000, brak:270, breakdown:{autoKg:2000, autoCrates:80, manKg:1000, manCrates:40}};
   await remember(); await replaceSource('production-log', production);
   await expect(page.locator('#dashboardActual')).toHaveText('4 т');
   await expect(page.locator('#dashboardBrak')).toHaveText('0,4 т');
-  await expect(page.locator('#pairStatsBody [data-group=analysis]')).toHaveAttribute('open', '');
+  await expect(page.locator('#pairStatsBody details[data-group^="team-"]').first()).toHaveAttribute('open', '');
   await retained({chartContainer:false, tableContainer:false, monthlyTrendChart:false, lineShiftContainer:false, wfCapacityChart:false, pairStatsBody:true, avTableContainer:true});
   assert.equal(await page.evaluate(() => getMonthlyDashboardData() !== window.__statisticsMemo.monthly && aggregateByMonth('2026') !== window.__statisticsMemo.annual), true);
   const personnel = data.personnel;
@@ -60,7 +60,7 @@ async function exerciseStatisticsCache({page, expect, replaceSource}) {
   await remember(); await replaceSource('pair-targets', pairs);
   await expect(page.locator('#pairStatsBody')).toContainText('2 / 1');
   await retained({chartContainer:true, tableContainer:true, monthlyTrendChart:true, lineShiftContainer:true, wfCapacityChart:true, pairStatsBody:false, avTableContainer:true});
-  await expect(page.locator('#pairStatsBody [data-group=analysis]')).toHaveAttribute('open', '');
+  await expect(page.locator('#pairStatsBody details[data-group^="team-"]').first()).toHaveAttribute('open', '');
   await page.locator('#pairStatsTeam').selectOption('Б');
   await expect(page.locator('#pairStatsBody')).toContainText('Няма двойки');
   await page.locator('#pairStatsTeam').selectOption('');

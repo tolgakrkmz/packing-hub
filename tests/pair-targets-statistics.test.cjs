@@ -133,3 +133,20 @@ test('read-only dashboard loads independently, preserves filters, rejects invali
   controls.get('pairStatsTeam').listeners.change();
   assert.match(controls.get('pairStatsBody').innerHTML, /Няма двойки за избрания/);
 });
+test('rankings list worst pairs, worst people and best pairs from reported entries', () => {
+  const pair = (id, a, b, overrides) => entry(id, {members:[{id:a, name:'Демо '+a}, {id:b, name:'Демо '+b}], ...overrides});
+  const result = model.aggregate([
+    pair('p1', 'x', 'y', {result:output(50,5,'materials')}),
+    pair('p2', 'y', 'x', {result:output(100,10)}),
+    pair('p3', 'x', 'z', {result:output(90,9,'downtime')}),
+    pair('p4', 'w', 'v', {result:output(120,12)}),
+    pair('p5', 'w', 'v'),
+    pair('p6', 'w', 'z', {cancellation:{reasonKey:'cleaning',reasonText:'',cancelledAt:'2026-10-04T07:00:00Z'}})
+  ], '2026-10').rankings;
+  assert.deepEqual(plain(result.worstPairs.map(row => [row.name, row.reported, row.missed])), [['Демо x + Демо z',1,1], ['Демо x + Демо y',2,1]]);
+  assert.deepEqual(plain(result.worstPeople.map(row => row.key)), ['z','x','y']);
+  assert.deepEqual(plain(result.bestPairs.map(row => row.name)), ['Демо v + Демо w']);
+  const many = Array.from({length:7}, (_, index) => pair('m'+index, 'a'+index, 'b'+index, {result:output(index,1,'other')}));
+  assert.equal(model.rankings(many).worstPairs.length, 5);
+  assert.equal(model.rankings(many).worstPairs[0].key, 'a0+b0');
+});
