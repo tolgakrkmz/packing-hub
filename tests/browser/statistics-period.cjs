@@ -169,7 +169,8 @@ async function exerciseStatisticsUnits({page, expect, replaceSources, screenshot
     await expect(page.locator('#kpiRow .prod-brak .val')).toHaveText('0 ' + unit);
     await expect(page.locator('#lineShiftSummary .prod-line.auto .v')).toHaveText('1 ' + unit);
     await expect(page.locator('#lineShiftSummary .prod-line.manual .v')).toHaveText('0,3 ' + unit);
-    await expect(page.locator('#prodTeamShare .prod-team')).not.toHaveCount(0);
+    await expect(page.locator('#prodTeamShare .prod-team')).toHaveCount(2);
+    await expect(page.locator('#prodTeamShare .prod-team').first()).toContainText('1,3 ' + unit);
     await expect(page.locator('#lineShiftContainer .total-row td').nth(1)).toHaveText('1 ' + unit);
     await expect(page.locator('#lineShiftContainer .total-row td').nth(2)).toHaveText('0,3 ' + unit);
     await expect(page.locator('#lineShiftContainer .total-row td').nth(3)).toHaveText('41');
