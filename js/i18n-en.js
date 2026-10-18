@@ -1005,6 +1005,8 @@ const HUB_EN_MESSAGES = {
   "Топ 5 несправили се двойки": "Top 5 underperforming pairs",
   "Топ 5 несправили се хора": "Top 5 underperforming people",
   "Топ 5 най-добри двойки": "Top 5 best pairs",
+  "Топ 5 най-добри хора": "Top 5 best people",
+  "Няма други хора с постигнат таргет.": "No other people achieved their target.",
   "Няма отчети за класиране.": "No reports to rank.",
   "Няма други двойки с постигнат таргет.": "No other pairs achieved their target.",
   "Най-ниска успеваемост, после най-нисък тонаж спрямо целта.": "Lowest success rate, then lowest tonnage against target.",
