@@ -158,7 +158,16 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await page.locator('#areaManual').check();
     await page.locator('#savePairBtn').click();
     await saved('pair-targets.json', data => data.entries.length === 1);
-    await page.locator('#equalizeCancelBtn').click();
+    // The last free people are paired below 30 t: raise to the goal, then restore the planned target.
+    await expect(page.locator('#equalizeList')).toContainText(/1\s?000 → 30\s?000 кг/);
+    await page.locator('#equalizeSaveBtn').click();
+    await saved('pair-targets.json', data => data.entries[0].targetKg === 30000 && data.entries[0].targetCrates === 40);
+    await expect(page.locator('#shiftGoalText')).toContainText('Целта от 30 т за смяната е достигната');
+    await page.locator('#pairsList [data-action=edit]').click();
+    await page.locator('#targetKg').fill('1000');
+    await page.locator('#savePairBtn').click();
+    await saved('pair-targets.json', data => data.entries[0].targetKg === 1000);
+    await expect(page.locator('#shiftGoalText')).toContainText('липсват 29 т');
     await page.locator('#pairsList [data-action=report]').click();
     await page.locator('#actualKg').fill('800');
     await page.locator('#actualCrates').fill('35');
@@ -323,7 +332,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
       await page.locator('#areaManual').check();
       await page.locator('#savePairBtn').click();
       await saved('pair-targets.json', data => data.entries.length === count);
-      await page.locator('#equalizeCancelBtn').click();
+      await expect(page.locator('#shiftGoal')).toBeHidden();
     }
     await plan(1);
     await expect(page.locator('#addPairBtn')).toBeDisabled();

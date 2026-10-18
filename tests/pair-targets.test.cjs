@@ -196,6 +196,9 @@ test('shift goal is always 30 t and without history the rest is split equally ac
   assert.ok(raised.every(entry => entry.updatedAt === '2026-10-04T08:00:00Z'));
   assert.deepEqual(plain(model.equalize([pair('a',15000),pair('b',15000)],'x')),[]);
   assert.deepEqual(plain(model.equalize([pair('a',1000,{result:{kg:1}})],'x')),[]);
+  assert.equal(model.hasShiftGoal('СТИКЕРИ'),false);
+  assert.equal(model.hasShiftGoal(team),true);
+  assert.deepEqual(plain(model.equalize([pair('a',1000,{team:'СТИКЕРИ'}),pair('b',1000,{team:'СТИКЕРИ'})],'x')),[]);
 });
 test('history raises each pair in proportion to its people, keeps higher targets and skips downtime',() => {
   const shift = (day,shiftCode,ids,kg,reasonKey = '') => ({id:'h'+day+shiftCode+ids,date:'2026-09-'+String(day).padStart(2,'0'),shiftCode,team,members:ids.map(id => ({id})),targetKg:1,result:{kg,reasonKey}});
