@@ -7,6 +7,13 @@ const PairTargets = (() => {
     {key:'changeover', label:'Смяна на артикул / пренастройка'},
     {key:'quality', label:'Проблем с качеството / доработка'},
     {key:'staffing', label:'Недостатъчен състав / отсъствие'},
+    {key:'small-profiles', label:'Дребни / леки профили (много каси, малко кг)'},
+    {key:'heavy-profiles', label:'Тежки профили (кг постигнати, по-малко каси)'},
+    {key:'crane', label:'Чакане на кран / товарач'},
+    {key:'slow-pace', label:'Бавно темпо'},
+    {key:'training', label:'Нов / обучаващ се служител'},
+    {key:'other-work', label:'Друга задача / преместване'},
+    {key:'cleaning', label:'Почистване на машина'},
     {key:'other', label:'Друга причина'}
   ];
   const CANCELLATION_REASONS = [
