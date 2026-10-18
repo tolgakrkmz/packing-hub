@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {randomUUID} = require('node:crypto');
 const {createHubServer} = require('../../server/server.cjs');
+const {photo} = require('./task-photo-fixture.cjs');
 const password = 'Fictional-problems-password-123';
 async function setup(t) {
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
@@ -16,7 +17,7 @@ async function setup(t) {
   async function create(user = admin, data = payload()) { const response = await request('/api/problems', user, 'POST', data); assert.equal(response.status, 201); return (await response.json()).id; }
   const find = async (id, user = admin) => (await (await request('/api/problems', user)).json()).items.find(item => item.id === id);
   const change = (id, user, data, revision) => request('/api/problems/' + id, user, 'PATCH', data, {'If-Match': '"' + revision + '"'});
-  return {admin, operator, other, observer, request, payload, create, find, change};
+  return {hub, admin, operator, other, observer, request, payload, create, find, change};
 }
 test('the column follows proposals and resolution', async t => {
   const s = await setup(t), id = await s.create(s.operator);
@@ -57,4 +58,27 @@ test('revisions, retries and input are checked at the server boundary', async t 
   assert.equal((await s.change(id, s.admin, {action: 'unknown'}, 2)).status, 400);
   assert.equal((await s.request('/api/problems', s.admin, 'PUT', {})).status, 405);
   assert.equal((await s.change(randomUUID(), s.admin, {action: 'resolve'}, 1)).status, 404);
+});
+test('problem and proposal photos are stored apart from tasks, readable by viewers and pruned when removed', async t => {
+  const s = await setup(t), id = await s.create(s.operator, s.payload({photos: [photo]}));
+  const other = await s.create(s.operator);
+  let item = await s.find(id, s.observer);
+  assert.equal(item.photos.length, 1); assert.equal(item.photos[0].available, true);
+  const url = '/api/problems/' + id + '/photos/' + item.photos[0].id;
+  const image = await s.request(url, s.observer);
+  assert.equal(image.status, 200); assert.equal(image.headers.get('content-type'), 'image/jpeg');
+  assert.equal((await s.request('/api/problems/' + other + '/photos/' + item.photos[0].id, s.observer)).status, 404, 'photos are tied to their problem');
+  s.hub.tasks.maintain();
+  assert.equal((await s.request(url, s.observer)).status, 200, 'task photo cleanup leaves problem photos alone');
+  assert.equal((await s.change(id, s.other, {action: 'propose', text: 'Fictional fix with photos', photos: [photo, photo]}, 1)).status, 200);
+  item = await s.find(id);
+  assert.equal(item.proposals[0].photos.length, 2);
+  assert.equal((await s.request('/api/problems/' + id + '/photos/' + item.proposals[0].photos[1].id, s.observer)).status, 200);
+  assert.equal((await s.change(id, s.operator, {...s.payload({photos: [{id: item.photos[0].id}]}), action: 'edit'}, 2)).status, 200, 'existing photos are kept by id');
+  assert.equal((await s.request(url, s.admin)).status, 200);
+  assert.equal((await s.change(id, s.operator, {...s.payload({photos: []}), action: 'edit'}, 3)).status, 200);
+  assert.equal((await s.request(url, s.admin)).status, 404, 'removed photos are deleted');
+  assert.equal(s.hub.store.db.prepare('SELECT count(*) AS count FROM problem_photos').get().count, 2);
+  assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: ['not-a-photo']}))).status, 400);
+  assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: Array(11).fill(photo)}))).status, 400);
 });

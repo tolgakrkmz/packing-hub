@@ -1756,5 +1756,9 @@ Object.assign(HUB_EN_MESSAGES, {
   "Проблемът е отворен отново": "Problem reopened",
   "Провери полетата на проблема.": "Check the problem fields.",
   "Проблемът е променен. Опресни таблото.": "The problem has changed. Refresh the board.",
-  "Натисни „Опресни“. Въведеното е запазено.": "Press “Refresh”. Your input is kept."
+  "Натисни „Опресни“. Въведеното е запазено.": "Press “Refresh”. Your input is kept.",
+  "Снимки (по желание)": "Photos (optional)",
+  "Добави една или повече снимки на проблема.": "Add one or more photos of the problem.",
+  "Снимки към решението (по желание)": "Solution photos (optional)",
+  "Добави снимки, които показват решението.": "Add photos that show the solution."
 });

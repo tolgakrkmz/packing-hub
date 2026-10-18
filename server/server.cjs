@@ -29,7 +29,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const avatars = createAccountAvatars(store);
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
-  const problems = createProblems(store, taskNow ? {now: taskNow} : {});
+  const problems = createProblems(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
   const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
@@ -313,15 +313,22 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           }
           throw problem(405, 'METHOD_REJECTED');
         }
+        const problemPhoto = pathname.match(/^\/api\/problems\/([0-9a-f-]{36})\/photos\/([0-9a-f-]{36})$/);
+        if (problemPhoto) {
+          if (!['GET', 'HEAD'].includes(request.method)) throw problem(405, 'METHOD_REJECTED');
+          const content = problems.photo(problemPhoto[1], problemPhoto[2], currentUser());
+          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
+          return response.end(request.method === 'HEAD' ? undefined : content);
+        }
         const problemRoute = pathname.match(/^\/api\/problems(?:\/([0-9a-f-]{36}))?$/);
         if (problemRoute) {
           if (!problemRoute[1] && request.method === 'GET') return json(response, 200, problems.list(currentUser()));
           if (!problemRoute[1] && request.method === 'POST') {
-            const result = problems.create(await jsonBody(request, 65536), currentUser());
+            const result = problems.create(await jsonBody(request, taskPhotoRequestBytes), currentUser());
             broadcast('problems', 0); return json(response, 201, result);
           }
           if (problemRoute[1] && request.method === 'PATCH') {
-            const input = await jsonBody(request, 65536), result = problems.change(problemRoute[1], input, revisionFor(request), currentUser());
+            const input = await jsonBody(request, taskPhotoRequestBytes), result = problems.change(problemRoute[1], input, revisionFor(request), currentUser());
             broadcast('problems', 0); return json(response, 200, result);
           }
           throw problem(405, 'METHOD_REJECTED');
