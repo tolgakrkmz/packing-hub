@@ -11,7 +11,7 @@
   let pairsLoaded = false, rosterLoaded = false, busy = false;
   let context = null, followLive = true, editing = null;
   let explicitScope=null, scopeLinkError='';
-  let pairAccess=null,serverScope=null;
+  let pairAccess=null,serverScope=null,equalizing=null;
   try {if(typeof HubReportScope!=='undefined')explicitScope=HubReportScope.parse(location.search);}
   catch(error){scopeLinkError=error.message;}
   const pairDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.($('pairDialog'),{isOpen:() => !!editing});
@@ -122,6 +122,14 @@
     $('rosterList').innerHTML = people.map(person => `<span class="person ${used.has(person.id) ? 'used' : ''}"><span translate="no">${escape(person.name)}</span><small>${person.category === 'auto' ? 'Автоматична' : person.category === 'manual' ? 'Ръчна' : 'Стикери'} · ${used.has(person.id) ? 'В двойка' : 'Неразпределен'}</small></span>`).join('') || '<p class="muted">Няма зареден активен състав за този екип.</p>';
     $('addPairBtn').disabled = busy || !pairsLoaded || !rosterLoaded || !scheduled || available.length < 2 || !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false);
     if(editing)$('savePairBtn').disabled=busy||!!pairAccess&&!pairAccess.canSave(!!JSON.parse(editing.original||'null')?.result);
+    const goal = PairTargets.shiftGoal(entries.length), gap = goal-totalKg;
+    $('shiftGoal').hidden = !pairsLoaded || !scheduled || !entries.length;
+    $('shiftGoal').classList.toggle('reached',gap <= 0);
+    $('shiftGoalText').textContent = `Сбор на таргетите: ${fmt(totalKg/1000)} т / цел ${fmt(goal/1000)} т`+
+      (entries.length < PairTargets.FULL_SHIFT_PAIRS ? ` · непълен състав: ${entries.length} от ${PairTargets.FULL_SHIFT_PAIRS} двойки` : '')+
+      (gap > 0 ? ` · липсват ${fmt(gap/1000)} т` : ' · целта е покрита');
+    $('equalizeBtn').hidden = !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false) || !PairTargets.equalize(entries,'').length;
+    $('equalizeBtn').disabled = busy;
     $('pairsList').innerHTML = selected.map(entry => pairCard(entry,!scopeLinkError)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
     globalThis.HubNotificationTarget?.reveal($('pairsList'));
@@ -297,7 +305,7 @@
       cancellationReason:$('cancellationReason').value,cancellationText:$('cancellationText').value,
       workAreas:[$('areaAuto').checked ? 'auto' : null,$('areaManual').checked ? 'manual' : null].filter(Boolean),now:new Date().toISOString()};
     if(sync.commitOperation) {
-      if(await saveServer(edit,inputs)) closeDialog();
+      if(await saveServer(edit,inputs)) { closeDialog(); if(edit.mode === 'plan' && !edit.id) remindGoal(); }
       return;
     }
     const saved = await mutate(() => {
@@ -307,8 +315,67 @@
       const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
       return {...data,entries:edit.id ? data.entries.map(item => item.id === edit.id ? next : item) : [...data.entries,next]};
     },$('dialogError'));
-    if(saved) closeDialog();
+    if(saved) { closeDialog(); if(edit.mode === 'plan' && !edit.id) remindGoal(); }
   });
+  const raisedKey = entries => JSON.stringify(entries.map(entry => [entry.id,entry.targetKg]));
+  function openEqualize(reminder) {
+    if(busy || editing || scopeLinkError || pairAccess&&!pairAccess.canSave(false)) return;
+    const selected = selectedEntries(), raised = PairTargets.equalize(selected,new Date().toISOString());
+    if(!raised.length) return;
+    const before = new Map(selected.map(entry => [entry.id,entry.targetKg]));
+    const goal = PairTargets.shiftGoal(selected.filter(entry => !entry.cancellation).length);
+    equalizing = {context:{...context},raised};
+    $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Изравняване до целта';
+    $('equalizeIntro').textContent = (reminder ? 'Всички свободни хора са разпределени. ' : '')+`Всяка неотчетена двойка получава +${fmt(raised[0].targetKg-before.get(raised[0].id))} кг, за да стигне смяната ${fmt(goal/1000)} т.`;
+    $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг</li>`).join('');
+    $('equalizeError').textContent = '';
+    $('equalizeDialog').showModal();
+  }
+  function closeEqualize() { if(busy) return; $('equalizeDialog').close(); equalizing = null; }
+  $('equalizeBtn').addEventListener('click',() => openEqualize(false));
+  $('equalizeCancelBtn').addEventListener('click',closeEqualize);
+  $('equalizeDialog').addEventListener('cancel',event => { event.preventDefault(); closeEqualize(); });
+  $('equalizeForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if(!equalizing || busy) return;
+    const {context:scope,raised} = equalizing;
+    // Recompute on fresh data so a pair changed by someone else is never overwritten from a stale preview.
+    const fresh = () => {
+      const next = PairTargets.equalize(data.entries.filter(entry => PairTargets.inScope(entry,scope)),raised[0].updatedAt);
+      if(raisedKey(next) !== raisedKey(raised)) throw new Error('Двойките са променени междувременно. Затвори и опитай отново.');
+      return next;
+    };
+    if(!sync.commitOperation) {
+      const saved = await mutate(() => {
+        const byId = new Map(fresh().map(entry => [entry.id,entry]));
+        return {...data,entries:data.entries.map(entry => byId.get(entry.id) || entry)};
+      },$('equalizeError'));
+      if(saved) closeEqualize();
+      return;
+    }
+    busy = true; render();
+    const locked = Array.from($('equalizeForm').querySelectorAll('button')).map(control => [control,control.disabled]);
+    locked.forEach(([control]) => { control.disabled = true; });
+    $('equalizeError').textContent = 'Записва се...';
+    let done = 0;
+    try {
+      await sync.refreshFromDisk({fresh:true});
+      for(const entry of fresh()) {
+        const result = await sync.commitOperation({reason:'Изравняване до целта на смяната',operationId:crypto.randomUUID(),action:'update',entryId:entry.id,entry,version:sync.recordVersion?.(entry.id)});
+        acceptPairs(result.data); done++;
+      }
+      busy = false; closeEqualize();
+    } catch(error) {
+      $('equalizeError').textContent = (done ? `Обновени са ${done} от ${raised.length} двойки. ` : 'Записът не е направен. ')+error.message;
+    } finally {
+      busy = false; locked.forEach(([control,disabled]) => { control.disabled = disabled; }); render();
+    }
+  });
+  function remindGoal() {
+    // Remind once the last free people are paired, never block the save itself.
+    const active = selectedEntries().filter(entry => !entry.cancellation), used = new Set(active.flatMap(entry => entry.members.map(person => person.id)));
+    if(rosterLoaded && PairTargets.roster(personnel.employees,context.team,context.date).filter(person => !used.has(person.id)).length < 2) openEqualize(true);
+  }
   $('pairsList').addEventListener('click', event => {
     const button = event.target.closest('button[data-action]');
     if(!button || busy) return;

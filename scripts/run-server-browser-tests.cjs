@@ -476,7 +476,7 @@ async function main() {
     await operator.goto(base + '/pair-targets'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
     const employees = hub.store.get('personnel').data.employees;
     await operator.locator('#memberOne').selectOption(employees[0].id); await operator.locator('#memberTwo').selectOption(employees[1].id); await operator.locator('#targetKg').fill('1000'); await operator.locator('#targetCrates').fill('40'); await operator.locator('#areaManual').check(); await operator.locator('#savePairBtn').click();
-    await expect(operator.locator('#pairsList')).toContainText('Очаква отчет'); await operator.locator('#pairsList [data-action=report]').click(); await operator.locator('#actualKg').fill('1100'); await operator.locator('#actualCrates').fill('44'); await operator.locator('#savePairBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Постигнат');
+    await operator.locator('#equalizeCancelBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Очаква отчет'); await operator.locator('#pairsList [data-action=report]').click(); await operator.locator('#actualKg').fill('1100'); await operator.locator('#actualCrates').fill('44'); await operator.locator('#savePairBtn').click(); await expect(operator.locator('#pairsList')).toContainText('Постигнат');
     await expect(observer.locator('#pairStatsBody')).toContainText(/1,1\s*\/\s*1/); await expect(observer.locator('#dashboardActual')).toHaveText('3 т');
     await expect(operator.locator('#pairsList [data-action=report]')).toBeHidden();
     console.log('PASS personnel, Stickers pair planning/reporting and live pair statistics');
