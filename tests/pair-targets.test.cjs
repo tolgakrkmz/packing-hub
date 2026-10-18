@@ -101,11 +101,14 @@ test('both targets must be met; missing results are pending',() => {
     assert.equal(model.status(result),'missed');
   }
 });
-test('preset and free text reasons are accepted, other requires explanation',() => {
+test('new reports need a specific reason; stored legacy reasons still validate',() => {
   assert.equal(report({kg:0,reasonKey:'materials'}).result.reasonKey,'materials');
-  assert.equal(report({kg:0,reasonText:'  Няма поръчка  '}).result.reasonText,'Няма поръчка');
-  assert.throws(() => report({kg:0,reasonKey:'other'}),/причина/);
-  assert.throws(() => report({kg:0,reasonText:'  '}),/причина/);
+  assert.equal(report({kg:0,reasonKey:'crane',reasonText:'  Fictional note  '}).result.reasonText,'Fictional note');
+  for(const values of [{reasonText:'Fictional note'},{reasonKey:'other',reasonText:'Fictional note'},{reasonKey:'unknown'}]) assert.throws(() => report({kg:0,...values}),/изберете причина\./);
+  assert.equal(report({kg:0,reasonText:'  Няма поръчка  ',legacy:true}).result.reasonText,'Няма поръчка');
+  assert.equal(report({kg:0,reasonKey:'other',reasonText:'Fictional note',legacy:true}).result.reasonKey,'other');
+  assert.throws(() => report({kg:0,reasonKey:'other',legacy:true}),/причина/);
+  assert.throws(() => report({kg:0,reasonText:'  ',legacy:true}),/причина/);
   assert.equal(report({reasonKey:'downtime',reasonText:'old'}).result.reasonText,'');
   for(const values of [{kg:''},{kg:' '},{kg:-1},{crates:1.5},{crates:''}]) assert.throws(() => report({...values,reasonKey:'downtime'}));
 });

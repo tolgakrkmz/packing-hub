@@ -353,7 +353,8 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await expect(page.locator('#pairsList')).toContainText('Постигнат');
     await page.locator('#pairsList [data-action=report]').click();
     await page.locator('#actualCrates').fill('39');
-    await page.locator('#reasonKey').selectOption('other');
+    await expect(page.locator('#reasonKey option[value=other]')).toHaveCount(0);
+    await page.locator('#reasonKey').selectOption('crane');
     await page.locator('#reasonText').fill('Fictional missing crate');
     await page.locator('#savePairBtn').click();
     await saved('pair-targets.json', data => data.entries[1].result?.crates === 39);

@@ -195,7 +195,7 @@
       $('targetCrates').value = entry.targetCrates;
     }
     updateMemberOptions();
-    $('reasonKey').innerHTML = '<option value="">Без предварително зададена причина</option>'+PairTargets.REASONS.map(reason => `<option value="${reason.key}">${reason.label}</option>`).join('');
+    $('reasonKey').innerHTML = '<option value="">Изберете причина</option>'+PairTargets.REASONS.filter(reason => reason.key !== 'other').map(reason => `<option value="${reason.key}">${reason.label}</option>`).join('');
     if(mode === 'report') {
       $('reportTargets').textContent = `Цел: ${fmt(entry.targetKg)} кг и ${fmt(entry.targetCrates)} каси`;
       $('actualKg').value = entry.result?.kg ?? '';
