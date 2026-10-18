@@ -1792,5 +1792,8 @@ Object.assign(HUB_EN_MESSAGES, {
   "Само на български": "Bulgarian only",
   "Промени английския текст": "Edit English text",
   "+ Английски текст": "+ English text",
-  "Английски текст на предложение": "Proposal English text"
+  "Английски текст на предложение": "Proposal English text",
+  "+ Предложи решение": "+ Propose a solution",
+  "Снимки": "Photos",
+  "Няма описание.": "No description."
 });

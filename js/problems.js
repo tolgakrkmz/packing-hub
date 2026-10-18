@@ -58,37 +58,64 @@
       return column;
     }));
   }
+  // Free text keeps its paragraphs; lines starting with "1." or "-" become real lists. Built with text nodes only, never HTML.
+  function richText(value) {
+    const root = el('div', '', 'problem-text', true);
+    let list = null, paragraph = null, blank = false;
+    for (const line of String(value).split(/\r?\n/)) {
+      if (!line.trim()) { paragraph = null; blank = true; continue; }
+      const marker = line.match(/^\s*(?:(\d{1,3})[.)]|[-•*–])\s+(.*)$/);
+      if (marker) {
+        const tag = marker[1] === undefined ? 'UL' : 'OL';
+        if (list?.tagName !== tag) { list = document.createElement(tag); if (tag === 'OL' && marker[1] !== '1') list.start = Number(marker[1]); root.append(list); }
+        list.append(el('li', marker[2])); paragraph = null;
+      } else if (list && !blank) list.lastChild.append(document.createElement('br'), line.trim());
+      else if (paragraph && !blank) paragraph.append(document.createElement('br'), line);
+      else { list = null; paragraph = el('p', line); root.append(paragraph); }
+      blank = false;
+    }
+    return root;
+  }
+  function section(label, ...children) { const node = el('section', '', 'problem-section'); node.append(el('h3', label), ...children); return node; }
   function renderDetail() {
     const item = state?.items.find(value => value.id === viewing);
     if (!item) { if ($('problemDetail').open) $('problemDetail').close(); return; }
     $('detailTitle').textContent = local(item, 'title');
-    const content = [], badges = el('div', '', 'task-badges');
-    badges.append(badge(stages[item.stage], item.stage === 'resolved' ? 'good' : ''), badge(levels[item.impactLevel], item.impactLevel === 'high' ? 'alert' : ''));
-    if (untranslated(item)) badges.append(badge('Само на български'));
-    content.push(badges);
-    const list = el('dl', '', 'problem-fields');
-    for (const [label, value] of [['Описание', local(item, 'description')], ['Въздействие', local(item, 'impact')], ['От кого зависи', local(item, 'dependsOn')]]) if (value) list.append(el('dt', label), el('dd', value, '', true));
-    list.append(el('dt', 'Записан от'), el('dd', item.createdBy.username + ' · ' + date(item.createdAt), '', true));
-    content.push(list, ...gallery(item, item.photos, 'Проблем'));
-    const actions = el('div', '', 'task-actions');
+    $('detailMeta').replaceChildren(badge(stages[item.stage], item.stage === 'resolved' ? 'good' : ''), badge(levels[item.impactLevel], item.impactLevel === 'high' ? 'alert' : ''),
+      ...(item.dependsOn ? [badge('→ ' + local(item, 'dependsOn'), '', true)] : []), badge(item.createdBy.username + ' · ' + date(item.createdAt), 'problem-muted-badge', true),
+      ...(untranslated(item) ? [badge('Само на български')] : []));
+    const actions = [];
     if (manager || owns(item)) {
-      actions.append(button('Редактирай', () => openEditor(item)));
-      actions.append(item.resolvedAt ? button('Отвори отново', () => act(item, {action: 'reopen'})) : button('Маркирай като решен', () => act(item, {action: 'resolve'}), ''));
+      actions.push(button('Редактирай', () => openEditor(item)));
+      actions.push(item.resolvedAt ? button('Отвори отново', () => act(item, {action: 'reopen'})) : button('Маркирай като решен', () => act(item, {action: 'resolve'}), ''));
     }
-    if (actions.childElementCount) content.push(actions);
-    content.push(el('h3', 'Предложени решения'));
-    if (!item.proposals.length) content.push(el('p', 'Още няма предложения.', 'task-muted'));
-    for (const entry of item.proposals) {
-      const node = el('div', '', 'problem-entry');
-      node.append(el('p', local(entry, 'text'), '', true), ...gallery(item, entry.photos, 'Решение'), el('p', entry.actor.username + ' · ' + date(entry.at), 'task-muted', true));
-      if (manager || entry.actor.id === HubServer.user.id) node.append(button(entry.textEn ? 'Промени английския текст' : '+ Английски текст', () => openTranslation(item, entry)));
-      content.push(node);
-    }
-    $('detailContent').replaceChildren(...content);
-    $('proposalForm').hidden = !creator || !!item.resolvedAt;
+    $('detailActions').replaceChildren(...actions);
+    const problem = [];
+    if (local(item, 'description')) problem.push(section('Описание', richText(local(item, 'description'))));
+    if (local(item, 'impact')) { const impact = el('div', '', 'problem-impact'); impact.append(richText(local(item, 'impact'))); problem.push(section('Въздействие', impact)); }
+    if (item.photos.length) problem.push(section('Снимки', ...gallery(item, item.photos, 'Проблем')));
+    if (!problem.length) problem.push(el('p', 'Няма описание.', 'task-muted'));
+    $('detailProblem').replaceChildren(...problem);
+    const proposals = item.proposals.length ? [] : [el('p', 'Още няма предложения.', 'task-muted')];
+    item.proposals.forEach(entry => {
+      const node = el('article', '', 'problem-proposal'), foot = el('div', '', 'problem-proposal-foot');
+      foot.append(el('span', entry.actor.username + ' · ' + date(entry.at), 'task-muted', true));
+      if (manager || entry.actor.id === HubServer.user.id) foot.append(button(entry.textEn ? 'Промени английския текст' : '+ Английски текст', () => openTranslation(item, entry)));
+      node.append(richText(local(entry, 'text')), ...gallery(item, entry.photos, 'Решение'), foot);
+      proposals.push(node);
+    });
+    $('detailProposals').replaceChildren(...proposals);
+    const canPropose = creator && !item.resolvedAt;
+    $('proposalOpen').hidden = !canPropose || !$('proposalForm').hidden;
+    if (!canPropose) $('proposalForm').hidden = true;
+  }
+  function showProposalForm(open) {
+    $('proposalForm').hidden = !open; $('proposalOpen').hidden = open || !creator;
+    if (open) $('proposalText').focus();
+    else { $('proposalForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); setSwitch($('proposalEnglishToggle'), false); }
   }
   function openDetail(id) {
-    if (viewing !== id) { $('proposalForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); setSwitch($('proposalEnglishToggle'), false); }
+    if (viewing !== id) showProposalForm(false);
     viewing = id; renderDetail(); if (!$('problemDetail').open) $('problemDetail').showModal();
   }
   function openTranslation(item, entry) {
@@ -154,7 +181,7 @@
     const invalid = photoProblem(solutionPicker); if (invalid) { $('actionFeedback').textContent = invalid; return; }
     const result = await submit($('proposalForm'), $('actionFeedback'), () => patch(item, {action: 'propose', text: $('proposalText').value, textEn: $('proposalTextEn').value, photos: solutionPicker.values}));
     if (!result) return;
-    $('proposalForm').reset(); solutionPicker.reset(); setSwitch($('proposalEnglishToggle'), false); await refresh(); $('problemMessage').textContent = 'Промяната е записана.';
+    showProposalForm(false); await refresh(); $('problemMessage').textContent = 'Промяната е записана.';
   });
   $('translationForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -167,7 +194,9 @@
   for (const id of ['problemEditor', 'problemDetail', 'translationDialog', 'taskPhotoViewer']) $(id).addEventListener('cancel', event => { if (busy) event.preventDefault(); });
   $('problemEditor').addEventListener('close', () => { problemPicker.reset(); refresh(); });
   $('taskPhotoViewer').addEventListener('close', () => $('photoViewerImage').removeAttribute('src'));
-  $('problemDetail').addEventListener('close', () => { viewing = null; $('proposalForm').reset(); solutionPicker.reset(); });
+  $('problemDetail').addEventListener('close', () => { viewing = null; showProposalForm(false); });
+  $('proposalOpen').addEventListener('click', () => showProposalForm(true));
+  $('proposalCancel').addEventListener('click', () => { if (!busy) showProposalForm(false); });
   $('newProblem').hidden = !creator; $('newProblem').addEventListener('click', () => { if (state) openEditor(); });
   $('refreshProblems').addEventListener('click', refresh);
   $('problemSearch').addEventListener('input', render);
