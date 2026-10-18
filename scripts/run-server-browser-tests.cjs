@@ -103,7 +103,7 @@ async function main() {
       await require('../tests/browser/personnel-transfers.cjs').exerciseTransferConsumers({page:admin,expect,
         go:name=>admin.goto(base+'/'+name),connect:async(button,file,dot)=>{await expect(admin.locator(dot)).toHaveClass(/\bon\b/);},
         setTime:async value=>{personnelTime=Date.parse(value);await admin.clock.setFixedTime(new Date(value));},
-        replaceSources:async sources=>{for(const [key,value] of Object.entries(sources)){const state=hub.store.get(key);hub.store.put(key,value,state.revision,hub.auth.list()[0]);}}});
+        replaceSources:async sources=>{for(const [key,value] of Object.entries(sources)){const state=hub.store.get(key);hub.store.put(key,value,state.revision,hub.auth.list()[0],'report',false,{reason:'Fictional transfer fixture seed'});}}});
       assert.deepEqual(errors,[]);console.log('PASS server planned personnel transfers');return;
     }
     if (process.argv.includes('--personnel-only')) {
@@ -220,10 +220,12 @@ async function main() {
       const personnel = hub.store.get('personnel');
       hub.store.put('personnel',{...personnel.data,employees},personnel.revision,user);
       await hub.auth.create('demo-cancel-operator',demoPassword,'operator',user);
+      // Ordinary accounts can plan pairs only for their assigned team.
+      await hub.auth.update(hub.auth.list().find(item => item.username === 'demo-cancel-operator').id,{taskTeam:'СТИКЕРИ'},user);
       const page = await device('demo-cancel-operator');
       await page.goto(base+'/pair-targets');
       await expect(page.locator('#pairsConnDot')).toHaveClass(/\bon\b/);
-      await exercisePairCancellation({page,base,expect,statisticsPage:admin,
+      await exercisePairCancellation({page,base,expect,statisticsPage:admin,liveStickers:true,
         failureText:'Промяната не е потвърдена',
         screenshotDir:process.argv.find(value => value.startsWith('--screenshots='))?.slice('--screenshots='.length),
         read:async () => hub.store.get('pair-targets').data,
@@ -234,9 +236,10 @@ async function main() {
             const reader = await device(username);
             await reader.goto(base+'/pair-targets');
             await reader.locator('#stickersShiftBtn').click();
-            await expect(reader.locator('#pairsList [data-action=cancel]')).toHaveCount(1);
+            // The plan is visible, but accounts without pair access get no card actions.
+            await expect(reader.locator('#pairsList .pair-card')).toHaveCount(1);
             await expect(reader.locator('#addPairBtn')).toBeHidden();
-            await expect(reader.locator('#pairsList [data-action=cancel]')).toBeHidden();
+            await expect(reader.locator('#pairsList [data-action]')).toHaveCount(0);
             await reader.context().close();
           }
         },

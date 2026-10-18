@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {assertResponsive} = require('./responsive.cjs');
 const employees = [1,2].map(id => ({id:'demo-cancellation-person-'+id,name:'Demo Cancellation Person '+id,category:'stickers',team:'1 смяна',role:'Опаковчик',active:true,note:''}));
-async function exercisePairCancellation({page,base,expect,read,replace,failNextWrite,failureText='Записът не е направен',statisticsPage=page,checkReadOnly=async () => {},screenshotDir}) {
+async function exercisePairCancellation({page,base,expect,read,replace,failNextWrite,failureText='Записът не е направен',statisticsPage=page,checkReadOnly=async () => {},screenshotDir,liveStickers=false}) {
   const saved = predicate => expect.poll(async () => {
     try { return predicate(await read()); }
     catch(error) {
@@ -29,7 +29,8 @@ async function exercisePairCancellation({page,base,expect,read,replace,failNextW
   await page.locator('#stickersShiftBtn').click();
   await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','true');
   await page.locator('#stickersShiftBtn').click();
-  await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed','false');
+  // Leaving Stickers returns to the live scope; an account assigned to Stickers stays there.
+  await expect(page.locator('#stickersShiftBtn')).toHaveAttribute('aria-pressed',String(liveStickers));
   await page.locator('#stickersShiftBtn').click();
   await plan(1);
   await checkReadOnly();
