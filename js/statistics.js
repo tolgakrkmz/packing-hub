@@ -128,6 +128,8 @@ const el = {
   lineShiftTitle: document.getElementById('lineShiftTitle'),
   lineShiftHint: document.getElementById('lineShiftHint'),
   lineShiftContainer: document.getElementById('lineShiftContainer'),
+  lineShiftSummary: document.getElementById('lineShiftSummary'),
+  prodTeamShare: document.getElementById('prodTeamShare'),
 
   workforceDashboard: document.getElementById('workforceDashboard'),
   wfSubtitle: document.getElementById('wfSubtitle'),
@@ -383,6 +385,8 @@ function renderAll() {
     document.getElementById('productionConnectBtn').hidden = connected;
     document.getElementById('productionAddLink').hidden = !connected || typeof HubServer !== 'undefined' && !HubServer.can('canCreateReports');
     renderKpis(rows, annual ? 'месец' : 'година');
+    renderTeamShare(rows);
+    document.getElementById('prodChartTitle').textContent = annual ? `Тонаж по месеци · ${selectedYear}` : 'Тонаж по години';
     renderStackedBarChart(el.chartContainer, rows);
     renderLegend();
     renderTable(rows, annual ? `месец (${selectedYear})` : 'година');

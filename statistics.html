@@ -533,7 +533,14 @@
 
     </div>
     <div class="stats-section" id="statsProduction" data-stats-panel="production" role="tabpanel" aria-labelledby="statsTabProduction" hidden>
-    <h2 id="productionScopeTitle"></h2>
+    <section class="workforce-dashboard prod-stats" aria-labelledby="productionScopeTitle">
+    <div class="wf-head">
+      <div>
+        <div class="dashboard-eyebrow">Производство</div>
+        <h2 class="wf-title" id="productionScopeTitle"></h2>
+        <div class="wf-subtitle">Тонаж, брак и дял на екипите по отчетите за смени. Линиите са за избрания общ месец.</div>
+      </div>
+    </div>
 
     <div class="stats-empty-month" id="productionEmpty" role="status" hidden>
       <span id="productionEmptyText">Няма тонажни отчети за избрания период.</span><br>
@@ -541,33 +548,50 @@
       <button class="conn-btn" id="productionConnectBtn" type="button">Свържи тонажен дневник</button>
     </div>
     <div id="productionBody">
-    <div class="kpi-row" id="kpiRow"></div>
+    <div class="wf-kpis" id="kpiRow"></div>
 
-    <div class="chart-wrap">
-      <div id="chartContainer"></div>
-      <div class="chart-legend" id="chartLegend"></div>
-    </div>
-
-    <details class="stats-details">
-      <summary>Покажи таблицата по периоди</summary>
-    <div class="panel">
-      <h2 id="tableTitle">Разбивка</h2>
-      <div class="stats-table-scroll" id="tableContainer"></div>
-    </div>
-
-    </details>
-    <details class="stats-details">
-      <summary>Покажи линиите и смените</summary>
-    <div class="panel">
-      <div class="line-shift-head">
-        <h2 id="lineShiftTitle">Ръчна / автоматична линия по смяна</h2>
+    <div class="wf-main">
+      <div class="wf-card">
+        <div class="wf-card-title" id="prodChartTitle">Тонаж по периоди</div>
+        <div class="wf-card-sub">Всяка колона е разделена по екипи.</div>
+        <div class="chart-wrap">
+          <div id="chartContainer"></div>
+          <div class="chart-legend" id="chartLegend"></div>
+        </div>
       </div>
-      <div class="conn-note" id="lineShiftHint" style="margin:0 0 14px;"></div>
-      <div id="lineShiftContainer" style="overflow-x:auto;"></div>
+      <div class="wf-card">
+        <div class="wf-card-title">Дял по екипи</div>
+        <div class="wf-card-sub">Колко от общия тонаж е произвел всеки екип.</div>
+        <div id="prodTeamShare"></div>
+      </div>
     </div>
 
-    </details>
+    <div class="ps-content">
+    <div class="wf-card">
+      <div class="line-shift-head">
+        <div>
+          <div class="wf-card-title" id="lineShiftTitle">Ръчна / автоматична линия по смяна</div>
+          <div class="wf-card-sub" id="lineShiftHint"></div>
+        </div>
+      </div>
+      <div id="lineShiftSummary"></div>
+      <details class="stats-details">
+        <summary>Покажи линиите по смени</summary>
+        <div id="lineShiftContainer" class="stats-table-scroll"></div>
+      </details>
     </div>
+
+    <div class="wf-card">
+      <div class="wf-card-title" id="tableTitle">Разбивка</div>
+      <div class="wf-card-sub">Тонаж, брак и екипи за всеки период.</div>
+      <details class="stats-details">
+        <summary>Покажи таблицата по периоди</summary>
+        <div class="stats-table-scroll" id="tableContainer"></div>
+      </details>
+    </div>
+    </div>
+    </div>
+    </section>
     </div>
     <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">
