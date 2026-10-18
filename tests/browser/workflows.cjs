@@ -158,6 +158,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await page.locator('#areaManual').check();
     await page.locator('#savePairBtn').click();
     await saved('pair-targets.json', data => data.entries.length === 1);
+    await page.locator('#equalizeCancelBtn').click();
     await page.locator('#pairsList [data-action=report]').click();
     await page.locator('#actualKg').fill('800');
     await page.locator('#actualCrates').fill('35');
@@ -322,6 +323,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
       await page.locator('#areaManual').check();
       await page.locator('#savePairBtn').click();
       await saved('pair-targets.json', data => data.entries.length === count);
+      await page.locator('#equalizeCancelBtn').click();
     }
     await plan(1);
     await expect(page.locator('#addPairBtn')).toBeDisabled();

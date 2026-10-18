@@ -66,6 +66,7 @@
   <section class="panel">
     <div class="section-head"><h2>Двойки за смяната</h2><button id="addPairBtn" class="primary" type="button">+ Нова двойка</button></div>
     <p id="pageError" class="error" role="alert"></p>
+    <div id="shiftGoal" class="shift-goal" hidden><p id="shiftGoalText" aria-live="polite"></p><button id="equalizeBtn" type="button">Изравни до целта</button></div>
     <div id="pairsList" class="pair-grid"></div>
   </section>
   <section class="panel">
@@ -110,6 +111,16 @@
     <p id="dialogError" class="error" role="alert"></p>
     <button type="button" id="reviewPairBtn" hidden>Прегледай актуалния запис</button>
     <div class="dialog-actions"><button type="button" id="cancelDialogBtn">Отказ</button><button id="savePairBtn" type="submit" class="primary">Запази</button></div>
+  </form>
+</dialog>
+<dialog id="equalizeDialog" aria-labelledby="equalizeTitle">
+  <form id="equalizeForm">
+    <h2 id="equalizeTitle">Изравняване до целта</h2>
+    <p id="equalizeIntro" class="target-note"></p>
+    <ul id="equalizeList" class="equalize-list"></ul>
+    <p class="muted">Касите не се променят. Може да коригираш отделна двойка и след това.</p>
+    <p id="equalizeError" class="error" role="alert"></p>
+    <div class="dialog-actions"><button type="button" id="equalizeCancelBtn">Не сега</button><button id="equalizeSaveBtn" type="submit" class="primary">Вдигни таргетите</button></div>
   </form>
 </dialog>
 <script src="js/data-validation.js"></script>

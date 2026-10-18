@@ -102,6 +102,17 @@ const PairTargets = (() => {
     if(typeof now !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(now) || !Number.isFinite(Date.parse(now)) || new Date(now).toISOString().replace('.000Z','Z') !== now.replace('.000Z','Z')) throw new Error('Невалиден момент на отмяна.');
     return {...entry, cancellation:{reasonKey:preset.key, reasonText:reasonText.trim(), cancelledAt:now}, updatedAt:now};
   }
+  // 6 pairs can reach 30 t, so an understaffed shift gets a proportionally lower goal.
+  const SHIFT_GOAL_KG = 30000, FULL_SHIFT_PAIRS = 6;
+  function shiftGoal(pairCount) { return Math.min(SHIFT_GOAL_KG, pairCount*SHIFT_GOAL_KG/FULL_SHIFT_PAIRS); }
+  // Raises every unreported pair by the same amount, rounded up to 100 kg, so the shift sum reaches the goal.
+  function equalize(entries, now) {
+    const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
+    const gap = shiftGoal(active.length)-active.reduce((sum,entry) => sum+entry.targetKg,0);
+    if(gap <= 0 || !open.length) return [];
+    const step = Math.ceil(gap/open.length/100)*100;
+    return open.map(entry => ({...entry, targetKg:entry.targetKg+step, updatedAt:now}));
+  }
   function validateData(data) {
     if(!data || data.module !== 'pair-targets' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) {
       throw new Error('Изберете pair-targets.json. Този файл не съдържа двойки и таргети.');
@@ -138,5 +149,5 @@ const PairTargets = (() => {
     });
     return data;
   }
-  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData};
+  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, FULL_SHIFT_PAIRS, shiftGoal, equalize};
 })();
