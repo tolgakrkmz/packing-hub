@@ -85,14 +85,16 @@ const PairTargets = (() => {
       createdAt:existing ? existing.createdAt : now, updatedAt:now
     };
   }
-  function report(entry, {context, kg, crates, reasonKey, reasonText, workAreas, now}) {
+  // legacy: stored reports may still use 'other' or free text only; new reports must pick a specific reason.
+  function report(entry, {context, kg, crates, reasonKey, reasonText, workAreas, now, legacy = false}) {
     if(entry.cancellation) throw new Error('Отменена двойка не може да се променя или отчита.');
     if(!context || !inScope(entry,context)) throw new Error('Отчетът трябва да е за избраната работна смяна.');
     const result = {kg:number(kg,'Резултата в килограми'), crates:number(crates,'Резултата в каси',false,true), reasonKey:'', reasonText:'', reportedAt:now};
     const missed = result.kg < entry.targetKg || result.crates < entry.targetCrates;
     if(missed) {
-      const preset = REASONS.find(reason => reason.key === reasonKey);
+      const preset = REASONS.find(reason => reason.key === reasonKey && (legacy || reason.key !== 'other'));
       const text = String(reasonText || '').trim();
+      if(!legacy && !preset) throw new Error('При непостигнат таргет изберете причина.');
       if(!preset && !text || preset && preset.key === 'other' && !text) throw new Error('При непостигнат таргет изберете причина или напишете обяснение.');
       result.reasonKey = preset ? preset.key : 'other';
       result.reasonText = text;
@@ -185,7 +187,7 @@ const PairTargets = (() => {
       }
       if(entry.result) {
         if(typeof entry.result.kg !== 'number' || typeof entry.result.crates !== 'number') throw new Error('Невалиден числов отчет.');
-        report(entry,{context:entry,...entry.result,workAreas:entry.areas,now:entry.result.reportedAt});
+        report(entry,{context:entry,...entry.result,workAreas:entry.areas,now:entry.result.reportedAt,legacy:true});
       }
     });
     return data;
