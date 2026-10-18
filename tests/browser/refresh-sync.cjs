@@ -46,7 +46,8 @@ async function exerciseRefreshSync({page, expect, replace, online}) {
       return entries === window.__refreshTest.entries && ids.every((id,i) => document.getElementById(id).firstElementChild === window.__refreshTest.nodes[i]);
     }),true);
     await page.evaluate(() => { window.__refreshTest.hidden = true; document.dispatchEvent(new Event('visibilitychange')); });
-    data.entries[0].tonnage += 1000;
+    // Keep the auto/manual breakdown consistent so the file passes validation.
+    data.entries[0].tonnage += 1000; data.entries[0].breakdown.autoKg += 1000;
     await replace(data);
     await page.clock.runFor(60000);
     assert.equal(await page.evaluate(() => window.__refreshTest.reads),1);
