@@ -96,6 +96,8 @@ function renderLineShiftTable(
   el.lineShiftHint.textContent =
     'Само записи с реална разбивка между автоматична и ръчна линия.';
 
+  renderLineShiftSummary(rows);
+
   if (!rows.length) {
     el.lineShiftContainer.innerHTML =
       '<div class="empty">Няма данни с разбивка за избрания месец.</div>';
@@ -246,4 +248,14 @@ function renderLineShiftTable(
 
   el.lineShiftContainer.innerHTML =
     html;
+}
+
+function renderLineShiftSummary(rows) {
+  const t = rows.reduce((sum, r) => ({autoKg: sum.autoKg + r.autoKg, autoCrates: sum.autoCrates + r.autoCrates, manKg: sum.manKg + r.manKg, manCrates: sum.manCrates + r.manCrates}), {autoKg: 0, autoCrates: 0, manKg: 0, manCrates: 0});
+  const total = t.autoKg + t.manKg;
+  if (!total) { el.lineShiftSummary.innerHTML = ''; return; }
+  const autoPct = t.autoKg / total * 100;
+  const tile = (cls, name, kg, crates, pct) => `<div class="prod-line ${cls}"><div class="l">${name}</div><div class="v">${fmtTons(kg)} т</div><div class="s">${pct.toFixed(1)}% от тонажа · ${fmt(crates)} каси</div></div>`;
+  el.lineShiftSummary.innerHTML = `<div class="prod-line-split" aria-hidden="true"><span class="auto" style="width:${autoPct}%"></span><span class="manual" style="width:${100 - autoPct}%"></span></div>
+    <div class="prod-lines">${tile('auto', 'Автоматична линия', t.autoKg, t.autoCrates, autoPct)}${tile('manual', 'Ръчна линия', t.manKg, t.manCrates, 100 - autoPct)}</div>`;
 }

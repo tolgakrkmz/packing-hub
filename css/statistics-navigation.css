@@ -25,3 +25,22 @@
 .pair-stats .stats-details>h3,.pair-stats .stats-details>p{margin-left:12px;margin-right:12px}
 .wf-calc .stats-details .wf-calc-note{padding:0 12px 12px}
 @media(max-width:600px){.stats-navigation button{flex:1 1 40%;white-space:normal}.stats-month-filters{width:100%;display:grid;grid-template-columns:1fr 1fr}.stats-month-filters .year-select-row,.stats-month-filters .dashboard-filter{display:grid;gap:6px;width:auto;justify-content:stretch}.stats-month-filters select{width:100%;max-width:none;font-size:12px;padding:8px}.stats-toolbar{flex-wrap:wrap}.month-dashboard .dashboard-top{padding:16px 14px 0}.month-dashboard .dashboard-main{padding:14px;gap:14px}.month-dashboard .pace-strip{margin-left:14px;margin-right:14px;margin-bottom:14px}.month-dashboard .stats-details{margin-left:14px;margin-right:14px}}
+.prod-stats .wf-title{margin:0}
+.prod-stats .chart-wrap{margin:10px 0 0;background:transparent;border:0;padding:0}
+.prod-stats .stats-details{margin-top:10px}
+.prod-stats .stats-details .stats-table-scroll{padding:0 12px 12px}
+.prod-stats .line-shift-head{margin-bottom:10px}
+.prod-team-list{display:grid;gap:9px;margin-top:12px}
+.prod-team{padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04)}
+.prod-team-head{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--text-muted);margin-bottom:7px}
+.prod-team-head b{color:var(--text)}
+.prod-team-no{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.05);font-size:10px;font-weight:850;margin-right:7px}
+.prod-line-split{display:flex;height:10px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.06)}
+.prod-line-split .auto{background:var(--purple)}.prod-line-split .manual{background:var(--amber)}
+.prod-lines{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.prod-line{padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}
+.prod-line .l{font-size:9px;color:var(--text-muted);font-weight:760;text-transform:uppercase;letter-spacing:.045em}
+.prod-line .v{font-size:17px;font-weight:880;margin-top:5px}
+.prod-line.auto .v{color:#c3a8ee}.prod-line.manual .v{color:var(--amber)}
+.prod-line .s{font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.4}
+@media(max-width:640px){.prod-lines{grid-template-columns:1fr}}

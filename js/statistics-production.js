@@ -539,93 +539,36 @@ function hasProductionReports(rows) {
   return rows.some(row => row.count > 0);
 }
 
-function renderKpis(
-  rows,
-  periodLabel
-) {
-  const active =
-    rows.filter(
-      r =>
-        r.tonnage > 0 ||
-        r.brak > 0
-    );
+function productionShiftTotals(rows) {
+  return SHIFT_ORDER.map(shift => ({shift, kg: rows.reduce((sum, row) => sum + (Number(row.byShift?.[shift]) || 0), 0)}));
+}
 
-  const total =
-    rows.reduce(
-      (a, r) =>
-        a +
-        r.tonnage,
-      0
-    );
+function renderKpis(rows, periodLabel) {
+  const active = rows.filter(r => r.tonnage > 0 || r.brak > 0);
+  const total = rows.reduce((a, r) => a + r.tonnage, 0);
+  const brak = rows.reduce((a, r) => a + r.brak, 0);
+  const count = rows.reduce((a, r) => a + (Number(r.count) || 0), 0);
+  const brakPct = total > 0 ? brak / total * 100 : 0;
+  const avg = active.length ? total / active.length : 0;
+  const best = active.reduce((top, r) => !top || r.tonnage > top.tonnage ? r : top, null);
+  const lead = productionShiftTotals(rows).reduce((top, r) => r.kg > top.kg ? r : top, {shift: '—', kg: 0});
+  const bestLabel = best ? (/^\d{4}-\d{2}$/.test(best.key) ? MONTH_FULL_LABELS[Number(best.key.slice(5)) - 1] : best.label) : '—';
+  const card = (lab, val, sub, cls = '') => `<div class="wf-kpi ${cls}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
+  el.kpiRow.innerHTML =
+    card('Общо тонаж', fmtTons(total) + ' т', `${fmt(count)} отчета за смени`, 'emphasis') +
+    card(`Среден тонаж / ${escapeHtml(periodLabel)}`, fmtTons(avg) + ' т', `за периодите с отчети: ${active.length}`) +
+    card('Най-силен период', best ? fmtTons(best.tonnage) + ' т' : '—', escapeHtml(bestLabel), 'good') +
+    card('Средно / отчет', count ? fmtTons(total / count) + ' т' : '—', 'тонаж на един отчет за смяна') +
+    card('Общо брак', fmtTons(brak) + ' т', `${brakPct.toFixed(1)}% от тонажа`, 'prod-brak' + (brak ? ' warn' : '')) +
+    card('Водещ екип', lead.kg ? escapeHtml(lead.shift) : '—', lead.kg ? `${fmtTons(lead.kg)} т · ${(lead.kg / total * 100).toFixed(1)}% от тонажа` : 'няма тонаж по екипи');
+}
 
-  const brak =
-    rows.reduce(
-      (a, r) =>
-        a +
-        r.brak,
-      0
-    );
-
-  const brakPct =
-    total > 0
-      ? brak /
-        total *
-        100
-      : 0;
-
-  const avg =
-    active.length
-      ? total /
-        active.length
-      : 0;
-
-  el.kpiRow.innerHTML = `
-    <div class="kpi-card">
-
-      <div class="lab">
-        Общо тонаж
-      </div>
-
-      <div class="val">
-        ${fmtTons(total)} т
-      </div>
-
-    </div>
-
-    <div class="kpi-card">
-
-      <div class="lab">
-        Общо брак
-      </div>
-
-      <div class="val">
-        ${fmtTons(brak)} т
-      </div>
-
-    </div>
-
-    <div class="kpi-card">
-
-      <div class="lab">
-        % брак
-      </div>
-
-      <div class="val">
-        ${brakPct.toFixed(1)}%
-      </div>
-
-    </div>
-
-    <div class="kpi-card">
-
-      <div class="lab">
-        Среден тонаж / ${escapeHtml(periodLabel)}
-      </div>
-
-      <div class="val">
-        ${fmtTons(avg)} т
-      </div>
-
-    </div>
-  `;
+function renderTeamShare(rows) {
+  const teams = productionShiftTotals(rows).filter(r => r.kg > 0).sort((a, b) => b.kg - a.kg);
+  const total = teams.reduce((sum, r) => sum + r.kg, 0);
+  el.prodTeamShare.innerHTML = !teams.length ? '<div class="ps-empty">Няма тонаж по екипи.</div>' : `<div class="prod-team-list">${teams.map((r, index) => {
+    const share = r.kg / total * 100;
+    return `<div class="prod-team"><div class="prod-team-head"><span><span class="prod-team-no">${index + 1}</span><b>${escapeHtml(r.shift)}</b></span><span><b>${fmtTons(r.kg)} т</b> · ${share.toFixed(1)}%</span></div>
+      <div class="ps-bar" aria-hidden="true"><span style="width:${share / (teams[0].kg / total * 100) * 100}%;background:${SHIFT_COLORS[r.shift]}"></span></div></div>`;
+  }).join('')}</div>`;
 }
