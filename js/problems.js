@@ -21,6 +21,12 @@
   const local = (value, key) => english() && value[key + 'En'] ? value[key + 'En'] : value[key];
   const date = at => new Date(at).toLocaleDateString(english() ? 'en-GB' : 'bg-BG');
   const untranslated = item => english() && !item.titleEn;
+  // The switch only shows or hides the English fields; hiding them never clears what was written.
+  function setSwitch(control, on) { control.setAttribute('aria-checked', String(on)); $(control.getAttribute('aria-controls')).hidden = !on; }
+  for (const id of ['englishToggle', 'proposalEnglishToggle']) $(id).addEventListener('click', () => {
+    const control = $(id); setSwitch(control, control.getAttribute('aria-checked') !== 'true');
+    if (control.getAttribute('aria-checked') === 'true') $(control.getAttribute('aria-controls')).querySelector('input,textarea').focus();
+  });
   const owns = item => item.createdBy.id === HubServer.user.id && creator;
 
   function card(item) {
@@ -82,7 +88,7 @@
     $('proposalForm').hidden = !creator || !!item.resolvedAt;
   }
   function openDetail(id) {
-    if (viewing !== id) { $('proposalForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); }
+    if (viewing !== id) { $('proposalForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset(); setSwitch($('proposalEnglishToggle'), false); }
     viewing = id; renderDetail(); if (!$('problemDetail').open) $('problemDetail').showModal();
   }
   function openTranslation(item, entry) {
@@ -107,6 +113,7 @@
     $('editorTitle').textContent = item ? 'Редактирай проблем' : 'Запиши проблем';
     $('problemTitle').value = item?.title || ''; $('problemDescription').value = item?.description || ''; $('problemImpactLevel').value = item?.impactLevel || 'medium';
     $('problemImpact').value = item?.impact || ''; $('problemDependsOn').value = item?.dependsOn || ''; problemPicker.reset(item?.photos || [], item);
+    setSwitch($('englishToggle'), !!(item?.titleEn || item?.descriptionEn || item?.impactEn || item?.dependsOnEn));
     $('problemTitleEn').value = item?.titleEn || ''; $('problemDescriptionEn').value = item?.descriptionEn || ''; $('problemImpactEn').value = item?.impactEn || ''; $('problemDependsOnEn').value = item?.dependsOnEn || '';
     $('problemEditor').showModal(); $('problemTitle').focus();
   }
@@ -147,7 +154,7 @@
     const invalid = photoProblem(solutionPicker); if (invalid) { $('actionFeedback').textContent = invalid; return; }
     const result = await submit($('proposalForm'), $('actionFeedback'), () => patch(item, {action: 'propose', text: $('proposalText').value, textEn: $('proposalTextEn').value, photos: solutionPicker.values}));
     if (!result) return;
-    $('proposalForm').reset(); solutionPicker.reset(); await refresh(); $('problemMessage').textContent = 'Промяната е записана.';
+    $('proposalForm').reset(); solutionPicker.reset(); setSwitch($('proposalEnglishToggle'), false); await refresh(); $('problemMessage').textContent = 'Промяната е записана.';
   });
   $('translationForm').addEventListener('submit', async event => {
     event.preventDefault();
