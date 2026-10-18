@@ -44,3 +44,21 @@
 .prod-line.auto .v{color:#c3a8ee}.prod-line.manual .v{color:var(--amber)}
 .prod-line .s{font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.4}
 @media(max-width:640px){.prod-lines{grid-template-columns:1fr}}
+.overview-stats{margin:0 0 20px}
+.overview-stats .wf-title{margin:0}
+.overview-stats .ov-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.ov-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px;padding:12px 22px 22px;position:relative;z-index:1}
+.ov-link{border:0;background:none;color:var(--amber);font:inherit;font-size:11px;font-weight:750;cursor:pointer;padding:2px 0;white-space:nowrap}
+.ov-link:hover{text-decoration:underline}.ov-link:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+.ov-shifts{display:grid;gap:8px;margin-top:10px}
+.ov-shift{padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04)}
+.ov-shift-head{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--text-muted);margin-bottom:7px}
+.ov-shift-head b{color:var(--text)}
+.ov-shift-note{font-size:10px;color:var(--text-muted);margin-top:6px}
+.ov-shift.bad .ov-shift-note{color:var(--red)}.ov-shift.good .ov-shift-note{color:var(--teal)}
+.ov-attention{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+.ov-attention li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 11px;border-radius:9px;font-size:12px;border:1px solid rgba(255,255,255,.05);border-left:3px solid var(--amber);background:rgba(245,166,35,.05)}
+.ov-attention li.bad{border-left-color:var(--red);background:rgba(226,84,74,.06)}
+.ov-ok{margin-top:10px;padding:14px;border-radius:9px;color:var(--teal);font-size:12px;font-weight:750;background:rgba(63,191,160,.07);border:1px solid rgba(63,191,160,.2)}
+@media(max-width:980px){.overview-stats .ov-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ov-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.overview-stats .ov-kpis{grid-template-columns:1fr 1fr}.ov-grid{padding-left:14px;padding-right:14px}.ov-attention li{flex-direction:column;align-items:flex-start}}
