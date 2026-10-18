@@ -24,7 +24,9 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
   }
   function fields(input) {
     if (!LEVELS.includes(input.impactLevel)) throw problem(400, 'INVALID_PROBLEM');
-    return {title: text(input.title, 180, true), description: text(input.description ?? '', 4000), impactLevel: input.impactLevel, impact: text(input.impact ?? '', 1000), dependsOn: text(input.dependsOn ?? '', 160)};
+    return {title: text(input.title, 180, true), description: text(input.description ?? '', 4000), impactLevel: input.impactLevel, impact: text(input.impact ?? '', 1000), dependsOn: text(input.dependsOn ?? '', 160),
+      // Optional English versions are written by people for meetings; free text is never sent to a translation service.
+      titleEn: text(input.titleEn ?? '', 180), descriptionEn: text(input.descriptionEn ?? '', 4000), impactEn: text(input.impactEn ?? '', 1000), dependsOnEn: text(input.dependsOnEn ?? '', 160)};
   }
   function row(id) {
     const found = db.prepare('SELECT * FROM problem_items WHERE id=?').get(id);
@@ -83,7 +85,12 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
         if (!can(user, 'canCreateProblems')) throw problem(403, 'FORBIDDEN');
         if (item.resolvedAt) throw problem(409, 'PROBLEM_STATE');
         if (item.proposals.length >= 30) throw problem(400, 'INVALID_PROBLEM');
-        item.proposals.push({id: randomUUID(), at, actor: actor(user), text: text(input.text, 2000, true), photos: photos.addMany(photoInputs(input, 'photos', 'photo'), at)});
+        item.proposals.push({id: randomUUID(), at, actor: actor(user), text: text(input.text, 2000, true), textEn: text(input.textEn ?? '', 2000), photos: photos.addMany(photoInputs(input, 'photos', 'photo'), at)});
+      } else if (input.action === 'translate') {
+        const entry = item.proposals.find(value => value.id === input.proposalId);
+        if (!entry) throw problem(400, 'INVALID_PROBLEM');
+        if (!manager(user) && !(entry.actor.id === user.id && can(user, 'canCreateProblems'))) throw problem(403, 'FORBIDDEN');
+        entry.textEn = text(input.textEn ?? '', 2000);
       } else if (input.action === 'resolve' || input.action === 'reopen') {
         if (!manager(user) && !author) throw problem(403, 'FORBIDDEN');
         if (!item.resolvedAt !== (input.action === 'resolve')) throw problem(409, 'PROBLEM_STATE');

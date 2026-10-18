@@ -17,7 +17,7 @@ async function setup(t) {
   async function create(user = admin, data = payload()) { const response = await request('/api/problems', user, 'POST', data); assert.equal(response.status, 201); return (await response.json()).id; }
   const find = async (id, user = admin) => (await (await request('/api/problems', user)).json()).items.find(item => item.id === id);
   const change = (id, user, data, revision) => request('/api/problems/' + id, user, 'PATCH', data, {'If-Match': '"' + revision + '"'});
-  return {hub, admin, operator, other, observer, request, payload, create, find, change};
+  return {hub, admin, operator, other, observer, login, request, payload, create, find, change};
 }
 test('the column follows proposals and resolution', async t => {
   const s = await setup(t), id = await s.create(s.operator);
@@ -81,4 +81,26 @@ test('problem and proposal photos are stored apart from tasks, readable by viewe
   assert.equal(s.hub.store.db.prepare('SELECT count(*) AS count FROM problem_photos').get().count, 2);
   assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: ['not-a-photo']}))).status, 400);
   assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({photos: Array(11).fill(photo)}))).status, 400);
+});
+test('optional English versions are stored with the problem and proposals; only authors and managers translate proposals', async t => {
+  const s = await setup(t);
+  const id = await s.create(s.operator, s.payload({titleEn: 'Fictional pallet gap EN', descriptionEn: 'Fictional EN description', impactEn: 'Fictional 120 min', dependsOnEn: 'Fictional logistics EN'}));
+  let item = await s.find(id, s.observer);
+  assert.deepEqual([item.titleEn, item.descriptionEn, item.impactEn, item.dependsOnEn], ['Fictional pallet gap EN', 'Fictional EN description', 'Fictional 120 min', 'Fictional logistics EN']);
+  assert.equal((await s.change(id, s.other, {action: 'propose', text: 'Fictional BG idea', textEn: 'Fictional EN idea'}, 1)).status, 200);
+  assert.equal((await s.change(id, s.other, {action: 'propose', text: 'Fictional second idea'}, 2)).status, 200);
+  item = await s.find(id);
+  assert.deepEqual(item.proposals.map(entry => entry.textEn), ['Fictional EN idea', '']);
+  const second = item.proposals[1].id;
+  assert.equal((await s.change(id, s.operator, {action: 'translate', proposalId: second, textEn: 'Fictional'}, 3)).status, 403, 'problem author is not the proposal author');
+  assert.equal((await s.change(id, s.other, {action: 'translate', proposalId: second, textEn: 'Fictional second EN'}, 3)).status, 200);
+  assert.equal((await s.change(id, s.admin, {action: 'resolve'}, 4)).status, 200);
+  assert.equal((await s.change(id, s.admin, {action: 'translate', proposalId: second, textEn: 'Fictional admin EN'}, 5)).status, 200, 'resolved problems can still be prepared for meetings');
+  assert.equal((await s.change(id, s.admin, {action: 'translate', proposalId: 'missing', textEn: 'Fictional'}, 6)).status, 400);
+  assert.equal((await s.request('/api/problems', s.admin, 'POST', s.payload({titleEn: 'x'.repeat(181)}))).status, 400);
+  assert.equal((await s.find(id)).proposals[1].textEn, 'Fictional admin EN');
+  const author = s.hub.auth.list().find(user => user.username === 'demo-operator-2');
+  await s.hub.auth.update(author.id, {permissions: {canCreateProblems: false}}, s.hub.auth.list().find(user => user.username === 'demo-admin'));
+  const revoked = await s.login('demo-operator-2');
+  assert.equal((await s.change(id, revoked, {action: 'translate', proposalId: second, textEn: 'Fictional after revoke'}, 6)).status, 403, 'authors need the create right to translate');
 });
