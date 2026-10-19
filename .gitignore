@@ -38,3 +38,5 @@ data/profiles/demo-profile-001/*
 !data/profiles/demo-profile-001/instruction.txt
 # Local Graphify knowledge graph; may index local-only files, never publish it.
 graphify-out/
+# Personal Claude Code settings (local hooks).
+.claude/settings.local.json
