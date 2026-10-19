@@ -4,12 +4,11 @@ const shifts = ['А','Б','В','Г','СТИКЕРИ'];
 function createStatisticsReads(store) {
   const cache = new Map();
   const revision = store.db.prepare('SELECT revision FROM documents WHERE kind=?');
-  const document = store.db.prepare('SELECT data FROM documents WHERE kind=?');
   function snapshot(kind) {
     const current = revision.get(kind);
     if (!current) throw problem(404,'NOT_FOUND');
     if (cache.get(kind)?.revision === current.revision) return cache.get(kind);
-    const data = JSON.parse(document.get(kind).data), months = new Map(), years = new Map(), byMonth = new Map(), byYear = new Map();
+    const data = store.get(kind).data, months = new Map(), years = new Map(), byMonth = new Map(), byYear = new Map();
     for (const entry of data.entries) for (const [rows,key] of [[byMonth,entry.date.slice(0,7)],[byYear,entry.date.slice(0,4)]]) {
       if (!rows.has(key)) rows.set(key,[]);
       rows.get(key).push(entry);

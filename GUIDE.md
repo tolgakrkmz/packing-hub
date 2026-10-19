@@ -877,8 +877,9 @@ bash scripts/restore-rehearsal.sh /absolute/local/verified-archive.sqlite sha256
 
 The archived file must be readable by UID 1000 and have no WAL/SHM/journal sidecars:
 use a completed snapshot, never an actively written database. The real archive
-stays on the protected host. Rehearsal is repeatable; the image must support archive
-schema version 4. Unsupported schemas, invalid data, partial copies, existing
+stays on the protected host. Rehearsal is repeatable; the image must support the
+archive schema version (4 or 5). A version 4 archive is moved to row storage when the
+application first opens it, after a private copy in `migration-backups/`. Unsupported schemas, invalid data, partial copies, existing
 destination files and missing recovery administration fail instead of being
 silently migrated or overwritten. A failed recovery destination is retained by
 the core command for local review, without a ready marker; the disposable Docker
@@ -2154,6 +2155,113 @@ All 18 pages together: 1616 / 1037 ms. The longest statistics task fell from
 about 270 ms to 95 ms. Unchanged on purpose: per-render formatters in access and
 status messages, the server permission model, and data comparison on server refresh,
 where each remaining cost is a few milliseconds of real time.
+
+### Report storage growth (19 October 2026)
+
+Production, downtime and pair reports are stored as one JSON document per
+module in `documents`. This evaluation measured that layout with generated
+fictional data; no production database was opened or changed.
+
+```sh
+node scripts/run-storage-benchmarks.cjs
+node scripts/run-storage-benchmarks.cjs --quick
+```
+
+The script uses a temporary SQLite file (WAL) created by the normal server,
+deliberately generous volumes of 5 production, 8 downtime and 12 pair reports
+per day, and one history row per report. A write is one complete
+`reportOperation` create by an administrator; backup is the regular `VACUUM
+INTO` snapshot plus archive verification. Values are medians of five samples
+after a warm-up on a local Intel Mac (Node 24.22.0, `darwin-x64`), without a
+Docker volume or concurrent clients.
+
+| Years | Reports (prod / downtime / pairs) | Database | Backup | Write prod / downtime / pairs | Read pairs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1,825 / 2,920 / 4,380 | 11.3 MiB | 0.20 s | 74 / 101 / 450 ms | 29 ms |
+| 3 | 5,475 / 8,760 / 13,140 | 33.4 MiB | 0.61 s | 217 / 327 / 2,154 ms | 157 ms |
+| 5 | 9,125 / 14,600 / 21,900 | 55.6 MiB | 1.00 s | 483 / 612 / 3,814 ms | 150 ms |
+
+The pair document reaches 11.3 MiB after five years. Database size and backup
+time grow linearly and remain acceptable. Write time is the real problem: every
+write runs synchronously on the Node event loop, so a multi-second pair write
+blocks every other request. An equivalent indexed row insert plus history row
+took 0.27 ms at every size.
+
+A CPU profile shows that SQLite I/O is not the main cost. Each write parses the
+whole document several times through `get()`, compares every entry with
+`isDeepStrictEqual`, runs one `report_versions` statement for every existing
+entry in `updateDocument()` and validates the whole module again.
+
+#### Row storage (schema version 5)
+
+Report records are stored one per row in `report_entries(kind, id, position,
+data)`. The module document keeps its metadata (`goalTons`, `reasons`,
+`module`, `schemaVersion`) and revision, with `entries: null` as a placeholder
+that preserves the original key order. `get(kind)` rebuilds the same
+`{...metadata, entries}` object in the original order, so the API, statistics,
+JSON export/import, offline files and notification logic are unchanged.
+
+Migration rules, chosen so that no record can be lost:
+
+- A report document whose `entries` is still an array is a legacy module and is
+  authoritative. It is moved to rows when the store opens (and lazily on the
+  next read if a document is written directly, for example by tests).
+- The move runs in a savepoint. The rebuilt module must serialize to exactly the
+  same JSON as the original; otherwise it rolls back and the module stays in the
+  legacy layout, which keeps working. Revisions and record versions do not change.
+- Before moving any non-empty legacy module in a file database, the store writes
+  a private `VACUUM INTO` copy to `migration-backups/pre-report-entries-*.sqlite`
+  beside the database (mode 0600). If that copy fails, the store refuses to start.
+- Writes change only the affected rows. Positions are kept while surviving
+  records stay in order and new ones are appended; any other order renumbers all
+  records. Production and pair writes still validate the whole module.
+- Backup verification and restore accept version 4 and 5 archives and validate
+  the rebuilt modules. A damaged row makes an archive invalid.
+- Older application versions stop at start-up on a migrated database (they
+  expect an array) instead of showing empty modules. To roll back, restore the
+  pre-migration copy or a version 4 archive; writes made after the migration
+  are only in the newer database and archives.
+
+Measured after the change with the same benchmark (load average about 10, so
+compare with the interim row below only roughly):
+
+| Years | Database | Backup | Write prod / downtime / pairs |
+| --- | ---: | ---: | ---: |
+| 1 | 13.0 MiB | 0.35 s | 48 / 66 / 252 ms |
+| 3 | 38.4 MiB | 0.67 s | 153 / 246 / 602 ms |
+| 5 | 64.0 MiB | 1.74 s | 260 / 478 / 1,540 ms |
+
+The database is about 15% larger because of the row index. Writes no longer
+serialize the whole module, but they still rebuild and validate it, so they
+remain linear. Constant-time writes need the next step: `reportOperation`
+validating only the affected record and its shift scope.
+
+#### Interim optimization (implemented)
+
+Without changing the storage format, the write path now:
+
+- freezes implicit versions of untracked legacy records with one SQLite
+  `json_each` statement instead of one statement per existing record;
+- reuses the document already read by `reportOperation()` and `put()` in the
+  same transaction instead of parsing it again in `updateDocument()`;
+- computes notification targets once and skips the whole-document comparison
+  when a record has already changed;
+- looks up previous pair records through a map instead of a linear search per
+  record, which removes quadratic pair validation.
+
+The same benchmark compared the previous commit and this change back to back.
+The machine was under load from other work (load average 10–20), so absolute
+values are higher than in the first table; compare only within a row.
+
+| Years | Write prod: before → after | Downtime: before → after | Pairs: before → after |
+| --- | ---: | ---: | ---: |
+| 1 | 107 → 62 ms | 132 → 106 ms | 681 → 335 ms |
+| 3 | 291 → 193 ms | 450 → 271 ms | 3,710 → 1,089 ms |
+| 5 | 579 → 297 ms | 856 → 391 ms | 5,460 → 2,359 ms |
+
+Writes are roughly two to three times faster and pair writes no longer grow
+quadratically, but every write remains linear in module size. Row storage is
+still required for constant-time writes at five years of pair data.
 
 ## Planned shift transfers
 
