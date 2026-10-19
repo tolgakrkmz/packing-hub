@@ -1036,6 +1036,8 @@ const HUB_EN_MESSAGES = {
   "Топ 5 най-добри двойки": "Top 5 best pairs",
   "Днес": "Today",
   "Последен отчетен ден": "Last reported day",
+  "Текущо денонощие": "Current production day",
+  "Предишно денонощие": "Previous production day",
   "за внимание": "need attention",
   "Всичко е наред": "All good",
   "Всичко е наред за денонощието.": "All good for the day.",

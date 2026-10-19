@@ -401,11 +401,10 @@ function renderAll() {
 }
 
 function renderOverview() {
-  const period = `${selectedYear}-${selectedDashboardMonth}`, today = statisticsDay(), shift = ShiftSchedule.current();
+  const period = `${selectedYear}-${selectedDashboardMonth}`, today = statisticsDay(), shift = ShiftSchedule.current(), liveDay = StatisticsOverview.productionDay(), day = StatisticsOverview.pickDay(period, entries);
   // The current shift is part of the key so "missing report" items appear once a shift ends.
-  statisticsCache.update('overview', [entries, avEntries, pairStatistics.getVersion(), personnelEmployees, personnelCounts, goalTons, el.connDot.classList.contains('on')], `${period}|${today}|${shift.date}|${shift.shiftCode}`, () => {
-    const day = StatisticsOverview.pickDay(period, today, entries);
-    renderStatisticsOverview({today, connected:el.connDot.classList.contains('on'),
+  statisticsCache.update('overview', [entries, avEntries, pairStatistics.getVersion(), personnelEmployees, personnelCounts, goalTons, el.connDot.classList.contains('on')], `${period}|${today}|${liveDay}|${day}|${shift.date}|${shift.shiftCode}`, () => {
+    renderStatisticsOverview({liveDay, connected:el.connDot.classList.contains('on'),
       summary:StatisticsOverview.summarize({day, production:entries, downtime:avEntries, pairs:pairStatistics.getEntries()})});
   });
 }

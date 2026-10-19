@@ -8,9 +8,17 @@ const StatisticsOverview = (() => {
   const shiftInterval = (team, date) => { try { return ShiftSchedule.shiftInterval(team, date); } catch { return null; } };
   const scrapPct = rows => { const kg = sum(rows, 'tonnage'); return kg > 0 ? sum(rows, 'brak') / kg * 100 : null; };
 
-  // Today inside the selected month; otherwise the last reported day of that month.
-  function pickDay(period, today, production) {
-    if (today.startsWith(period + '-')) return today;
+  // The production day starts at 06:00 Sofia time; the night shift belongs to the day it started.
+  function productionDay(at = Date.now()) {
+    const calendar = ShiftSchedule.sofiaDate(new Date(at));
+    return at < ShiftSchedule.sofiaInstant(calendar, 6) ? ShiftSchedule.addDays(calendar, -1) : calendar;
+  }
+  // Current month: like the report form, until 10:00 the previous day stays in view (the night shift reports until then).
+  // Other months: the last reported day of that month.
+  // shortcut: on the 1st before 10:00 the previous day is in last month, which the server may not have sent; load it if that matters.
+  function pickDay(period, production, at = Date.now()) {
+    const calendar = ShiftSchedule.sofiaDate(new Date(at));
+    if (calendar.startsWith(period + '-')) return at < ShiftSchedule.sofiaInstant(calendar, 10) ? ShiftSchedule.addDays(calendar, -1) : calendar;
     return production.map(entry => entry.date).filter(date => date?.startsWith(period + '-')).sort().at(-1) || null;
   }
 
@@ -48,16 +56,17 @@ const StatisticsOverview = (() => {
       kg:sum(rows, 'tonnage'), brak:sum(rows, 'brak'), scrapPct:dayScrap, monthScrapPct:monthScrap,
       downtime:{minutes:sum(stops, 'durationMin'), count:stops.length, topReason:topReason && {reason:topReason[0], minutes:topReason[1]}}};
   }
-  return {SHIFT_GOAL_KG, LONG_DOWNTIME_MIN, pickDay, summarize};
+  return {SHIFT_GOAL_KG, LONG_DOWNTIME_MIN, productionDay, pickDay, summarize};
 })();
 
-function renderStatisticsOverview({summary, today, connected}) {
+function renderStatisticsOverview({summary, liveDay, connected}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const tons = StatisticsUnits.formatKg, pct = value => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits:1}) + '%';
   const shiftLabel = code => ShiftSchedule.LABELS[code] || 'Извън график';
   const link = (tab, label) => `<button type="button" class="ov-link" data-overview-tab="${tab}">${label} →</button>`;
-  $('overviewDay').textContent = !summary.day ? '' : summary.day === today ? 'Днес · ' + summary.day.split('-').reverse().join('.') : 'Последен отчетен ден · ' + summary.day.split('-').reverse().join('.');
+  const label = summary.day === liveDay ? 'Текущо денонощие' : summary.day === ShiftSchedule.addDays(liveDay, -1) ? 'Предишно денонощие' : 'Последен отчетен ден';
+  $('overviewDay').textContent = summary.day ? label + ' · ' + summary.day.split('-').reverse().join('.') : '';
   if (!summary.day || !connected) {
     $('overviewStatus').className = 'status-chip neutral';
     $('overviewStatus').textContent = 'Няма данни';
