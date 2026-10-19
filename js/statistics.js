@@ -398,6 +398,7 @@ function renderAll() {
     renderAvTable(rows, annual ? `месец (${selectedYear})` : 'година');
   });
   renderOverview();
+  renderComparison();
 }
 
 function renderOverview() {
@@ -408,6 +409,29 @@ function renderOverview() {
       summary:StatisticsOverview.summarize({day, production:entries, downtime:avEntries, pairs:pairStatistics.getEntries()})});
   });
 }
+let comparisonRequest = 0, comparisonShown = null;
+async function renderComparison() {
+  if (document.getElementById('statsComparison').hidden) return;
+  const month = `${selectedYear}-${selectedDashboardMonth}`, mode = document.getElementById('comparisonBase').value, now = Date.now();
+  const connected = el.connDot.classList.contains('on'), downtimeConnected = el.avConnDot.classList.contains('on');
+  const periods = StatisticsComparison.ranges(month, mode, now);
+  const key = [month, mode, periods.current.to, connected, downtimeConnected].join('|');
+  if (comparisonShown && comparisonShown.key === key && comparisonShown.entries === entries && comparisonShown.avEntries === avEntries) return;
+  const request = ++comparisonRequest, shown = {key, entries, avEntries};
+  let baseProduction = entries, baseDowntime = downtimeConnected ? avEntries : [], error = false;
+  // The server sends only the selected period, so the base month is read through the same permission-checked endpoints.
+  if (typeof HubServer !== 'undefined' && connected && periods.base.from) {
+    try {
+      const read = kind => HubServer.json(`/api/statistics/period/${kind}?month=${encodeURIComponent(periods.base.month)}`).then(result => result.data.entries || []);
+      [baseProduction, baseDowntime] = await Promise.all([read('production-log'), downtimeConnected ? read('line-downtime') : []]);
+    } catch { error = true; }
+  }
+  if (request !== comparisonRequest) return;
+  renderStatisticsComparison({connected, downtimeConnected, error,
+    result:StatisticsComparison.compare({month, mode, production:entries, downtime:downtimeConnected ? avEntries : [], baseProduction, baseDowntime, now})});
+  comparisonShown = error ? null : shown;
+}
+document.getElementById('comparisonBase').addEventListener('change', renderComparison);
 document.getElementById('overviewBody').addEventListener('click', event => {
   const tab = event.target.closest('[data-overview-tab]')?.dataset.overviewTab;
   if (tab) document.querySelector(`[data-stats-tab="${tab}"]`).click();

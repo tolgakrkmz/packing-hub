@@ -398,6 +398,7 @@
       <button id="statsTabPairs" role="tab" data-stats-tab="pairs" aria-controls="statsPairs" aria-selected="false" tabindex="-1">Двойки и таргети</button>
       <button id="statsTabDowntime" role="tab" data-stats-tab="downtime" aria-controls="statsDowntime" aria-selected="false" tabindex="-1">Престои</button>
       <button id="statsTabWorkforce" role="tab" data-stats-tab="workforce" aria-controls="statsWorkforce" aria-selected="false" tabindex="-1">Състав и капацитет</button>
+      <button id="statsTabComparison" role="tab" data-stats-tab="comparison" aria-controls="statsComparison" aria-selected="false" tabindex="-1">Сравнение</button>
     </nav>
     <div class="stats-section" id="statsOverview" data-stats-panel="overview" role="tabpanel" aria-labelledby="statsTabOverview">
       <section class="workforce-dashboard overview-stats" aria-labelledby="overviewTitle">
@@ -603,6 +604,25 @@
     </div>
     </section>
     </div>
+    <div class="stats-section" id="statsComparison" data-stats-panel="comparison" role="tabpanel" aria-labelledby="statsTabComparison" hidden>
+      <section class="workforce-dashboard comparison-stats" aria-labelledby="comparisonTitle">
+        <div class="wf-head">
+          <div>
+            <div class="dashboard-eyebrow">Сравнение</div>
+            <h2 class="wf-title" id="comparisonTitle">Сравнение на периоди</h2>
+            <div class="wf-subtitle" id="comparisonPeriods"></div>
+          </div>
+          <div class="wf-head-right dashboard-filter">
+            <label for="comparisonBase">Сравни с</label>
+            <select class="dashboard-select" id="comparisonBase">
+              <option value="month">Предишния месец</option>
+              <option value="year">Същия месец миналата година</option>
+            </select>
+          </div>
+        </div>
+        <div id="comparisonBody"></div>
+      </section>
+    </div>
     <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">
       <h2 id="downtimeScopeTitle">Престой на автоматична линия</h2>
@@ -630,6 +650,7 @@
 <script src="js/statistics-cache.js"></script>
 <script src="js/pair-targets-statistics.js"></script>
 <script src="js/statistics-overview.js"></script>
+<script src="js/statistics-comparison.js"></script>
 <script src="js/statistics-navigation.js"></script>
 <script src="js/statistics-helpers.js"></script>
 <script src="js/statistics-production.js"></script>
