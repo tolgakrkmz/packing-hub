@@ -36,6 +36,7 @@ test('any month with completed days can be the base, newest first', () => {
   assert.equal(months.length, 21);
   assert.ok(!months.includes('2026-09'));
   assert.equal(comparison.options('2026-10', [], at('2026-10-01', 12))[0], '2026-09', 'a month without completed days is not offered');
+  assert.equal(comparison.options('2026-10', ['0001', 'abcd', 2025], now).at(-1), '2025-01', 'malformed record years do not extend the list');
 });
 
 test('summary counts scheduled shifts, missing reports and exact denominators', () => {

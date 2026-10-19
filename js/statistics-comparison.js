@@ -3,7 +3,8 @@ const StatisticsComparison = (() => {
   const sum = (rows, key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
   const shiftInterval = (team, date) => { try { return ShiftSchedule.shiftInterval(team, date); } catch { return null; } };
   const daysIn = month => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).getUTCDate();
-  const addMonths = (month, count) => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 1 + count, 1)).toISOString().slice(0, 7);
+  // Integer month arithmetic: Date.UTC maps years 0-99 to 1900-1999.
+  const addMonths = (month, count) => { const index = +month.slice(0, 4) * 12 + +month.slice(5, 7) - 1 + count; return `${String(Math.floor(index / 12)).padStart(4, '0')}-${String(index % 12 + 1).padStart(2, '0')}`; };
   const range = (month, days) => days ? {month, from:`${month}-01`, to:`${month}-${String(days).padStart(2, '0')}`, days} : {month, from:null, to:null, days:0};
   // A production day ends when the next one starts at 06:00, after its night shift.
   const lastDone = now => ShiftSchedule.addDays(StatisticsOverview.productionDay(now), -1);
@@ -23,7 +24,9 @@ const StatisticsComparison = (() => {
 
   // Months with completed days, newest first, without the selected one.
   function options(month, years = [], now = Date.now()) {
-    const first = (years.slice().sort()[0] || month.slice(0, 4)) + '-01', result = [];
+    // Years come from stored records; ignore malformed or implausible ones so the list stays bounded.
+    const valid = years.map(String).filter(year => /^\d{4}$/.test(year) && year >= '2000').sort();
+    const first = (valid[0] || month.slice(0, 4)) + '-01', result = [];
     for (let value = lastDone(now).slice(0, 7); value >= first; value = addMonths(value, -1)) if (value !== month) result.push(value);
     return result;
   }
