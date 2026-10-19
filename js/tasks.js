@@ -328,11 +328,12 @@
   async function mutate(form, feedback, fn) {
     if (busy) return;
     busy = true; const submit = form.querySelector('button[type=submit]'); submit.disabled = true; feedback.textContent = '';
+    const focused = document.activeElement, dialog = form.closest('dialog');
     const controls = [...form.querySelectorAll('input,select,textarea,button')].filter(control => !control.disabled); for (const control of controls) control.disabled = true;
     ++sequence; pendingRead = null;
-    try { await fn(); ++sequence; pendingRead = null; form.closest('dialog').close(); busy = false; await refresh({fresh:true}); $('taskMessage').textContent = 'Промяната е записана.'; }
+    try { await fn(); ++sequence; pendingRead = null; dialog.close(); busy = false; await refresh({fresh:true}); $('taskMessage').textContent = 'Промяната е записана.'; if (document.activeElement === document.body) $('taskMessage').focus(); }
     catch (error) { feedback.textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; if (error.status === 409) feedback.textContent += ' Затвори прозореца и натисни „Опресни“. Въведеното е запазено до затваряне.'; }
-    finally { busy = false; for (const control of controls) control.disabled = false; submit.disabled = false; }
+    finally { busy = false; for (const control of controls) control.disabled = false; submit.disabled = false; if (dialog.open && !dialog.contains(document.activeElement)) (dialog.contains(focused) ? focused : submit).focus(); }
   }
   $('taskForm').addEventListener('submit', event => {
     event.preventDefault();

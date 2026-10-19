@@ -50,6 +50,7 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
   async function run(change, onSuccess, successMessage, operation = null) {
     if(busy) return false;
     busy = true;
+    const focused = document.activeElement;
     if(operation && operation.action !== 'create' && !operation.reason) {
       const reason = await HubServer.correctionReason();
       if(reason === null) { busy = false; return false; }
@@ -102,6 +103,9 @@ function createReportWriter({sync, getData, setData, render, updateControls, con
         locked.forEach(({control,disabled}) => { control.disabled = disabled; });
         updateControls();
         retryButton.hidden = !retry;
+        // Disabled controls drop keyboard focus; return it to the retry, the same control or the status.
+        const active = document.activeElement, usable = control => !control.disabled && control.checkVisibility();
+        if(focused && focused !== document.body && (active === document.body || !usable(active))) (retry ? retryButton : usable(focused) ? focused : message).focus();
       }
     }
     return accepted;

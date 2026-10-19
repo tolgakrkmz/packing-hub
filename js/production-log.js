@@ -101,12 +101,18 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
   if(!btn) return;
   selectedShift = btn.dataset.shift;
   reportDate.selectShift(selectedShift);
-  document.querySelectorAll('.shift-btn').forEach(b=>{
-    b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
-  });
-  btn.classList.add('sel-'+selectedShift);
+  markShiftButtons();
   updateSaveEnabled();
 });
+
+// aria-pressed carries the selected shift for assistive tech and the non-colour underline.
+function markShiftButtons(){
+  document.querySelectorAll('.shift-btn').forEach(button => {
+    const selected = button.dataset.shift === selectedShift;
+    for(const shift of SHIFTS) button.classList.toggle('sel-'+shift, selected && shift === selectedShift);
+    button.ariaPressed = String(selected);
+  });
+}
 
 function updateSaveEnabled(){
   productionAccess?.check();
@@ -129,7 +135,7 @@ function editEntry(id) {
   breakdownToggle.checked = !!entry.breakdown;
   simpleTonRow.style.display = entry.breakdown ? 'none' : 'flex'; breakdownRows.style.display = entry.breakdown ? 'block' : 'none';
   for(const [control,key] of [[autoKgInput,'autoKg'],[autoCrateInput,'autoCrates'],[manKgInput,'manKg'],[manCrateInput,'manCrates']]) control.value = entry.breakdown?.[key] || 0;
-  document.querySelectorAll('.shift-btn').forEach(button => { for(const shift of SHIFTS) button.classList.remove('sel-'+shift); if(button.dataset.shift === selectedShift) button.classList.add('sel-'+selectedShift); });
+  markShiftButtons();
   updateTotalReadout(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
   productionDraft?.accept();
   dateInput.scrollIntoView?.({block:'center'});
@@ -309,9 +315,7 @@ saveBtn.addEventListener('click', async ()=>{
     updateTotalReadout();
     selectedShift = null;
     productionDraft?.accept();
-    document.querySelectorAll('.shift-btn').forEach(b=>{
-      b.classList.remove('sel-А','sel-Б','sel-В','sel-Г','sel-СТИКЕРИ');
-    });
+    markShiftButtons();
   }, 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.',operation);
 });
 
@@ -430,7 +434,7 @@ if(explicitReportScope) {
   dateInput.value=explicitReportScope.date;
   dateInput.dispatchEvent(new Event('input',{bubbles:true}));
   selectedShift=explicitReportScope.team;
-  document.querySelectorAll('.shift-btn').forEach(button=>button.classList.toggle('sel-'+selectedShift,button.dataset.shift===selectedShift));
+  markShiftButtons();
   updateSaveEnabled();productionDraft?.accept();
 }
 if(scopeLinkError) {msg.textContent=scopeLinkError;msg.dataset.state='error';updateSaveEnabled();}
@@ -441,7 +445,7 @@ if(typeof createProductionAccessControls!=='undefined')productionAccess=createPr
     if(explicitReportScope||scopeLinkError||selectedShift||reportDraft||editingReport||dateInput.value!==initialProductionDate||!HubServer.user.taskTeam)return;
     dateInput.value=scope.date;selectedShift=scope.team;
     dateInput.dispatchEvent(new Event('input',{bubbles:true}));
-    document.querySelectorAll('.shift-btn').forEach(button=>button.classList.toggle('sel-'+selectedShift,button.dataset.shift===selectedShift));
+    markShiftButtons();
     renderDayTotal();productionDraft?.accept();
   }
 });
