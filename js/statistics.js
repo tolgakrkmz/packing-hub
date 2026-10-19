@@ -409,13 +409,22 @@ function renderOverview() {
       summary:StatisticsOverview.summarize({day, production:entries, downtime:avEntries, pairs:pairStatistics.getEntries()})});
   });
 }
-let comparisonRequest = 0, comparisonShown = null;
+let comparisonRequest = 0, comparisonShown = null, comparisonChoice = '';
 async function renderComparison() {
   if (document.getElementById('statsComparison').hidden) return;
-  const month = `${selectedYear}-${selectedDashboardMonth}`, mode = document.getElementById('comparisonBase').value, now = Date.now();
+  const month = `${selectedYear}-${selectedDashboardMonth}`, now = Date.now(), select = document.getElementById('comparisonBase');
+  const months = StatisticsComparison.options(month, getAvailableYears(), now);
+  // A chosen month stays selected while it remains a valid base for the shared period.
+  if (/^\d{4}-\d{2}$/.test(comparisonChoice) && !months.includes(comparisonChoice)) comparisonChoice = '';
+  statisticsCache.update('comparison-options', [], months.join(','), () => {
+    select.innerHTML = '<option value="">Предишния месец</option><option value="year">Същия месец миналата година</option>' +
+      months.map(value => `<option value="${value}">${comparisonMonthLabel(value)}</option>`).join('');
+  });
+  select.value = comparisonChoice;
+  const base = StatisticsComparison.baseMonth(month, comparisonChoice);
   const connected = el.connDot.classList.contains('on'), downtimeConnected = el.avConnDot.classList.contains('on');
-  const periods = StatisticsComparison.ranges(month, mode, now);
-  const key = [month, mode, periods.current.to, connected, downtimeConnected].join('|');
+  const periods = StatisticsComparison.ranges(month, base, now);
+  const key = [month, base, periods.current.to, connected, downtimeConnected].join('|');
   if (comparisonShown && comparisonShown.key === key && comparisonShown.entries === entries && comparisonShown.avEntries === avEntries) return;
   const request = ++comparisonRequest, shown = {key, entries, avEntries};
   let baseProduction = entries, baseDowntime = downtimeConnected ? avEntries : [], error = false;
@@ -428,10 +437,10 @@ async function renderComparison() {
   }
   if (request !== comparisonRequest) return;
   renderStatisticsComparison({connected, downtimeConnected, error,
-    result:StatisticsComparison.compare({month, mode, production:entries, downtime:downtimeConnected ? avEntries : [], baseProduction, baseDowntime, now})});
+    result:StatisticsComparison.compare({month, base, production:entries, downtime:downtimeConnected ? avEntries : [], baseProduction, baseDowntime, now})});
   comparisonShown = error ? null : shown;
 }
-document.getElementById('comparisonBase').addEventListener('change', renderComparison);
+document.getElementById('comparisonBase').addEventListener('change', event => { comparisonChoice = event.target.value; renderComparison(); });
 document.getElementById('overviewBody').addEventListener('click', event => {
   const tab = event.target.closest('[data-overview-tab]')?.dataset.overviewTab;
   if (tab) document.querySelector(`[data-stats-tab="${tab}"]`).click();

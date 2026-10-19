@@ -29,7 +29,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   for (const value of ['2024','2025','2026']) await expect(year.locator(`option[value="${value}"]`)).toHaveCount(1);
   await expect(page.locator('#dashboardActual')).toHaveText('3 т');
   await expect(page.locator('#dashboardBrak')).toHaveText('0,2 т');
-  await exerciseStatisticsComparison({page, expect});
+  await exerciseStatisticsComparison({page, expect, screenshotDir});
   const refreshed = statisticsFixture();
   refreshed['production-log'].entries[0].brak = 170;
   await replaceSources(refreshed);
@@ -136,35 +136,54 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
 }
 
-async function exerciseStatisticsComparison({page, expect}) {
-  console.log('RUN period comparison over completed days with report coverage');
+async function exerciseStatisticsComparison({page, expect, screenshotDir}) {
+  console.log('RUN period comparison cards, cumulative chart, any base month and report coverage');
   await page.locator('[data-stats-tab=comparison]').click();
-  const body = page.locator('#comparisonBody'), kg = body.locator('[data-metric=kg] td');
+  const body = page.locator('#comparisonBody'), base = page.locator('#comparisonBase'), kg = body.locator('.cmp-kpi[data-metric=kg]');
   // The fixed time is 05.10 08:30, so 1-4 October are the completed days.
   await expect(page.locator('#comparisonPeriods')).toHaveText('01.10.2026 – 04.10.2026 спрямо 01.09.2026 – 04.09.2026');
-  await expect(kg.nth(1)).toHaveText('2 т');
-  await expect(kg.nth(2)).toHaveText('0 т');
-  await expect(kg.nth(3)).toHaveText('+2 т');
+  await expect(kg.locator('.val')).toHaveText('2 т');
+  await expect(kg.locator('.cmp-base')).toHaveText('0 т');
+  await expect(kg.locator('.cmp-delta')).toHaveText('+2 т');
+  await expect(kg.locator('.cmp-delta')).toHaveClass(/good/);
   await expect(body).toContainText('Няма отчети в сравнителния период.');
-  await expect(body).toContainText('Месецът не е приключил');
+  await expect(body).toContainText('Сравняват се само завършените дни: 1–4.');
   await expect(body).toContainText('Има смени без отчет');
   await expect(body.locator('.cmp-coverage .val').first()).toHaveText(/^1 \/ \d+$/);
-  await page.locator('#comparisonBase').selectOption('year');
+  await expect(body.locator('.cmp-chart svg polyline')).toHaveCount(2);
+  await expect(body.locator('table')).toHaveCount(0);
+  await expect(base.locator('option[value="2025-10"]')).toHaveText('Октомври 2025');
+  await expect(base.locator('option[value="2026-10"]')).toHaveCount(0);
+  await base.selectOption('year');
   await expect(page.locator('#comparisonPeriods')).toContainText('01.10.2025 – 04.10.2025');
-  await expect(kg.nth(2)).toHaveText('5 т');
-  await expect(kg.nth(3)).toHaveText('-3 т (-60%)');
-  await expect(body.locator('[data-metric=scrapPct] td').nth(3)).toHaveText(/п\.п\.$/);
+  await expect(kg.locator('.cmp-base')).toHaveText('5 т');
+  await expect(kg.locator('.cmp-delta')).toHaveText('-3 т (-60%)');
+  await expect(kg.locator('.cmp-delta')).toHaveClass(/bad/);
+  await expect(body.locator('.cmp-kpi[data-metric=scrapPct] .cmp-delta')).toHaveText(/п\.п\.$/);
+  await base.selectOption('2025-10');
+  await page.locator('#dashboardMonthSelect').selectOption('09');
+  await expect(base).toHaveValue('2025-10');
+  await expect(page.locator('#comparisonPeriods')).toHaveText('01.09.2026 – 30.09.2026 спрямо 01.10.2025 – 30.10.2025');
+  await expect(kg.locator('.val')).toHaveText('1 т');
+  await expect(kg.locator('.cmp-base')).toHaveText('5 т');
+  await expect(body.locator('.cmp-legend-row')).toContainText('Септември 2026');
+  await expect(body.locator('.cmp-legend-row')).toContainText('Октомври 2025');
   await page.locator('[data-hub-language=en]').click();
   await expect(page.locator('#comparisonTitle')).toHaveText('Period comparison');
-  await expect(kg.nth(3)).toHaveText('-3 t (-60%)');
-  for (const width of [390, 1440]) { await page.setViewportSize({width, height:900}); await assertResponsive(page, `Comparison en ${width}`); }
+  await expect(kg.locator('.cmp-delta')).toHaveText('-4 t (-80%)');
+  await expect(base.locator('option[value="2025-10"]')).toHaveText('October 2025');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({width, height:900});
+    await assertResponsive(page, `Comparison en ${width}`);
+    if (screenshotDir) await page.locator('#statsComparison').screenshot({path:screenshotDir + `/comparison-en-${width}.png`});
+  }
   await page.locator('[data-hub-language=bg]').click();
-  await page.locator('#comparisonBase').selectOption('month');
   await page.locator('#dashboardMonthSelect').selectOption('11');
-  await expect(body).toContainText('Няма завършени дни в избрания месец.');
+  await expect(body).toContainText('Няма завършени дни за сравнение в избраните месеци.');
+  await base.selectOption('');
   await page.locator('#dashboardMonthSelect').selectOption('10');
   await page.locator('[data-stats-tab=overview]').click();
-  console.log('PASS period comparison over completed days with report coverage');
+  console.log('PASS period comparison cards, cumulative chart, any base month and report coverage');
 }
 
 async function exerciseStatisticsUnits({page, expect, replaceSources, screenshotDir}) {
