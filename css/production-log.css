@@ -24,6 +24,7 @@ header h1{letter-spacing:.2px;}
   transition:transform .08s ease;
 }
 .shift-btn:active{transform:scale(.96);}
+.shift-btn[aria-pressed=true]{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;}
 .shift-btn.sel-А{background:var(--amber-dark);border-color:var(--amber);color:var(--amber);}
 .shift-btn.sel-Б{background:var(--blue-dark);border-color:var(--blue);color:var(--blue);}
 .shift-btn.sel-В{background:var(--teal-dark);border-color:var(--teal);color:var(--teal);}

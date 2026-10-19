@@ -1207,6 +1207,18 @@ file and server modes, including accounts and import screens in server mode.
 These are Chrome checks; Safari/iOS and Android devices still need a manual
 check before production deployment.
 
+Login, tonnage, tasks and end of shift work with the keyboard alone. Every
+control and dialog has an accessible name, text meets WCAG AA contrast and the
+selected shift is underlined and exposed as `aria-pressed`, not only coloured.
+After a save, an error or a closed dialog, focus returns to the control, the
+retry button or the status message instead of the page body. The accessibility
+suite checks this for BG/EN, an administrator and a restricted operator, at
+320, 390 and 640 px (400% and 200% browser zoom of a 1280 px window):
+
+```sh
+node scripts/run-server-browser-tests.cjs --headless --accessibility-only
+```
+
 ## Report dates
 
 In authenticated server mode, production uses the assigned account team and

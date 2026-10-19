@@ -21,5 +21,5 @@ document.getElementById('loginForm').addEventListener('submit', async event => {
       : response.status === 429 ? 'Твърде много опити. Опитай отново след 15 минути.'
       : 'Входът временно не е достъпен. Опитай отново.';
   } catch { message.textContent = 'Няма връзка със сървъра. Опитай отново.'; }
-  finally { button.disabled = false; }
+  finally { button.disabled = false; if (document.activeElement === document.body) button.focus(); }
 });

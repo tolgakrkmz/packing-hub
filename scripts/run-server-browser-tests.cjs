@@ -123,6 +123,10 @@ async function main() {
       await require('../tests/browser/account-password.cjs').exerciseAccountPassword({admin,hub,base,browser,expect});
       assert.deepEqual(errors,[]); return;
     }
+    if (process.argv.includes('--accessibility-only')) {
+      await require('../tests/browser/accessibility.cjs').exerciseAccessibility({admin,hub,base,device,expect});
+      assert.deepEqual(errors,[]); return;
+    }
     if (process.argv.includes('--login-only')) {
       await require('../tests/browser/login-usability.cjs').exerciseLoginUsability({admin,base,expect});
       assert.deepEqual(errors,[]); return;
