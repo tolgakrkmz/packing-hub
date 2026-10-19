@@ -2091,6 +2091,29 @@ task after the complete view is attached, including history sections assembled
 off-DOM. A regression refreshes a neighboring task and verifies that the reused
 linked card retains focus and loads its photo after automatic scrolling.
 
+### English translation startup (19 October 2026)
+
+The translator previously combined all ~2000 English keys into one regular
+expression. Chrome compiled it on the first English translation of every page,
+which took about 170 ms on the host CPU. Matching now uses an index of keys by
+first character, built on first English use. The rules are unchanged: whole
+words, a key space matches any whitespace run, leftmost match first, then the
+longest key. `tests/i18n.test.cjs` compares the new matcher against the former
+regular expression on every key with boundary, whitespace and combination variants.
+
+Headless Chrome 155 at CPU rate 4 on offline `file://` pages, medians of five fresh
+contexts, `main` at `6035862` before / after:
+
+| Page | First BG → EN switch (ms) | Page load with EN saved (ms) |
+| --- | ---: | ---: |
+| Statistics | 774 / 52 | 1275 / 633 |
+| Production log | 766 / 31 | 1149 / 385 |
+| Home | 758 / 18 | 1149 / 505 |
+
+Bulgarian pages no longer build the expression at all. They still load
+`js/i18n-en.js` (about 45 KB with Brotli, cached by version). These are local
+measurements, not results from a physical phone or the live installation.
+
 ## Planned shift transfers
 
 Status: implemented. Production deployment uses a separate manual copy. Trello:

@@ -61,3 +61,18 @@ test('every page loads the translator with a demo-specific preference key', () =
     assert.match(html,/src="js\/i18n.js" data-storage-key="portfolio-hub-language"/);
   }
 });
+test('indexed matching keeps the former whole-word regex results', () => {
+  const {i18n} = environment('en');
+  const sandbox = vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/i18n-en.js'),'utf8'),sandbox);
+  const messages = vm.runInContext('HUB_EN_MESSAGES',sandbox), keys = Object.keys(messages).sort((a,b) => b.length-a.length);
+  // The previous implementation, kept as the reference.
+  const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const pattern = new RegExp('(?<![\\p{L}_])(?:' + keys.map(key => (/^\d/.test(key) ? '(?<!\\d)' : '') + escape(key).replace(/ /g,'\\s+')).join('|') + ')(?![\\p{L}_])','gu');
+  const normalize = value => String(value).trim().replace(/\s+/g,' ');
+  const reference = text => text.replace(pattern,match => Object.hasOwn(messages,normalize(match)) ? messages[normalize(match)] : match);
+  const samples = ['', ' ', 'Fictional task 1', '2026-10-04', 'Не сега', '😀Не сега', 'аНе сега', '_Не сега', 'Не сегаа'];
+  for (const key of keys) samples.push(key, ' ' + key + '\n', '1 ' + key + ': 5', key + key, key.replace(/ /g,' \n  '), 'x' + key, key + 'а', key.slice(0,-1), '3' + key, '😀' + key, key + '_');
+  for (let i = 0; i < 3000; i++) samples.push(keys[i % keys.length] + ' и ' + keys[i * 7919 % keys.length]);
+  for (const text of samples) assert.equal(i18n.t(text), reference(text), JSON.stringify(text));
+});
