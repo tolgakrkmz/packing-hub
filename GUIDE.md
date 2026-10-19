@@ -2199,9 +2199,32 @@ entry in `updateDocument()` and validates the whole module again.
 - Statistics and history queries read `report_entries` instead of `json_each`
   over the document.
 
-A smaller interim step is to remove the per-entry `report_versions` statement
-from `updateDocument()` and repeated `get()` calls per write. It reduces the
-constant but keeps linear growth.
+#### Interim optimization (implemented)
+
+Without changing the storage format, the write path now:
+
+- freezes implicit versions of untracked legacy records with one SQLite
+  `json_each` statement instead of one statement per existing record;
+- reuses the document already read by `reportOperation()` and `put()` in the
+  same transaction instead of parsing it again in `updateDocument()`;
+- computes notification targets once and skips the whole-document comparison
+  when a record has already changed;
+- looks up previous pair records through a map instead of a linear search per
+  record, which removes quadratic pair validation.
+
+The same benchmark compared the previous commit and this change back to back.
+The machine was under load from other work (load average 10–20), so absolute
+values are higher than in the first table; compare only within a row.
+
+| Years | Write prod: before → after | Downtime: before → after | Pairs: before → after |
+| --- | ---: | ---: | ---: |
+| 1 | 107 → 62 ms | 132 → 106 ms | 681 → 335 ms |
+| 3 | 291 → 193 ms | 450 → 271 ms | 3,710 → 1,089 ms |
+| 5 | 579 → 297 ms | 856 → 391 ms | 5,460 → 2,359 ms |
+
+Writes are roughly two to three times faster and pair writes no longer grow
+quadratically, but every write remains linear in module size. Row storage is
+still required for constant-time writes at five years of pair data.
 
 ## Planned shift transfers
 

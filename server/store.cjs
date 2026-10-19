@@ -44,9 +44,9 @@ function validateData(kind, data) {
   } catch { throw problem(400, 'INVALID_DATA'); }
 }
 function validReason(value) { return typeof value === 'string' && value.trim().length > 0 && value.length <= 1000; }
-function reportChanges(before, after) {
-  const {addedIds, changedIds} = notificationTargets(before, after);
-  return {added: addedIds.length > 0, changed: changedIds.length > 0, content: !isDeepStrictEqual(before, after)};
+function reportChanges(before, after, targets = notificationTargets(before, after)) {
+  const {addedIds, changedIds} = targets;
+  return {added: addedIds.length > 0, changed: changedIds.length > 0, content: addedIds.length > 0 || changedIds.length > 0 || !isDeepStrictEqual(before, after)};
 }
 function notificationTargets(before, after) {
   const prior = new Map((before.entries || []).map(entry => [entry.id, entry]));
@@ -145,13 +145,13 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
       }
     } catch { throw problem(400,'INVALID_PERSONNEL_CHANGE'); }
   }
-  function updateDocument(kind, data, user, context = {}) {
+  function updateDocument(kind, data, user, context = {}, before = get(kind)) {
     if(kind==='personnel') { validateData(kind,data); validatePersonnelChange(data,context.personnelImport===true); }
-    const before = get(kind);
     if (Object.hasOwn(reports, kind)) {
       const prior = new Map(before.data.entries.map(entry => [entry.id, entry]));
       const next = new Map(data.entries.map(entry => [entry.id, entry]));
-      for (const id of prior.keys()) db.prepare('INSERT OR IGNORE INTO report_versions VALUES(?,?,?)').run(kind,id,before.versions[id]);
+      // Freeze implicit versions of legacy entries in one statement; get() reports them as the document revision.
+      db.prepare("INSERT OR IGNORE INTO report_versions SELECT kind,json_extract(value,'$.id'),revision FROM documents,json_each(documents.data,'$.entries') WHERE kind=?").run(kind);
       for (const id of new Set([...prior.keys(), ...next.keys()])) {
         if (!isDeepStrictEqual(prior.get(id), next.get(id))) {
           const old = prior.get(id), value = next.get(id);
@@ -174,7 +174,8 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
     if (!canViewModule(user, kind)) throw problem(403, 'FORBIDDEN');
     if (context.reason !== undefined && !validReason(context.reason)) throw problem(400,'INVALID_OPERATION');
     const work = () => {
-      const current = get(kind);
+      // reportOperation passes the document it already read inside the same transaction.
+      const current = context.current || get(kind);
       if (current.revision !== revision) throw problem(409, 'CONFLICT');
       const report = reports[kind], importing = mode === 'import' && can(user, 'canImportData');
       if (report && !importing) {
@@ -197,12 +198,12 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         try {
           const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
           const planFields = ['id', 'date', 'shiftCode', 'team', 'members', 'targetKg', 'targetCrates', 'createdAt'];
-          const remaining = new Set(data.entries.map(entry => entry.id));
+          const remaining = new Set(data.entries.map(entry => entry.id)), prior = new Map(current.data.entries.map(entry => [entry.id, entry]));
           // Ordinary planning keeps cancelled snapshots immutable. Deletions
           // and restores use protected history and the record operation checks.
           if (context.action !== 'delete' && current.data.entries.some(entry => !remaining.has(entry.id))) throw new Error();
           for (const entry of data.entries) {
-            const previous = current.data.entries.find(item => item.id === entry.id);
+            const previous = prior.get(entry.id);
             if (previous && isDeepStrictEqual(previous, entry)) continue;
             // A restore uses an already-validated historical snapshot. Schema
             // and duplicate-membership checks still run in validateData(), but
@@ -227,8 +228,9 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
           }
         } catch { throw problem(400, 'INVALID_PAIR_CHANGE'); }
       }
-      updateDocument(kind, data, user, {...context,personnelImport:importing});
-      audit(user, 'write', kind, reportChanges(current.data, data), notificationTargets(current.data, data));
+      updateDocument(kind, data, user, {reason:context.reason,action:context.action,personnelImport:importing}, current);
+      const targets = notificationTargets(current.data, data);
+      audit(user, 'write', kind, reportChanges(current.data, data, targets), targets);
       return get(kind);
     };
     return withinTransaction ? work() : transaction(work);
@@ -266,7 +268,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         if (kind === 'pair-targets' && !restored.cancellation && current.data.entries.some(item => !item.cancellation && pairModel.inScope(item,restored) && item.members.some(person => restored.members.some(member => member.id === person.id)))) throw problem(409,'REPORT_CONFLICT');
       }
       const entries = input.action === 'restore' ? [...current.data.entries, restored] : input.action === 'create' ? [...current.data.entries, input.entry] : input.action === 'delete' ? current.data.entries.filter(item => item.id !== input.entryId) : current.data.entries.map(item => item.id === input.entryId ? input.entry : item);
-      const saved = put(kind, {...current.data, entries}, current.revision, user, 'report', true, {reason:input.reason,action:input.action});
+      const saved = put(kind, {...current.data, entries}, current.revision, user, 'report', true, {reason:input.reason,action:input.action,current});
       const receipt = {operationId: input.operationId, entryId: input.entryId, action: input.action, version: saved.versions[input.entryId] ?? saved.revision, status: 'confirmed', message: input.action === 'delete' ? 'REPORT_DELETED' : input.action === 'restore' ? 'REPORT_RESTORED' : 'REPORT_SAVED'};
       db.prepare('INSERT INTO report_operations VALUES(?,?,?,?,?,?)').run(user.id, kind, input.operationId, signature, permission, JSON.stringify(receipt));
       return {...saved, receipt, replayed: false};

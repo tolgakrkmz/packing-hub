@@ -162,6 +162,17 @@ test('record versions and receipts survive restart, legacy replacement and addit
   assert.equal(store.get('production-log').versions[input.entryId],legacyVersion);
   store.close();
 });
+test('a write freezes the implicit version of an untracked legacy record',() => {
+  const store = openStore(':memory:'), user = {id:1,role:'admin'};
+  const legacy = entry('production-log','demo-legacy'), next = {...entry('production-log','demo-next'),shift:'А'};
+  store.put('production-log',{...store.get('production-log').data,entries:[legacy]},1,user,'report',false,{reason:'Fictional setup'});
+  store.db.prepare("DELETE FROM report_versions WHERE entry_id='demo-legacy'").run();
+  const before = store.get('production-log');
+  const saved = store.put('production-log',{...before.data,entries:[legacy,next]},before.revision,user,'report',false,{reason:'Fictional setup'});
+  assert.equal(saved.versions['demo-legacy'],before.revision);
+  assert.equal(saved.versions['demo-next'],saved.revision);
+  store.close();
+});
 test('receipt failure rolls back the report, version and audit; snapshots retain replay protection',t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(),'hub-report-receipt-'));
   t.after(() => fs.rmSync(directory,{recursive:true,force:true}));
