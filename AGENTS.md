@@ -30,6 +30,12 @@ PACKAGE-HUB е приложение за смени, производствен�
 При задачи за сигурност, архиви или възстановяване прочети също
 `SECURITY-REVIEW.md`, `BACKUP-RECOVERY-SCENARIOS.md` и съответната част от `GUIDE.md`.
 
+Ако Graphify е инсталиран, локалният кодов граф е в `graphify-out/` (игнориран
+от Git, не се публикува). За въпроси „какво е свързано с какво“ ползвай
+`graphify query`, `graphify path` или `graphify explain`. След промени по код и
+преди commit го обнови само от тази папка с
+`GRAPHIFY_BACKEND=none graphify update .` — без LLM и без външни услуги.
+
 ## Архитектура и конвенции
 
 - Клиентът използва HTML, CSS и обикновен JavaScript. Запазвай поддръжката
