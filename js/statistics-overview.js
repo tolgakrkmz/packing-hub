@@ -62,7 +62,7 @@ const StatisticsOverview = (() => {
 function renderStatisticsOverview({summary, liveDay, connected}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const tons = StatisticsUnits.formatKg, pct = value => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits:1}) + '%';
+  const tons = StatisticsUnits.formatKg, percent = new Intl.NumberFormat('bg-BG', {maximumFractionDigits:1}), pct = value => value === null ? '—' : percent.format(Number(value)) + '%';
   const shiftLabel = code => ShiftSchedule.LABELS[code] || 'Извън график';
   const link = (tab, label) => `<button type="button" class="ov-link" data-overview-tab="${tab}">${label} →</button>`;
   const label = summary.day === liveDay ? 'Текущо денонощие' : summary.day === ShiftSchedule.addDays(liveDay, -1) ? 'Предишно денонощие' : 'Последен отчетен ден';

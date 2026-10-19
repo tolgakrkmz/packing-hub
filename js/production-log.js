@@ -158,8 +158,10 @@ document.querySelectorAll('.stepper button, .quick button').forEach(btn=>{
   });
 });
 
+// Number#toLocaleString builds a formatter on every call; history rows reuse these.
+const BG_INTEGER = new Intl.NumberFormat('bg-BG'), BG_ONE_DECIMAL = new Intl.NumberFormat('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
 function fmt(n){
-  return Math.round(n).toLocaleString('bg-BG');
+  return BG_INTEGER.format(Math.round(n));
 }
 
 const sync = createFileSync({
@@ -196,7 +198,7 @@ const sync = createFileSync({
 });
 
 function fmtTons(kg){
-  return (kg/1000).toLocaleString('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
+  return BG_ONE_DECIMAL.format(kg/1000);
 }
 
 function fmtDate(d){
