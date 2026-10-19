@@ -2,10 +2,11 @@
 function createPairTargetsStatistics({dbName, localStorageKey, getPeriod, onDataChange}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const fmt = value => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits: 2});
+  const number = new Intl.NumberFormat('bg-BG', {maximumFractionDigits: 2}), monthName = new Intl.DateTimeFormat('bg-BG', {month:'long', year:'numeric'});
+  const fmt = value => value === null ? '—' : number.format(Number(value));
   const fmtTons = StatisticsUnits.formatKg;
   const pct = value => value === null ? '—' : fmt(value) + '%';
-  const monthLabel = month => new Date(Number(month.slice(0,4)), Number(month.slice(5,7)) - 1, 1).toLocaleDateString('bg-BG', {month:'long', year:'numeric'});
+  const monthLabel = month => monthName.format(new Date(Number(month.slice(0,4)), Number(month.slice(5,7)) - 1, 1));
   const statusLabels = {pending:'Очаква отчет', achieved:'Постигнат', missed:'Непостигнат', cancelled:'Отменена'};
   let data = PairTargets.emptyData(), loaded = false, started = false;
   let version = 0;

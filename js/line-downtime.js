@@ -93,8 +93,9 @@ function fmtDur(min){
   return h+'ч' + (rem ? ' '+rem+'мин' : '');
 }
 
+const BG_ONE_DECIMAL = new Intl.NumberFormat('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
 function fmtHoursDecimal(min){
-  return (min/60).toLocaleString('bg-BG',{minimumFractionDigits:1,maximumFractionDigits:1});
+  return BG_ONE_DECIMAL.format(min/60);
 }
 
 function updateDurationReadout(){

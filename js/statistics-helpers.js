@@ -13,10 +13,15 @@ const SHIFT_COLORS = {
 };
 
 const HOURS_PER_SHIFT = 8;
+// Number#toLocaleString builds a formatter on every call; render loops reuse these.
+const BG_INTEGER = new Intl.NumberFormat('bg-BG');
+const BG_ONE_DECIMAL = new Intl.NumberFormat('bg-BG', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+const BG_FIXED_DIGITS = new Map();
+
 function fmt(n) {
-  return Math.round(
+  return BG_INTEGER.format(Math.round(
     Number(n) || 0
-  ).toLocaleString('bg-BG');
+  ));
 }
 
 function fmtTons(kg) {
@@ -24,12 +29,9 @@ function fmtTons(kg) {
 }
 
 function fmtHoursDecimal(h) {
-  return (
+  return BG_ONE_DECIMAL.format(
     Number(h) || 0
-  ).toLocaleString('bg-BG', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
-  });
+  );
 }
 
 function escapeHtml(str) {
@@ -109,10 +111,11 @@ const WF_EPOCH_UTC = Date.UTC(2026,11,1);
 function wfFmt(value, digits=2) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
-  return n.toLocaleString('bg-BG', {
+  if (!BG_FIXED_DIGITS.has(digits)) BG_FIXED_DIGITS.set(digits, new Intl.NumberFormat('bg-BG', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
-  });
+  }));
+  return BG_FIXED_DIGITS.get(digits).format(n);
 }
 
 function wfShiftCodeFor(team, dateObj) {

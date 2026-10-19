@@ -2,7 +2,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const fmt = value => Number(value).toLocaleString('bg-BG',{maximumFractionDigits:2});
+  const number = new Intl.NumberFormat('bg-BG',{maximumFractionDigits:2}), clock = new Intl.DateTimeFormat('bg-BG',{year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'});
+  const fmt = value => number.format(Number(value));
   const fmtDate = value => value.split('-').reverse().join('.');
   const statusLabels = {pending:'Очаква отчет',achieved:'Постигнат',missed:'Непостигнат',cancelled:'Отменена'};
   const areaLabels = {auto:'Автоматична',manual:'Ръчна'};
@@ -80,7 +81,7 @@
       <div class="area-tags">${entry.areas.map(area => `<span class="badge">${areaLabels[area]} опаковка</span>`).join('')}</div>
       ${metric(entry.targetKg,entry.result?.kg,'кг')}${metric(entry.targetCrates,entry.result?.crates,'каси')}
       ${state === 'missed' || state === 'cancelled' ? `<p class="cause"><strong>${state === 'cancelled' ? 'Причина за отмяната:' : 'Причина:'}</strong> ${cause}</p>` : ''}
-      ${entry.cancellation ? `<p class="muted">Отменена на: <time datetime="${escape(entry.cancellation.cancelledAt)}">${escape(new Date(entry.cancellation.cancelledAt).toLocaleString('bg-BG'))}</time></p>` : ''}
+      ${entry.cancellation ? `<p class="muted">Отменена на: <time datetime="${escape(entry.cancellation.cancelledAt)}">${escape(clock.format(new Date(entry.cancellation.cancelledAt)))}</time></p>` : ''}
       ${actions && !entry.cancellation && (!pairAccess||pairAccess.canSave(!!entry.result)) ? `<div class="card-actions"><button data-action="report" data-reported="${!!entry.result}" data-id="${escape(entry.id)}">${entry.result ? 'Коригирай отчета' : 'Отчети резултат'}</button>${entry.result ? '' : `<button data-action="edit" data-id="${escape(entry.id)}">Промени</button><button class="delete" data-action="cancel" data-id="${escape(entry.id)}">Отмени</button>`}</div>` : ''}
     </article>`;
   }

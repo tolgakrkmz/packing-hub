@@ -73,7 +73,12 @@ function comparisonMonthLabel(month) {
 
 function renderStatisticsComparison({result, connected, downtimeConnected, error}) {
   const $ = id => document.getElementById(id);
-  const number = (value, digits = 1) => value === null ? '—' : Number(value).toLocaleString('bg-BG', {maximumFractionDigits:digits});
+  const formats = new Map();
+  const number = (value, digits = 1) => {
+    if (value === null) return '—';
+    if (!formats.has(digits)) formats.set(digits, new Intl.NumberFormat('bg-BG', {maximumFractionDigits:digits}));
+    return formats.get(digits).format(Number(value));
+  };
   const date = value => value.split('-').reverse().join('.');
   const label = range => range.from ? `${date(range.from)} – ${date(range.to)}` : '—';
   $('comparisonPeriods').textContent = result ? `${label(result.current)} спрямо ${label(result.base)}` : '';

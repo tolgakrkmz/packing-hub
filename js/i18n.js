@@ -5,16 +5,54 @@ const HubI18n = (() => {
   let language = 'bg';
   try { if (localStorage.getItem(storageKey) === 'en') language = 'en'; } catch (error) {}
   const normalize = value => String(value).trim().replace(/\s+/g, ' ');
-  const keys = Object.keys(messages).sort((a, b) => b.length - a.length);
-  const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp('(?<![\\p{L}_])(?:' + keys.map(key => (/^\d/.test(key) ? '(?<!\\d)' : '') + escape(key).replace(/ /g, '\\s+')).join('|') + ')(?![\\p{L}_])', 'gu');
+  const wordChar = /[\p{L}_]/u, space = /\s/;
+  const codePoint = (text, index) => String.fromCodePoint(text.codePointAt(index));
+  let index = null;
+  // A first-character index, built on first English use. One regex with ~2000
+  // alternatives cost ~170 ms to compile on every page that needed it.
+  function candidates(char) {
+    if (!index) {
+      index = new Map();
+      for (const key of Object.keys(messages).sort((a, b) => b.length - a.length)) {
+        if (!index.has(key[0])) index.set(key[0], []);
+        index.get(key[0]).push(key);
+      }
+    }
+    return index.get(char);
+  }
+  // Keys have single inner spaces only; each matches any whitespace run. Returns the match end or -1.
+  function matchEnd(text, start, key) {
+    let at = start;
+    for (const char of key) {
+      if (char === ' ') {
+        if (!space.test(text[at] ?? '')) return -1;
+        while (space.test(text[at] ?? '')) at++;
+      } else if (text.startsWith(char, at)) at += char.length;
+      else return -1;
+    }
+    return at < text.length && wordChar.test(codePoint(text, at)) ? -1 : at;
+  }
+  // Whole words only, leftmost match first, then the longest key.
   function t(value, exact = false) {
     const text = String(value ?? '');
     if (language === 'bg') return text;
     if (exact) return Object.hasOwn(messages, normalize(text)) ? messages[normalize(text)] : text;
-    return text.replace(pattern, match => {
-      return Object.hasOwn(messages, normalize(match)) ? messages[normalize(match)] : match;
-    });
+    let result = '', copied = 0;
+    for (let at = 0; at < text.length;) {
+      const keys = candidates(text[at]);
+      let end = -1;
+      if (keys && !(at && wordChar.test(codePoint(text, at - (/[\uDC00-\uDFFF]/.test(text[at - 1]) && at > 1 ? 2 : 1))))) {
+        for (const key of keys) {
+          if (/^\d/.test(key) && at && /\d/.test(text[at - 1])) continue;
+          if ((end = matchEnd(text, at, key)) >= 0) break;
+        }
+      }
+      if (end < 0) { at += text.codePointAt(at) > 0xffff ? 2 : 1; continue; }
+      const match = text.slice(at, end);
+      result += text.slice(copied, at) + (Object.hasOwn(messages, normalize(match)) ? messages[normalize(match)] : match);
+      copied = at = end;
+    }
+    return result + text.slice(copied);
   }
   function dialogText(value) {
     const quoted = [];
@@ -70,7 +108,10 @@ const HubI18n = (() => {
         else if (child.nodeType === 3) translateText(child);
       }
     }
-    const observe = () => observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes});
+    // Bulgarian is the source text: nothing is observed until English is chosen. Translation
+    // state is recovered lazily from the current text, so later switches stay exact.
+    let translated = false;
+    const observe = () => { if (language === 'en') observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes}); };
     function update(records) {
       const added = new Set(), texts = new Set(), changedAttributes = new Map();
       for (const record of records) {
@@ -103,7 +144,8 @@ const HubI18n = (() => {
       observer?.disconnect();
       try {
         document.documentElement.lang = language;
-        visit(document.documentElement);
+        if (language === 'en' || translated) visit(document.documentElement);
+        translated = language === 'en';
         document.querySelectorAll('[data-hub-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.hubLanguage === language)));
       } finally { observe(); }
     };

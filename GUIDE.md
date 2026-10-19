@@ -2091,6 +2091,58 @@ task after the complete view is attached, including history sections assembled
 off-DOM. A regression refreshes a neighboring task and verifies that the reused
 linked card retains focus and loads its photo after automatic scrolling.
 
+### English translation startup (19 October 2026)
+
+The translator previously combined all ~2000 English keys into one regular
+expression. Chrome compiled it on the first English translation of every page,
+which took about 170 ms on the host CPU. Matching now uses an index of keys by
+first character, built on first English use. The rules are unchanged: whole
+words, a key space matches any whitespace run, leftmost match first, then the
+longest key. `tests/i18n.test.cjs` compares the new matcher against the former
+regular expression on every key with boundary, whitespace and combination variants.
+
+Headless Chrome 155 at CPU rate 4 on offline `file://` pages, medians of five fresh
+contexts, `main` at `6035862` before / after:
+
+| Page | First BG → EN switch (ms) | Page load with EN saved (ms) |
+| --- | ---: | ---: |
+| Statistics | 774 / 52 | 1275 / 633 |
+| Production log | 766 / 31 | 1149 / 385 |
+| Home | 758 / 18 | 1149 / 505 |
+
+Bulgarian pages no longer build the expression at all. They still load
+`js/i18n-en.js` (about 45 KB with Brotli, cached by version). These are local
+measurements, not results from a physical phone or the live installation.
+
+### Page load profile (19 October 2026)
+
+Every server page was profiled in headless Chrome 155 at CPU rate 4, signed in to
+an isolated SQLite database with 2000 generated fictional production reports,
+downtime entries, pairs and tasks. Two causes recurred:
+
+- `Number#toLocaleString` and `Date#toLocaleString` create a new formatter on
+  every call (about 17–80 µs each in Chrome). Statistics, production, downtime and
+  pair rows now reuse `Intl.NumberFormat` / `Intl.DateTimeFormat` instances with the
+  same locale and options, so the text is identical by specification.
+- In Bulgarian the translator visited the whole page and observed every DOM change
+  without translating anything. It now does so only while English is selected; a
+  switch back to Bulgarian restores the original text once and stops observing.
+
+JavaScript CPU time per page load (profiler samples for the application's own
+scripts, median of three runs, before / after):
+
+| Page | ms | Page | ms |
+| --- | ---: | --- | ---: |
+| Statistics | 440 / 200 | Production log | 118 / 77 |
+| Pair targets | 135 / 110 | Personnel | 119 / 87 |
+| Tasks | 102 / 83 | Line downtime | 80 / 67 |
+| Home | 45 / 29 | Other 11 pages, total | 577 / 384 |
+
+All 18 pages together: 1616 / 1037 ms. The longest statistics task fell from
+about 270 ms to 95 ms. Unchanged on purpose: per-render formatters in access and
+status messages, the server permission model, and data comparison on server refresh,
+where each remaining cost is a few milliseconds of real time.
+
 ## Planned shift transfers
 
 Status: implemented. Production deployment uses a separate manual copy. Trello:
