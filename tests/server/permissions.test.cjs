@@ -43,7 +43,7 @@ test('role defaults and explicit restrictions survive a reopen; migration preser
   assert.equal(auth.session(session.token), null); store.close();
   store = openStore(filename); t.after(() => store.close());
   assert.equal(accounts(store).list()[0].permissions.canExportReports, false);
-  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 4);
+  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 5);
 });
 test('account managers control strictly boolean overrides for every role', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), operator = await login('operator');
@@ -74,7 +74,7 @@ test('assignment overrides survive reopening and reset to safe role defaults wit
   await auth.update(operator.id, {permissions: {}}, admin); store.close();
   store = openStore(filename); t.after(() => store.close());
   assert.deepEqual(accounts(store).list().find(user => user.id === operator.id).permissions, defaults.operator);
-  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 4);
+  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 5);
 });
 test('export permission gates every supported download, retains viewing and records only audit metadata', async t => {
   const {hub, login, request, change} = await setup(t); const admin = await login(), observer = await login('observer');

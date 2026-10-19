@@ -63,6 +63,17 @@ function notificationTargets(before, after) {
   }
   return {addedIds, changedIds, profiles: [...profiles]};
 }
+// Report records live in report_entries. Their document keeps the metadata with
+// `entries: null` as an order placeholder. A document whose `entries` is still an
+// array is a legacy (or directly seeded) module and is authoritative.
+function reportRows(db, kind) {
+  return JSON.parse(db.prepare("SELECT '['||coalesce(group_concat(data,',' ORDER BY position),'')||']' AS rows FROM report_entries WHERE kind=?").get(kind).rows);
+}
+function moduleData(db, kind, text) {
+  const data = JSON.parse(text);
+  if (Object.hasOwn(reports, kind) && data && typeof data === 'object' && data.entries === null) data.entries = reportRows(db, kind);
+  return data;
+}
 function openStore(filename, {personnelNow = Date.now, productionNow = Date.now} = {}) {
   if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), {recursive: true, mode: 0o700});
   const db = new DatabaseSync(filename, {timeout: 5000});
@@ -99,20 +110,51 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
       PRIMARY KEY(user_id,path));
     CREATE TRIGGER IF NOT EXISTS remove_account_instructions AFTER UPDATE OF deleted_at ON users
       WHEN NEW.deleted_at IS NOT NULL BEGIN DELETE FROM account_instruction_sets WHERE user_id=NEW.id; END;`);
-  db.exec('PRAGMA user_version=4');
+  db.exec(`CREATE TABLE IF NOT EXISTS report_entries(kind TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(kind,id));
+    CREATE INDEX IF NOT EXISTS report_entries_order ON report_entries(kind,position);`);
+  db.exec('PRAGMA user_version=5');
   for (const [kind, data] of Object.entries(defaults)) db.prepare('INSERT OR IGNORE INTO documents(kind,data) VALUES(?,?)').run(kind, JSON.stringify(data));
+  const legacyType = db.prepare("SELECT json_type(data,'$.entries') AS type FROM documents WHERE kind=?");
+  const legacy = kind => Object.hasOwn(reports, kind) && legacyType.get(kind)?.type === 'array';
+  // Moves a legacy module into rows without changing its revision. The rebuilt
+  // module must serialize identically; otherwise it rolls back and stays legacy.
+  function materialize(kind) {
+    if (!legacy(kind)) return true;
+    const text = db.prepare('SELECT data FROM documents WHERE kind=?').get(kind).data, original = JSON.parse(text);
+    db.exec('SAVEPOINT report_entries_migration');
+    try {
+      db.prepare('DELETE FROM report_entries WHERE kind=?').run(kind);
+      const insert = db.prepare('INSERT INTO report_entries(kind,id,position,data) VALUES(?,?,?,?)');
+      original.entries.forEach((entry, position) => insert.run(kind, entry.id, position, JSON.stringify(entry)));
+      db.prepare('UPDATE documents SET data=? WHERE kind=?').run(JSON.stringify({...original, entries: null}), kind);
+      if (JSON.stringify(moduleData(db, kind, db.prepare('SELECT data FROM documents WHERE kind=?').get(kind).data)) !== JSON.stringify(original)) throw new Error('MIGRATION_MISMATCH');
+      db.exec('RELEASE report_entries_migration');
+      return true;
+    } catch {
+      db.exec('ROLLBACK TO report_entries_migration; RELEASE report_entries_migration');
+      return false;
+    }
+  }
+  // Keep a private pre-migration copy beside the database before moving any records.
+  if (filename !== ':memory:' && Object.keys(reports).some(kind => legacy(kind) && db.prepare("SELECT json_array_length(data,'$.entries') AS count FROM documents WHERE kind=?").get(kind).count > 0)) {
+    const directory = path.join(path.dirname(filename), 'migration-backups'), backup = path.join(directory, 'pre-report-entries-' + randomUUID() + '.sqlite');
+    try { fs.mkdirSync(directory, {recursive: true, mode: 0o700}); db.prepare('VACUUM INTO ?').run(backup); fs.chmodSync(backup, 0o600); }
+    catch { db.close(); throw problem(500, 'MIGRATION_BACKUP_FAILED'); }
+  }
   // Additive migration: existing reports receive their current document revision.
   // Deleted identities retain a tombstone version, so recreating an ID cannot
   // make a stale editor valid again.
-  for (const kind of Object.keys(reports)) {
-    const row = db.prepare('SELECT data,revision FROM documents WHERE kind=?').get(kind);
-    for (const entry of JSON.parse(row.data).entries) db.prepare('INSERT OR IGNORE INTO report_versions VALUES(?,?,?)').run(kind, entry.id, row.revision);
+  function freezeVersions(kind) {
+    db.prepare("INSERT OR IGNORE INTO report_versions SELECT kind,json_extract(value,'$.id'),revision FROM documents,json_each(documents.data,'$.entries') WHERE kind=? AND json_type(documents.data,'$.entries')='array'").run(kind);
+    db.prepare("INSERT OR IGNORE INTO report_versions SELECT e.kind,e.id,d.revision FROM report_entries e JOIN documents d ON d.kind=e.kind WHERE e.kind=? AND json_type(d.data,'$.entries')='null'").run(kind);
   }
+  for (const kind of Object.keys(reports)) { materialize(kind); freezeVersions(kind); }
   db.prepare("INSERT OR IGNORE INTO files(path,kind) VALUES('data','directory'),('data/profiles','directory')").run();
   const get = kind => {
+    if (Object.hasOwn(reports, kind)) materialize(kind);
     const row = db.prepare('SELECT data, revision FROM documents WHERE kind=?').get(kind);
     if (!row) throw problem(404, 'NOT_FOUND');
-    const data = JSON.parse(row.data);
+    const data = moduleData(db, kind, row.data);
     const ids = Object.hasOwn(reports, kind) ? new Set(data.entries.map(entry => entry.id)) : null;
     const savedVersions = ids ? new Map(db.prepare('SELECT entry_id,version FROM report_versions WHERE kind=?').all(kind).map(item => [item.entry_id,item.version])) : null;
     const versions = ids ? Object.fromEntries([...ids].map(id => [id,savedVersions.get(id) ?? row.revision])) : null;
@@ -150,8 +192,8 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
     if (Object.hasOwn(reports, kind)) {
       const prior = new Map(before.data.entries.map(entry => [entry.id, entry]));
       const next = new Map(data.entries.map(entry => [entry.id, entry]));
-      // Freeze implicit versions of legacy entries in one statement; get() reports them as the document revision.
-      db.prepare("INSERT OR IGNORE INTO report_versions SELECT kind,json_extract(value,'$.id'),revision FROM documents,json_each(documents.data,'$.entries') WHERE kind=?").run(kind);
+      // Freeze implicit versions of untracked entries; get() reports them as the document revision.
+      freezeVersions(kind);
       for (const id of new Set([...prior.keys(), ...next.keys()])) {
         if (!isDeepStrictEqual(prior.get(id), next.get(id))) {
           const old = prior.get(id), value = next.get(id);
@@ -167,7 +209,31 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         }
       }
     }
-    db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+    if (!Object.hasOwn(reports, kind)) return db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify(data), kind);
+    writeEntries(kind, data.entries);
+    db.prepare('UPDATE documents SET data=?,revision=revision+1 WHERE kind=?').run(JSON.stringify({...data, entries: null}), kind);
+  }
+  // Writes only changed records. Positions are kept while surviving records stay
+  // in order and new ones are appended; any other order renumbers every record.
+  function writeEntries(kind, entries) {
+    const rows = legacy(kind) ? [] : db.prepare('SELECT id,position,data FROM report_entries WHERE kind=?').all(kind);
+    if (legacy(kind)) db.prepare('DELETE FROM report_entries WHERE kind=?').run(kind);
+    const stored = new Map(rows.map(row => [row.id, row])), ids = new Set(entries.map(entry => entry.id));
+    const remove = db.prepare('DELETE FROM report_entries WHERE kind=? AND id=?');
+    for (const id of stored.keys()) if (!ids.has(id)) remove.run(kind, id);
+    let last = -1, appending = false, ordered = true;
+    for (const entry of entries) {
+      const row = stored.get(entry.id);
+      if (!row) appending = true;
+      else if (appending || row.position <= last) { ordered = false; break; }
+      else last = row.position;
+    }
+    let next = rows.reduce((max, row) => Math.max(max, row.position), -1) + 1;
+    const upsert = db.prepare('INSERT INTO report_entries(kind,id,position,data) VALUES(?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET position=excluded.position,data=excluded.data');
+    entries.forEach((entry, index) => {
+      const row = stored.get(entry.id), text = JSON.stringify(entry), position = !ordered ? index : row ? row.position : next++;
+      if (!row || row.position !== position || row.data !== text) upsert.run(kind, entry.id, position, text);
+    });
   }
   function put(kind, data, revision, user, mode = 'report', withinTransaction = false, context = {}) {
     validateData(kind, data);
@@ -296,7 +362,8 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
   function reportHistory(kind, entryId, user, options = {}) {
     historyAccess(kind,user);
     // Read one live record, without constructing every report and its version map.
-    const current = db.prepare("SELECT revision,(SELECT value FROM json_each(documents.data,'$.entries') WHERE json_extract(value,'$.id')=? LIMIT 1) AS entry FROM documents WHERE kind=?").get(entryId,kind);
+    materialize(kind);
+    const current = db.prepare("SELECT revision,coalesce((SELECT value FROM json_each(documents.data,'$.entries') WHERE json_type(documents.data,'$.entries')='array' AND json_extract(value,'$.id')=?1 LIMIT 1),(SELECT data FROM report_entries WHERE kind=?2 AND id=?1 AND json_type(documents.data,'$.entries')='null')) AS entry FROM documents WHERE kind=?2").get(entryId,kind);
     const live = current.entry ? JSON.parse(current.entry) : null;
     const version = db.prepare('SELECT version FROM report_versions WHERE kind=? AND entry_id=?').get(kind,entryId)?.version ?? (live ? current.revision : undefined);
     if (!version) throw problem(404,'NOT_FOUND');
@@ -316,10 +383,13 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
       catch { throw problem(400,'INVALID_HISTORY_FILTER'); }
     }
     // Project only list metadata in SQLite, including legacy and deleted records.
+    materialize(kind);
     const rows = db.prepare(`WITH live AS (
       SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.date') AS date,
         coalesce(json_extract(value,'$.shift'),json_extract(value,'$.team')) AS shift
-      FROM documents,json_each(documents.data,'$.entries') WHERE kind=?
+      FROM documents,json_each(documents.data,'$.entries') WHERE kind=? AND json_type(documents.data,'$.entries')='array'
+      UNION ALL SELECT e.id,json_extract(e.data,'$.date'),coalesce(json_extract(e.data,'$.shift'),json_extract(e.data,'$.team'))
+      FROM report_entries e JOIN documents d ON d.kind=e.kind WHERE e.kind=? AND json_type(d.data,'$.entries')='null'
     ), records AS (
       SELECT v.entry_id AS entryId,v.version,l.id IS NULL AS deleted,
         coalesce(l.date,json_extract(coalesce(h.after_data,h.before_data),'$.date')) AS date,
@@ -329,7 +399,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
       UNION ALL SELECT l.id,d.revision,0,l.date,l.shift FROM live l JOIN documents d ON d.kind=?
       WHERE NOT EXISTS(SELECT 1 FROM report_versions v WHERE v.kind=d.kind AND v.entry_id=l.id)
     ) SELECT * FROM records WHERE (?='' OR date=?) AND (version<? OR (version=? AND entryId>?))
-      ORDER BY version DESC,entryId COLLATE BINARY LIMIT ?`).all(kind,kind,kind,date,date,cursor.version,cursor.version,cursor.id,limit+1);
+      ORDER BY version DESC,entryId COLLATE BINARY LIMIT ?`).all(kind,kind,kind,kind,date,date,cursor.version,cursor.version,cursor.id,limit+1);
     const entries = rows.slice(0,limit).map(row => ({...row,deleted:!!row.deleted}));
     const last = entries.at(-1);
     return {entries,nextCursor:rows.length > limit ? Buffer.from(JSON.stringify({version:last.version,id:last.entryId})).toString('base64url') : null};
@@ -423,4 +493,4 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
   const productionAccess=createProductionAccess({db,audit,transaction,get},{schedule:shiftSchedule,problem,now:productionNow});
   return {db, get, put, productionAccess, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
-module.exports = {openStore, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};
+module.exports = {openStore, moduleData, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

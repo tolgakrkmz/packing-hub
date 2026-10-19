@@ -877,8 +877,9 @@ bash scripts/restore-rehearsal.sh /absolute/local/verified-archive.sqlite sha256
 
 The archived file must be readable by UID 1000 and have no WAL/SHM/journal sidecars:
 use a completed snapshot, never an actively written database. The real archive
-stays on the protected host. Rehearsal is repeatable; the image must support archive
-schema version 4. Unsupported schemas, invalid data, partial copies, existing
+stays on the protected host. Rehearsal is repeatable; the image must support the
+archive schema version (4 or 5). A version 4 archive is moved to row storage when the
+application first opens it, after a private copy in `migration-backups/`. Unsupported schemas, invalid data, partial copies, existing
 destination files and missing recovery administration fail instead of being
 silently migrated or overwritten. A failed recovery destination is retained by
 the core command for local review, without a ready marker; the disposable Docker
@@ -2179,25 +2180,49 @@ whole document several times through `get()`, compares every entry with
 `isDeepStrictEqual`, runs one `report_versions` statement for every existing
 entry in `updateDocument()` and validates the whole module again.
 
-#### Proposed row storage (design only, not implemented)
+#### Row storage (schema version 5)
 
-- New table `report_entries(kind, id, position, date, scope, data,
-  PRIMARY KEY(kind,id))` with an index on `(kind,date)`. `documents` keeps the
-  module metadata (`goalTons`, `reasons`, `schemaVersion`) and the module
-  revision, without `entries`.
-- Additive migration in `openStore()`: copy existing entries in one transaction,
-  keep their order in `position`, then remove `entries` from the document and
-  raise `user_version` to 5. Backup verification and restore accept version 4
-  archives and migrate them when opened.
-- `get(kind)` still returns `{...metadata, entries}` in the original order, so
-  the API, statistics, JSON export/import, offline files and old archives keep
-  the same format.
-- `reportOperation` reads, validates and writes only the affected row and its
-  shift scope (production access and pair conflicts are scoped by date, shift
-  and team), then appends history. Whole-document `put()` for imports and
-  settings writes only changed rows.
-- Statistics and history queries read `report_entries` instead of `json_each`
-  over the document.
+Report records are stored one per row in `report_entries(kind, id, position,
+data)`. The module document keeps its metadata (`goalTons`, `reasons`,
+`module`, `schemaVersion`) and revision, with `entries: null` as a placeholder
+that preserves the original key order. `get(kind)` rebuilds the same
+`{...metadata, entries}` object in the original order, so the API, statistics,
+JSON export/import, offline files and notification logic are unchanged.
+
+Migration rules, chosen so that no record can be lost:
+
+- A report document whose `entries` is still an array is a legacy module and is
+  authoritative. It is moved to rows when the store opens (and lazily on the
+  next read if a document is written directly, for example by tests).
+- The move runs in a savepoint. The rebuilt module must serialize to exactly the
+  same JSON as the original; otherwise it rolls back and the module stays in the
+  legacy layout, which keeps working. Revisions and record versions do not change.
+- Before moving any non-empty legacy module in a file database, the store writes
+  a private `VACUUM INTO` copy to `migration-backups/pre-report-entries-*.sqlite`
+  beside the database (mode 0600). If that copy fails, the store refuses to start.
+- Writes change only the affected rows. Positions are kept while surviving
+  records stay in order and new ones are appended; any other order renumbers all
+  records. Production and pair writes still validate the whole module.
+- Backup verification and restore accept version 4 and 5 archives and validate
+  the rebuilt modules. A damaged row makes an archive invalid.
+- Older application versions stop at start-up on a migrated database (they
+  expect an array) instead of showing empty modules. To roll back, restore the
+  pre-migration copy or a version 4 archive; writes made after the migration
+  are only in the newer database and archives.
+
+Measured after the change with the same benchmark (load average about 10, so
+compare with the interim row below only roughly):
+
+| Years | Database | Backup | Write prod / downtime / pairs |
+| --- | ---: | ---: | ---: |
+| 1 | 13.0 MiB | 0.35 s | 48 / 66 / 252 ms |
+| 3 | 38.4 MiB | 0.67 s | 153 / 246 / 602 ms |
+| 5 | 64.0 MiB | 1.74 s | 260 / 478 / 1,540 ms |
+
+The database is about 15% larger because of the row index. Writes no longer
+serialize the whole module, but they still rebuild and validate it, so they
+remain linear. Constant-time writes need the next step: `reportOperation`
+validating only the affected record and its shift scope.
 
 #### Interim optimization (implemented)
 

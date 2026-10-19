@@ -6,6 +6,7 @@ const {spawn} = require('node:child_process');
 const {DatabaseSync} = require('node:sqlite');
 const {snapshot, copyVerified, verifyDatabase, runBackup, readStatus, retainedArchives} = require('../../server/backups.cjs');
 const {backupFixture} = require('./backup-fixture.cjs');
+const {moduleData} = require('../../server/store.cjs');
 const now = new Date('2026-10-08T12:00:00.000Z');
 function separateDevice(t, secondary) {
   const original = fs.statSync;
@@ -149,7 +150,7 @@ test('a snapshot excludes uncommitted WAL changes and leaves the live transactio
     demo.store.db.prepare("UPDATE documents SET data=? WHERE kind='production-log'").run(JSON.stringify({entries: [], goalTons: 1}));
     snapshot(demo.database, destination);
     const db = new DatabaseSync(destination, {readOnly: true});
-    try { assert.deepEqual(JSON.parse(db.prepare("SELECT data FROM documents WHERE kind='production-log'").get().data), expected.data); }
+    try { assert.deepEqual(moduleData(db, 'production-log', db.prepare("SELECT data FROM documents WHERE kind='production-log'").get().data), expected.data); }
     finally { db.close(); }
     assert.equal(demo.store.get('production-log').data.entries.length, 0);
   } finally { demo.store.db.exec('ROLLBACK'); }

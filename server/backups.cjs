@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {randomUUID, createHash} = require('node:crypto');
 const {DatabaseSync} = require('node:sqlite');
-const {validateData} = require('./store.cjs');
+const {validateData, moduleData} = require('./store.cjs');
 
 const ARCHIVE = /^hub-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-[a-f0-9-]{36}\.sqlite$/;
 const TABLES = ['documents', 'users', 'sessions', 'files', 'audit', 'task_items', 'task_schedules', 'task_requests'];
@@ -41,7 +41,7 @@ function verifyDatabase(filename) {
     db.exec('PRAGMA busy_timeout=5000; PRAGMA query_only=ON');
     const checks = db.prepare('PRAGMA integrity_check').all();
     if (checks.length !== 1 || checks[0].integrity_check !== 'ok' || db.prepare('PRAGMA foreign_key_check').all().length) throw failure('INVALID_ARCHIVE');
-    if (db.prepare('PRAGMA user_version').get().user_version !== 4) throw failure('UNSUPPORTED_SCHEMA');
+    if (![4, 5].includes(db.prepare('PRAGMA user_version').get().user_version)) throw failure('UNSUPPORTED_SCHEMA');
     const tables = new Set(db.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all().map(row => row.name));
     if (TABLES.some(table => !tables.has(table))) throw failure('INVALID_ARCHIVE');
     // Read every table, including attachment BLOBs, without returning their contents.
@@ -53,7 +53,8 @@ function verifyDatabase(filename) {
     for (const kind of ['production-log', 'line-downtime', 'personnel', 'pair-targets', 'package-instructions']) {
       const row = modules.find(item => item.kind === kind);
       if (!row) throw failure('INVALID_ARCHIVE');
-      validateData(kind, JSON.parse(row.data));
+      // Version 4 archives keep records inside the document; version 5 keeps them in report_entries.
+      validateData(kind, moduleData(db, kind, row.data));
     }
     // Problems are additive: older archives without the table still restore.
     if (tables.has('problem_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM problem_photos').get();
