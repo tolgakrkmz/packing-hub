@@ -11,18 +11,32 @@ const at = (date, hour, minute = 0) => schedule.sofiaInstant(date, hour, minute)
 const scheduled = date => schedule.TEAMS.filter(team => schedule.shiftInterval(team, date));
 
 test('periods cover the same completed days and only completed days', () => {
-  const now = at('2026-10-05', 8, 30);
-  assert.deepEqual(plain(comparison.ranges('2026-10', 'month', now)), {partial:true,
+  const now = at('2026-10-05', 8, 30), base = (month, choice) => comparison.baseMonth(month, choice);
+  assert.deepEqual([base('2026-10', ''), base('2026-10', 'year'), base('2026-01', ''), base('2026-10', '2024-02'), base('2026-10', '2024-13')], ['2026-09', '2025-10', '2025-12', '2024-02', '2026-09']);
+  assert.deepEqual(plain(comparison.ranges('2026-10', '2026-09', now)), {partial:true,
     current:{month:'2026-10', from:'2026-10-01', to:'2026-10-04', days:4}, base:{month:'2026-09', from:'2026-09-01', to:'2026-09-04', days:4}});
   // Before 06:00 the night shift of the previous day is still running.
-  assert.equal(comparison.ranges('2026-10', 'month', at('2026-10-05', 5, 59)).current.to, '2026-10-03');
-  assert.deepEqual(plain(comparison.ranges('2026-10', 'year', now).base), {month:'2025-10', from:'2025-10-01', to:'2025-10-04', days:4});
-  assert.deepEqual(plain(comparison.ranges('2026-01', 'month', now).base), {month:'2025-12', from:'2025-12-01', to:'2025-12-31', days:31});
-  const march = comparison.ranges('2026-03', 'month', now);
+  assert.equal(comparison.ranges('2026-10', '2026-09', at('2026-10-05', 5, 59)).current.to, '2026-10-03');
+  assert.deepEqual(plain(comparison.ranges('2026-10', '2025-03', now).base), {month:'2025-03', from:'2025-03-01', to:'2025-03-04', days:4});
+  const march = comparison.ranges('2026-03', '2026-02', now);
   assert.deepEqual(plain([march.partial, march.current.days, march.base.to]), [false, 31, '2026-02-28']);
-  const future = comparison.ranges('2026-11', 'month', now);
-  assert.deepEqual(plain([future.current.from, future.base.from, future.partial]), [null, null, true]);
-  assert.equal(comparison.ranges('2026-10', 'month', at('2026-10-01', 12)).current.from, null);
+  // An unfinished base month limits a finished month to the same completed days.
+  const reversed = comparison.ranges('2026-08', '2026-10', now);
+  assert.deepEqual(plain([reversed.partial, reversed.current.to, reversed.base.to]), [true, '2026-08-04', '2026-10-04']);
+  const future = comparison.ranges('2026-11', '2026-10', now);
+  assert.deepEqual(plain([future.current.from, future.base.from]), [null, null]);
+  assert.equal(comparison.ranges('2026-10', '2026-09', at('2026-10-01', 12)).current.from, null);
+});
+
+test('any month with completed days can be the base, newest first', () => {
+  const now = at('2026-10-05', 8, 30);
+  const months = comparison.options('2026-09', ['2026', '2025'], now);
+  assert.equal(months[0], '2026-10');
+  assert.equal(months.at(-1), '2025-01');
+  assert.equal(months.length, 21);
+  assert.ok(!months.includes('2026-09'));
+  assert.equal(comparison.options('2026-10', [], at('2026-10-01', 12))[0], '2026-09', 'a month without completed days is not offered');
+  assert.equal(comparison.options('2026-10', ['0001', 'abcd', 2025], now).at(-1), '2025-01', 'malformed record years do not extend the list');
 });
 
 test('summary counts scheduled shifts, missing reports and exact denominators', () => {
@@ -46,6 +60,7 @@ test('summary counts scheduled shifts, missing reports and exact denominators', 
   assert.equal(result.downtimeMin, 45);
   assert.deepEqual(plain([result.expectedShifts, result.reportedShifts, result.missing.length]), [expected, 2, expected - 2]);
   assert.equal(result.coveragePct, 2 / expected * 100);
+  assert.deepEqual(plain(result.daily), [63000, 0]);
   assert.ok(result.missing.every(shift => shift.code && !(shift.date === '2026-10-01' && [first, second].includes(shift.team))));
 });
 
@@ -58,7 +73,7 @@ test('empty periods and a zero base have no misleading percentages', () => {
   assert.deepEqual(plain(result.changes.kg), {diff:2000, pct:null});
   assert.equal(result.changes.scrapPct, null);
   assert.equal(result.complete, false);
-  const later = comparison.compare({month:'2026-10', mode:'year', production:[{date:'2026-10-02', shift:'А', tonnage:3000, brak:0}],
+  const later = comparison.compare({month:'2026-10', base:'2025-10', production:[{date:'2026-10-02', shift:'А', tonnage:3000, brak:0}],
     baseProduction:[{date:'2025-10-02', shift:'А', tonnage:2000, brak:0}], now});
   assert.deepEqual(plain(later.changes.kg), {diff:1000, pct:50});
 });
