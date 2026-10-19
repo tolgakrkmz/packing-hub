@@ -108,7 +108,10 @@ const HubI18n = (() => {
         else if (child.nodeType === 3) translateText(child);
       }
     }
-    const observe = () => observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes});
+    // Bulgarian is the source text: nothing is observed until English is chosen. Translation
+    // state is recovered lazily from the current text, so later switches stay exact.
+    let translated = false;
+    const observe = () => { if (language === 'en') observer?.observe(document.documentElement, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:attributes}); };
     function update(records) {
       const added = new Set(), texts = new Set(), changedAttributes = new Map();
       for (const record of records) {
@@ -141,7 +144,8 @@ const HubI18n = (() => {
       observer?.disconnect();
       try {
         document.documentElement.lang = language;
-        visit(document.documentElement);
+        if (language === 'en' || translated) visit(document.documentElement);
+        translated = language === 'en';
         document.querySelectorAll('[data-hub-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.hubLanguage === language)));
       } finally { observe(); }
     };

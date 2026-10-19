@@ -67,6 +67,20 @@ async function exerciseI18n({page,expect}) {
   assert.equal(visits,0,'A small translation update must not traverse unrelated DOM');
   await expect(page.locator('#i18nAdded')).toHaveText('Production & Scrap');
   await expect(page.locator('#i18nLabel')).toHaveAttribute('title','Monthly Result');
+  // Bulgarian is not observed: content added after returning to it translates on the next switch.
+  await page.evaluate(()=>{
+    HubI18n.setLanguage('bg');
+    document.getElementById('i18nDynamic').innerHTML='<p id="i18nLate" title="Тонаж и брак">Месечен резултат</p><select><option id="i18nLateOption">Месечен резултат</option></select>';
+  });
+  await expect(page.locator('#i18nLate')).toHaveText('Месечен резултат');
+  await page.evaluate(()=>HubI18n.setLanguage('en'));
+  await expect(page.locator('#i18nLate')).toHaveText('Monthly Result');
+  await expect(page.locator('#i18nLate')).toHaveAttribute('title','Production & Scrap');
+  await expect(page.locator('#i18nLateOption')).toHaveText('Monthly Result');
+  await expect(page.locator('#i18nLateOption')).toHaveAttribute('value','Месечен резултат');
+  await page.evaluate(()=>HubI18n.setLanguage('bg'));
+  await expect(page.locator('#i18nLate')).toHaveText('Месечен резултат');
+  await expect(page.locator('#i18nLate')).toHaveAttribute('title','Тонаж и брак');
   await page.evaluate(()=>{document.getElementById('i18nRegression').remove();HubI18n.setLanguage('bg');});
   console.log('PASS incremental translations, language roundtrips, excluded data, stable option/form values and unrelated DOM');
 }
