@@ -62,3 +62,11 @@
 .ov-ok{margin-top:10px;padding:14px;border-radius:9px;color:var(--teal);font-size:12px;font-weight:750;background:rgba(63,191,160,.07);border:1px solid rgba(63,191,160,.2)}
 @media(max-width:980px){.overview-stats .ov-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ov-grid{grid-template-columns:1fr}}
 @media(max-width:640px){.overview-stats .ov-kpis{grid-template-columns:1fr 1fr}.ov-grid{padding-left:14px;padding-right:14px}.ov-attention li{flex-direction:column;align-items:flex-start}}
+.comparison-stats{margin:0 0 20px}
+.comparison-stats .wf-title{margin:0}
+.comparison-stats .cmp-coverage{grid-template-columns:repeat(2,minmax(0,1fr))}
+.comparison-stats .cmp-warnings,.comparison-stats .pair-stats-scroll,.comparison-stats .cmp-formulas{margin:12px 22px 0;position:relative;z-index:1}
+.comparison-stats .cmp-formulas{margin-bottom:22px;font-size:12px;color:var(--text-muted);line-height:1.5}
+.cmp-missing{margin:8px 0 0;padding-left:16px;font-size:10px;color:var(--text-muted);line-height:1.5}
+.cmp-table td:not(:first-child),.cmp-table th:not(:first-child){text-align:right;white-space:nowrap}
+@media(max-width:640px){.comparison-stats .cmp-coverage{grid-template-columns:1fr}.comparison-stats .cmp-warnings,.comparison-stats .pair-stats-scroll,.comparison-stats .cmp-formulas{margin-left:14px;margin-right:14px}}
