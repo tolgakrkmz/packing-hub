@@ -6,7 +6,7 @@ const {createHubServer} = require('../../server/server.cjs');
 const password = 'Fictional-password-123';
 async function setup(t) {
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
-  await hub.auth.create('demo-route-admin', password, 'admin');
+  await hub.auth.create('demo-route-admin', password, 'admin', null, {canViewWall: true}); // The wall needs an explicit grant even for admins.
   await hub.auth.create('demo-route-observer', password, 'observer');
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
   t.after(() => hub.close());

@@ -211,6 +211,31 @@ task changes, reconnection, returning to a tab and every 30 seconds while visibl
 The authenticated summary API returns only a count, without task details. A
 failed refresh hides the badge until the connection succeeds again.
 
+### Shift leads wall
+
+`/wall` is an informal page for shift leads; it is not a work tool and does not
+replace Tasks or Global problems. A post has up to 500 characters and/or one
+photo, then reactions (🍺 😂 🔥 👍, one of each kind per person, pressing again
+removes it) and short comments. The feed is newest first with **Show more**.
+Authors delete their own posts and comments; only administrators delete others'.
+Posts, comments, reactions and photos are removed automatically after 90 days.
+
+`canViewWall` allows reading and reacting, `canPostWall` posting and commenting;
+both default to shift leads (task supervisors) only. Any other account,
+administrators included, needs an explicit grant in Accounts. The home tile
+and module menu show **new** for other people's posts since the wall was last
+opened. A new post creates the optional **New wall posts** notification, which
+each person can turn off. Photos use the task-photo checks (JPEG without
+metadata, at most 300 KB and 1280 px) and their own `wall_photos` table. To keep
+the disk and archives small, each person can add at most 5 photo posts per day
+and all wall photos together are capped at 200 MB. The
+offline file version hides the module.
+
+```sh
+node --test tests/server/wall.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --wall-only
+```
+
 ### Notifications on Android and iPhone
 
 Accounts have separate receiving flags for task assignment, changes/returns,

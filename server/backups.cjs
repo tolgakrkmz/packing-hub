@@ -59,6 +59,9 @@ function verifyDatabase(filename) {
     // Problems are additive: older archives without the table still restore.
     if (tables.has('problem_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM problem_photos').get();
     if (tables.has('problem_items')) for (const row of db.prepare('SELECT data FROM problem_items').iterate()) JSON.parse(row.data);
+    // The wall is additive as well; reading the BLOBs proves the photos are intact.
+    if (tables.has('wall_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM wall_photos').get();
+    for (const table of ['wall_posts', 'wall_comments', 'wall_reactions']) if (tables.has(table)) db.prepare(`SELECT count(*) FROM ${table}`).get();
     for (const table of ['task_items', 'task_schedules']) {
       for (const row of db.prepare(`SELECT data FROM ${table}`).iterate()) JSON.parse(row.data);
     }

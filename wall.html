@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Стена · Package Hub</title>
+<link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/tasks.css"><link rel="stylesheet" href="css/wall.css"><link rel="stylesheet" href="css/i18n.css">
+<script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
+<script src="js/task-photos.js" defer></script><script src="js/wall.js" defer></script>
+<link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/package-hub-icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/brand.css">
+<link rel="stylesheet" href="css/brand-shell.css">
+</head>
+<body>
+<main class="wrap tasks-wrap wall-wrap">
+<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Само за началник смените</p><h1>Стена</h1><p>Снимки, майтапи и кратки бележки след смяната. Не е работен инструмент.</p></div></header>
+<p id="wallMessage" role="status" aria-live="polite"></p>
+<form id="wallForm" class="wall-composer" hidden>
+<label>Нова публикация<textarea id="wallText" maxlength="500" rows="3" placeholder="Какво ново?"></textarea></label>
+<p class="wall-rule">Без снимки на продукти, етикети, документи и клиенти.</p>
+<fieldset class="task-photo-picker"><legend>Снимка (по желание)</legend><div class="task-fields"><label>Избери снимка<input id="wallPhoto" type="file" accept="image/*"></label><label>Снимай<input id="wallCamera" type="file" accept="image/*" capture="environment"></label></div><p id="wallPhotoCount" class="task-muted" role="status" translate="no" hidden></p><div id="wallPhotoPreview" class="task-photo-choices"></div><p id="wallPhotoInfo" class="task-muted" role="status"></p><button id="wallPhotoClear" type="button" class="secondary" hidden>Премахни избора</button></fieldset>
+<p id="actionFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Публикувай</button></div>
+</form>
+<div class="task-toolbar"><button id="refreshWall" type="button" class="secondary">Опресни</button></div>
+<section id="wallFeed" class="wall-feed" aria-live="polite"></section>
+<div class="task-actions wall-more"><button id="wallMore" type="button" class="secondary" hidden>Покажи още</button></div>
+<dialog id="taskPhotoViewer" class="task-dialog task-photo-viewer"><div class="dialog-heading"><h2 id="photoViewerTitle">Снимка</h2><button type="button" data-close="taskPhotoViewer" class="secondary" aria-label="Затвори">×</button></div><img id="photoViewerImage" alt=""><p id="photoViewerFeedback" role="status"></p></dialog>
+</main></body></html>

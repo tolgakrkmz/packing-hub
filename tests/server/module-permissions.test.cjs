@@ -71,7 +71,7 @@ test('viewing denials gate direct pages, APIs, exports, roster, statistics and i
       'package-instructions': ['/api/data/package-instructions', '/api/folders', '/api/files?path=data%2Fpackage-instructions.json'],
       statistics: ['/api/statistics/workforce', '/api/statistics/data/production-log'],
       tasks: ['/api/tasks', '/api/tasks/summary', '/api/tasks/preview'],
-      problems: ['/api/problems'],
+      problems: ['/api/problems'], wall: ['/api/wall', '/api/wall/summary'],
       accounts: ['/api/accounts'], 'activity-log': ['/api/admin/activity'], 'system-status': ['/api/admin/status']
     };
     for (const route of routes[group.module]) assert.equal((await request(route, session)).status, 403, route);

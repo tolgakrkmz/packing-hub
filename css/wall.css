@@ -1,0 +1,25 @@
+.wall-wrap{max-width:720px}
+.wall-composer,.wall-post{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin:0 0 14px;min-width:0}
+.wall-rule{font-size:12px;color:var(--text-muted);margin:4px 0 10px}
+.wall-feed{display:flex;flex-direction:column}
+.wall-author{display:flex;align-items:center;gap:10px;min-width:0}
+.wall-author>div{display:flex;flex-direction:column;min-width:0;flex:1}
+.wall-author strong{overflow-wrap:anywhere}
+.wall-author .task-muted{font-size:12px}
+.wall-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0}
+.tasks-wrap button.wall-photo{display:block;width:100%;padding:0;margin:8px 0;background:none;border:0;border-radius:10px;overflow:hidden}
+.wall-photo img{display:block;width:100%;height:auto;max-height:480px;object-fit:contain;background:var(--panel-2)}
+.wall-reactions{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.tasks-wrap button.wall-reaction{width:auto;padding:6px 10px;border-radius:999px;font-weight:600}
+.tasks-wrap button.wall-reaction.is-active{background:var(--teal-dark);border-color:var(--teal)}
+.tasks-wrap button.wall-delete{width:auto;padding:4px 8px;font-size:12px}
+.wall-comments{border-top:1px solid var(--border);padding-top:8px}
+.wall-comment{padding:8px 0 0}
+.wall-comment .wall-text{margin:6px 0 0 46px}
+.wall-comment .wall-avatar{width:28px;height:28px;font-size:11px}
+.wall-comment-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.wall-comment-form input{flex:1 1 180px;min-width:0}
+.tasks-wrap .wall-comment-form button{width:auto}
+.wall-comment-form .task-error{flex-basis:100%;margin:0}
+.wall-more{justify-content:center}
+@media (max-width:480px){.wall-comment .wall-text{margin-left:0}}
