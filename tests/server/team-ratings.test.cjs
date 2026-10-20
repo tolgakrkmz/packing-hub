@@ -79,7 +79,8 @@ test('the prompt starts after a pair result, returns until everyone shown is rat
   const row = id => summary.rows.find(item => item.id === id);
   assert.deepEqual([row('demo-rate-1').good, row('demo-rate-2').poor, row('demo-rate-3').ok, row('demo-rate-2').lowData], [1, 1, 1, true]);
   assert.deepEqual([row('demo-rate-5').present, row('demo-rate-5').absent], [0, 1]);
-  assert.ok(!JSON.stringify(summary).includes('slow'), 'reasons stay out of the summary');
+  assert.deepEqual(summary.reasons, [{team: 'А', reason: 'slow', count: 1}], 'reasons are counted per team');
+  assert.ok(!JSON.stringify(summary.rows).includes('slow'), 'reasons stay out of the per-person rows');
 });
 test('foreign teams, operators without the right and closed shifts are refused; the report needs its own right', async t => {
   const s = await setup(t);

@@ -112,7 +112,9 @@ function createTeamRatings(store, {now = Date.now} = {}) {
       if (!rosters.has(key)) rosters.set(key, store.pairRosterAt(employees, team, date));
       return rosters.get(key);
     };
-    return {days, since, lowData: LOW_DATA, rows: summarize({ratings: db.prepare('SELECT employee_id,name,team,date,rating FROM team_ratings WHERE date>=?').all(since), entries: pairs, rosterAt, since})};
+    // Reasons are counted per team only, never per person.
+    const reasons = db.prepare("SELECT team,reason,count(*) AS count FROM team_ratings WHERE date>=? AND reason<>'' GROUP BY team,reason ORDER BY team,reason").all(since).map(row => ({...row}));
+    return {days, since, lowData: LOW_DATA, reasons, rows: summarize({ratings: db.prepare('SELECT employee_id,name,team,date,rating FROM team_ratings WHERE date>=?').all(since), entries: pairs, rosterAt, since})};
   }
   return {prompt, rate, summary};
 }
