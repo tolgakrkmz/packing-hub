@@ -16,6 +16,9 @@ const MonthlyPresentation = (() => {
   const sum = (rows, read) => rows.reduce((total, row) => total + (Number(read(row)) || 0), 0);
   const name = month => NAMES[+month.slice(5, 7) - 1];
   const inMonth = (rows, month) => rows.filter(entry => entry.date?.startsWith(month + '-'));
+  // Site figures the user may replace with numbers from company systems; the site value stays the default.
+  const EDITABLE = ['autoT','manualT','stickersT','cases','scrapT','downtimeH','goalT','p1AutoT','p1ManualT','p1StickersT','p1ScrapT','p1DowntimeH','p2AutoT','p2ManualT','p2StickersT'];
+  const TEAMS = [['А', 'A'], ['Б', 'B'], ['В', 'C'], ['Г', 'D']];
 
   // Totals in tonnes. Reports without a breakdown count as manual packing so the routes add up to the total.
   function packing(entries, month) {
@@ -24,6 +27,16 @@ const MonthlyPresentation = (() => {
     const auto = sum(line, entry => entry.breakdown?.autoKg) / 1000;
     return {name:name(month), rows:rows.length, total, auto, stickers, manual:total - auto - stickers, scrap:sum(rows, entry => entry.brak) / 1000,
       cases:sum(rows, entry => (Number(entry.breakdown?.autoCrates) || 0) + (Number(entry.breakdown?.manCrates) || 0))};
+  }
+
+  // Defaults for EDITABLE, rounded as the dialog shows them. goalTons is the production log goal in tonnes.
+  function siteFigures({month, production, downtime, goalTons}) {
+    const round = value => Math.round(value * 10) / 10, hours = value => round(sum(inMonth(downtime, value), entry => entry.durationMin) / 60);
+    const [p2, p1, now] = [addMonths(month, -2), addMonths(month, -1), month].map(value => packing(production, value));
+    const figures = {cases:now.cases, scrapT:round(now.scrap), downtimeH:hours(month), goalT:Number(goalTons) || 0, p1ScrapT:round(p1.scrap), p1DowntimeH:hours(addMonths(month, -1))};
+    for (const [prefix, row] of [['', now], ['p1', p1], ['p2', p2]]) for (const key of ['auto', 'manual', 'stickers'])
+      figures[(prefix ? prefix + key[0].toUpperCase() + key.slice(1) : key) + 'T'] = round(row[key]);
+    return figures;
   }
 
   // Largest downtime reasons of the month, for the automatic line constraints.
@@ -62,17 +75,42 @@ const MonthlyPresentation = (() => {
       perPersonT:num(production ? packed / production : NaN, 1), teams};
   }
 
+  // Shift tasks and global tasks due in the month; cancelled and not applicable ones are left out.
+  function tasks(items, start, end) {
+    if (!Array.isArray(items)) return null;
+    const due = items.filter(item => item.due >= start && item.due < end && !['cancelled', 'not-applicable'].includes(item.status));
+    const completed = due.filter(item => item.status === 'completed'), late = completed.filter(item => item.report?.late).length;
+    const notDone = due.filter(item => item.status === 'not-done' || item.displayStatus === 'unreported').length;
+    return {total:due.length, completed:completed.length, late, notDone, open:due.length - completed.length - notDone, onTime:pct((completed.length - late) / due.length, 0)};
+  }
+
+  // One line per metric: this month against the previous one; lowerBetter flips the colour of the change.
+  function change(label, current, previous, unit, lowerBetter = false, digits = 0) {
+    const ratio = previous ? (current - previous) / previous : NaN, trend = !Number.isFinite(ratio) || Math.abs(ratio) < 0.0005 ? 'flat' : ratio > 0 ? 'up' : 'down';
+    return {label, current:num(current, digits) + ' ' + unit, previous:num(previous, digits) + ' ' + unit, change:Number.isFinite(ratio) ? signed(pct(ratio), ratio) : '—',
+      trend, good:trend === 'flat' ? null : (trend === 'down') === lowerBetter};
+  }
+
   // production: entries covering the month and the two before it; downtime: line-downtime entries; inputs: numbers or empty; today: YYYY-MM-DD for the cover.
   // problemItems: /api/problems items or null; period: {start, end, now} instants of the month in Sofia; counts: workforce counts or null.
-  function values({month, production, downtime, inputs = {}, today = '', problemItems = null, period = null, counts = null}) {
+  // goalTons: production log goal; pairTeams: [{team, reported, achieved, successPct, kgPct}] per team; taskItems: /api/tasks items or null.
+  // EDITABLE inputs replace the site figures; empty ones fall back to them.
+  function values({month, production, downtime, inputs = {}, today = '', problemItems = null, period = null, counts = null, goalTons = 0, pairTeams = [], taskItems = null}) {
     const input = key => inputs[key] === '' || inputs[key] === null || inputs[key] === undefined ? NaN : Number(inputs[key]);
-    const months = [addMonths(month, -2), addMonths(month, -1), month].map(value => packing(production, value)), [p2, p1, now] = months;
+    const site = siteFigures({month, production, downtime, goalTons}), pick = key => Number.isFinite(input(key)) ? input(key) : site[key];
+    const months = [['p2', addMonths(month, -2)], ['p1', addMonths(month, -1)], ['', month]].map(([prefix, value]) => {
+      const key = route => prefix ? prefix + route[0].toUpperCase() + route.slice(1) + 'T' : route + 'T';
+      const row = packing(production, value), auto = pick(key('auto')), manual = pick(key('manual')), stickers = pick(key('stickers'));
+      return {...row, auto, manual, stickers, total:auto + manual + stickers};
+    }), [p2, p1, now] = months;
+    now.cases = pick('cases'); now.scrap = pick('scrapT'); p1.scrap = pick('p1ScrapT');
+    const goal = pick('goalT'), goalRatio = now.total / goal;
     const days = daysIn(month), weekdays = workingDays(month), stations = input('stations');
     const profiles = input('profiles'), dispatched = input('dispatchedT'), extruded = input('extrudedT');
     const realization = Number.isFinite(input('realizationT')) ? input('realizationT') : now.total;
     const diff = extruded - realization, awaiting = input('anodizingT') + input('sawsT') + input('cncT'), outside = now.scrap + input('specialT');
     const actual = diff - awaiting - outside;
-    const stops = inMonth(downtime, month), calendarH = days * 24, downtimeH = sum(stops, entry => entry.durationMin) / 60;
+    const stops = inMonth(downtime, month), calendarH = days * 24, downtimeH = pick('downtimeH');
     const runningH = Math.max(calendarH - downtimeH, 0), availability = runningH / calendarH, loading = stations / STATIONS;
     const perHour = runningH ? now.auto / runningH : NaN, perStation = stations ? STATIONS / stations : NaN;
     const trucks = input('trucks'), target = input('trucksTarget'), gap = target - trucks;
@@ -99,8 +137,19 @@ const MonthlyPresentation = (() => {
       trucksRatio:Number.isFinite(trucks / target) ? Math.min(Math.max(trucks / target, 0), 1) : 0,
       trucksGap:signed(short(gap), gap), trucksUplift:signed(pct(gap / trucks), gap),
       problems:period ? problems(problemItems, period.start, period.end, period.now) : null, workforce:workforce(counts, inMonth(production, month)),
+      p1Name:p1.name,
+      goal:{goalT:num(goal), percent:pct(goalRatio, 0), ratio:Number.isFinite(goalRatio) ? Math.min(Math.max(goalRatio, 0), 1) : 0,
+        gap:Number.isFinite(goalRatio) ? `${num(Math.abs(now.total - goal))} t ${now.total >= goal ? 'above' : 'below'} goal` : '—', met:now.total >= goal && goal > 0},
+      comparison:[change('Packed tonnage', now.total, p1.total, 't'), change('Automatic line', now.auto, p1.auto, 't'), change('Manual packing', now.manual, p1.manual, 't'),
+        change('Stickers', now.stickers, p1.stickers, 't', false, 1), change('Scrap', now.scrap, p1.scrap, 't', true, 1), change('Downtime', downtimeH, pick('p1DowntimeH'), 'h', true)],
+      teams:TEAMS.map(([team, label]) => {
+        const pairs = pairTeams.find(row => row.team === team) || {}, finitePct = value => Number.isFinite(value) ? `${Math.round(value)}%` : '—';
+        return {team:'Team ' + label, packedT:num(sum(inMonth(production, month).filter(entry => entry.shift === team), entry => entry.tonnage) / 1000),
+          pairs:String(pairs.reported || 0), met:finitePct(pairs.successPct), kg:finitePct(pairs.kgPct)};
+      }),
+      tasks:period ? tasks(taskItems, period.start, period.end) : null,
       empty:{current:!now.rows, previous:!p1.rows || !p2.rows}
     };
   }
-  return {INPUTS, STATIONS, addMonths, workingDays, values};
+  return {INPUTS, EDITABLE, STATIONS, addMonths, workingDays, siteFigures, values};
 })();

@@ -147,6 +147,12 @@ async function exerciseMonthlyPresentation({page, expect}) {
   await page.locator('#presentationBtn').click();
   await expect(dialog).toBeVisible();
   await expect(page.locator('#presentationPeriod')).toHaveText('Октомври 2026');
+  // Site figures are defaults: October has 1.4 t automatic and 1.6 t manual; September comes from a separate read.
+  const auto = dialog.locator('input[name=autoT]');
+  await expect(auto).toHaveValue('1.4');
+  for (const [name, value] of [['manualT', '1.6'], ['goalT', '10'], ['p1ManualT', '1'], ['cases', '80']]) await expect(dialog.locator(`input[name=${name}]`)).toHaveValue(value);
+  await auto.fill('5');
+  await expect(auto).toHaveClass(/changed/);
   await dialog.locator('input[name=stations]').fill('2.5');
   await dialog.locator('input[name=specialLabel]').fill('Fictional special line');
   await dialog.locator('textarea[name=improvements]').fill('Fictional count: Stock checked.');
@@ -158,13 +164,18 @@ async function exerciseMonthlyPresentation({page, expect}) {
   const files = unzipText(fs.readFileSync(await file.path()));
   const slide = n => slideText(files[`ppt/slides/slide${n}.xml`]);
   for (const line of ['October 2026', 'Prepared 05.10.2026']) assert.ok(slide(1).includes(line), line);
-  assert.ok(slide(2).includes('3 t'));
-  assert.ok(slide(3).includes('Fictional special line'));
-  for (const line of ['3 t', '1 t', '0 t']) assert.ok(slide(4).includes(line), line);
-  assert.ok(slide(5).includes('50.0%'));
-  assert.ok(slide(6).includes('Fictional count') && slide(6).includes('Stock checked.'));
-  assert.ok(slide(7).includes('Global Problems') && slide(7).includes('No active problems at month end.'));
-  assert.ok(slide(8).includes('Workforce') && slide(8).includes('Team A'));
+  // The replaced automatic line figure (5 t) flows into the totals.
+  assert.ok(slide(2).includes('7 t'));
+  for (const line of ['Month Performance', '66%', '7 t of 10 t goal', 'Team A', 'TASKS DUE THIS MONTH']) assert.ok(slide(3).includes(line), line);
+  assert.ok(slide(4).includes('Fictional special line'));
+  for (const line of ['7 t', '1 t', '0 t']) assert.ok(slide(5).includes(line), line);
+  assert.ok(slide(6).includes('50.0%'));
+  assert.ok(slide(7).includes('Fictional count') && slide(7).includes('Stock checked.'));
+  assert.ok(slide(8).includes('Global Problems') && slide(8).includes('No active problems at month end.'));
+  assert.ok(slide(9).includes('Workforce') && slide(9).includes('Team A'));
+  await dialog.locator('[data-reset=autoT]').click();
+  await expect(auto).toHaveValue('1.4');
+  await expect(auto).not.toHaveClass(/changed/);
   await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
   // Repeated settings return on the next visit; monthly figures do not.
   await page.reload();
