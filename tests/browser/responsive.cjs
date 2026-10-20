@@ -13,7 +13,7 @@ async function assertResponsive(page, description) {
       viewport: document.querySelector('meta[name=viewport]')?.content,
       overflow: document.documentElement.scrollWidth > width + 1,
       overflowingElements: [...document.querySelectorAll('body *')].filter(visible).filter(element => {
-        if (element.closest('.sched-scroll, .history-month-table, .stats-table-scroll, .import-table-wrap, .task-table-wrap, .chart-wrap, #avTableContainer, #lineShiftContainer, #historyWrap, .ratings-table')) return false;
+        if (element.closest('.sched-scroll, .history-month-table, .stats-table-scroll, .import-table-wrap, .task-table-wrap, .chart-wrap, #avTableContainer, #lineShiftContainer, #historyWrap')) return false;
         const rect = element.getBoundingClientRect();
         return rect.left < -1 || rect.right > width + 1;
       }).map(element => element.id || element.className).slice(0, 8),

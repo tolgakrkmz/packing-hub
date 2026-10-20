@@ -250,8 +250,9 @@ only within the pair-reporting window and for the account's own team; a pair
 cancelled later drops its people from an open prompt.
 
 `canRateTeam` (default: shift leads) gives ratings for the own team only.
-`canViewRatings` (default: administrators) shows the **Team ratings** report on
-the same page: the share of 👍 / 👌 / 👎 per person over 30 or 90 days, the
+`canViewRatings` (default: administrators) shows the **Team ratings** tab in
+**Statistics** (it also needs `canViewStatistics`; without the right the tab is
+not shown): the share of 👍 / 👌 / 👎 per person over 30 or 90 days, the
 number of ratings with a **little data** flag below 5, pair targets met, and
 shifts present/absent. Absent means a team shift with pairs where the person was
 in none; no absence reason (such as sick leave) is recorded or shown, and the
