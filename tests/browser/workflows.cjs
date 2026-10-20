@@ -362,6 +362,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await expect(page.locator('#pairsList')).toContainText('Непостигнат');
     await expect(page.locator('#pairsList [data-action=cancel]')).toHaveCount(0);
     await page.locator('#currentShiftBtn').click();
+    await page.locator('#historyDetails > summary').click();
     await page.locator('#historyList summary').click();
     await page.locator('#historyList [data-action=view]').click();
     await expect(page.locator('#contextTeam')).toHaveValue('СТИКЕРИ');
