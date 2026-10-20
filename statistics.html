@@ -622,18 +622,22 @@
       </section>
     </div>
     <div class="stats-section" id="statsRatings" data-stats-panel="ratings" role="tabpanel" aria-labelledby="statsTabRatings" hidden>
-      <section class="workforce-dashboard" aria-labelledby="ratingsTitle">
-        <div class="wf-head">
-          <div>
-            <div class="dashboard-eyebrow">Само за вътрешна информация</div>
-            <h2 class="wf-title" id="ratingsTitle">Оценки на екипа</h2>
-            <div class="wf-subtitle">Бързите оценки на началник смените. Оценените не виждат оценките.</div>
-          </div>
-          <div class="wf-head-right"><label for="ratingsPeriod">Период<select class="dashboard-select" id="ratingsPeriod"><option value="30">30 дни</option><option value="90">90 дни</option></select></label></div>
+    <section class="workforce-dashboard pair-stats" aria-labelledby="ratingsTitle">
+      <div class="wf-head">
+        <div>
+          <div class="dashboard-eyebrow">Само за вътрешна информация</div>
+          <h2 class="wf-title" id="ratingsTitle">Оценки на екипа</h2>
+          <div class="wf-subtitle">Бързите оценки на началник смените. Оценените не виждат оценките.</div>
         </div>
-        <div class="stats-table-scroll"><table class="stats-table"><thead><tr><th scope="col">Служител</th><th scope="col">Екип</th><th scope="col">👍 Добре</th><th scope="col">👌 Нормално</th><th scope="col">👎 Слабо</th><th scope="col">Оценки</th><th scope="col">Постигнати таргети</th><th scope="col">Присъствал</th><th scope="col">Отсъствал</th></tr></thead><tbody id="ratingsRows"></tbody></table></div>
-        <p class="wf-subtitle" id="ratingsNote" role="status"></p>
-      </section>
+        <div class="wf-head-right pair-stats-filters">
+          <label for="ratingsTeam">Екип<select class="dashboard-select" id="ratingsTeam"><option value="">Всички екипи</option></select></label>
+          <label for="ratingsPeriod">Период<select class="dashboard-select" id="ratingsPeriod"><option value="30">30 дни</option><option value="90">90 дни</option></select></label>
+          <span class="status-chip neutral" id="ratingsStatus">Няма данни</span>
+        </div>
+      </div>
+      <p class="wf-subtitle pair-stats-hint">Оценката и присъствието са отделни показатели. Изпълнението на таргетите е в „Двойки и таргети“. Причина за отсъствие не се записва.</p>
+      <div id="ratingsBody"></div>
+    </section>
     </div>
     <div class="stats-section" id="statsDowntime" data-stats-panel="downtime" role="tabpanel" aria-labelledby="statsTabDowntime" hidden>
     <div class="panel">
@@ -663,6 +667,7 @@
 <script src="js/pair-targets-statistics.js"></script>
 <script src="js/statistics-overview.js"></script>
 <script src="js/statistics-comparison.js"></script>
+<script src="js/team-ratings-statistics-model.js"></script>
 <script src="js/team-ratings-report.js"></script>
 <script src="js/statistics-navigation.js"></script>
 <script src="js/statistics-helpers.js"></script>

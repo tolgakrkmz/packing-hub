@@ -17,10 +17,11 @@ function selectForPrompt(present, lastRated, limit = PROMPT_LIMIT) {
   return present.slice().sort((a, b) => (lastRated.get(a.id) ?? -1) - (lastRated.get(b.id) ?? -1) || a.name.localeCompare(b.name, 'bg')).slice(0, limit);
 }
 // Ratings and attendance stay separate columns: absences never change the rating and no reason is recorded.
+// Pair results are not repeated here; they belong to the pair statistics.
 function summarize({ratings, entries, rosterAt, since}) {
   const rows = new Map();
   const row = (id, name, team) => {
-    if (!rows.has(id)) rows.set(id, {id, name, team, good: 0, ok: 0, poor: 0, total: 0, lowData: true, pairs: 0, achieved: 0, present: 0, absent: 0});
+    if (!rows.has(id)) rows.set(id, {id, name, team, good: 0, ok: 0, poor: 0, total: 0, lowData: true, present: 0, absent: 0});
     const found = rows.get(id); if (name && !found.name) found.name = name; if (team && !found.team) found.team = team;
     return found;
   };
@@ -29,12 +30,7 @@ function summarize({ratings, entries, rosterAt, since}) {
     if (entry.date < since || entry.cancellation) continue;
     const key = scopeKey(entry);
     if (!scopes.has(key)) scopes.set(key, {entry, present: new Set()});
-    for (const person of entry.members) {
-      scopes.get(key).present.add(person.id);
-      if (!entry.result) continue;
-      const found = row(person.id, person.name, entry.team); found.pairs++;
-      if (entry.result.kg >= entry.targetKg && entry.result.crates >= entry.targetCrates) found.achieved++;
-    }
+    for (const person of entry.members) scopes.get(key).present.add(person.id);
   }
   for (const {entry, present} of scopes.values()) {
     for (const person of rosterAt(entry.team, entry.date)) row(person.id, person.name, entry.team)[present.has(person.id) ? 'present' : 'absent']++;
@@ -112,7 +108,9 @@ function createTeamRatings(store, {now = Date.now} = {}) {
       if (!rosters.has(key)) rosters.set(key, store.pairRosterAt(employees, team, date));
       return rosters.get(key);
     };
-    return {days, since, lowData: LOW_DATA, rows: summarize({ratings: db.prepare('SELECT employee_id,name,team,date,rating FROM team_ratings WHERE date>=?').all(since), entries: pairs, rosterAt, since})};
+    // Reasons are counted per team only, never per person.
+    const reasons = db.prepare("SELECT team,reason,count(*) AS count FROM team_ratings WHERE date>=? AND reason<>'' GROUP BY team,reason ORDER BY team,reason").all(since).map(row => ({...row}));
+    return {days, since, lowData: LOW_DATA, reasons, rows: summarize({ratings: db.prepare('SELECT employee_id,name,team,date,rating FROM team_ratings WHERE date>=?').all(since), entries: pairs, rosterAt, since})};
   }
   return {prompt, rate, summary};
 }
