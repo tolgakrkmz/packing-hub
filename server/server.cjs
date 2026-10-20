@@ -12,6 +12,7 @@ const {createImports, limits: importLimits} = require('./imports.cjs');
 const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {createProblems} = require('./problems.cjs');
+const {createWall} = require('./wall.cjs');
 const {createStatisticsReads} = require('./statistics.cjs');
 const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
@@ -30,6 +31,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const problems = createProblems(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const wall = createWall(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const statistics = createStatisticsReads(store);
   const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
@@ -313,6 +315,38 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           }
           throw problem(405, 'METHOD_REJECTED');
         }
+        if (pathname === '/api/wall/summary') {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, wall.summary(currentUser()));
+        }
+        const wallAvatar = pathname.match(/^\/api\/wall\/authors\/(\d{1,12})\/avatar$/);
+        if (wallAvatar) {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          const owner = auth.list().find(user => user.id === wall.authorId(Number(wallAvatar[1]), currentUser()));
+          if (!owner) throw problem(404, 'NOT_FOUND');
+          const content = avatars.get(owner);
+          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length, 'Content-Disposition': 'inline'});
+          return response.end(content);
+        }
+        const wallPhoto = pathname.match(/^\/api\/wall\/([0-9a-f-]{36})\/photos\/([0-9a-f-]{36})$/);
+        if (wallPhoto) {
+          if (!['GET', 'HEAD'].includes(request.method)) throw problem(405, 'METHOD_REJECTED');
+          const content = wall.photo(wallPhoto[1], wallPhoto[2], currentUser());
+          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
+          return response.end(request.method === 'HEAD' ? undefined : content);
+        }
+        const wallRoute = pathname.match(/^\/api\/wall(?:\/([0-9a-f-]{36})(?:\/(comments|reactions)(?:\/([0-9a-f-]{36}))?)?)?$/);
+        if (wallRoute) {
+          const [, postId, part, commentId] = wallRoute;
+          let result, status = 200;
+          if (!postId && request.method === 'GET') return json(response, 200, wall.list(currentUser(), url.searchParams.get('before')));
+          if (!postId && request.method === 'POST') { result = wall.create(await jsonBody(request, taskPhotoRequestBytes), currentUser()); status = 201; }
+          else if (postId && part === 'comments' && !commentId && request.method === 'POST') { result = wall.comment(postId, await jsonBody(request), currentUser()); status = 201; }
+          else if (postId && part === 'reactions' && !commentId && request.method === 'POST') result = wall.react(postId, await jsonBody(request), currentUser());
+          else if (postId && (!part || part === 'comments' && commentId) && request.method === 'DELETE') result = wall.remove(postId, commentId, currentUser());
+          else throw problem(405, 'METHOD_REJECTED');
+          broadcast('wall', 0); return json(response, status, result);
+        }
         const problemPhoto = pathname.match(/^\/api\/problems\/([0-9a-f-]{36})\/photos\/([0-9a-f-]{36})$/);
         if (problemPhoto) {
           if (!['GET', 'HEAD'].includes(request.method)) throw problem(405, 'METHOD_REJECTED');
@@ -466,7 +500,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const photoCleanup = setInterval(() => { try { tasks.maintain(); } catch { /* Retry next hour; do not log private task data. */ } }, 3600000);
+  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch { /* Retry next hour. */ } try { tasks.maintain(); } catch { /* Retry next hour; do not log private task data. */ } }, 3600000);
   photoCleanup.unref();
   let statusRunning = false, notificationStopped = false, statusWork;
   function checkNotificationStatus() {
@@ -477,7 +511,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(() => {}); }, 30000); notificationTick.unref();
   const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
   const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, tasks, problems, maintenance, notifications, close};
+  return {server, store, auth, imports, tasks, problems, wall, maintenance, notifications, close};
 }
 if (require.main === module) {
   process.umask(0o077);

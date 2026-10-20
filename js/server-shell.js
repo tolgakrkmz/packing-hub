@@ -44,7 +44,7 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
   const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
   const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';
   const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.disabled = true; placeholder.textContent = 'Избери модул'; moduleSelect.append(placeholder);
-  const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['shift-closeout','Край на смяната'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики'], ['problems', 'Глобални проблеми']];
+  const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['shift-closeout','Край на смяната'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики'], ['problems', 'Глобални проблеми'], ['wall', 'Стена']];
   for (const [name, title] of modules) {
     if (name !== 'index' && !canViewModule(name)) continue;
     const option = document.createElement('option'); option.value = name === 'index' ? '/' : '/' + name; option.textContent = title;
@@ -256,6 +256,8 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
     if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
     const problemsLink = document.querySelector('a[href="/problems"],a[href="problems.html"]');
     if (problemsLink && can('canViewProblems')) problemsLink.hidden = false;
+    const wallLink = document.querySelector('a[href="/wall"],a[href="wall.html"]');
+    if (wallLink && can('canViewWall')) wallLink.hidden = false;
     document.querySelector('.sub').textContent = 'Общи данни за всички устройства. Изберете модул.';
     document.querySelector('footer').textContent = 'Общи данни за всички устройства. Промените се показват автоматично.';
   }
@@ -263,7 +265,7 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
   let taskCountSequence = 0;
   let taskCountRead = null;
   if (can('canViewTasks') && currentModule !== 'report-history') {
-    for (const link of document.querySelectorAll('a[href="/tasks"],a[href="tasks.html"],a[href="/tasks.html"],.tasks-heading h1')) {
+    for (const link of document.querySelectorAll('a[href="/tasks"],a[href="tasks.html"],a[href="/tasks.html"]' + (currentModule === 'tasks' ? ',.tasks-heading h1' : ''))) {
       const badge = document.createElement('span'); badge.className = 'task-count'; badge.hidden = true;
       badge.setAttribute('role', 'status'); (link.querySelector('h2') || link).append(badge); taskBadges.push(badge);
     }
@@ -291,6 +293,19 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
     taskCountRead = operation;
     operation.finally(() => { if (taskCountRead === operation) taskCountRead = null; }).catch(() => {});
     return operation;
+  }
+  // "New" marks wall posts by others since this account last opened the wall.
+  if (can('canViewWall') && !['wall', 'report-history'].includes(currentModule)) {
+    const marks = [...document.querySelectorAll('a[href="/wall"],a[href="wall.html"]')].map(link => {
+      const badge = document.createElement('span'); badge.className = 'wall-new'; badge.hidden = true; badge.textContent = 'ново';
+      (link.querySelector('h2') || link).append(badge); return badge;
+    });
+    const option = moduleSelect.querySelector('option[value="/wall"]');
+    const refreshWallBadge = () => json('/api/wall/summary').then(({unread}) => {
+      for (const badge of marks) { badge.hidden = !unread; badge.title = 'Нови публикации: ' + unread; }
+      if (option) option.textContent = unread ? 'Стена · ново' : 'Стена';
+    }).catch(() => {});
+    watch('wall', refreshWallBadge); refreshWallBadge();
   }
   applyPermissions();
   new MutationObserver(applyPermissions).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});

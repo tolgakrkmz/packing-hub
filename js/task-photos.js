@@ -77,6 +77,7 @@ function photoPicker(prefix) {
     const files = [...event.target.files]; if (!files.length) return;
     const current = ++sequence; pending = true; failed = false; clear.hidden = false; input.disabled = true; camera.disabled = true; clearFeedback(); info.textContent = 'Подготвяне на снимката…';
     try {
+      if (getState().photoPolicy.maxPhotos === 1) entries = []; // A single-photo picker replaces its choice.
       if (entries.length + files.length > getState().photoPolicy.maxPhotos) throw new Error('Можеш да добавиш до 10 снимки.');
       const added = [];
       for (const file of files) { added.push({data: await encode(file)}); if (sequence !== current) return; }

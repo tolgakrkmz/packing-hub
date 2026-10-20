@@ -20,6 +20,7 @@
     downtimeChanged: {flag: 'canReceiveDowntimeChanged', module: 'line-downtime', label: 'Корекции на престои', text: 'Отчет за престой е коригиран или изтрит.'},
     pairs: {flag: 'canReceivePairNotifications', module: 'pair-targets', label: 'Планове и резултати на двойки', text: 'Има нов или променен запис за двойки.'},
     instructions: {flag: 'canReceiveInstructionNotifications', module: 'package-instructions', label: 'Обновени инструкции', text: 'Инструкциите са обновени.'},
+    wallPost: {flag: 'canReceiveWallPosts', module: 'wall', label: 'Нови публикации на стената', text: 'Има нова публикация на стената.'},
     systemDatabase: {flag: 'canReceiveDatabaseNotifications', module: 'system-status', label: 'Проблем с базата', text: 'Работната база изисква проверка.'},
     systemDisk: {flag: 'canReceiveDiskNotifications', module: 'system-status', label: 'Недостатъчно място на диска', text: 'Свободното място изисква проверка.'},
     systemBackup: {flag: 'canReceiveBackupNotifications', module: 'system-status', label: 'Проблем с архивите', text: 'Архивите изискват проверка.'},

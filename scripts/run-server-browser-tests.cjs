@@ -78,6 +78,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--wall-only')) {
+      await require('../tests/browser/wall.cjs').exerciseWall({admin, hub, base, device, expect});
+      assert.deepEqual(errors, []); return;
+    }
     if(process.argv.includes('--production-access-only')) {
       await require('../tests/browser/production-access.cjs').exerciseProductionAccess({admin,hub,base,device,expect,setTime:value=>{taskTime=Date.parse(value);}});
       assert.deepEqual(errors,[]);return;

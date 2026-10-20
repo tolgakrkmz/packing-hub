@@ -60,7 +60,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   function sync() {
     store.transaction(() => {
       const roster = users();
-      const changes = db.prepare('SELECT a.id,a.at,a.action,a.module,a.detail,t.data AS targets FROM audit a LEFT JOIN notification_targets t ON t.audit_id=a.id WHERE a.id>? ORDER BY a.id LIMIT 1000').all(Number(state('audit')));
+      const changes = db.prepare('SELECT a.id,a.at,a.user_id,a.action,a.module,a.detail,t.data AS targets FROM audit a LEFT JOIN notification_targets t ON t.audit_id=a.id WHERE a.id>? ORDER BY a.id LIMIT 1000').all(Number(state('audit')));
       for (const change of changes) {
         const detail = JSON.parse(change.detail), targets = JSON.parse(change.targets || '{}'), key = 'audit:' + change.id;
         const records = (type, ids) => {
@@ -75,6 +75,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
           } else if (detail.content && change.module === 'pair-targets') records('pairs', [...(targets.addedIds || []), ...(targets.changedIds || [])]);
           else if (detail.content && change.module === 'package-instructions') records('instructions', targets.profiles);
         }
+        if (change.action === 'wall-post' && change.module === 'wall') emit('wallPost', key, roster.filter(user => user.id !== change.user_id), null, change.at);
         if (['attachment-write', 'attachments-import'].includes(change.action) && change.module === 'package-instructions') records('instructions', targets.profiles);
         saveState('audit', change.id);
         db.prepare('DELETE FROM notification_targets WHERE audit_id=?').run(change.id);

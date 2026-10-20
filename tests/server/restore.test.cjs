@@ -185,3 +185,19 @@ test('recovery can use the secondary archive after the primary archive is lost',
     assert.equal(db.prepare('SELECT count(*) AS n FROM sessions').get().n, 0);
   } finally { db.close(); }
 });
+test('wall posts, comments, reactions and photos survive a verified backup and restore', t => {
+  const {createWall} = require('../../server/wall.cjs');
+  const demo = backupFixture(t), wall = createWall(demo.store), user = {id: 1, username: 'demo-backup-admin', role: 'admin'};
+  const {id} = wall.create({requestId: randomUUID(), text: 'Fictional wall note', photo}, user);
+  wall.comment(id, {requestId: randomUUID(), text: 'Fictional comment'}, user);
+  wall.react(id, {requestId: randomUUID(), kind: 'beer'}, user);
+  const archive = path.join(demo.primary, 'wall.sqlite'), target = path.join(demo.directory, 'wall-recovered');
+  snapshot(demo.database, archive); verifyDatabase(archive); restoreArchive(archive, target);
+  const restored = new DatabaseSync(path.join(target, 'hub.sqlite'), {readOnly: true});
+  try {
+    for (const table of ['wall_posts', 'wall_comments', 'wall_reactions', 'wall_photos']) {
+      const rows = restored.prepare(`SELECT * FROM ${table} ORDER BY 1`).all();
+      assert.equal(rows.length, 1, table); assert.deepEqual(rows, demo.store.db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all());
+    }
+  } finally { restored.close(); }
+});

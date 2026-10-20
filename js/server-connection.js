@@ -427,7 +427,7 @@ const HubServer = (() => {
     node.setAttribute('data-tone', String([...user.username].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5));
     if (user.avatar) {
       // Other accounts' photos go through the account-management route and its permission check.
-      const route = user.id === boot.user.id ? '/api/account/avatar' : '/api/accounts/' + encodeURIComponent(user.id) + '/avatar';
+      const route = user.avatarRoute || (user.id === boot.user.id ? '/api/account/avatar' : '/api/accounts/' + encodeURIComponent(user.id) + '/avatar');
       const image = document.createElement('img'); image.alt = ''; image.src = route + '?v=' + encodeURIComponent(user.avatar);
       image.onerror = () => { image.remove(); node.textContent = initials(user.username); };
       node.append(image);
