@@ -163,6 +163,8 @@ async function exerciseMonthlyPresentation({page, expect}) {
   for (const line of ['3 t', '1 t', '0 t']) assert.ok(slide(4).includes(line), line);
   assert.ok(slide(5).includes('50.0%'));
   assert.ok(slide(6).includes('Fictional count') && slide(6).includes('Stock checked.'));
+  assert.ok(slide(7).includes('Global Problems') && slide(7).includes('No active problems at month end.'));
+  assert.ok(slide(8).includes('Workforce') && slide(8).includes('Team A'));
   await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
   // Repeated settings return on the next visit; monthly figures do not.
   await page.reload();
