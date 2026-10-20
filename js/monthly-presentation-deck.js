@@ -2,7 +2,7 @@
 const MonthlyPresentationDeck = (() => {
   const C = {bg:'15171B', panel:'1D2025', panel2:'22262C', border:'2C3039', text:'EDEBE3', muted:'8A8D93',
     amber:'F5A623', amberDark:'3A2C10', blue:'4F95C9', teal:'3FBFA0', coral:'E0765A', purple:'A083D6', pink:'C26B9E'};
-  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 8, GAP = 0.25, RIGHT = W - M;
+  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 9, GAP = 0.25, RIGHT = W - M;
   const text = (slide, value, x, y, w, h, options = {}) => slide.addText(value, {x, y, w, h, fontFace:FONT, fontSize:12, color:C.text, margin:0, valign:'top', ...options});
   const box = (slide, x, y, w, h, fill = C.panel, line = C.border) => slide.addShape('roundRect', {x, y, w, h, rectRadius:0.08, fill:{color:fill}, line:{color:line, width:0.75}});
   const bar = (slide, x, y, w, h, color) => slide.addShape('rect', {x, y, w:Math.max(w, 0.01), h, fill:{color}, line:{color, width:0}});
@@ -87,8 +87,45 @@ const MonthlyPresentationDeck = (() => {
     text(slide, `Daily averages: packing totals ÷ ${v.calendarDays} calendar days  |  dispatch ÷ ${v.workingDays} Mon–Fri working days`, M, 6.5, RIGHT - M, 0.3, {fontSize:10, color:C.muted});
   }
 
+  // Goal, change against the previous month, team results and tasks on one slide.
+  function performance(pptx, v) {
+    const slide = frame(pptx, v, 3, 'Month Performance', `Goal, change against ${v.p1Name} and team results · ${v.monthName} ${v.year}`);
+    const leftW = 3.9, x = M + leftW + GAP, w = RIGHT - x, g = v.goal;
+    box(slide, M, 1.95, leftW, 2.55);
+    label(slide, 'Monthly goal', M + 0.25, 2.12, leftW - 0.5);
+    text(slide, g.percent, M + 0.25, 2.45, leftW - 0.5, 0.7, {fontSize:36, bold:true, color:g.met ? C.teal : C.amber, valign:'middle'});
+    bar(slide, M + 0.25, 3.25, leftW - 0.5, 0.18, C.panel2);
+    bar(slide, M + 0.25, 3.25, (leftW - 0.5) * g.ratio, 0.18, g.met ? C.teal : C.amber);
+    text(slide, `${v.packedT} t of ${g.goalT} t goal`, M + 0.25, 3.55, leftW - 0.5, 0.3, {fontSize:12});
+    text(slide, g.gap, M + 0.25, 3.88, leftW - 0.5, 0.3, {fontSize:11, color:C.muted});
+    box(slide, x, 1.95, w, 2.55);
+    label(slide, `Change against ${v.p1Name}`, x + 0.25, 2.12, w - 0.5);
+    const cell = (value, options = {}) => ({text:String(value), options:{fontFace:FONT, fontSize:10.5, color:C.text, valign:'middle', ...options}});
+    const head = (value, align = 'right') => cell(value, {bold:true, color:C.muted, fontSize:9.5, align});
+    const tableOptions = (top, colW) => ({x:x + 0.25, y:top, w:w - 0.5, colW, rowH:0.27, border:{type:'solid', color:C.border, pt:0.5}, fill:{color:C.panel}, margin:0.02});
+    slide.addTable([[head('Metric', 'left'), head(v.monthName), head(v.p1Name), head('Change')],
+      ...v.comparison.map(row => [cell(row.label), cell(row.current, {align:'right', bold:true}), cell(row.previous, {align:'right', color:C.muted}),
+        cell(`${row.trend === 'up' ? '▲ ' : row.trend === 'down' ? '▼ ' : ''}${row.change}`, {align:'right', bold:true, color:row.good === null ? C.muted : row.good ? C.teal : C.coral})])],
+      tableOptions(2.4, [2.4, 1.8, 1.8, 1.48]));
+    box(slide, M, 4.68, w, 2.14);
+    label(slide, 'Teams A–D', M + 0.25, 4.83, w - 0.5);
+    slide.addTable([[head('Team', 'left'), head('Packed'), head('Pairs reported'), head('Pair targets met'), head('Kg vs target')],
+      ...v.teams.map(row => [cell(row.team, {bold:true}), cell(row.packedT + ' t', {align:'right'}), cell(row.pairs, {align:'right'}),
+        cell(row.met, {align:'right', bold:true, color:C.amber}), cell(row.kg, {align:'right'})])],
+      {...tableOptions(5.15, [1.5, 1.5, 1.5, 1.6, 1.38]), x:M + 0.25, w:w - 0.5, rowH:0.29});
+    const tx = M + w + GAP, tw = RIGHT - tx, t = v.tasks;
+    box(slide, tx, 4.68, tw, 2.14);
+    label(slide, 'Tasks due this month', tx + 0.25, 4.83, tw - 0.5);
+    if (!t) return text(slide, 'Tasks were not available.', tx + 0.25, 5.2, tw - 0.5, 0.4, {fontSize:12, color:C.muted});
+    text(slide, [{text:t.onTime, options:{fontSize:30, bold:true, color:C.teal}}, {text:' on time', options:{fontSize:12, color:C.muted}}], tx + 0.25, 5.1, tw - 0.5, 0.55, {valign:'middle'});
+    [['Completed', `${t.completed} (${t.late} late)`], ['Not done', t.notDone], ['Still open', t.open], ['Total', t.total]].forEach(([name, value], i) => {
+      text(slide, name, tx + 0.25, 5.72 + i * 0.26, tw - 1.6, 0.25, {fontSize:11, color:C.muted, valign:'middle'});
+      text(slide, String(value), tx + tw - 1.6, 5.72 + i * 0.26, 1.35, 0.25, {fontSize:11, bold:true, align:'right', valign:'middle'});
+    });
+  }
+
   function reconciliation(pptx, v, specialLabel) {
-    const slide = frame(pptx, v, 3, 'Production-to-Packing Reconciliation', 'From extrusion output to the actual Packing-area balance');
+    const slide = frame(pptx, v, 4, 'Production-to-Packing Reconciliation', 'From extrusion output to the actual Packing-area balance');
     const cols = columns(3);
     card(slide, {...cols[0], y:1.95, h:1.75, title:'Extruded output', value:v.extrudedT, unit:'t', color:C.blue, sub:'Extrusion'});
     card(slide, {...cols[1], y:1.95, h:1.75, title:'Packing for realization', value:v.realizationT, unit:'t', color:C.teal, sub:'Packing'});
@@ -110,7 +147,7 @@ const MonthlyPresentationDeck = (() => {
   }
 
   function workload(pptx, v) {
-    const slide = frame(pptx, v, 4, 'Packing Workload', 'Three-month view of how total packing volume is distributed by route');
+    const slide = frame(pptx, v, 5, 'Packing Workload', 'Three-month view of how total packing volume is distributed by route');
     const cols = columns(4);
     [['Total packed', v.packedT, C.amber], ['Automatic line', v.autoT, C.teal], ['Manual packing', v.manualT, C.blue], ['Stickers', v.stickersT, C.pink]]
       .forEach(([title, value, color], i) => card(slide, {...cols[i], y:1.92, h:1.45, title, value, unit:'t', color, size:26}));
@@ -133,7 +170,7 @@ const MonthlyPresentationDeck = (() => {
   }
 
   function automaticLine(pptx, v) {
-    const slide = frame(pptx, v, 5, 'Automatic Line Capacity Utilization', `${v.monthName} actual output: ${v.autoT} t · machine availability and station loading limit effective capacity`);
+    const slide = frame(pptx, v, 6, 'Automatic Line Capacity Utilization', `${v.monthName} actual output: ${v.autoT} t · machine availability and station loading limit effective capacity`);
     const y = 1.95, h = 1.75, w = 2.7;
     card(slide, {x:0.6, y, w, h, title:'Machine availability', value:v.availability, color:C.teal, sub:`${v.runningH} h running / ${v.calendarH} h calendar`, size:28});
     text(slide, '×', 3.35, y, 0.4, h, {fontSize:24, bold:true, color:C.muted, align:'center', valign:'middle'});
@@ -158,7 +195,7 @@ const MonthlyPresentationDeck = (() => {
   }
 
   function logistics(pptx, v, improvements) {
-    const slide = frame(pptx, v, 6, 'Logistics – Operational Improvements', 'Key actions completed during the month and the next throughput target');
+    const slide = frame(pptx, v, 7, 'Logistics – Operational Improvements', 'Key actions completed during the month and the next throughput target');
     const leftW = 6.6, x = M + leftW + GAP, w = RIGHT - x;
     box(slide, M, 1.95, leftW, 4.85);
     label(slide, `${v.monthName} improvements`, M + 0.25, 2.15, leftW - 0.5);
@@ -190,7 +227,7 @@ const MonthlyPresentationDeck = (() => {
   const LEVELS = {high:['High', C.coral], medium:['Medium', C.amber], low:['Low', C.teal]};
 
   function globalProblems(pptx, v) {
-    const slide = frame(pptx, v, 7, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
+    const slide = frame(pptx, v, 8, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
     if (!p) return unavailable(slide, 'Global problems were not available when the presentation was created.');
     const cols = columns(4);
     card(slide, {...cols[0], y:1.95, h:1.75, title:'Active problems', value:String(p.active), color:C.amber, sub:`${p.open} open · ${p.proposed} with a proposed solution`});
@@ -220,7 +257,7 @@ const MonthlyPresentationDeck = (() => {
   }
 
   function people(pptx, v) {
-    const slide = frame(pptx, v, 8, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team · for information`), f = v.workforce;
+    const slide = frame(pptx, v, 9, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team · for information`), f = v.workforce;
     if (!f) return unavailable(slide, 'The personnel list was not available when the presentation was created.');
     const cols = columns(4);
     [['Active people', f.active, C.amber], ['Automatic line', f.auto, C.teal], ['Manual packing', f.manual, C.blue], ['Stickers', f.stickers, C.pink]]
@@ -253,7 +290,7 @@ const MonthlyPresentationDeck = (() => {
       const at = line.indexOf(':');
       return at > 0 ? {title:line.slice(0, at).trim(), body:line.slice(at + 1).trim()} : {title:line, body:''};
     });
-    cover(pptx, v); overview(pptx, v); reconciliation(pptx, v, String(specialLabel).trim() || 'Special production');
+    cover(pptx, v); overview(pptx, v); performance(pptx, v); reconciliation(pptx, v, String(specialLabel).trim() || 'Special production');
     workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v); people(pptx, v);
     return pptx;
   }
