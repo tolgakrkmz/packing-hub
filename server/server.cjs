@@ -94,7 +94,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     try { const value = JSON.parse((await body(request, limit)).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
     catch (error) { if (error.status) throw error; throw problem(400, 'INVALID_DATA'); }
   }
-  function syncNotifications() { try { tasks.tick(); notifications.sync(); } catch { /* Retry on the next tick without exposing local content. */ } }
+  // Log only where it failed and the error's kind; messages, bodies and values may hold private data.
+  function logFailure(where, error) {
+    const code = [error?.code, error?.name].find(value => typeof value === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(value)) || 'UNKNOWN';
+    console.error('Package Hub failure: ' + where + ' (' + code + ')');
+  }
+  function syncNotifications() { try { tasks.tick(); notifications.sync(); } catch (error) { logFailure('job notifications-sync', error); /* Retry on the next tick. */ } }
   // Revoked tokens lose their live updates at once instead of at the next heartbeat.
   function closeRevoked() {
     for (const client of clients) if (!auth.session(client.token)) { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
@@ -498,6 +503,8 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (request.method === 'GET' && session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
       return;
     } catch (error) {
+      // Route names stop at the module; later segments can name records or folders.
+      if (!error.status) logFailure('route ' + String(request.url).split('?')[0].split('/').slice(1, 3).map(part => /^[a-z0-9.-]{1,40}$/.test(part) ? part : '*').join('/'), error);
       if (!response.headersSent) json(response, error.status || 500, {error: error.status ? error.code : 'SERVER_ERROR'});
       else response.end();
     }
@@ -511,15 +518,15 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch { /* Retry next hour. */ } try { tasks.maintain(); } catch { /* Retry next hour; do not log private task data. */ } }, 3600000);
+  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } }, 3600000);
   photoCleanup.unref();
   let statusRunning = false, notificationStopped = false, statusWork;
   function checkNotificationStatus() {
     if (statusRunning || notificationStopped) return;
     statusRunning = true;
-    statusWork = maintenance.status().then(status => { if (!notificationStopped) notifications.systemStatus(status); }).catch(() => {}).finally(() => { statusRunning = false; });
+    statusWork = maintenance.status().then(status => { if (!notificationStopped) notifications.systemStatus(status); }).catch(error => logFailure('job system-status', error)).finally(() => { statusRunning = false; });
   }
-  const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(() => {}); }, 30000); notificationTick.unref();
+  const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(error => logFailure('job push-delivery', error)); }, 30000); notificationTick.unref();
   const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
   const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
   return {server, store, auth, imports, tasks, problems, wall, maintenance, notifications, close};
