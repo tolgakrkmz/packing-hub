@@ -141,7 +141,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
 
 // Minimal stored .pptx with template fields; the real company template stays on the local machine.
 function presentationTemplate() {
-  const files = [['ppt/slides/slide1.xml', '<a:t>{{monthName}} {{year}}|{{packedT}}|{{p1PackedT}}|{{p2PackedT}}|{{stations}}|{{stationLoading}}|{{extrudedT}}</a:t>'], ['ppt/media/image1.png', 'PNG']];
+  const files = [['ppt/slides/slide1.xml', '<a:t>{{coverDate}}|{{monthName}} {{year}}|{{packedT}}|{{p1PackedT}}|{{p2PackedT}}|{{stations}}|{{stationLoading}}|{{extrudedT}}</a:t>'], ['ppt/media/image1.png', 'PNG']];
   const parts = [], central = [];
   let offset = 0;
   for (const [name, text] of files) {
@@ -157,6 +157,8 @@ function presentationTemplate() {
 
 async function exerciseMonthlyPresentation({page, expect}) {
   console.log('RUN monthly presentation from a local template');
+  // Offline files have no accounts, so the administrator-only button stays hidden there.
+  if (await page.evaluate(() => typeof HubServer === 'undefined')) { await expect(page.locator('#presentationBtn')).toBeHidden(); return; }
   const dialog = page.locator('#presentationDialog'), feedback = page.locator('#presentationFeedback');
   await page.locator('#presentationBtn').click();
   await expect(dialog).toBeVisible();
@@ -170,7 +172,7 @@ async function exerciseMonthlyPresentation({page, expect}) {
   const file = await download;
   assert.equal(file.suggestedFilename(), 'packing-presentation-2026-10.pptx');
   // Filled parts are stored uncompressed; September comes from a separate server read of the previous month.
-  assert.ok(fs.readFileSync(await file.path()).toString().includes('<a:t>October 2026|3|1|0|2.5|50.0%|—</a:t>'));
+  assert.ok(fs.readFileSync(await file.path()).toString().includes('<a:t>05.10.2026|October 2026|3|1|0|2.5|50.0%|—</a:t>'));
   await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

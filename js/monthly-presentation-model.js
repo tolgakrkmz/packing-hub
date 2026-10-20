@@ -24,8 +24,8 @@ const MonthlyPresentation = (() => {
       cases:sum(rows, entry => (Number(entry.breakdown?.autoCrates) || 0) + (Number(entry.breakdown?.manCrates) || 0))};
   }
 
-  // production: entries covering the month and the two before it; downtime: line-downtime entries; inputs: numbers or empty.
-  function values({month, production, downtime, inputs = {}}) {
+  // production: entries covering the month and the two before it; downtime: line-downtime entries; inputs: numbers or empty; today: YYYY-MM-DD for the cover.
+  function values({month, production, downtime, inputs = {}, today = ''}) {
     const input = key => inputs[key] === '' || inputs[key] === null || inputs[key] === undefined ? NaN : Number(inputs[key]);
     const p2Month = addMonths(month, -2), p1Month = addMonths(month, -1);
     const [p2, p1, now] = [p2Month, p1Month, month].map(value => packing(production, value));
@@ -39,7 +39,7 @@ const MonthlyPresentation = (() => {
     const perHour = runningH ? now.auto / runningH : NaN, perStation = stations ? STATIONS / stations : NaN;
     const trucks = input('trucks'), target = input('trucksTarget'), gap = target - trucks;
     return {
-      monthName:name(month), monthNameUpper:name(month).toUpperCase(), monthShort:name(month).slice(0, 3), year:month.slice(0, 4),
+      coverDate:today.split('-').reverse().join('.'), monthName:name(month), monthNameUpper:name(month).toUpperCase(), monthShort:name(month).slice(0, 3), year:month.slice(0, 4),
       p1Name:name(p1Month), p1NameUpper:name(p1Month).toUpperCase(), p2Name:name(p2Month), p2NameUpper:name(p2Month).toUpperCase(), p2Short:name(p2Month).slice(0, 3),
       packedT:num(now.total), cases:num(now.cases), profiles:num(profiles), dispatchedT:num(dispatched),
       packedTDay:num(now.total / days, 1), casesDay:num(now.cases / days, 1), profilesDay:num(profiles / days), dispatchDay:num(dispatched / weekdays, 1),

@@ -1,5 +1,8 @@
 /* Statistics: monthly presentation from a local .pptx template. The template and the deck never leave the browser. */
 (() => {
+  // Only the administrator sees it; the deck holds figures statistics viewers can already read. No accounts offline.
+  if (typeof HubServer === 'undefined' || HubServer.user.role !== 'admin') return;
+  document.getElementById('presentationBtn').hidden = false;
   const dialog = document.getElementById('presentationDialog'), form = document.getElementById('presentationForm');
   const feedback = document.getElementById('presentationFeedback'), submit = document.getElementById('presentationSubmit');
   const selectedMonth = () => `${selectedYear}-${selectedDashboardMonth}`;
@@ -15,7 +18,6 @@
 
   // The server sends only the selected month, so the two earlier months for the packing mix are read separately.
   async function production(month) {
-    if (typeof HubServer === 'undefined') return entries;
     const read = value => HubServer.json(`/api/statistics/period/production-log?month=${encodeURIComponent(value)}`).then(result => result.data.entries || []);
     return [...productionMonthEntries(), ...(await Promise.all([-2, -1].map(count => read(MonthlyPresentation.addMonths(month, count))))).flat()];
   }
@@ -30,7 +32,7 @@
     try {
       const month = selectedMonth();
       const inputs = Object.fromEntries(MonthlyPresentation.INPUTS.map(key => [key, form.elements[key].value]));
-      const values = MonthlyPresentation.values({month, production:await production(month), downtime:avEntries, inputs});
+      const values = MonthlyPresentation.values({month, production:await production(month), downtime:avEntries, inputs, today:statisticsDay()});
       const {blob, missing} = await PptxTemplate.fill(await file.arrayBuffer(), values);
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);

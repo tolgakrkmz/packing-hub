@@ -42,6 +42,7 @@ async function exerciseModulePermissions({admin, hub, base, device, expect, scre
     await page.goto(base + '/personnel'); await expect(page.locator('#connDot')).toHaveClass(/on/);
     await expect(page.locator('#addPersonBtn')).toBeHidden(); await expect(page.locator('#settingsBtn')).toBeHidden();
     await page.goto(base + '/statistics'); await expect(page.locator('#connDot')).toHaveClass(/on/);
+    await expect(page.locator('#presentationBtn')).toBeHidden();
     await page.goto(base + '/accounts'); await expect(page.locator('#accountList')).toContainText(user.username);
     await expect(page.locator('#newAccountButton')).toBeHidden();
     const entry = page.locator('.account-entry').filter({hasText: user.username}); await entry.locator('summary').first().click();

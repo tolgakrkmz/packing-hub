@@ -20,7 +20,8 @@ const inputs = {profiles:'450000', dispatchedT:'1800', extrudedT:'2400', realiza
   stations:'2', trucks:'6', trucksTarget:'8'};
 
 test('monthly values add the packing routes and the reconciliation', () => {
-  const v = presentation.values({month:'2026-09', production, downtime, inputs});
+  const v = presentation.values({month:'2026-09', production, downtime, inputs, today:'2026-10-02'});
+  assert.equal(v.coverDate, '02.10.2026');
   assert.deepEqual([v.monthName, v.p1Name, v.p2Name, v.monthShort, v.p2Short, v.year], ['September', 'August', 'July', 'Sep', 'Jul', '2026']);
   assert.deepEqual([v.packedT, v.autoT, v.manualT, v.stickersT, v.cases], ['1,900', '800', '1,000', '100.4', '30']);
   assert.deepEqual([v.p1PackedT, v.p2PackedT, v.autoShare, v.p1AutoShare], ['2,000', '2,000', '42.1%', '45.0%']);

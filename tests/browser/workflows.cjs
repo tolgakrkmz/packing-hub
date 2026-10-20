@@ -183,6 +183,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await go('index');
     await page.locator('a[href="statistics.html"]').click();
     await expect(page.locator('#statsFilesStatus')).toHaveText('4/4 свързани');
+    await expect(page.locator('#presentationBtn')).toBeHidden();
     await expect(page.locator('#dashboardActual')).toHaveText('5,5 т');
     await expect(page.locator('#dashboardGoal')).toContainText('12 т');
     await page.locator('#monthlyTrendDetails summary').click();
