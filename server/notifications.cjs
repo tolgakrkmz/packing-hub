@@ -95,7 +95,10 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
           saveState(key,1);
         }
       }
-      for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) {
+      // Only items with unseen events, or open items that may need a reminder, are read.
+      const pending = table => db.prepare(`SELECT id,data FROM ${table} WHERE json_array_length(data,'$.events')>COALESCE((SELECT CAST(value AS INTEGER) FROM notification_state WHERE key='task:'||${table}.id),0)
+        ${table === 'task_items' ? "OR json_extract(data,'$.status') IN ('pending','in-progress','blocked')" : ''}`).all().map(row => ({id: row.id, ...JSON.parse(row.data)}));
+      for (const table of ['task_items', 'task_schedules']) for (const item of pending(table)) {
         if (!Array.isArray(item.events) || !item.owner || !Array.isArray(item.participants)) continue;
         const cursor = Number(state('task:' + item.id) || 0);
         for (let i = cursor; i < item.events.length; i++) {
@@ -114,7 +117,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
             emit(type, key, recipients, item.id, item.scheduleId && i === 0 ? now() : event.at);
           }
         }
-        saveState('task:' + item.id, item.events.length);
+        if (cursor !== item.events.length) saveState('task:' + item.id, item.events.length);
         if (table !== 'task_items' || !['pending', 'in-progress', 'blocked'].includes(item.status) || item.kind === 'shift' && item.shift.start > at) continue;
         const recipients = roster.filter(user => [item.owner.id, ...item.participants.map(p => p.id)].includes(user.id));
         const cycle = item.events.filter(e => ['edit', 'reopen', 'return', 'transfer'].includes(e.action)).length;
@@ -127,6 +130,17 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
       }
       db.prepare('DELETE FROM notifications WHERE at<?').run(now() - 90 * 86400000);
       for (const user of roster) db.prepare('DELETE FROM notifications WHERE user_id=? AND id NOT IN (SELECT id FROM notifications WHERE user_id=? ORDER BY at DESC,rowid DESC LIMIT 1000)').run(user.id, user.id);
+    });
+  }
+  // Hourly: a closed task's reminder keys are never read again (reopening starts a new cycle),
+  // and shift-closeout reminders only look two days back.
+  function prune() {
+    const at = taskNow(), cutoff = at - 30 * 86400000;
+    store.transaction(() => {
+      db.prepare(`DELETE FROM notification_state WHERE (key LIKE 'taskDue:%' OR key LIKE 'taskOverdue:%') AND EXISTS(SELECT 1 FROM task_items i
+        WHERE i.id=substr(rtrim(key,'0123456789'),instr(key,':')+1,length(rtrim(key,'0123456789'))-instr(key,':')-1)
+        AND json_extract(i.data,'$.closedAt')<? AND json_extract(i.data,'$.status') NOT IN ('pending','in-progress','blocked'))`).run(cutoff);
+      db.prepare("DELETE FROM notification_state WHERE key GLOB 'closeout:[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*' AND substr(key,10,10)<?").run(new Date(cutoff).toISOString().slice(0, 10));
     });
   }
   function list(user, before) {
@@ -259,6 +273,6 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   }
   function flush() { if (!working && !stopped) running = deliver(); return running; }
   async function close() { stopped = true; await running; }
-  return {sync, list, summary, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
+  return {sync, prune, list, summary, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
 }
 module.exports = {createNotifications};

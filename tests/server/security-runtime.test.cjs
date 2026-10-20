@@ -152,3 +152,18 @@ test('unknown fields and noncanonical timestamps cannot turn malformed status in
     assert.equal(JSON.stringify(status).includes('Fictional'), false);
   }
 });
+test('server errors and failed background jobs log only the route or job and error kind', async t => {
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
+  await hub.auth.create('demo-log-admin', 'Fictional-log-password-123', 'admin');
+  await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
+  const base = 'http://127.0.0.1:' + hub.server.address().port, session = await hub.auth.login('demo-log-admin', 'Fictional-log-password-123');
+  const get = route => fetch(base + route, {headers: {Origin: base, Cookie: 'hub-local-session=' + session.token}});
+  const logged = [], original = console.error; console.error = (...values) => logged.push(values.join(' ')); t.after(() => { console.error = original; });
+  const secret = 'Fictional private value 42';
+  hub.notifications.sync = () => { throw Object.assign(new Error(secret), {code: 'ERR_SQLITE_ERROR'}); };
+  assert.equal((await get('/api/notifications/summary')).status, 200);
+  hub.tasks.summary = () => { throw new TypeError(secret); };
+  const response = await get('/api/tasks/summary'); assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {error: 'SERVER_ERROR'});
+  assert.deepEqual(logged, ['Package Hub failure: job notifications-sync (ERR_SQLITE_ERROR)', 'Package Hub failure: route api/tasks (TypeError)']);
+});

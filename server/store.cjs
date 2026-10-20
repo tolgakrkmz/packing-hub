@@ -492,6 +492,25 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
   }
   const productionAccess=createProductionAccess({db,audit,transaction,get},{schedule:shiftSchedule,problem,now:productionNow});
   const pairRosterAt = (employees, team, date) => pairModel.roster(employees, team, date);
-  return {db, get, put, productionAccess, pairRosterAt, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  // Per-account request receipts make retries idempotent; `at` lets each module prune them by age.
+  function requestLog(table, invalid, now) {
+    db.exec(`CREATE TABLE IF NOT EXISTS ${table}(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, at INTEGER, PRIMARY KEY(actor,id))`);
+    // Receipts from before the column existed start their retention window now.
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === 'at')) db.exec(`ALTER TABLE ${table} ADD COLUMN at INTEGER`);
+    db.prepare(`UPDATE ${table} SET at=? WHERE at IS NULL`).run(now());
+    function run(input, user, work) {
+      if (typeof input.requestId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.requestId)) throw problem(400, invalid);
+      const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+      return transaction(() => {
+        const prior = db.prepare(`SELECT hash,result FROM ${table} WHERE actor=? AND id=?`).get(user.id, input.requestId);
+        if (prior) { if (prior.hash !== hash) throw problem(409, 'CONFLICT'); return JSON.parse(prior.result); }
+        const result = work();
+        db.prepare(`INSERT INTO ${table}(actor,id,hash,result,at) VALUES(?,?,?,?,?)`).run(user.id, input.requestId, hash, JSON.stringify(result), now());
+        return result;
+      });
+    }
+    return {run, prune: cutoff => db.prepare(`DELETE FROM ${table} WHERE at<?`).run(cutoff)};
+  }
+  return {db, get, put, requestLog, productionAccess, pairRosterAt, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, moduleData, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

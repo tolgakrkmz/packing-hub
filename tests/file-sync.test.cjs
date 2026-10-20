@@ -164,6 +164,19 @@ test('commit invalidates pending refresh and polling pauses while saving',async 
   assert.equal(env.writes,1);
 });
 
+test('a save from another PC after loading is refused, not overwritten, and the connection stays usable',async () => {
+  const env = environment(); await env.elements.openFileBtn.click();
+  env.setPayload({entries:['mine']}); await env.sync.commitData();
+  env.setPayload({entries:['mine','second']}); await env.sync.commitData();
+  assert.equal(env.writes,2);
+  env.handle.text = '{"entries":["other PC"]}';
+  env.setPayload({entries:['mine','third']});
+  await assert.rejects(env.sync.commitData(),{code:'REPORT_CONFLICT'});
+  assert.equal(env.writes,2); assert.equal(env.handle.text,'{"entries":["other PC"]}'); assert.equal(env.sync.isReady,true);
+  await env.sync.refreshFromDisk({fresh:true}); assert.equal(env.accepted.entries[0],'other PC');
+  env.setPayload({entries:['other PC','third']}); await env.sync.commitData();
+  assert.equal(env.writes,3); assert.match(env.handle.text,/third/);
+});
 test('rejected file selection retains accepted data and the remembered handle',async()=>{
   const env=environment({suggestedFileName:'production-log.json'});
   env.handle.name='old-name.json'; env.handle.text='{"entries":[],"goalTons":1000}';

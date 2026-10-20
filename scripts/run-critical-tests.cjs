@@ -32,6 +32,8 @@ if (flags.includes('--browser') || flags.includes('--browser-only')) {
       modes.push('production-access');
       modes.push('closeout-indicator');
       modes.push('accessibility');
+      modes.push('wall');
+      modes.push('team-ratings');
       if (fs.existsSync(path.join(root, 'tests/browser/report-history.cjs'))) modes.push('report-history');
     }
     for (const mode of modes) suites.push([script + ':' + (mode || 'default'), ['scripts/' + script, '--headless', ...(mode ? ['--' + mode + '-only'] : [])]]);

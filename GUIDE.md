@@ -1577,7 +1577,7 @@ node scripts/check-publication.cjs --staged
 
 The runner uses the same Node executable for child processes, prints a result
 for each suite and returns nonzero if any suite fails. Browser totals are
-**suite invocations**, not assertion counts: six offline and fifteen server
+**suite invocations**, not assertion counts: twelve offline and thirty-seven server
 invocations. When `tests/browser/report-history.cjs` is present after integration
 of that feature, its `--report-history-only` server flow is included too (one
 additional invocation). Default browser flows and focused flows are
