@@ -5,6 +5,8 @@ const {can} = require('./permissions.cjs');
 const {createTaskPhotos} = require('./task-photos.cjs');
 const REACTIONS = ['beer', 'laugh', 'fire', 'like'];
 const RETENTION = 90 * 86400000, PAGE = 10;
+// Disk budget: at most 5 photo posts per person per day and 200 MB of wall photos overall (each archive copies them too).
+const DAILY_PHOTOS = 5, LIMIT_BYTES = 200 * 1024 * 1024;
 function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS wall_posts(id TEXT PRIMARY KEY, author_id INTEGER NOT NULL, text TEXT NOT NULL, photo TEXT, created_at INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
@@ -14,7 +16,7 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
     CREATE TABLE IF NOT EXISTS wall_seen(user_id INTEGER PRIMARY KEY, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS wall_comments_post ON wall_comments(post_id,created_at);`);
   // Wall photos have their own table, so task and problem retention never touch them and vice versa.
-  const photos = createTaskPhotos(store, {...photoOptions, table: 'wall_photos'});
+  const photos = createTaskPhotos(store, {...photoOptions, limitBytes: Math.min(photoOptions?.limitBytes ?? LIMIT_BYTES, LIMIT_BYTES), table: 'wall_photos'});
   const view = user => { if (!can(user, 'canViewWall')) throw problem(403, 'FORBIDDEN'); };
   const poster = user => { view(user); if (!can(user, 'canPostWall')) throw problem(403, 'FORBIDDEN'); };
   const admin = user => user.role === 'admin';
@@ -96,7 +98,9 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
     if (input.photo != null && typeof input.photo !== 'string') throw problem(400, 'INVALID_WALL');
     if (!value && !input.photo) throw problem(400, 'INVALID_WALL');
     return idempotent(input, user, () => {
-      const id = randomUUID(), at = now(), attached = input.photo ? photos.add(input.photo, at) : null;
+      const id = randomUUID(), at = now();
+      if (input.photo && db.prepare('SELECT count(*) AS n FROM wall_posts WHERE author_id=? AND photo IS NOT NULL AND created_at>?').get(user.id, at - 86400000).n >= DAILY_PHOTOS) throw problem(429, 'WALL_PHOTO_DAILY_LIMIT');
+      const attached = input.photo ? photos.add(input.photo, at) : null;
       db.prepare('INSERT INTO wall_posts(id,author_id,text,photo,created_at) VALUES(?,?,?,?,?)').run(id, user.id, value, attached && JSON.stringify(attached), at);
       store.audit(user, 'wall-post', 'wall');
       return {id};
@@ -151,4 +155,4 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
   }
   return {list, summary, photo, authorId, create, comment, react, remove, cleanup};
 }
-module.exports = {createWall, REACTIONS};
+module.exports = {createWall, REACTIONS, DAILY_PHOTOS, LIMIT_BYTES};

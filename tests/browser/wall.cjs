@@ -10,6 +10,7 @@ async function exerciseWall({admin, hub, base, device, expect}) {
   await expect(operator.locator('a.tile.wall')).toBeHidden();
   assert.equal((await operator.goto(base + '/wall')).status(), 403);
   // The admin posts with a photo; the shift lead sees the "new" badge until opening the wall.
+  hub.store.db.prepare("UPDATE users SET permissions=json_patch(permissions,'{\"canViewWall\":true,\"canPostWall\":true}') WHERE username='demo-admin'").run();
   await admin.goto(base + '/wall'); await admin.locator('[data-hub-language=bg]').click();
   await admin.locator('#wallText').fill('Fictional pizza after the night shift');
   await admin.locator('#wallPhoto').setInputFiles({name: 'fictional-photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(photo, 'base64')});

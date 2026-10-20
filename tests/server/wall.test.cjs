@@ -7,7 +7,9 @@ const password = 'Fictional-wall-password-123';
 async function setup(t) {
   let time = Date.parse('2026-10-20T10:00:00Z');
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => time});
-  await hub.auth.create('demo-admin', password, 'admin');
+  // The admin running the wall has an explicit grant; other admins get nothing by default.
+  await hub.auth.create('demo-admin', password, 'admin', null, {canViewWall: true, canPostWall: true, canReceiveWallPosts: true});
+  await hub.auth.create('demo-admin-2', password, 'admin');
   await hub.auth.create('demo-lead', password, 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   await hub.auth.create('demo-lead-2', password, 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'Б'});
   await hub.auth.create('demo-operator', password, 'operator');
@@ -15,14 +17,16 @@ async function setup(t) {
   const base = 'http://127.0.0.1:' + hub.server.address().port;
   const login = async name => { const logged = await hub.auth.login(name, password); return {...logged, cookie: 'hub-local-session=' + logged.token}; };
   const request = (route, user, method = 'GET', data) => fetch(base + route, {method, headers: {Origin: base, Cookie: user.cookie, 'X-CSRF-Token': user.csrf, 'Content-Type': 'application/json'}, ...(data === undefined ? {} : {body: JSON.stringify(data)})});
-  const [admin, lead, other, operator] = await Promise.all(['demo-admin', 'demo-lead', 'demo-lead-2', 'demo-operator'].map(login));
+  const [admin, lead, other, operator, plainAdmin] = await Promise.all(['demo-admin', 'demo-lead', 'demo-lead-2', 'demo-operator', 'demo-admin-2'].map(login));
   async function post(user, extra = {}) { const response = await request('/api/wall', user, 'POST', {requestId: randomUUID(), text: 'Fictional after-shift note', ...extra}); assert.equal(response.status, 201); return (await response.json()).id; }
   const feed = async (user, before) => (await request('/api/wall' + (before ? '?before=' + before : ''), user)).json();
-  return {hub, admin, lead, other, operator, request, post, feed, advance: ms => { time += ms; }};
+  return {hub, admin, lead, other, operator, plainAdmin, request, post, feed, advance: ms => { time += ms; }};
 }
-test('shift leads and admins use the wall; other operators are refused', async t => {
+test('shift leads and explicitly granted accounts use the wall; other operators and admins are refused', async t => {
   const s = await setup(t);
   assert.equal((await s.request('/api/wall', s.operator)).status, 403);
+  assert.equal((await s.request('/api/wall', s.plainAdmin)).status, 403);
+  assert.equal((await s.request('/wall', s.plainAdmin)).status, 403);
   assert.equal((await s.request('/api/wall', s.operator, 'POST', {requestId: randomUUID(), text: 'x'})).status, 403);
   const id = await s.post(s.lead);
   const [item] = (await s.feed(s.admin)).items;
@@ -110,6 +114,7 @@ test('a new post notifies other wall readers unless they turned it off', async t
   assert.deepEqual(await types(s.lead), [], 'the author is not notified');
   assert.deepEqual(await types(s.admin), [], 'disabled by preference');
   assert.deepEqual(await types(s.operator), []);
+  assert.deepEqual(await types(s.plainAdmin), [], 'admins without the wall get no wall notifications');
 });
 test('author avatars are readable on the wall without the accounts module', async t => {
   const s = await setup(t);
@@ -117,4 +122,19 @@ test('author avatars are readable on the wall without the accounts module', asyn
   await s.post(s.lead);
   assert.notEqual((await s.request('/api/wall/authors/' + s.lead.user.id + '/avatar', s.other)).status, 403);
   assert.equal((await s.request('/api/wall/authors/' + s.lead.user.id + '/avatar', s.operator)).status, 403);
+});
+test('each person adds at most 5 photo posts per day; text posts stay allowed', async t => {
+  const s = await setup(t);
+  for (let i = 0; i < 5; i++) await s.post(s.lead, {photo});
+  const refused = await s.request('/api/wall', s.lead, 'POST', {requestId: randomUUID(), text: 'x', photo});
+  assert.equal(refused.status, 429); assert.equal((await refused.json()).error, 'WALL_PHOTO_DAILY_LIMIT');
+  await s.post(s.lead); await s.post(s.other, {photo});
+  s.advance(86400000 + 1000); await s.post(s.lead, {photo});
+});
+test('wall photos have their own 200 MB budget, independent of task photos', async t => {
+  const s = await setup(t), {LIMIT_BYTES} = require('../../server/wall.cjs');
+  assert.equal(LIMIT_BYTES, 200 * 1024 * 1024);
+  s.hub.store.db.prepare('INSERT INTO wall_photos(id,content,created_at) VALUES(?,zeroblob(?),?)').run(randomUUID(), LIMIT_BYTES, Date.now());
+  assert.equal((await s.request('/api/wall', s.lead, 'POST', {requestId: randomUUID(), text: 'x', photo})).status, 507);
+  assert.equal((await s.request('/api/wall', s.lead, 'POST', {requestId: randomUUID(), text: 'Fictional text only'})).status, 201);
 });

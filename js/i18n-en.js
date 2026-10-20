@@ -1939,5 +1939,7 @@ Object.assign(HUB_EN_MESSAGES, {
   "Публикация на стената": "Wall post",
   "Коментар на стената": "Wall comment",
   "Изтрита публикация на стената": "Deleted wall post",
-  "Изтрит коментар на стената": "Deleted wall comment"
+  "Изтрит коментар на стената": "Deleted wall comment",
+  "Провери текста на публикацията.": "Check the post text.",
+  "Днес вече добави 5 снимки. Публикувай само текст или опитай утре.": "You already added 5 photos today. Post text only or try tomorrow."
 });

@@ -187,7 +187,7 @@ test('recovery can use the secondary archive after the primary archive is lost',
 });
 test('wall posts, comments, reactions and photos survive a verified backup and restore', t => {
   const {createWall} = require('../../server/wall.cjs');
-  const demo = backupFixture(t), wall = createWall(demo.store), user = {id: 1, username: 'demo-backup-admin', role: 'admin'};
+  const demo = backupFixture(t), wall = createWall(demo.store), user = {id: 1, username: 'demo-backup-admin', role: 'admin', taskSupervisor: true};
   const {id} = wall.create({requestId: randomUUID(), text: 'Fictional wall note', photo}, user);
   wall.comment(id, {requestId: randomUUID(), text: 'Fictional comment'}, user);
   wall.react(id, {requestId: randomUUID(), kind: 'beer'}, user);
