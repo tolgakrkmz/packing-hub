@@ -95,7 +95,10 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
           saveState(key,1);
         }
       }
-      for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) {
+      // Only items with unseen events, or open items that may need a reminder, are read.
+      const pending = table => db.prepare(`SELECT id,data FROM ${table} WHERE json_array_length(data,'$.events')>COALESCE((SELECT CAST(value AS INTEGER) FROM notification_state WHERE key='task:'||${table}.id),0)
+        ${table === 'task_items' ? "OR json_extract(data,'$.status') IN ('pending','in-progress','blocked')" : ''}`).all().map(row => ({id: row.id, ...JSON.parse(row.data)}));
+      for (const table of ['task_items', 'task_schedules']) for (const item of pending(table)) {
         if (!Array.isArray(item.events) || !item.owner || !Array.isArray(item.participants)) continue;
         const cursor = Number(state('task:' + item.id) || 0);
         for (let i = cursor; i < item.events.length; i++) {
@@ -114,7 +117,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
             emit(type, key, recipients, item.id, item.scheduleId && i === 0 ? now() : event.at);
           }
         }
-        saveState('task:' + item.id, item.events.length);
+        if (cursor !== item.events.length) saveState('task:' + item.id, item.events.length);
         if (table !== 'task_items' || !['pending', 'in-progress', 'blocked'].includes(item.status) || item.kind === 'shift' && item.shift.start > at) continue;
         const recipients = roster.filter(user => [item.owner.id, ...item.participants.map(p => p.id)].includes(user.id));
         const cycle = item.events.filter(e => ['edit', 'reopen', 'return', 'transfer'].includes(e.action)).length;

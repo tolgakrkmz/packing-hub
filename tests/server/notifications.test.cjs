@@ -40,6 +40,14 @@ test('direct admin completion notifies the owner as a task outcome once', async 
   const outcomes = s.inbox.list(s.chief).items.filter(item => item.type === 'taskOutcome');
   assert.equal(outcomes.length, 1); assert.equal(outcomes[0].href, '/tasks?target=' + encodeURIComponent(id));
 });
+test('an unchanged sync writes nothing, and closed tasks still notify again after a reopen', async t => {
+  const s = await model(t), id = s.tasks.create(s.payload(), s.admin).id;
+  s.tasks.change(id, {action: 'complete'}, 1, s.admin); s.inbox.sync();
+  const changes = () => s.store.db.prepare('SELECT total_changes() AS n').get().n, before = changes();
+  s.inbox.sync(); assert.equal(changes(), before);
+  s.tasks.change(id, {action: 'reopen', note: 'Fictional reopen'}, 2, s.admin); s.inbox.sync();
+  assert.equal(s.inbox.list(s.chief).items.filter(item => item.type === 'taskChanged').length, 1);
+});
 test('every important event has an editable flag; notification flags never grant module access', () => {
   for (const type of Object.values(types)) assert.ok(permissions.keys.includes(type.flag));
   const user = {role: 'observer', permissionOverrides: {canReceiveProductionAdded: true, canViewProduction: false}};
