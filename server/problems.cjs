@@ -8,6 +8,8 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS problem_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS problem_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
+  if (!db.prepare('PRAGMA table_info(problem_requests)').all().some(column => column.name === 'at')) db.exec('ALTER TABLE problem_requests ADD COLUMN at INTEGER');
+  db.prepare('UPDATE problem_requests SET at=? WHERE at IS NULL').run(now());
   // Problem photos live in their own table, so task retention cleanup never removes them; they stay while their problem exists.
   const photos = createTaskPhotos(store, {...photoOptions, table: 'problem_photos'});
   const references = item => [...photoList(item, 'photos'), ...item.proposals.flatMap(entry => photoList(entry, 'photos'))];
@@ -56,7 +58,7 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
       const prior = db.prepare('SELECT hash,result FROM problem_requests WHERE actor=? AND id=?').get(user.id, input.requestId);
       if (prior) { if (prior.hash !== hash) throw problem(409, 'CONFLICT'); return JSON.parse(prior.result); }
       const result = work();
-      db.prepare('INSERT INTO problem_requests(actor,id,hash,result) VALUES(?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result));
+      db.prepare('INSERT INTO problem_requests(actor,id,hash,result,at) VALUES(?,?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result), now());
       return result;
     });
   }
@@ -109,6 +111,8 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
     db.prepare('UPDATE problem_items SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(data), id);
     return row(id);
   }
-  return {list, create, change, photo};
+  // Request ids live only in an open page; same 90-day window as wall and task retries.
+  function pruneRequests() { db.prepare('DELETE FROM problem_requests WHERE at<?').run(now() - 90 * 86400000); }
+  return {list, create, change, photo, pruneRequests};
 }
 module.exports = {createProblems};

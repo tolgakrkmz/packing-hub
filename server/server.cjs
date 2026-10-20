@@ -518,7 +518,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } }, 3600000);
+  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } try { tasks.pruneRequests(); problems.pruneRequests(); notifications.prune(); } catch (error) { logFailure('job retention', error); } }, 3600000);
   photoCleanup.unref();
   let statusRunning = false, notificationStopped = false, statusWork;
   function checkNotificationStatus() {

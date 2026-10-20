@@ -132,6 +132,17 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
       for (const user of roster) db.prepare('DELETE FROM notifications WHERE user_id=? AND id NOT IN (SELECT id FROM notifications WHERE user_id=? ORDER BY at DESC,rowid DESC LIMIT 1000)').run(user.id, user.id);
     });
   }
+  // Hourly: a closed task's reminder keys are never read again (reopening starts a new cycle),
+  // and shift-closeout reminders only look two days back.
+  function prune() {
+    const at = taskNow(), cutoff = at - 30 * 86400000;
+    store.transaction(() => {
+      db.prepare(`DELETE FROM notification_state WHERE (key LIKE 'taskDue:%' OR key LIKE 'taskOverdue:%') AND EXISTS(SELECT 1 FROM task_items i
+        WHERE i.id=substr(rtrim(key,'0123456789'),instr(key,':')+1,length(rtrim(key,'0123456789'))-instr(key,':')-1)
+        AND json_extract(i.data,'$.closedAt')<? AND json_extract(i.data,'$.status') NOT IN ('pending','in-progress','blocked'))`).run(cutoff);
+      db.prepare("DELETE FROM notification_state WHERE key GLOB 'closeout:[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/*' AND substr(key,10,10)<?").run(new Date(cutoff).toISOString().slice(0, 10));
+    });
+  }
   function list(user, before) {
     access(user);
     if (before !== null && before !== undefined && (!/^\d{1,16}$/.test(before) || !Number.isSafeInteger(Number(before)))) throw problem(400, 'INVALID_DATA');
@@ -262,6 +273,6 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   }
   function flush() { if (!working && !stopped) running = deliver(); return running; }
   async function close() { stopped = true; await running; }
-  return {sync, list, summary, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
+  return {sync, prune, list, summary, preferences, updatePreferences, read, device, subscribe, unsubscribe, testDevice, systemStatus, flush, close};
 }
 module.exports = {createNotifications};

@@ -41,6 +41,9 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));
     CREATE TABLE IF NOT EXISTS task_schedule_progress(id TEXT PRIMARY KEY, through TEXT NOT NULL);`);
+  // Retry receipts are pruned by age; receipts from before the column existed start their window now.
+  if (!db.prepare('PRAGMA table_info(task_requests)').all().some(column => column.name === 'at')) db.exec('ALTER TABLE task_requests ADD COLUMN at INTEGER');
+  db.prepare('UPDATE task_requests SET at=? WHERE at IS NULL').run(now());
   db.exec("CREATE INDEX IF NOT EXISTS task_items_status ON task_items(json_extract(data,'$.status'))");
   db.exec("CREATE INDEX IF NOT EXISTS task_items_open_stickers ON task_items(json_extract(data,'$.shift.date')) WHERE json_extract(data,'$.kind')='shift' AND json_extract(data,'$.status')='pending' AND json_extract(data,'$.shift.team')='СТИКЕРИ' AND json_extract(data,'$.report') IS NULL");
   const photos = createTaskPhotos(store, photoOptions);
@@ -201,7 +204,7 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
       const prior = db.prepare('SELECT hash,result FROM task_requests WHERE actor=? AND id=?').get(user.id, input.requestId);
       if (prior) { if (prior.hash !== hash) throw problem(409, 'CONFLICT'); return JSON.parse(prior.result); }
       const result = work();
-      db.prepare('INSERT INTO task_requests(actor,id,hash,result) VALUES(?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result));
+      db.prepare('INSERT INTO task_requests(actor,id,hash,result,at) VALUES(?,?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result), now());
       return result;
     });
   }
@@ -332,6 +335,8 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     if (!owner) throw problem(400, 'INVALID_TASK_ASSIGNEE');
     return {shift: shift(date, owner.team), timezone};
   }
-  return {tick: () => store.transaction(() => materialize(now())), list, summary, create, change, shift, instant, localDate, currentShift, preview, photo, maintain};
+  // Request ids live only in an open page, as for the wall a 90-day window covers any retry.
+  function pruneRequests() { db.prepare('DELETE FROM task_requests WHERE at<?').run(now() - 90 * 86400000); }
+  return {tick: () => store.transaction(() => materialize(now())), pruneRequests, list, summary, create, change, shift, instant, localDate, currentShift, preview, photo, maintain};
 }
 module.exports = {createTasks};
