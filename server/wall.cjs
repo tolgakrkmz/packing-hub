@@ -1,5 +1,5 @@
 /* Informal wall for shift leads: short posts, one photo, reactions and comments. Everything expires after 90 days. */
-const {randomUUID, createHash} = require('node:crypto');
+const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
 const {createTaskPhotos} = require('./task-photos.cjs');
@@ -12,9 +12,9 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS wall_posts(id TEXT PRIMARY KEY, author_id INTEGER NOT NULL, text TEXT NOT NULL, photo TEXT, created_at INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS wall_comments(id TEXT PRIMARY KEY, post_id TEXT NOT NULL REFERENCES wall_posts(id) ON DELETE CASCADE, author_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS wall_reactions(post_id TEXT NOT NULL REFERENCES wall_posts(id) ON DELETE CASCADE, user_id INTEGER NOT NULL, kind TEXT NOT NULL, PRIMARY KEY(post_id,user_id,kind));
-    CREATE TABLE IF NOT EXISTS wall_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(actor,id));
     CREATE TABLE IF NOT EXISTS wall_seen(user_id INTEGER PRIMARY KEY, at INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS wall_comments_post ON wall_comments(post_id,created_at);`);
+  const requests = store.requestLog('wall_requests', 'INVALID_WALL', now), idempotent = requests.run;
   // Wall photos have their own table, so task and problem retention never touch them and vice versa.
   const photos = createTaskPhotos(store, {...photoOptions, limitBytes: Math.min(photoOptions?.limitBytes ?? LIMIT_BYTES, LIMIT_BYTES), table: 'wall_photos'});
   const view = user => { if (!can(user, 'canViewWall')) throw problem(403, 'FORBIDDEN'); };
@@ -36,7 +36,7 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
       db.prepare('DELETE FROM wall_reactions WHERE post_id IN (SELECT id FROM wall_posts WHERE created_at<?)').run(cutoff);
       db.prepare('DELETE FROM wall_posts WHERE created_at<?').run(cutoff);
       db.prepare("DELETE FROM wall_photos WHERE id NOT IN (SELECT json_extract(photo,'$.id') FROM wall_posts WHERE photo IS NOT NULL)").run();
-      db.prepare('DELETE FROM wall_requests WHERE at<?').run(cutoff);
+      requests.prune(cutoff);
     });
   }
   function person(id) {
@@ -79,17 +79,6 @@ function createWall(store, {now = Date.now, photos: photoOptions} = {}) {
     view(user);
     if (!db.prepare('SELECT 1 FROM wall_posts WHERE author_id=? UNION SELECT 1 FROM wall_comments WHERE author_id=?').get(id, id)) throw problem(404, 'NOT_FOUND');
     return id;
-  }
-  function idempotent(input, user, work) {
-    if (typeof input.requestId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.requestId)) throw problem(400, 'INVALID_WALL');
-    const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
-    return store.transaction(() => {
-      const prior = db.prepare('SELECT hash,result FROM wall_requests WHERE actor=? AND id=?').get(user.id, input.requestId);
-      if (prior) { if (prior.hash !== hash) throw problem(409, 'CONFLICT'); return JSON.parse(prior.result); }
-      const result = work();
-      db.prepare('INSERT INTO wall_requests(actor,id,hash,result,at) VALUES(?,?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result), now());
-      return result;
-    });
   }
   const only = (input, keys) => { if (!input || typeof input !== 'object' || Object.keys(input).some(key => !keys.includes(key))) throw problem(400, 'INVALID_WALL'); };
   function create(input, user) {

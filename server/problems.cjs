@@ -1,15 +1,13 @@
 /* Global problems sit outside the team's control: we record them and the solutions we propose until they are resolved. */
-const {randomUUID, createHash} = require('node:crypto');
+const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
 const {createTaskPhotos, photoList, photoInputs} = require('./task-photos.cjs');
 const LEVELS = ['low', 'medium', 'high'];
 function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
   const {db} = store;
-  db.exec(`CREATE TABLE IF NOT EXISTS problem_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS problem_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
-  if (!db.prepare('PRAGMA table_info(problem_requests)').all().some(column => column.name === 'at')) db.exec('ALTER TABLE problem_requests ADD COLUMN at INTEGER');
-  db.prepare('UPDATE problem_requests SET at=? WHERE at IS NULL').run(now());
+  db.exec(`CREATE TABLE IF NOT EXISTS problem_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);`);
+  const requests = store.requestLog('problem_requests', 'INVALID_PROBLEM', now), idempotent = requests.run;
   // Problem photos live in their own table, so task retention cleanup never removes them; they stay while their problem exists.
   const photos = createTaskPhotos(store, {...photoOptions, table: 'problem_photos'});
   const references = item => [...photoList(item, 'photos'), ...item.proposals.flatMap(entry => photoList(entry, 'photos'))];
@@ -50,17 +48,6 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
     const found = db.prepare('SELECT content FROM problem_photos WHERE id=?').get(photoId);
     if (!found) throw problem(404, 'NOT_FOUND');
     return Buffer.from(found.content);
-  }
-  function idempotent(input, user, work) {
-    if (typeof input.requestId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.requestId)) throw problem(400, 'INVALID_PROBLEM');
-    const hash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
-    return store.transaction(() => {
-      const prior = db.prepare('SELECT hash,result FROM problem_requests WHERE actor=? AND id=?').get(user.id, input.requestId);
-      if (prior) { if (prior.hash !== hash) throw problem(409, 'CONFLICT'); return JSON.parse(prior.result); }
-      const result = work();
-      db.prepare('INSERT INTO problem_requests(actor,id,hash,result,at) VALUES(?,?,?,?,?)').run(user.id, input.requestId, hash, JSON.stringify(result), now());
-      return result;
-    });
   }
   const actor = user => ({id: user.id, username: user.username});
   function create(input, user) {
@@ -112,7 +99,7 @@ function createProblems(store, {now = Date.now, photos: photoOptions} = {}) {
     return row(id);
   }
   // Request ids live only in an open page; same 90-day window as wall and task retries.
-  function pruneRequests() { db.prepare('DELETE FROM problem_requests WHERE at<?').run(now() - 90 * 86400000); }
+  const pruneRequests = () => requests.prune(now() - 90 * 86400000);
   return {list, create, change, photo, pruneRequests};
 }
 module.exports = {createProblems};
