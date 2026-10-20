@@ -236,6 +236,35 @@ node --test tests/server/wall.test.cjs
 node scripts/run-server-browser-tests.cjs --headless --wall-only
 ```
 
+### Team spot-ratings
+
+After the first confirmed pair result of a shift in **Teams & targets**, a
+shift lead gets a **How did they do today?** dialog with up to three people who
+were in a non-cancelled pair of that shift. Never-rated and longest-unrated
+people come first, so a team is covered within a few weeks. Each person needs
+👍 / 👌 / 👎; the reason from a fixed list is optional. The dialog cannot be
+skipped: Escape does not close it, and after a reload or on another device it
+returns until every person shown is rated. The pair result itself is already
+saved and is never changed by the rating. Each lead answers once per shift, and
+only within the pair-reporting window and for the account's own team; a pair
+cancelled later drops its people from an open prompt.
+
+`canRateTeam` (default: shift leads) gives ratings for the own team only.
+`canViewRatings` (default: administrators) shows the **Team ratings** report on
+the same page: the share of 👍 / 👌 / 👎 per person over 30 or 90 days, the
+number of ratings with a **little data** flag below 5, pair targets met, and
+shifts present/absent. Absent means a team shift with pairs where the person was
+in none; no absence reason (such as sick leave) is recorded or shown, and the
+rating is never computed from attendance. Rated people do not see ratings in the
+app; an access request is handled by an administrator outside the app. Data lives in
+`team_ratings` and `team_rating_prompts`, which are part of backups and restore.
+The offline file version hides the feature.
+
+```sh
+node --test tests/server/team-ratings.test.cjs
+node scripts/run-server-browser-tests.cjs --headless --team-ratings-only
+```
+
 ### Notifications on Android and iPhone
 
 Accounts have separate receiving flags for task assignment, changes/returns,

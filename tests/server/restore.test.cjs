@@ -201,3 +201,15 @@ test('wall posts, comments, reactions and photos survive a verified backup and r
     }
   } finally { restored.close(); }
 });
+test('team ratings and prompts survive a verified backup and restore', t => {
+  const {createTeamRatings} = require('../../server/team-ratings.cjs');
+  const demo = backupFixture(t); createTeamRatings(demo.store);
+  demo.store.db.prepare("INSERT INTO team_ratings(id,employee_id,name,rater_id,date,shift_code,team,rating,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").run(randomUUID(), 'demo-rate-1', 'Demo Packer 1', 1, '2026-10-20', 1, 'А', 'good', '', 1);
+  demo.store.db.prepare("INSERT INTO team_rating_prompts(rater_id,date,shift_code,team,people,at) VALUES(1,'2026-10-20',1,'А','[]',1)").run();
+  const archive = path.join(demo.primary, 'ratings.sqlite'), target = path.join(demo.directory, 'ratings-recovered');
+  snapshot(demo.database, archive); verifyDatabase(archive); restoreArchive(archive, target);
+  const restored = new DatabaseSync(path.join(target, 'hub.sqlite'), {readOnly: true});
+  try {
+    for (const table of ['team_ratings', 'team_rating_prompts']) assert.deepEqual(restored.prepare(`SELECT * FROM ${table}`).all(), demo.store.db.prepare(`SELECT * FROM ${table}`).all(), table);
+  } finally { restored.close(); }
+});

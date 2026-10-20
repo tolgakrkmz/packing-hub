@@ -35,7 +35,7 @@ async function main() {
   const notificationMode = process.argv.includes('--notifications-only');
   const notificationKey = notificationMode ? require('node:crypto').generateKeyPairSync('ec', {namedCurve: 'prime256v1'}).privateKey.export({format: 'jwk'}) : null;
   const hub = createHubServer({notifications: notificationMode ? {push: {privateKey: JSON.stringify(notificationKey), subject: 'mailto:demo@example.test', fetcher: async () => ({status: 201})}} : undefined, filename: path.join(dir, 'demo.sqlite'), publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => taskTime, personnelNow:()=>personnelTime,
-    productionNow:()=>process.argv.includes('--production-access-only')||process.argv.includes('--shift-closeout-only')?taskTime:Date.parse('2026-10-05T12:00:00+03:00'),maintenanceSocket: status?.socketPath});
+    productionNow:()=>process.argv.includes('--production-access-only')||process.argv.includes('--team-ratings-only')||process.argv.includes('--shift-closeout-only')?taskTime:Date.parse('2026-10-05T12:00:00+03:00'),maintenanceSocket: status?.socketPath});
   let browser;
   const errors = [];
   try {
@@ -78,6 +78,10 @@ async function main() {
     }
     console.log('RUN accounts and real browser login');
     const admin = await device('demo-admin');
+    if (process.argv.includes('--team-ratings-only')) {
+      await require('../tests/browser/team-ratings.cjs').exerciseTeamRatings({admin, hub, base, device, expect, setTime: value => { taskTime = Date.parse(value); }});
+      assert.deepEqual(errors, []); return;
+    }
     if (process.argv.includes('--wall-only')) {
       await require('../tests/browser/wall.cjs').exerciseWall({admin, hub, base, device, expect});
       assert.deepEqual(errors, []); return;

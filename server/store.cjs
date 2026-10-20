@@ -491,6 +491,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
     return list;
   }
   const productionAccess=createProductionAccess({db,audit,transaction,get},{schedule:shiftSchedule,problem,now:productionNow});
-  return {db, get, put, productionAccess, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
+  const pairRosterAt = (employees, team, date) => pairModel.roster(employees, team, date);
+  return {db, get, put, productionAccess, pairRosterAt, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
 module.exports = {openStore, moduleData, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

@@ -73,6 +73,12 @@
     <div class="section-head"><h2>История по месеци</h2><label>Месец<input id="historyMonth" type="month"></label></div>
     <div id="historyList"></div>
   </section>
+  <section class="panel" id="ratingsPanel" hidden>
+    <div class="section-head"><h2>Оценки на екипа</h2><label>Период<select id="ratingsPeriod"><option value="30">30 дни</option><option value="90">90 дни</option></select></label></div>
+    <p class="muted">Само за вътрешна информация. Оценените не виждат оценките.</p>
+    <div class="ratings-table"><table><thead><tr><th scope="col">Служител</th><th scope="col">Екип</th><th scope="col">👍 Добре</th><th scope="col">👌 Нормално</th><th scope="col">👎 Слабо</th><th scope="col">Оценки</th><th scope="col">Постигнати таргети</th><th scope="col">Присъствал</th><th scope="col">Отсъствал</th></tr></thead><tbody id="ratingsRows"></tbody></table></div>
+    <p id="ratingsNote" class="muted" role="status"></p>
+  </section>
 </main>
 </div>
 <dialog id="pairDialog" aria-labelledby="dialogTitle">
@@ -123,6 +129,15 @@
     <div class="dialog-actions"><button type="button" id="equalizeCancelBtn">Не сега</button><button id="equalizeSaveBtn" type="submit" class="primary">Повиши таргетите</button></div>
   </form>
 </dialog>
+<dialog id="ratingDialog" aria-labelledby="ratingTitle">
+  <form id="ratingForm">
+    <h2 id="ratingTitle">Как се справиха днес?</h2>
+    <p class="muted">Оцени всеки човек, за да продължиш. Оценката е само за вътрешна информация.</p>
+    <div id="ratingPeople"></div>
+    <p id="ratingError" class="error" role="alert"></p>
+    <div class="dialog-actions"><button id="ratingSave" type="submit" class="primary">Запази оценките</button></div>
+  </form>
+</dialog>
 <script src="js/data-validation.js"></script>
 <script src="js/file-sync.js"></script>
 <script src="js/shift-schedule.js"></script>
@@ -130,6 +145,7 @@
 <script src="js/pair-targets-model.js"></script>
 <script src="js/report-scope.js"></script>
 <script src="js/pair-access.js"></script>
+<script src="js/team-ratings.js"></script>
 <script src="js/pair-targets.js"></script>
 </body>
 </html>
