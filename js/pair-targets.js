@@ -136,6 +136,7 @@
     globalThis.HubNotificationTarget?.reveal($('pairsList'));
   }
   function renderHistory() {
+    if(!$('historyDetails').open) return; // rendered only when opened, keeps the page fast
     const open = new Set(Array.from($('historyList').querySelectorAll('details[open]'),item => item.dataset.scope));
     const groups = new Map();
     data.entries.filter(entry => entry.date.slice(0,7) === $('historyMonth').value).sort((a,b) => b.date.localeCompare(a.date) || b.shiftCode-a.shiftCode || a.team.localeCompare(b.team,'bg')).forEach(entry => {
@@ -421,6 +422,7 @@
   });
   $('historyMonth').value = ShiftSchedule.current().date.slice(0,7);
   $('historyMonth').addEventListener('change',renderHistory);
+  $('historyDetails').addEventListener('toggle',renderHistory);
   ['memberOne','memberTwo'].forEach(id => $(id).addEventListener('change',updateMemberOptions));
   ['actualKg','actualCrates'].forEach(id => $(id).addEventListener('input',updateResultPreview));
   $('cancellationReason').addEventListener('change',() => { $('cancellationText').required = $('cancellationReason').value === 'other'; });

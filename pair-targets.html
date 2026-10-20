@@ -70,8 +70,10 @@
     <div id="pairsList" class="pair-grid"></div>
   </section>
   <section class="panel">
-    <div class="section-head"><h2>История по месеци</h2><label>Месец<input id="historyMonth" type="month"></label></div>
-    <div id="historyList"></div>
+    <details id="historyDetails" class="history-details"><summary><h2>История по месеци</h2></summary>
+      <label class="history-month">Месец<input id="historyMonth" type="month"></label>
+      <div id="historyList"></div>
+    </details>
   </section>
 </main>
 </div>

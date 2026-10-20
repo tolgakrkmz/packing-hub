@@ -18,3 +18,4 @@ dialog{width:min(590px,calc(100% - 32px));max-height:90vh;overflow:hidden auto;b
 
 .rating-person{margin:14px 0}.rating-person legend{font-size:14px;color:var(--text)}.rating-choices{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}.rating-choice{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer}.rating-choice:has(input:checked){border-color:var(--teal)}
 .rating-choice:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
+.history-details>summary{cursor:pointer;padding:10px 0}.history-details>summary h2{display:inline;margin:0}.history-month{display:inline-flex;gap:8px;align-items:center;margin:14px 0}
