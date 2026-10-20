@@ -51,12 +51,15 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
     }
   }
   const allTasks = table => db.prepare(`SELECT id,data FROM ${table}`).all().map(row => ({id: row.id, ...JSON.parse(row.data)}));
+  const existingInstallation = state('audit') !== undefined;
   if (state('audit') === undefined) {
     // First installation starts with future events, rather than replaying private history.
     saveState('audit', db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n);
     db.prepare('DELETE FROM notification_targets WHERE audit_id<=?').run(Number(state('audit')));
     for (const table of ['task_items', 'task_schedules']) for (const item of allTasks(table)) saveState('task:' + item.id, item.events?.length || 0);
   }
+  // Existing installations announce the new wall once to everyone allowed to read it.
+  if (state('wall:opened') === undefined) store.transaction(() => { if (existingInstallation) emit('wallOpened', 'wall:opened', users()); saveState('wall:opened', 1); });
   function sync() {
     store.transaction(() => {
       const roster = users();
@@ -152,7 +155,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
   }
   function preferences(user) {
     access(user);
-    return {types: Object.entries(types).filter(([key]) => allowed(user, key)).map(([key, value]) => ({key, label: value.label, enabled: settings(user)[key] !== false})), publicKey: transport.publicKey};
+    return {types: Object.entries(types).filter(([key, value]) => !value.once && allowed(user, key)).map(([key, value]) => ({key, label: value.label, enabled: settings(user)[key] !== false})), publicKey: transport.publicKey};
   }
   function updatePreferences(input, user) {
     access(user);

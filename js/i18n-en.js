@@ -1941,5 +1941,6 @@ Object.assign(HUB_EN_MESSAGES, {
   "Изтрита публикация на стената": "Deleted wall post",
   "Изтрит коментар на стената": "Deleted wall comment",
   "Провери текста на публикацията.": "Check the post text.",
-  "Днес вече добави 5 снимки. Публикувай само текст или опитай утре.": "You already added 5 photos today. Post text only or try tomorrow."
+  "Днес вече добави 5 снимки. Публикувай само текст или опитай утре.": "You already added 5 photos today. Post text only or try tomorrow.",
+  "Модулът „Стена“ е отворен. Влез и пусни първата публикация!": "The Wall module is open. Come in and share the first post!"
 });

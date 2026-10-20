@@ -21,6 +21,8 @@
     pairs: {flag: 'canReceivePairNotifications', module: 'pair-targets', label: 'Планове и резултати на двойки', text: 'Има нов или променен запис за двойки.'},
     instructions: {flag: 'canReceiveInstructionNotifications', module: 'package-instructions', label: 'Обновени инструкции', text: 'Инструкциите са обновени.'},
     wallPost: {flag: 'canReceiveWallPosts', module: 'wall', label: 'Нови публикации на стената', text: 'Има нова публикация на стената.'},
+    // Sent once when an existing installation gains the wall; it is not a separate preference.
+    wallOpened: {flag: 'canReceiveWallPosts', module: 'wall', label: 'Нови публикации на стената', text: 'Модулът „Стена“ е отворен. Влез и пусни първата публикация!', once: true},
     systemDatabase: {flag: 'canReceiveDatabaseNotifications', module: 'system-status', label: 'Проблем с базата', text: 'Работната база изисква проверка.'},
     systemDisk: {flag: 'canReceiveDiskNotifications', module: 'system-status', label: 'Недостатъчно място на диска', text: 'Свободното място изисква проверка.'},
     systemBackup: {flag: 'canReceiveBackupNotifications', module: 'system-status', label: 'Проблем с архивите', text: 'Архивите изискват проверка.'},

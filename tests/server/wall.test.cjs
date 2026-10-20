@@ -138,3 +138,20 @@ test('wall photos have their own 200 MB budget, independent of task photos', asy
   assert.equal((await s.request('/api/wall', s.lead, 'POST', {requestId: randomUUID(), text: 'x', photo})).status, 507);
   assert.equal((await s.request('/api/wall', s.lead, 'POST', {requestId: randomUUID(), text: 'Fictional text only'})).status, 201);
 });
+test('an existing installation announces the wall once to shift leads only', async t => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-wall-open-')), filename = path.join(dir, 'demo.sqlite');
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const start = () => createHubServer({filename, publicOrigin: 'http://127.0.0.1:0', allowHttp: true});
+  let hub = start();
+  const lead = await hub.auth.create('demo-lead', password, 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
+  const operator = await hub.auth.create('demo-operator', password, 'operator');
+  const inbox = id => hub.store.db.prepare('SELECT type FROM notifications WHERE user_id=?').all(id).map(row => row.type);
+  assert.deepEqual(inbox(lead.id), [], 'a new installation sends nothing');
+  hub.store.db.prepare("DELETE FROM notification_state WHERE key='wall:opened'").run(); // as before the wall existed
+  await hub.close(); hub = start();
+  assert.deepEqual(inbox(lead.id), ['wallOpened']); assert.deepEqual(inbox(operator.id), []);
+  assert.equal(hub.store.db.prepare("SELECT count(*) AS n FROM push_queue").get().n, 0, 'no devices registered in this test');
+  await hub.close(); hub = start();
+  assert.deepEqual(inbox(lead.id), ['wallOpened'], 'sent only once'); await hub.close();
+});
