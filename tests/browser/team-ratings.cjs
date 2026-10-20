@@ -62,17 +62,16 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
   const panel = admin.locator('#statsRatings'); await expect(panel).toBeVisible();
   await expect(panel.locator('#ratingsStatus')).toHaveText('3 оценки');
   await expect(panel.locator('.kpi-card').first()).toContainText('3');
-  await expect(panel.locator('.ps-rankings .wf-card').first().locator('.ps-rank-name')).toHaveText(['Demo Rate Browser 2 малко данни']);
   await expect(panel.locator('.ps-team[data-team="СТИКЕРИ"]')).toContainText('33%');
   await expect(panel.locator('.pair-reason-title')).toContainText('Бавен');
   await panel.locator('details[data-group="team-СТИКЕРИ"] summary').click();
   const row = name => panel.locator('tbody tr').filter({hasText: name});
   await expect(row('Demo Rate Browser 1')).toContainText('100%'); await expect(row('Demo Rate Browser 1')).toContainText('малко данни');
-  await expect(row('Demo Rate Browser 1')).toContainText('1 / 1');
   await panel.locator('#ratingsTeam').selectOption('СТИКЕРИ'); await expect(row('Demo Rate Browser 2')).toContainText('100%');
   await panel.locator('#ratingsPeriod').selectOption('90'); await expect(panel.locator('#ratingsStatus')).toHaveText('3 оценки');
   await admin.locator('[data-hub-language=en]').click();
-  await expect(panel.locator('h2')).toHaveText('Team ratings'); await expect(panel.getByText('Top 5 weakest')).toBeVisible();
+  await expect(panel.locator('h2')).toHaveText('Team ratings'); await expect(panel.getByText('People by team')).toBeVisible();
+  await expect(panel.locator('.ps-rank')).toHaveCount(0); await expect(panel.getByText('Targets met')).toHaveCount(0);
   await expect(row('Demo Rate Browser 1')).toContainText('little data');
   await admin.locator('[data-hub-language=bg]').click();
   for (const width of [320, 390, 768, 1440]) { await admin.setViewportSize({width, height: 900}); await assertResponsive(admin, 'ratings report at ' + width + ' px'); }

@@ -44,3 +44,4 @@
 @media(max-width:980px){.ps-analysis{grid-template-columns:1fr}}
 @media(max-width:640px){.ps-rankings{grid-template-columns:1fr}.ps-content,.pair-stats-hint{padding-left:14px;padding-right:14px}.pair-stats-filters label{flex:1}}
 .ratings-reason{font-size:12px;margin-top:10px}
+#statsRatings .wf-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:980px){#statsRatings .wf-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:640px){#statsRatings .wf-kpis{grid-template-columns:1fr 1fr}}

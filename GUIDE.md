@@ -252,9 +252,11 @@ cancelled later drops its people from an open prompt.
 `canRateTeam` (default: shift leads) gives ratings for the own team only.
 `canViewRatings` (default: administrators) shows the **Team ratings** tab in
 **Statistics** (it also needs `canViewStatistics`; without the right the tab is
-not shown): the share of 👍 / 👌 / 👎 per person over 30 or 90 days, the
-number of ratings with a **little data** flag below 5, pair targets met, and
-shifts present/absent. Absent means a team shift with pairs where the person was
+not shown). Like the pair statistics it has a team filter and 30/90 days,
+cards for the number of ratings, 👍 / 👌 / 👎 shares and attendance, a team
+comparison, optional reasons counted per team only, and a per-team list of
+people with their shares, a **little data** flag below 5 ratings and shifts
+present/absent. Pair targets are not repeated; they stay in the pair statistics. Absent means a team shift with pairs where the person was
 in none; no absence reason (such as sick leave) is recorded or shown, and the
 rating is never computed from attendance. Rated people do not see ratings in the
 app; an access request is handled by an administrator outside the app. Data lives in

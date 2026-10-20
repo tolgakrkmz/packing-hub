@@ -15,14 +15,14 @@ test('the prompt picks never-rated people first, then the longest unrated, at mo
   assert.deepEqual(selectForPrompt(present.slice(0, 2), last).map(p => p.id), ['demo-rate-2', 'demo-rate-1']);
   assert.deepEqual(selectForPrompt([], last), []);
 });
-test('the summary keeps ratings, pair results and attendance apart and flags little data', () => {
+test('the summary keeps ratings and attendance apart and flags little data', () => {
   const [a, b, c] = [1, 2, 3].map(person);
   const entry = (date, members, result) => ({date, shiftCode: 1, team: 'А', members, targetKg: 100, targetCrates: 1, result});
   const entries = [entry('2026-10-01', [a, b], {kg: 120, crates: 1}), entry('2026-10-02', [a, c], {kg: 50, crates: 1}), {...entry('2026-10-03', [b, c], null), cancellation: {}}, entry('2026-09-01', [b, c], null)];
   const ratings = [...Array(5)].map(() => ({employee_id: a.id, name: a.name, team: 'А', date: '2026-10-02', rating: 'good'})).concat({employee_id: b.id, name: b.name, team: 'А', date: '2026-10-01', rating: 'poor'});
   const rows = summarize({ratings, entries, rosterAt: () => [a, b, c], since: '2026-09-21'});
   const byId = Object.fromEntries(rows.map(row => [row.id, row]));
-  assert.deepEqual([byId[a.id].good, byId[a.id].total, byId[a.id].lowData, byId[a.id].pairs, byId[a.id].achieved, byId[a.id].present, byId[a.id].absent], [5, 5, false, 2, 1, 2, 0]);
+  assert.deepEqual([byId[a.id].good, byId[a.id].total, byId[a.id].lowData, byId[a.id].present, byId[a.id].absent], [5, 5, false, 2, 0]);
   assert.deepEqual([byId[b.id].poor, byId[b.id].lowData, byId[b.id].present, byId[b.id].absent], [1, true, 1, 1]);
   assert.deepEqual([byId[c.id].total, byId[c.id].present, byId[c.id].absent], [0, 1, 1], 'the cancelled and older shifts do not count');
   assert.deepEqual(summarize({ratings: [], entries: [], rosterAt: () => [], since: '2026-01-01'}), []);
