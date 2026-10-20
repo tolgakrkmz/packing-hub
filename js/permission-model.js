@@ -16,6 +16,8 @@
     {title: 'Задачи', module: 'tasks', view: 'canViewTasks', flags: {canViewTasks: 'Преглед на „Задачи“', canAssignTasks: 'Може да възлага задачи', canReportTasks: 'Отчитане на собствени задачи', canManageTasks: 'Редакция, отмяна и повторно отваряне', canReviewTasks: 'Потвърждаване и връщане за работа'}},
     {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Записване на проблеми и предложения', canManageProblems: 'Редакция и решаване на всички проблеми'}},
     {title: 'Стена', module: 'wall', view: 'canViewWall', flags: {canViewWall: 'Преглед на „Стена“ и реакции', canPostWall: 'Публикации и коментари в „Стена“'}},
+    // No view flag: rating the own team must never open the ratings report.
+    {title: 'Оценки на екипа', flags: {canRateTeam: 'Бързи оценки на хората от собствения екип', canViewRatings: 'Справка за оценките на всички екипи'}},
     {title: 'Акаунти', module: 'accounts', view: 'canViewAccounts', flags: {canViewAccounts: 'Преглед на акаунтите и правата', canManageAccounts: 'Управление на акаунти и права'}},
     {title: 'Потребителска активност', module: 'activity-log', view: 'canViewActivity', flags: {canViewActivity: 'Преглед на потребителската активност'}},
     {title: 'Статус на системата', module: 'system-status', view: 'canViewSystemStatus', flags: {canViewSystemStatus: 'Преглед на статуса на системата', canBackupSystem: 'Създаване на архив'}},
@@ -51,6 +53,7 @@
     for (const key of ['canReceiveShiftCloseoutDue','canReceiveShiftCloseoutOverdue']) if (!explicit(key)) result[key] = user.role === 'admin' || user.taskSupervisor === true;
     // The wall is for shift leads only; any other account, admins included, needs an explicit grant in Accounts.
     for (const key of ['canViewWall','canPostWall','canReceiveWallPosts']) if (!explicit(key)) result[key] = user.taskSupervisor === true;
+    if (!explicit('canRateTeam')) result.canRateTeam = user.taskSupervisor === true;
     for (const report of Object.values(reports)) {
       for (const [action, legacy] of [['create', 'canCreateReports'], ['edit', 'canEditReports']]) {
         if (!explicit(report[action])) result[report[action]] = result[legacy];

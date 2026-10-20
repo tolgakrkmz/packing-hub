@@ -133,6 +133,7 @@ const HubServer = (() => {
   Object.assign(messages, {AVATAR_INVALID: 'Снимката не е валидна. Избери друга снимка.'});
   Object.assign(messages, {TASK_PHOTO_COUNT: 'Броят на снимките на решението трябва да е равен на броя на снимките на проблема.', TASK_PHOTO_LIMIT: 'Можеш да добавиш до 10 снимки.'});
   Object.assign(messages, {INVALID_TASK_PROFILE: 'Началникът трябва да има избран екип.', INVALID_TASK: 'Провери полетата на задачата.', INVALID_TASK_DATE: 'Избери валидна работна смяна или бъдещ срок.', INVALID_TASK_ASSIGNEE: 'Избери активен началник смяна. Екипът на повтарящата се задача се запазва.', TASK_REASON: 'Добави причина или бележка.', TASK_STATE: 'Състоянието е променено. Опресни задачите.', TASK_NOT_STARTED: 'Смяната още не е започнала.', TASK_REPEAT_TEAM: 'За Стикери възлагай конкретни смени; повтарянето следва графика на А–Г.'});
+  Object.assign(messages, {INVALID_RATING: 'Провери оценките.', RATING_NOT_PRESENT: 'Човекът не е в двойка за тази смяна.'});
   Object.assign(messages, {INVALID_WALL: 'Провери текста на публикацията.', WALL_PHOTO_DAILY_LIMIT: 'Днес вече добави 5 снимки. Публикувай само текст или опитай утре.'});
   Object.assign(messages, {INVALID_PROBLEM: 'Провери полетата на проблема.', PROBLEM_STATE: 'Проблемът е променен. Опресни таблото.'});
   async function request(url, options = {}) {

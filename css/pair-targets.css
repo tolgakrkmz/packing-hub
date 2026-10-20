@@ -15,3 +15,6 @@ dialog{width:min(590px,calc(100% - 32px));max-height:90vh;overflow:hidden auto;b
 .badge.cancelled{border:1px solid var(--border);color:var(--text-muted)}
 #cancellationFields label{margin:14px 0}
 .shift-goal{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--amber);background:var(--amber-dark);border-radius:8px;padding:10px 14px;margin-bottom:14px}.shift-goal p{margin:0;font-size:13px;line-height:1.6;color:var(--text)}.shift-goal.reached{border-color:var(--teal);background:var(--teal-dark)}.equalize-list{margin:14px 0;padding-left:18px;font-size:13px;line-height:1.8}
+
+.rating-person{margin:14px 0}.rating-person legend{font-size:14px;color:var(--text)}.rating-choices{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}.rating-choice{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer}.rating-choice:has(input:checked){border-color:var(--teal)}.ratings-table{overflow-x:auto}.ratings-table table{width:100%;border-collapse:collapse;font-size:13px}.ratings-table th,.ratings-table td{padding:8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.rating-choice:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}

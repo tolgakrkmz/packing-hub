@@ -306,7 +306,7 @@
       cancellationReason:$('cancellationReason').value,cancellationText:$('cancellationText').value,
       workAreas:[$('areaAuto').checked ? 'auto' : null,$('areaManual').checked ? 'manual' : null].filter(Boolean),now:new Date().toISOString()};
     if(sync.commitOperation) {
-      if(await saveServer(edit,inputs)) { closeDialog(); if(edit.mode === 'plan' && !edit.id) remindGoal(); }
+      if(await saveServer(edit,inputs)) { closeDialog(); if(edit.mode === 'plan' && !edit.id) remindGoal(); if(edit.mode === 'report') HubTeamRatings.prompt(edit.context); }
       return;
     }
     const saved = await mutate(() => {

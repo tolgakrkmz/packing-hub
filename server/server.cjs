@@ -13,6 +13,7 @@ const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {createProblems} = require('./problems.cjs');
 const {createWall} = require('./wall.cjs');
+const {createTeamRatings} = require('./team-ratings.cjs');
 const {createStatisticsReads} = require('./statistics.cjs');
 const {createStaticAssets} = require('./static-assets.cjs');
 const {REQUEST_BYTES: taskPhotoRequestBytes} = require('./task-photos.cjs');
@@ -32,6 +33,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const problems = createProblems(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const wall = createWall(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const teamRatings = createTeamRatings(store, productionNow ? {now: productionNow} : {});
   const statistics = createStatisticsReads(store);
   const closeout = createShiftCloseout(store, taskNow ? {now:taskNow} : {});
   tasks.maintain();
@@ -314,6 +316,15 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
             broadcast('tasks', 0); return json(response, 200, result);
           }
           throw problem(405, 'METHOD_REJECTED');
+        }
+        if (pathname === '/api/team-ratings/summary') {
+          if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, teamRatings.summary(Number(url.searchParams.get('days') || 30), currentUser()));
+        }
+        if (pathname === '/api/team-ratings/prompt' || pathname === '/api/team-ratings') {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const input = await jsonBody(request);
+          return json(response, 200, pathname.endsWith('/prompt') ? teamRatings.prompt(input, currentUser()) : teamRatings.rate(input, currentUser()));
         }
         if (pathname === '/api/wall/summary') {
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
