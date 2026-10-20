@@ -6,12 +6,15 @@ const HubTeamRatings = (() => {
   const reasons = [['', 'Без причина'], ['slow', 'Бавен'], ['scrap', 'Брак'], ['instructions', 'Неспазва указания'], ['away', 'Отсъства от поста'], ['other', 'Друго']];
   let current = null;
   function el(tag, text = '', cls = '') { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; return node; }
-  // Called after a confirmed pair result. Failures stay silent: the rating never blocks or alters the pair save.
+  let asking = false;
+  // Called after a pair result and on every pair-access check: an unanswered prompt comes back until every person is rated.
+  // Failures stay silent; the rating never alters the pair save itself.
   async function prompt(scope) {
-    if (!server || !HubServer.can('canRateTeam') || current) return;
+    if (!server || !HubServer.can('canRateTeam') || current || asking || !scope) return;
     let people;
-    try { ({people} = await HubServer.send('/api/team-ratings/prompt', 'POST', {date: scope.date, shiftCode: Number(scope.shiftCode), team: scope.team})); } catch { return; }
-    if (!people.length || $('pairDialog').open) return;
+    asking = true;
+    try { ({people} = await HubServer.send('/api/team-ratings/prompt', 'POST', {date: scope.date, shiftCode: Number(scope.shiftCode), team: scope.team})); } catch { return; } finally { asking = false; }
+    if (!people.length || current || document.querySelector('dialog[open]')) return;
     current = {scope: {date: scope.date, shiftCode: Number(scope.shiftCode), team: scope.team}, people};
     const list = $('ratingPeople'); list.replaceChildren(); $('ratingError').textContent = '';
     people.forEach((person, index) => {
@@ -19,7 +22,7 @@ const HubTeamRatings = (() => {
       const choices = el('div', '', 'rating-choices');
       for (const [value, icon, label] of ratings) {
         const option = el('label', '', 'rating-choice'), input = el('input');
-        input.type = 'radio'; input.name = 'rating-' + index; input.value = value;
+        input.type = 'radio'; input.name = 'rating-' + index; input.value = value; input.required = true;
         option.append(input, el('span', icon + ' ' + label)); choices.append(option);
       }
       const reason = el('label', 'Причина (по желание)'), select = el('select'); select.name = 'reason-' + index;
@@ -36,7 +39,6 @@ const HubTeamRatings = (() => {
       const rating = $('ratingForm').querySelector(`input[name="rating-${index}"]:checked`)?.value, reason = $('ratingForm').elements['reason-' + index].value;
       return rating && {employeeId: person.id, rating, ...(reason ? {reason} : {})};
     }).filter(Boolean);
-    if (!chosen.length) return close();
     $('ratingSave').disabled = true; $('ratingError').textContent = 'Записва се...';
     try { await HubServer.send('/api/team-ratings', 'POST', {...current.scope, ratings: chosen}); close(); $('pageError').textContent = 'Оценките са записани.'; $('pageError').dataset.state = 'success'; refreshSummary(); }
     catch (error) { $('ratingError').textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; }
@@ -62,8 +64,8 @@ const HubTeamRatings = (() => {
   }
   if (server) {
     $('ratingForm').addEventListener('submit', save);
-    $('ratingSkip').addEventListener('click', close);
-    $('ratingDialog').addEventListener('cancel', event => { event.preventDefault(); close(); });
+    // Rating is required: Escape does not close the dialog.
+    $('ratingDialog').addEventListener('cancel', event => event.preventDefault());
     $('ratingsPeriod').addEventListener('change', refreshSummary);
     refreshSummary();
   }

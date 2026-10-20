@@ -22,33 +22,37 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
     await page.locator('#actualKg').fill('100'); await page.locator('#actualCrates').fill('1');
     await page.locator('#savePairBtn').click(); await expect(page.locator('#pairDialog')).not.toBeVisible();
   }
-  // The first lead skips; the prompt does not come back in the same shift.
+  // The prompt cannot be skipped: Escape keeps it open and it returns after a reload until everyone is rated.
   const lead = await device('demo-rate-lead');
-  await pair(lead, 0, 1); await pair(lead, 2, 3);
+  await pair(lead, 0, 1); await pair(lead, 2, 3); await pair(lead, 4, 5);
   await expect(lead.locator('#ratingsPanel')).toBeHidden();
   await report(lead, 0);
-  await expect(lead.locator('#ratingDialog')).toBeVisible();
-  await expect(lead.locator('#ratingDialog .rating-person')).toHaveCount(3);
-  await assertResponsive(lead, 'rating prompt at 390 px');
-  await lead.getByRole('button', {name: 'Пропусни', exact: true}).click();
-  await expect(lead.locator('#ratingDialog')).not.toBeVisible();
-  await report(lead, 0);
-  await lead.waitForTimeout(500); await expect(lead.locator('#ratingDialog')).not.toBeVisible();
-  assert.deepEqual(ratings(), []);
-  // The second lead of the same team gets the never-rated people of the whole shift first.
-  const second = await device('demo-rate-lead-2');
-  await pair(second, 4, 5); await second.locator('[data-hub-language=en]').click(); await report(second, 0);
-  const dialog = second.locator('#ratingDialog'); await expect(dialog).toBeVisible();
-  await expect(dialog.locator('h2')).toHaveText('How did they do today?');
-  await expect(dialog.getByRole('button', {name: 'Skip', exact: true})).toBeVisible();
+  const dialog = lead.locator('#ratingDialog'); await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.rating-person')).toHaveCount(3);
+  await expect(dialog.getByRole('button', {name: 'Пропусни'})).toHaveCount(0);
+  await lead.keyboard.press('Escape'); await expect(dialog).toBeVisible();
   const person = name => dialog.locator('.rating-person').filter({hasText: name});
+  await person('Demo Rate Browser 1').getByLabel('👍 Добре').check();
+  await dialog.getByRole('button', {name: 'Запази оценките', exact: true}).click();
+  await expect(dialog).toBeVisible(); assert.deepEqual(ratings(), [], 'the browser asks for the remaining people first');
+  await lead.reload(); await expect(dialog).toBeVisible();
+  await lead.evaluate(() => localStorage.setItem('portfolio-hub-language', 'en')); await lead.reload(); await expect(dialog).toBeVisible();
+  await expect(dialog.locator('h2')).toHaveText('How did they do today?');
   await person('Demo Rate Browser 1').getByLabel('👍 Good').check();
   await person('Demo Rate Browser 2').getByLabel('👎 Poor').check();
   await person('Demo Rate Browser 2').getByLabel('Reason (optional)').selectOption('slow');
+  await person('Demo Rate Browser 3').getByLabel('👌 Okay').check();
   await dialog.getByRole('button', {name: 'Save ratings', exact: true}).click();
-  await expect(dialog).not.toBeVisible(); await expect(second.locator('#pageError')).toHaveText('The ratings are saved.');
-  await second.locator('[data-hub-language=bg]').click();
-  assert.deepEqual(ratings(), [{employee_id: 'demo-rate-browser-1', rating: 'good', reason: ''}, {employee_id: 'demo-rate-browser-2', rating: 'poor', reason: 'slow'}]);
+  await expect(dialog).not.toBeVisible(); await expect(lead.locator('#pageError')).toHaveText('The ratings are saved.');
+  await lead.locator('[data-hub-language=bg]').click();
+  assert.deepEqual(ratings(), [{employee_id: 'demo-rate-browser-1', rating: 'good', reason: ''}, {employee_id: 'demo-rate-browser-2', rating: 'poor', reason: 'slow'}, {employee_id: 'demo-rate-browser-3', rating: 'ok', reason: ''}]);
+  await report(lead, 0);
+  await lead.waitForTimeout(500); await expect(dialog).not.toBeVisible();
+  // A second lead of the same team is asked on opening the page, never-rated people first.
+  const second = await device('demo-rate-lead-2');
+  await second.goto(base + '/pair-targets');
+  await expect(second.locator('#ratingDialog .rating-person legend')).toHaveText(['Demo Rate Browser 4', 'Demo Rate Browser 5', 'Demo Rate Browser 6']);
+  await assertResponsive(second, 'rating prompt');
   // Only the report right shows the summary.
   await admin.goto(base + '/pair-targets');
   const panel = admin.locator('#ratingsPanel'); await expect(panel).toBeVisible();
@@ -61,6 +65,6 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
   await admin.locator('[data-hub-language=bg]').click();
   for (const width of [320, 390, 768, 1440]) { await admin.setViewportSize({width, height: 900}); await assertResponsive(admin, 'ratings report at ' + width + ' px'); }
   await lead.context().close(); await second.context().close();
-  console.log('PASS online team spot-ratings prompt, skip, once per shift and report');
+  console.log('PASS online team spot-ratings: required prompt, reload, once per shift and report');
 }
 module.exports = {exerciseTeamRatings};

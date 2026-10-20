@@ -46,20 +46,30 @@ async function setup(t) {
     const entry = {id, date, shiftCode, team: 'А', members: pair.map(({id, name, category, role}) => ({id, name, category, role})), areas: ['auto'], targetKg: 100, targetCrates: 1, result: null, createdAt: at, updatedAt: at};
     hub.store.reportOperation('pair-targets', {operationId: randomUUID(), action: 'create', entryId: id, entry}, undefined, users['demo-lead']);
   }
+  const report = id => {
+    const current = hub.store.get('pair-targets'), entry = current.data.entries.find(item => item.id === id), at = new Date(time).toISOString();
+    hub.store.reportOperation('pair-targets', {operationId: randomUUID(), action: 'update', entryId: id, entry: {...entry, result: {kg: 100, crates: 1, reasonKey: '', reasonText: '', reportedAt: at}, updatedAt: at}}, current.versions[id], users['demo-lead']);
+  };
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
   const base = 'http://127.0.0.1:' + hub.server.address().port;
   const login = async name => { const logged = await hub.auth.login(name, password); return {...logged, cookie: 'hub-local-session=' + logged.token}; };
   const request = (route, user, method = 'GET', data) => fetch(base + route, {method, headers: {Origin: base, Cookie: user.cookie, 'X-CSRF-Token': user.csrf, 'Content-Type': 'application/json'}, ...(data === undefined ? {} : {body: JSON.stringify(data)})});
   const [admin, lead, other, operator] = await Promise.all(['demo-admin', 'demo-lead', 'demo-lead-2', 'demo-operator'].map(login));
-  return {hub, admin, lead, other, operator, request, scope: {date, shiftCode, team: 'А'}, people, advance: ms => { time += ms; }};
+  return {hub, admin, lead, other, operator, request, report, scope: {date, shiftCode, team: 'А'}, people, advance: ms => { time += ms; }};
 }
-test('a shift lead gets one prompt per shift with up to three present people, and rates them once', async t => {
+test('the prompt starts after a pair result, returns until everyone shown is rated, then never again that shift', async t => {
   const s = await setup(t);
-  const first = await (await s.request('/api/team-ratings/prompt', s.lead, 'POST', s.scope)).json();
-  assert.deepEqual(first.people.map(p => p.id), ['demo-rate-1', 'demo-rate-2', 'demo-rate-3'], 'person 5 is not in a pair');
-  assert.deepEqual(await (await s.request('/api/team-ratings/prompt', s.lead, 'POST', s.scope)).json(), {people: []}, 'once per shift');
+  const ask = async () => (await (await s.request('/api/team-ratings/prompt', s.lead, 'POST', s.scope)).json()).people.map(p => p.id);
+  assert.deepEqual(await ask(), [], 'no result yet');
+  s.report('demo-pair-0');
+  assert.deepEqual(await ask(), ['demo-rate-1', 'demo-rate-2', 'demo-rate-3'], 'person 5 is not in a pair');
+  assert.deepEqual(await ask(), ['demo-rate-1', 'demo-rate-2', 'demo-rate-3'], 'an unanswered prompt comes back');
   const ratings = [{employeeId: 'demo-rate-1', rating: 'good'}, {employeeId: 'demo-rate-2', rating: 'poor', reason: 'slow'}];
-  assert.deepEqual(await (await s.request('/api/team-ratings', s.lead, 'POST', {...s.scope, ratings})).json(), {saved: 2});
+  const partial = await s.request('/api/team-ratings', s.lead, 'POST', {...s.scope, ratings});
+  assert.equal(partial.status, 400); assert.equal((await partial.json()).error, 'RATING_INCOMPLETE');
+  ratings.push({employeeId: 'demo-rate-3', rating: 'ok'});
+  assert.deepEqual(await (await s.request('/api/team-ratings', s.lead, 'POST', {...s.scope, ratings})).json(), {saved: 3});
+  assert.deepEqual(await ask(), [], 'answered for this shift');
   assert.deepEqual(await (await s.request('/api/team-ratings', s.lead, 'POST', {...s.scope, ratings})).json(), {saved: 0}, 'a retry keeps the first answer');
   assert.equal((await s.request('/api/team-ratings', s.lead, 'POST', {...s.scope, ratings: [{employeeId: 'demo-rate-5', rating: 'ok'}]})).status, 403, 'absent people cannot be rated');
   for (const bad of [{employeeId: 'demo-rate-1', rating: 'great'}, {employeeId: 'demo-rate-1', rating: 'ok', reason: 'sick'}, {employeeId: 'demo-rate-1', rating: 'ok', note: 'x'}]) {
@@ -67,7 +77,7 @@ test('a shift lead gets one prompt per shift with up to three present people, an
   }
   const summary = await (await s.request('/api/team-ratings/summary?days=30', s.admin)).json();
   const row = id => summary.rows.find(item => item.id === id);
-  assert.deepEqual([row('demo-rate-1').good, row('demo-rate-2').poor, row('demo-rate-2').lowData], [1, 1, true]);
+  assert.deepEqual([row('demo-rate-1').good, row('demo-rate-2').poor, row('demo-rate-3').ok, row('demo-rate-2').lowData], [1, 1, 1, true]);
   assert.deepEqual([row('demo-rate-5').present, row('demo-rate-5').absent], [0, 1]);
   assert.ok(!JSON.stringify(summary).includes('slow'), 'reasons stay out of the summary');
 });

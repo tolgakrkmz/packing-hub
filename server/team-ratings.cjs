@@ -50,7 +50,7 @@ function summarize({ratings, entries, rosterAt, since}) {
 function createTeamRatings(store, {now = Date.now} = {}) {
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS team_ratings(id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, name TEXT NOT NULL, rater_id INTEGER NOT NULL, date TEXT NOT NULL, shift_code INTEGER NOT NULL, team TEXT NOT NULL, rating TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, UNIQUE(employee_id,rater_id,date,shift_code,team));
-    CREATE TABLE IF NOT EXISTS team_rating_prompts(rater_id INTEGER NOT NULL, date TEXT NOT NULL, shift_code INTEGER NOT NULL, team TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(rater_id,date,shift_code,team));
+    CREATE TABLE IF NOT EXISTS team_rating_prompts(rater_id INTEGER NOT NULL, date TEXT NOT NULL, shift_code INTEGER NOT NULL, team TEXT NOT NULL, people TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(rater_id,date,shift_code,team));
     CREATE INDEX IF NOT EXISTS team_ratings_date ON team_ratings(date);`);
   // Rating follows the pair-reporting window and team assignment, so a lead rates only their own team's current shift.
   function scope(input, user) {
@@ -59,17 +59,27 @@ function createTeamRatings(store, {now = Date.now} = {}) {
     try { shiftSchedule.parseDate(input.date); } catch { throw problem(400, 'INVALID_RATING'); }
     const access = store.productionAccess.status(input.date, input.team, user, now(), 'pair-targets', input.shiftCode);
     if (!access.allowed) throw problem(403, access.code || 'FORBIDDEN');
-    const value = {date: input.date, shiftCode: input.shiftCode, team: input.team};
-    return {...value, present: presentPeople(store.get('pair-targets').data.entries, value)};
+    const value = {date: input.date, shiftCode: input.shiftCode, team: input.team}, entries = store.get('pair-targets').data.entries;
+    return {...value, present: presentPeople(entries, value), reported: entries.some(entry => entry.result && !entry.cancellation && scopeKey(entry) === scopeKey(value))};
   }
-  // Reserves the shift's single prompt; a second call for the same shift returns nobody.
+  // People of the shift's prompt that this lead has not rated yet; someone whose pair was cancelled drops out.
+  function pending(value, user) {
+    const row = db.prepare('SELECT people FROM team_rating_prompts WHERE rater_id=? AND date=? AND shift_code=? AND team=?').get(user.id, value.date, value.shiftCode, value.team);
+    if (!row) return null;
+    const rated = new Set(db.prepare('SELECT employee_id FROM team_ratings WHERE rater_id=? AND date=? AND shift_code=? AND team=?').all(user.id, value.date, value.shiftCode, value.team).map(found => found.employee_id));
+    return JSON.parse(row.people).filter(person => !rated.has(person.id) && value.present.some(found => found.id === person.id));
+  }
+  // The first call after a pair result fixes the shift's people; later calls return whoever is still unrated, so the prompt comes back until it is answered.
   function prompt(input, user) {
     const value = scope(input, user);
     return store.transaction(() => {
-      const added = db.prepare('INSERT OR IGNORE INTO team_rating_prompts(rater_id,date,shift_code,team,at) VALUES(?,?,?,?,?)').run(user.id, value.date, value.shiftCode, value.team, now()).changes;
-      if (!added || !value.present.length) return {people: []};
+      const open = pending(value, user);
+      if (open) return {people: open};
+      if (!value.reported || !value.present.length) return {people: []};
       const last = new Map(db.prepare('SELECT employee_id,MAX(created_at) AS at FROM team_ratings GROUP BY employee_id').all().map(row => [row.employee_id, row.at]));
-      return {people: selectForPrompt(value.present, last)};
+      const people = selectForPrompt(value.present, last);
+      db.prepare('INSERT INTO team_rating_prompts(rater_id,date,shift_code,team,people,at) VALUES(?,?,?,?,?,?)').run(user.id, value.date, value.shiftCode, value.team, JSON.stringify(people), now());
+      return {people};
     });
   }
   function rate(input, user) {
@@ -80,10 +90,13 @@ function createTeamRatings(store, {now = Date.now} = {}) {
       if (!value.present.some(person => person.id === item.employeeId)) throw problem(403, 'RATING_NOT_PRESENT');
     }
     return store.transaction(() => {
+      // Every person of the prompt is rated together; an answered prompt accepts nothing more.
+      const open = pending(value, user) || [];
+      if (open.length && (input.ratings.length !== open.length || open.some(person => !input.ratings.some(item => item.employeeId === person.id)))) throw problem(400, 'RATING_INCOMPLETE');
       // A retried request hits the unique key and keeps the first answer.
       const insert = db.prepare('INSERT OR IGNORE INTO team_ratings(id,employee_id,name,rater_id,date,shift_code,team,rating,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
       let saved = 0;
-      for (const item of input.ratings) saved += insert.run(randomUUID(), item.employeeId, value.present.find(person => person.id === item.employeeId).name, user.id, value.date, value.shiftCode, value.team, item.rating, item.reason || '', now()).changes;
+      for (const item of open.length ? input.ratings : []) saved += insert.run(randomUUID(), item.employeeId, value.present.find(person => person.id === item.employeeId).name, user.id, value.date, value.shiftCode, value.team, item.rating, item.reason || '', now()).changes;
       if (saved) store.audit(user, 'team-rating', 'pair-targets', {count: saved});
       return {saved};
     });

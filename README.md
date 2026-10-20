@@ -24,7 +24,7 @@
 - 👥 **Teams & targets** — rotating shifts, packer pairs, goals and actual results.
 - ✅ **Shift tasks** — assignments, recurring plans, progress and approvals.
 - ✅ **Global problems** — board for issues outside the team's control and the solutions proposed for them.
-- 👍 **Team spot-ratings** — optional 👍/👌/👎 for 2–3 people after a pair result and an internal report; server mode only.
+- 👍 **Team spot-ratings** — required 👍/👌/👎 for 2–3 people after a pair result and an internal report; server mode only.
 - 🍺 **Shift leads wall** — informal posts with one photo, reactions and comments; server mode only, removed after 90 days.
 - 📦 **Packing instructions** — searchable profiles, folders and attachments.
 - 🔔 **Shared workspace** — live updates, account permissions and optional Web Push.

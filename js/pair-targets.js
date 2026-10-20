@@ -435,6 +435,7 @@
       if(value?.currentScope&&HubServer.user.taskTeam) {
         serverScope=value.currentScope;
         if(followLive&&!editing&&!busy){context={...serverScope};updateControls();}
+        HubTeamRatings.prompt(serverScope);
       }
       render();
     }

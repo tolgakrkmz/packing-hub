@@ -238,13 +238,16 @@ node scripts/run-server-browser-tests.cjs --headless --wall-only
 
 ### Team spot-ratings
 
-After a confirmed pair result in **Teams & targets**, a shift lead may get a
-small **How did they do today?** dialog with up to three people who were in a
-non-cancelled pair of that shift. Never-rated and longest-unrated people come
-first, so a team is covered within a few weeks. Each person gets 👍 / 👌 / 👎
-and an optional reason from a fixed list; **Skip** closes it. The dialog appears
-at most once per shift and lead, is never required and never changes or blocks
-the pair save. Ratings follow the pair-reporting window and the account's team.
+After the first confirmed pair result of a shift in **Teams & targets**, a
+shift lead gets a **How did they do today?** dialog with up to three people who
+were in a non-cancelled pair of that shift. Never-rated and longest-unrated
+people come first, so a team is covered within a few weeks. Each person needs
+👍 / 👌 / 👎; the reason from a fixed list is optional. The dialog cannot be
+skipped: Escape does not close it, and after a reload or on another device it
+returns until every person shown is rated. The pair result itself is already
+saved and is never changed by the rating. Each lead answers once per shift, and
+only within the pair-reporting window and for the account's own team; a pair
+cancelled later drops its people from an open prompt.
 
 `canRateTeam` (default: shift leads) gives ratings for the own team only.
 `canViewRatings` (default: administrators) shows the **Team ratings** report on
