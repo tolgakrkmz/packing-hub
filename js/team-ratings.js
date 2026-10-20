@@ -1,4 +1,4 @@
-/* Optional spot-ratings after a pair result and the ratings report. Server version only; nothing is kept in the browser. */
+/* Required spot-ratings after a pair result. Server version only; nothing is kept in the browser. The report is in Statistics. */
 const HubTeamRatings = (() => {
   const $ = id => document.getElementById(id);
   const server = typeof HubServer !== 'undefined';
@@ -40,34 +40,14 @@ const HubTeamRatings = (() => {
       return rating && {employeeId: person.id, rating, ...(reason ? {reason} : {})};
     }).filter(Boolean);
     $('ratingSave').disabled = true; $('ratingError').textContent = 'Записва се...';
-    try { await HubServer.send('/api/team-ratings', 'POST', {...current.scope, ratings: chosen}); close(); $('pageError').textContent = 'Оценките са записани.'; $('pageError').dataset.state = 'success'; refreshSummary(); }
+    try { await HubServer.send('/api/team-ratings', 'POST', {...current.scope, ratings: chosen}); close(); $('pageError').textContent = 'Оценките са записани.'; $('pageError').dataset.state = 'success'; }
     catch (error) { $('ratingError').textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; }
     finally { $('ratingSave').disabled = false; }
-  }
-  const percent = (part, total) => total ? Math.round(part * 100 / total) + ' %' : '—';
-  async function refreshSummary() {
-    if (!server || !HubServer.can('canViewRatings')) return;
-    $('ratingsPanel').hidden = false;
-    const body = $('ratingsRows'), note = $('ratingsNote');
-    try {
-      const {rows} = await HubServer.json('/api/team-ratings/summary?days=' + $('ratingsPeriod').value);
-      body.replaceChildren();
-      note.textContent = rows.length ? 'Под 5 оценки резултатът е ориентировъчен. Отсъствие означава смяна на екипа без участие в двойка; причината не се записва.' : 'Още няма оценки или отчетени двойки за периода.';
-      for (const row of rows) {
-        const line = el('tr'), name = el('td'), person = el('span', row.name); person.setAttribute('translate', 'no'); name.append(person);
-        if (row.lowData) name.append(' ', el('span', 'малко данни', 'badge pending'));
-        line.append(name, el('td', row.team), el('td', percent(row.good, row.total)), el('td', percent(row.ok, row.total)), el('td', percent(row.poor, row.total)), el('td', String(row.total)),
-          el('td', row.pairs ? row.achieved + ' / ' + row.pairs : '—'), el('td', String(row.present)), el('td', String(row.absent)));
-        body.append(line);
-      }
-    } catch (error) { note.textContent = error.message || 'Справката не е заредена.'; }
   }
   if (server) {
     $('ratingForm').addEventListener('submit', save);
     // Rating is required: Escape does not close the dialog.
     $('ratingDialog').addEventListener('cancel', event => event.preventDefault());
-    $('ratingsPeriod').addEventListener('change', refreshSummary);
-    refreshSummary();
   }
   return {prompt};
 })();

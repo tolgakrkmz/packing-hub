@@ -25,7 +25,6 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
   // The prompt cannot be skipped: Escape keeps it open and it returns after a reload until everyone is rated.
   const lead = await device('demo-rate-lead');
   await pair(lead, 0, 1); await pair(lead, 2, 3); await pair(lead, 4, 5);
-  await expect(lead.locator('#ratingsPanel')).toBeHidden();
   await report(lead, 0);
   const dialog = lead.locator('#ratingDialog'); await expect(dialog).toBeVisible();
   await expect(dialog.locator('.rating-person')).toHaveCount(3);
@@ -54,8 +53,13 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
   await expect(second.locator('#ratingDialog .rating-person legend')).toHaveText(['Demo Rate Browser 4', 'Demo Rate Browser 5', 'Demo Rate Browser 6']);
   await assertResponsive(second, 'rating prompt');
   // Only the report right shows the summary.
-  await admin.goto(base + '/pair-targets');
-  const panel = admin.locator('#ratingsPanel'); await expect(panel).toBeVisible();
+  // The report is a Statistics tab, shown only with canViewRatings.
+  await hub.auth.create('demo-rate-viewer', 'Fictional-password-123', 'operator', actor, {canViewStatistics: true});
+  const viewer = await device('demo-rate-viewer');
+  await viewer.goto(base + '/statistics'); await expect(viewer.locator('#statsTabComparison')).toBeVisible();
+  await expect(viewer.locator('#statsTabRatings')).toHaveCount(0); await viewer.context().close();
+  await admin.goto(base + '/statistics'); await admin.locator('#statsTabRatings').click();
+  const panel = admin.locator('#statsRatings'); await expect(panel).toBeVisible();
   const row = name => panel.locator('tbody tr').filter({hasText: name});
   await expect(row('Demo Rate Browser 1')).toContainText('100 %'); await expect(row('Demo Rate Browser 1')).toContainText('малко данни');
   await expect(row('Demo Rate Browser 1')).toContainText('1 / 1');
