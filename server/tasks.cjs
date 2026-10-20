@@ -39,7 +39,8 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS task_items(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS task_schedules(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));`);
+    CREATE TABLE IF NOT EXISTS task_requests(actor INTEGER NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(actor,id));
+    CREATE TABLE IF NOT EXISTS task_schedule_progress(id TEXT PRIMARY KEY, through TEXT NOT NULL);`);
   db.exec("CREATE INDEX IF NOT EXISTS task_items_status ON task_items(json_extract(data,'$.status'))");
   db.exec("CREATE INDEX IF NOT EXISTS task_items_open_stickers ON task_items(json_extract(data,'$.shift.date')) WHERE json_extract(data,'$.kind')='shift' AND json_extract(data,'$.status')='pending' AND json_extract(data,'$.shift.team')='СТИКЕРИ' AND json_extract(data,'$.report') IS NULL");
   const photos = createTaskPhotos(store, photoOptions);
@@ -115,13 +116,26 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
       while(!period) { date=nextDate(date); period=shift(date,'СТИКЕРИ'); }
       if(item.due !== period.due || item.shift.start !== period.start || item.shift.due !== period.due) save('task_items',{...item,shift:period,due:period.due});
     }
-    for (const source of all('task_schedules')) {
-      for (let date = source.from; date <= source.until && date <= today; date = nextDate(date)) {
+    // A day is decided once its shift has started (or it has none); "through" is the last decided day,
+    // so each call only walks the days that are still open. Fully decided schedules are not read.
+    const open = db.prepare(`SELECT s.*,p.through FROM task_schedules s LEFT JOIN task_schedule_progress p ON p.id=s.id
+      WHERE p.through IS NULL OR p.through<json_extract(s.data,'$.until')`).all();
+    for (const found of open) {
+      const source = {...JSON.parse(found.data), id: found.id, revision: found.revision};
+      // No shift on a later local day can start before the stop.
+      const stopDay = source.stoppedAt ? localDate(source.stoppedAt) : source.until;
+      const end = [source.until, today, stopDay].sort()[0];
+      let through = found.through, date = through ? nextDate(through) : source.from;
+      for (; date <= end; date = nextDate(date)) {
         const period = shift(date, source.team);
-        if (!period || period.start > at || period.due <= source.createdAt || source.stoppedAt && period.start >= source.stoppedAt) continue;
+        if (period && period.start > at) break;
+        through = date;
+        if (!period || period.due <= source.createdAt || source.stoppedAt && period.start >= source.stoppedAt) continue;
         const id = source.id + ':' + date;
         if (!db.prepare('SELECT 1 FROM task_items WHERE id=?').get(id)) insert('task_items', id, itemFrom(source, period, source.createdAt));
       }
+      if (source.stoppedAt && date > end) through = source.until;
+      if (through && through !== found.through) db.prepare('INSERT INTO task_schedule_progress(id,through) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET through=excluded.through').run(found.id, through);
     }
   }
   function derived(item, at) {

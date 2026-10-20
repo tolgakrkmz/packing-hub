@@ -473,6 +473,33 @@ test('tasks, supervisor profiles, event history and recurring catch-up survive a
   assert.equal(accounts(store).list().find(user => user.id === chief.id).permissions.canViewTasks, false);
   assert.equal(createTasks(store).list(admin).items.length, view.items.length);
 });
+test('recurring catch-up walks only open days yet matches a full replay for old, stopped and night-shift schedules', async t => {
+  const store = openStore(':memory:'); t.after(() => store.close()); const auth = accounts(store);
+  const admin = await auth.create('demo-admin', password, 'admin'), chief = await auth.create('demo-night-chief', password, 'operator', admin, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
+  let time = Date.parse('2026-12-01T07:00:00+02:00'); const tasks = createTasks(store, {now: () => time});
+  const create = (from, until) => tasks.create({problemPhoto: photo, requestId: randomUUID(), title: 'Fictional night check', description: '', priority: 'normal', assigneeId: chief.id, participantIds: [], kind: 'shift', repeat: 'every-shift', from, until}, admin).id;
+  const short = create('2026-12-01', '2027-01-09'), long = create('2026-12-01', '2027-12-01');
+  const schedules = () => tasks.list(admin).schedules;
+  const expected = () => schedules().flatMap(source => {
+    const ids = [];
+    for (let date = source.from; date <= source.until && date <= tasks.localDate(time); date = new Date(Date.parse(date) + 86400000).toISOString().slice(0, 10)) {
+      const period = tasks.shift(date, source.team);
+      if (period && period.start <= time && period.due > source.createdAt && !(source.stoppedAt && period.start >= source.stoppedAt)) ids.push(source.id + ':' + date);
+    }
+    return ids;
+  }).sort();
+  const actual = () => store.db.prepare('SELECT id FROM task_items').all().map(row => row.id).sort();
+  const through = id => store.db.prepare('SELECT through FROM task_schedule_progress WHERE id=?').get(id)?.through;
+  for (let step = 0; step < 25 * 8; step++) { time += 3 * 3600000; tasks.tick(); }
+  assert.ok(actual().some(id => tasks.shift(id.split(':')[1], 'В').code === 3)); assert.deepEqual(actual(), expected());
+  time = Date.parse('2026-12-26T23:30:00+02:00'); tasks.tick();
+  tasks.change(short, {action: 'stop', note: 'Fictional stop'}, schedules().find(item => item.id === short).revision, admin, true);
+  for (let step = 0; step < 20 * 8; step++) { time += 3 * 3600000; tasks.tick(); }
+  assert.deepEqual(actual(), expected()); assert.equal(through(short), '2027-01-09');
+  time = Date.parse('2028-01-05T12:00:00+02:00'); tasks.tick();
+  assert.deepEqual(actual(), expected()); assert.equal(through(long), '2027-12-01');
+  const count = actual().length; time += 30 * 86400000; tasks.tick(); assert.equal(actual().length, count);
+});
 test('task reporting, management and review can each be delegated to every role independently', async t => {
   const s = await setup(t);
   for (const role of ['admin', 'operator', 'observer']) {
