@@ -214,6 +214,17 @@
 @media (max-width:980px){.wf-kpis{grid-template-columns:repeat(3,1fr)}.wf-main{grid-template-columns:1fr}.wf-chart{height:280px;}}
 @media (max-width:640px){.wf-head{flex-direction:column}.wf-head-right{justify-content:flex-start}.wf-kpis{grid-template-columns:1fr 1fr;padding-left:14px;padding-right:14px}.wf-main{padding-left:14px;padding-right:14px}.wf-line-metrics{grid-template-columns:1fr}.wf-auto-grid{grid-template-columns:1fr}.wf-chart{height:250px}}
 
+.presentation-dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:18px 20px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);box-sizing:border-box;}
+.presentation-dialog::backdrop{background:rgba(0,0,0,.6);}
+.presentation-head{display:flex;justify-content:space-between;align-items:center;gap:12px;}.presentation-head h2{margin:0;font-size:18px;}
+.presentation-dialog label{display:grid;gap:5px;font-size:12px;color:var(--text-muted);font-weight:700;}
+.presentation-dialog textarea{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 10px;font:inherit;resize:vertical;}
+.presentation-dialog .presentation-wide{grid-column:1/-1;}
+.presentation-dialog input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 10px;font:inherit;min-height:44px;box-sizing:border-box;}
+.presentation-dialog fieldset{border:1px solid var(--border);border-radius:10px;margin:12px 0 0;padding:10px 12px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;}
+.presentation-dialog legend{font-size:12px;font-weight:800;padding:0 4px;}
+.presentation-dialog textarea:focus-visible,.presentation-dialog input:focus-visible,.presentation-dialog button:focus-visible{outline:2px solid var(--purple);outline-offset:2px;}
+.presentation-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 </style>
 <link rel="stylesheet" href="css/layout.css">
 <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
@@ -310,6 +321,7 @@
           <label for="dashboardMonthSelect">Общ месец</label>
           <select class="dashboard-select" id="dashboardMonthSelect"></select>
         </div>
+        <button class="conn-btn" id="presentationBtn" type="button" hidden>Месечна презентация</button>
         </div>
       </div>
 
@@ -656,6 +668,19 @@
   </div>
 </div>
 
+<dialog id="presentationDialog" class="presentation-dialog" aria-labelledby="presentationTitle">
+  <form id="presentationForm" novalidate>
+    <div class="presentation-head"><h2 id="presentationTitle">Месечна презентация</h2><button type="button" class="conn-btn" data-close aria-label="Затвори">×</button></div>
+    <p class="conn-note"><span id="presentationPeriod"></span>. Тонажът, касите, автоматичната и ръчната линия, стикерите, бракът и престоите идват от сайта. Презентацията се създава на този компютър.</p>
+    <fieldset><legend>Обзор</legend><label>Опаковани профили (бр.)<input name="profiles" type="number" min="0" step="any" inputmode="decimal"></label><label>Експедирано (т)<input name="dispatchedT" type="number" min="0" step="any" inputmode="decimal"></label></fieldset>
+    <fieldset><legend>Екструзия → Опаковане</legend><label>Екструдирано (т)<input name="extrudedT" type="number" min="0" step="any" inputmode="decimal"></label><label>За реализация (т)<input name="realizationT" type="number" min="0" step="any" inputmode="decimal"></label><label>Анодиране и боя (т)<input name="anodizingT" type="number" min="0" step="any" inputmode="decimal"></label><label>Триони (т)<input name="sawsT" type="number" min="0" step="any" inputmode="decimal"></label><label>CNC (т)<input name="cncT" type="number" min="0" step="any" inputmode="decimal"></label><label>Специално производство (т)<input name="specialT" type="number" min="0" step="any" inputmode="decimal"></label><label>Име на специалното производство<input name="specialLabel" type="text" maxlength="40" autocomplete="off"></label></fieldset>
+    <fieldset><legend>Автоматична линия</legend><label>Средно активни станции (от 5)<input name="stations" type="number" min="0" max="5" step="0.5" inputmode="decimal"></label></fieldset>
+    <fieldset><legend>Логистика</legend><label>Камиони на ден<input name="trucks" type="number" min="0" step="any" inputmode="decimal"></label><label>Цел камиони на ден<input name="trucksTarget" type="number" min="0" step="any" inputmode="decimal"></label><label class="presentation-wide">Подобрения през месеца (до 3, по едно на ред: „Заглавие: описание“)<textarea name="improvements" rows="3" maxlength="900" lang="en"></textarea></label></fieldset>
+    <p class="conn-note">Празно поле остава „—“ в презентацията. Всеки текст може да се промени в PowerPoint.</p>
+    <p id="presentationFeedback" class="conn-note" role="status" aria-live="polite"></p>
+    <div class="presentation-actions"><button type="submit" class="conn-btn primary" id="presentationSubmit">Свали презентацията</button><button type="button" class="conn-btn" data-close>Отказ</button></div>
+  </form>
+</dialog>
 <script src="js/data-validation.js"></script>
 <script src="js/file-sync.js"></script>
 <script src="js/shift-schedule.js"></script>
@@ -678,5 +703,8 @@
 <script src="js/statistics-workforce.js"></script>
 <script src="js/statistics-line-shifts.js"></script>
 <script src="js/statistics.js"></script>
+<script src="js/monthly-presentation-model.js"></script>
+<script src="js/monthly-presentation-deck.js"></script>
+<script src="js/monthly-presentation.js"></script>
 </body>
 </html>

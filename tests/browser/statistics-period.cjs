@@ -1,6 +1,8 @@
 /* Fictional reports deliberately cover different months and years in each source. */
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
+const fs = require('node:fs');
+const {unzipText, slideText} = require('../pptx-zip.cjs');
 
 function statisticsFixture() {
   const members = [1, 2].map(id => ({id:'demo-period-person-' + id, name:'Demo Period Person ' + id, category:'auto', role:'Опаковчик'}));
@@ -30,6 +32,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(page.locator('#dashboardActual')).toHaveText('3 т');
   await expect(page.locator('#dashboardBrak')).toHaveText('0,2 т');
   await exerciseStatisticsComparison({page, expect, screenshotDir});
+  await exerciseMonthlyPresentation({page, expect});
   const refreshed = statisticsFixture();
   refreshed['production-log'].entries[0].brak = 170;
   await replaceSources(refreshed);
@@ -134,6 +137,40 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   assert.equal(await page.locator('#pairStatsMonth, #lineShiftMonthSelect').count(), 0);
   await exerciseStatisticsUnits({page, expect, replaceSources, screenshotDir});
   console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
+}
+
+async function exerciseMonthlyPresentation({page, expect}) {
+  console.log('RUN monthly presentation built from statistics');
+  // Offline files have no accounts, so the administrator-only button stays hidden there.
+  if (await page.evaluate(() => typeof HubServer === 'undefined')) { await expect(page.locator('#presentationBtn')).toBeHidden(); return; }
+  const dialog = page.locator('#presentationDialog'), feedback = page.locator('#presentationFeedback');
+  await page.locator('#presentationBtn').click();
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#presentationPeriod')).toHaveText('Октомври 2026');
+  await dialog.locator('input[name=stations]').fill('2.5');
+  await dialog.locator('input[name=specialLabel]').fill('Fictional special line');
+  await dialog.locator('textarea[name=improvements]').fill('Fictional count: Stock checked.');
+  const download = page.waitForEvent('download');
+  await page.locator('#presentationSubmit').click();
+  const file = await download;
+  assert.equal(file.suggestedFilename(), 'packing-presentation-2026-10.pptx');
+  // September comes from a separate server read of the previous month.
+  const files = unzipText(fs.readFileSync(await file.path()));
+  const slide = n => slideText(files[`ppt/slides/slide${n}.xml`]);
+  for (const line of ['October 2026', 'Prepared 05.10.2026']) assert.ok(slide(1).includes(line), line);
+  assert.ok(slide(2).includes('3 t'));
+  assert.ok(slide(3).includes('Fictional special line'));
+  for (const line of ['3 t', '1 t', '0 t']) assert.ok(slide(4).includes(line), line);
+  assert.ok(slide(5).includes('50.0%'));
+  assert.ok(slide(6).includes('Fictional count') && slide(6).includes('Stock checked.'));
+  await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
+  // Repeated settings return on the next visit; monthly figures do not.
+  await page.reload();
+  await page.locator('#presentationBtn').click();
+  await expect(dialog.locator('input[name=specialLabel]')).toHaveValue('Fictional special line');
+  await expect(dialog.locator('input[name=stations]')).toHaveValue('');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 }
 
 async function exerciseStatisticsComparison({page, expect, screenshotDir}) {
