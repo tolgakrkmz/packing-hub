@@ -100,6 +100,9 @@ async function exerciseOfflineResponsiveLayouts(browser, base, expect) {
     await page.locator('#rosterSummary').click();
     assert.equal(await page.locator('.roster-details').evaluate(element => element.open), true, 'Roster disclosure opens');
     await check('Pair history disclosure remains usable', async () => {
+      // The monthly history is collapsed and rendered only after it is opened.
+      await assertTouchTarget(page.locator('#historyDetails > summary'), 'Pair history section');
+      await page.locator('#historyDetails > summary').click();
       await assertTouchTarget(page.locator('.history-group > summary'), 'Pair history disclosure');
       await page.locator('.history-group > summary').click();
       await expect(page.locator('.history-group .pair-card')).toBeVisible();
