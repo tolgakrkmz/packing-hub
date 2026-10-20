@@ -128,14 +128,16 @@ function createFileSync(cfg){
 
   async function writeFileData(handle = fileHandle, data = getData()){
     validate(data);
+    const text = JSON.stringify(data, null, 2);
     const writable = await handle.createWritable();
     try {
-      await writable.write(JSON.stringify(data, null, 2));
+      await writable.write(text);
       await writable.close();
     } catch(error) {
       if(writable.abort) await writable.abort().catch(()=>{});
       throw error;
     }
+    return text;
   }
 
   function refreshFromDisk({fresh = false} = {}){
@@ -210,15 +212,19 @@ function createFileSync(cfg){
     if(cfg.readOnly) throw new Error('Файлът се използва само за четене.');
     ++readRevision;
     pendingRead = null;
+    const loaded = acceptedText;
     acceptedText = null;
     if(!readyForWrites) throw HubDataValidation.error('Първо свържете валиден файл. Записът не е направен.');
     if(fileHandle){
+      let text;
+      try{ ({text} = await readFileData()); } catch(e){ connectionLost(e); throw e; }
+      // Another PC saved after this page loaded the file: refuse instead of overwriting its change.
+      if(text !== loaded) throw Object.assign(new Error('Файлът е променен от друг компютър. Опитай отново.'), {code:'REPORT_CONFLICT'});
       try{
-        await readFileData();
-        await writeFileData();
+        acceptedText = await writeFileData();
         ++readRevision;
         pendingRead = null;
-      } catch(e){ connectionLost(e); throw e; }
+      } catch(e){ acceptedText = null; connectionLost(e); throw e; }
     } else if(!supportsFS){
       validate(getData());
       saveLocalFallback();
