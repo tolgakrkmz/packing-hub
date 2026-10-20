@@ -1,6 +1,8 @@
 /* Fictional reports deliberately cover different months and years in each source. */
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
+const fs = require('node:fs');
+const zlib = require('node:zlib');
 
 function statisticsFixture() {
   const members = [1, 2].map(id => ({id:'demo-period-person-' + id, name:'Demo Period Person ' + id, category:'auto', role:'Опаковчик'}));
@@ -30,6 +32,7 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await expect(page.locator('#dashboardActual')).toHaveText('3 т');
   await expect(page.locator('#dashboardBrak')).toHaveText('0,2 т');
   await exerciseStatisticsComparison({page, expect, screenshotDir});
+  await exerciseMonthlyPresentation({page, expect});
   const refreshed = statisticsFixture();
   refreshed['production-log'].entries[0].brak = 170;
   await replaceSources(refreshed);
@@ -134,6 +137,43 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   assert.equal(await page.locator('#pairStatsMonth, #lineShiftMonthSelect').count(), 0);
   await exerciseStatisticsUnits({page, expect, replaceSources, screenshotDir});
   console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
+}
+
+// Minimal stored .pptx with template fields; the real company template stays on the local machine.
+function presentationTemplate() {
+  const files = [['ppt/slides/slide1.xml', '<a:t>{{monthName}} {{year}}|{{packedT}}|{{p1PackedT}}|{{p2PackedT}}|{{stations}}|{{stationLoading}}|{{extrudedT}}</a:t>'], ['ppt/media/image1.png', 'PNG']];
+  const parts = [], central = [];
+  let offset = 0;
+  for (const [name, text] of files) {
+    const data = Buffer.from(text), nameBytes = Buffer.from(name), head = Buffer.alloc(30), dir = Buffer.alloc(46);
+    head.writeUInt32LE(0x04034b50, 0); head.writeUInt32LE(zlib.crc32(data), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(nameBytes.length, 26);
+    dir.writeUInt32LE(0x02014b50, 0); dir.writeUInt32LE(zlib.crc32(data), 16); dir.writeUInt32LE(data.length, 20); dir.writeUInt32LE(data.length, 24); dir.writeUInt16LE(nameBytes.length, 28); dir.writeUInt32LE(offset, 42);
+    parts.push(head, nameBytes, data); central.push(dir, nameBytes); offset += 30 + nameBytes.length + data.length;
+  }
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(Buffer.concat(central).length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, ...central, end]);
+}
+
+async function exerciseMonthlyPresentation({page, expect}) {
+  console.log('RUN monthly presentation from a local template');
+  const dialog = page.locator('#presentationDialog'), feedback = page.locator('#presentationFeedback');
+  await page.locator('#presentationBtn').click();
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#presentationPeriod')).toHaveText('Октомври 2026');
+  await page.locator('#presentationSubmit').click();
+  await expect(feedback).toHaveText('Избери шаблона (.pptx).');
+  await dialog.locator('input[name=stations]').fill('2.5');
+  await dialog.locator('input[name=template]').setInputFiles({name:'template.pptx', mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer:presentationTemplate()});
+  const download = page.waitForEvent('download');
+  await page.locator('#presentationSubmit').click();
+  const file = await download;
+  assert.equal(file.suggestedFilename(), 'packing-presentation-2026-10.pptx');
+  // Filled parts are stored uncompressed; September comes from a separate server read of the previous month.
+  assert.ok(fs.readFileSync(await file.path()).toString().includes('<a:t>October 2026|3|1|0|2.5|50.0%|—</a:t>'));
+  await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 }
 
 async function exerciseStatisticsComparison({page, expect, screenshotDir}) {
