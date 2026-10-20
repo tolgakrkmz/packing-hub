@@ -37,8 +37,34 @@ const MonthlyPresentation = (() => {
       .map(row => ({reason:row.reason, hours:short(row.minutes / 60), stops:row.stops}));
   }
 
+  // Global problems as they stood at the end of the month: only counts, impact and titles, no authors.
+  function problems(items, start, end, now) {
+    if (!Array.isArray(items)) return null;
+    const until = Math.min(end, now), known = items.filter(item => item.createdAt < end);
+    const active = known.filter(item => !item.resolvedAt || item.resolvedAt >= end);
+    const proposed = item => (item.proposals || []).some(entry => entry.at < end), rank = {high:0, medium:1, low:2};
+    return {active:active.length, proposed:active.filter(proposed).length, open:active.filter(item => !proposed(item)).length,
+      created:known.filter(item => item.createdAt >= start).length, resolved:items.filter(item => item.resolvedAt >= start && item.resolvedAt < end).length,
+      byImpact:['high', 'medium', 'low'].map(level => ({level, count:active.filter(item => item.impactLevel === level).length})),
+      oldest:[...active].sort((a, b) => rank[a.impactLevel] - rank[b.impactLevel] || a.createdAt - b.createdAt).slice(0, 5).map(item => ({
+        title:String(item.titleEn || item.title || ''), level:item.impactLevel, days:Math.max(0, Math.floor((until - item.createdAt) / 86400000)), stage:proposed(item) ? 'Solution proposed' : 'Open'}))};
+  }
+
+  // Team totals only: today's roster headcount (no dated snapshots exist) against the month's packed tonnage per team.
+  function workforce(counts, rows) {
+    if (!counts) return null;
+    const teams = [['А', 'A'], ['Б', 'B'], ['В', 'C'], ['Г', 'D']].map(([team, label]) => {
+      const people = Number(counts.production?.[team]) || 0, packed = sum(rows.filter(entry => entry.shift === team), entry => entry.tonnage) / 1000;
+      return {team:'Team ' + label, people, auto:Number(counts.auto?.[team]) || 0, manual:Number(counts.manual?.[team]) || 0, packedT:num(packed), perPerson:people ? finite(packed / people) : 0, perPersonT:num(people ? packed / people : NaN, 1)};
+    });
+    const production = Number(counts.productionTotal) || 0, packed = sum(rows.filter(entry => entry.shift !== STICKERS), entry => entry.tonnage) / 1000;
+    return {active:num(Number(counts.totalActive) || 0), auto:num(Number(counts.autoTotal) || 0), manual:num(Number(counts.manualTotal) || 0), stickers:num(Number(counts.stickers) || 0),
+      perPersonT:num(production ? packed / production : NaN, 1), teams};
+  }
+
   // production: entries covering the month and the two before it; downtime: line-downtime entries; inputs: numbers or empty; today: YYYY-MM-DD for the cover.
-  function values({month, production, downtime, inputs = {}, today = ''}) {
+  // problemItems: /api/problems items or null; period: {start, end, now} instants of the month in Sofia; counts: workforce counts or null.
+  function values({month, production, downtime, inputs = {}, today = '', problemItems = null, period = null, counts = null}) {
     const input = key => inputs[key] === '' || inputs[key] === null || inputs[key] === undefined ? NaN : Number(inputs[key]);
     const months = [addMonths(month, -2), addMonths(month, -1), month].map(value => packing(production, value)), [p2, p1, now] = months;
     const days = daysIn(month), weekdays = workingDays(month), stations = input('stations');
@@ -72,6 +98,7 @@ const MonthlyPresentation = (() => {
       trucks:short(trucks), trucksTarget:short(target), trucksPerformance:pct(trucks / target, 0),
       trucksRatio:Number.isFinite(trucks / target) ? Math.min(Math.max(trucks / target, 0), 1) : 0,
       trucksGap:signed(short(gap), gap), trucksUplift:signed(pct(gap / trucks), gap),
+      problems:period ? problems(problemItems, period.start, period.end, period.now) : null, workforce:workforce(counts, inMonth(production, month)),
       empty:{current:!now.rows, previous:!p1.rows || !p2.rows}
     };
   }

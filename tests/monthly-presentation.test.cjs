@@ -21,7 +21,36 @@ const downtime = [{date:'2026-09-02', durationMin:180 * 60, reason:'Fictional ma
   {date:'2026-09-21', durationMin:6 * 60, reason:'Fictional changeover'}, {date:'2026-08-31', durationMin:999, reason:'Fictional old stop'}];
 const inputs = {profiles:'450000', dispatchedT:'1800', extrudedT:'2400', realizationT:'1900', anodizingT:'20', sawsT:'50', cncT:'30', specialT:'100',
   stations:'2', trucks:'6', trucksTarget:'8'};
-const september = () => presentation.values({month:'2026-09', production, downtime, inputs, today:'2026-10-02'});
+// Fictional problems and roster counts; instants are UTC for readability.
+const at = date => Date.parse(date + 'T12:00:00Z');
+const problemItems = [
+  {title:'Fictional old high', titleEn:'', impactLevel:'high', createdAt:at('2026-07-01'), resolvedAt:null, proposals:[{at:at('2026-09-10')}]},
+  {title:'Фиктивен проблем', titleEn:'Fictional medium', impactLevel:'medium', createdAt:at('2026-09-05'), resolvedAt:null, proposals:[{at:at('2026-10-05')}]},
+  {title:'Fictional resolved', impactLevel:'low', createdAt:at('2026-08-01'), resolvedAt:at('2026-09-20'), proposals:[]},
+  {title:'Fictional later', impactLevel:'high', createdAt:at('2026-10-03'), resolvedAt:null, proposals:[]},
+  {title:'Fictional resolved later', impactLevel:'low', createdAt:at('2026-09-01'), resolvedAt:at('2026-10-02'), proposals:[]}];
+const period = {start:Date.parse('2026-09-01T00:00:00Z'), end:Date.parse('2026-10-01T00:00:00Z'), now:Date.parse('2026-10-20T00:00:00Z')};
+const counts = {auto:{А:4, Б:3, В:0, Г:2}, manual:{А:2, Б:2, В:0, Г:1}, production:{А:6, Б:5, В:0, Г:3}, autoTotal:9, manualTotal:5, productionTotal:14, stickers:3, additional:1, totalActive:17};
+const september = () => presentation.values({month:'2026-09', production, downtime, inputs, today:'2026-10-02', problemItems, period, counts});
+
+test('problems show the month-end state: counts, impact and the longest open, without authors', () => {
+  const p = september().problems;
+  assert.deepEqual([p.active, p.open, p.proposed, p.created, p.resolved], [3, 2, 1, 2, 1]);
+  assert.deepEqual(plain(p.byImpact), [{level:'high', count:1}, {level:'medium', count:1}, {level:'low', count:1}]);
+  assert.deepEqual(plain(p.oldest), [
+    {title:'Fictional old high', level:'high', days:91, stage:'Solution proposed'},
+    {title:'Fictional medium', level:'medium', days:25, stage:'Open'},
+    {title:'Fictional resolved later', level:'low', days:29, stage:'Open'}]);
+  assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
+});
+
+test('workforce compares team headcount with the team packed tonnage', () => {
+  const f = september().workforce;
+  assert.deepEqual([f.active, f.auto, f.manual, f.stickers, f.perPersonT], ['17', '9', '5', '3', '128.6']);
+  assert.deepEqual(plain(f.teams.map(row => [row.team, row.people, row.packedT, row.perPersonT, row.perPerson])),
+    [['Team A', 6, '1,100', '183.3', 183.3], ['Team B', 5, '700', '140.0', 140], ['Team C', 0, '0', '—', 0], ['Team D', 3, '0', '0.0', 0]]);
+  assert.equal(presentation.values({month:'2026-09', production, downtime}).workforce, null);
+});
 
 test('monthly values add the packing routes and the reconciliation', () => {
   const v = september();
@@ -54,20 +83,22 @@ test('empty inputs and months stay visible as dashes, never as NaN', () => {
   assert.deepEqual(plain(v.empty), {current:true, previous:true});
 });
 
-test('the deck has six designed slides with the figures, native charts and editable text', async () => {
+test('the deck has eight designed slides with the figures, native charts and editable text', async () => {
   const pptx = deck.build(PptxGenJS, september(), {improvements:['Fictional count: Stock checked twice.', '', 'Fictional scanners'], specialLabel:'Fictional line'});
   const files = unzipText(Buffer.from(await pptx.write({outputType:'arraybuffer'})));
-  const slides = [1, 2, 3, 4, 5, 6].map(n => slideText(files[`ppt/slides/slide${n}.xml`]));
+  const slides = [1, 2, 3, 4, 5, 6, 7, 8].map(n => slideText(files[`ppt/slides/slide${n}.xml`]));
   const has = (n, lines) => { for (const line of lines) assert.ok(slides[n].includes(line), `slide ${n + 1} lacks "${line}": ${slides[n].join(' | ')}`); };
-  assert.equal(files['ppt/slides/slide7.xml'], undefined);
+  assert.equal(files['ppt/slides/slide9.xml'], undefined);
   has(0, ['Packaging and Logistics Sector', 'September 2026', 'Prepared 02.10.2026']);
   has(1, ['1,900 t', '30 pcs', '450,000 pcs', '1,800 t', '81.8 t/day', 'Daily averages: packing totals ÷ 30 calendar days  |  dispatch ÷ 22 Mon–Fri working days']);
   has(2, ['Fictional line', '100 t', '280 t', '56% of the total difference · 500 − 100 − 120 = 280 t']);
   has(3, ['800 t', '1,000 t', '100.4 t', 'AL share 42.1%', 'PACKING MIX – JULY TO SEPTEMBER']);
   has(4, ['70.0%', '40.0%', '28.0%', '216 h', 'Fictional material wait', '36 h of downtime in 2 stops.']);
   has(5, ['Fictional count', 'Stock checked twice.', 'Fictional scanners', 'Add an improvement', '6 trucks/day', '+2 trucks/day', '+33.3%']);
+  has(6, ['Global Problems', '3', '2 open · 1 with a proposed solution', 'Fictional old high', '91 days · Solution proposed', '7 / 8']);
+  has(7, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—']);
   const charts = Object.keys(files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map(name => files[name]);
-  assert.equal(charts.length, 2);
+  assert.equal(charts.length, 3);
   assert.ok(charts.some(xml => xml.includes('<c:grouping val="stacked"/>') && xml.includes('<c:v>100.4</c:v>')));
   assert.ok(charts.some(xml => xml.includes('<c:v>2857.1</c:v>')));
   assert.ok(Object.keys(files).some(name => name.startsWith('ppt/embeddings/')), 'charts keep editable data');

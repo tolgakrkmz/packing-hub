@@ -46,7 +46,11 @@
     try {
       const month = `${selectedYear}-${selectedDashboardMonth}`;
       const inputs = Object.fromEntries(MonthlyPresentation.INPUTS.map(key => [key, form.elements[key].value]));
-      const values = MonthlyPresentation.values({month, production:await production(month), downtime:avEntries, inputs, today:statisticsDay()});
+      // Problems are optional for the deck: without access or connection the slide says they were not available.
+      const problemItems = await HubServer.json('/api/problems').then(result => result.items).catch(() => null);
+      const period = {start:ShiftSchedule.sofiaInstant(`${month}-01`, 0), end:ShiftSchedule.sofiaInstant(`${MonthlyPresentation.addMonths(month, 1)}-01`, 0), now:Date.now()};
+      const values = MonthlyPresentation.values({month, production:await production(month), downtime:avEntries, inputs, today:statisticsDay(),
+        problemItems, period, counts:getPersonnelSnapshot()});
       const deck = MonthlyPresentationDeck.build(await loadLibrary(), values,
         {improvements:form.elements.improvements.value.split('\n'), specialLabel:form.elements.specialLabel.value});
       const link = document.createElement('a');

@@ -2,7 +2,7 @@
 const MonthlyPresentationDeck = (() => {
   const C = {bg:'15171B', panel:'1D2025', panel2:'22262C', border:'2C3039', text:'EDEBE3', muted:'8A8D93',
     amber:'F5A623', amberDark:'3A2C10', blue:'4F95C9', teal:'3FBFA0', coral:'E0765A', purple:'A083D6', pink:'C26B9E'};
-  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 6, GAP = 0.25, RIGHT = W - M;
+  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 8, GAP = 0.25, RIGHT = W - M;
   const text = (slide, value, x, y, w, h, options = {}) => slide.addText(value, {x, y, w, h, fontFace:FONT, fontSize:12, color:C.text, margin:0, valign:'top', ...options});
   const box = (slide, x, y, w, h, fill = C.panel, line = C.border) => slide.addShape('roundRect', {x, y, w, h, rectRadius:0.08, fill:{color:fill}, line:{color:line, width:0.75}});
   const bar = (slide, x, y, w, h, color) => slide.addShape('rect', {x, y, w:Math.max(w, 0.01), h, fill:{color}, line:{color, width:0}});
@@ -186,6 +186,63 @@ const MonthlyPresentationDeck = (() => {
       x + 0.5, 5.7, w - 0.9, 0.85);
   }
 
+  const unavailable = (slide, message) => { box(slide, M, 1.95, RIGHT - M, 4.85); text(slide, message, M, 1.95, RIGHT - M, 4.85, {fontSize:14, color:C.muted, align:'center', valign:'middle'}); };
+  const LEVELS = {high:['High', C.coral], medium:['Medium', C.amber], low:['Low', C.teal]};
+
+  function globalProblems(pptx, v) {
+    const slide = frame(pptx, v, 7, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
+    if (!p) return unavailable(slide, 'Global problems were not available when the presentation was created.');
+    const cols = columns(4);
+    card(slide, {...cols[0], y:1.95, h:1.75, title:'Active problems', value:String(p.active), color:C.amber, sub:`${p.open} open · ${p.proposed} with a proposed solution`});
+    card(slide, {...cols[1], y:1.95, h:1.75, title:'New this month', value:String(p.created), color:C.blue, sub:'Recorded during the month'});
+    card(slide, {...cols[2], y:1.95, h:1.75, title:'Resolved this month', value:String(p.resolved), color:C.teal, sub:'Closed during the month'});
+    card(slide, {...cols[3], y:1.95, h:1.75, title:'High impact', value:String(p.byImpact[0].count), color:C.coral, sub:'Active at month end'});
+    const leftW = 4.2, x = M + leftW + GAP, w = RIGHT - x, most = Math.max(1, ...p.byImpact.map(row => row.count));
+    box(slide, M, 3.9, leftW, 2.9);
+    label(slide, 'Active by impact', M + 0.25, 4.07, leftW - 0.5);
+    p.byImpact.forEach((row, i) => {
+      const [name, color] = LEVELS[row.level], top = 4.55 + i * 0.7, track = leftW - 2.0;
+      text(slide, name, M + 0.25, top, 0.95, 0.35, {fontSize:12, color:C.muted, valign:'middle'});
+      bar(slide, M + 1.25, top + 0.08, track, 0.2, C.panel2);
+      bar(slide, M + 1.25, top + 0.08, track * row.count / most, 0.2, color);
+      text(slide, String(row.count), M + leftW - 0.65, top, 0.4, 0.35, {fontSize:14, bold:true, align:'right', valign:'middle'});
+    });
+    box(slide, x, 3.9, w, 2.9);
+    label(slide, 'Longest open, by impact', x + 0.25, 4.07, w - 0.5);
+    if (!p.oldest.length) text(slide, 'No active problems at month end.', x + 0.25, 4.5, w - 0.5, 0.4, {fontSize:12, color:C.muted});
+    p.oldest.forEach((row, i) => {
+      const top = 4.45 + i * 0.45, [, color] = LEVELS[row.level] || ['', C.muted];
+      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.05, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
+      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.12, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
+      text(slide, row.title, x + 0.5, top, w - 3.05, 0.37, {fontSize:11, valign:'middle', fit:'shrink'});
+      text(slide, `${row.days} ${row.days === 1 ? 'day' : 'days'} · ${row.stage}`, x + w - 2.5, top, 2.25, 0.37, {fontSize:10, color:C.muted, align:'right', valign:'middle'});
+    });
+  }
+
+  function people(pptx, v) {
+    const slide = frame(pptx, v, 8, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team · for information`), f = v.workforce;
+    if (!f) return unavailable(slide, 'The personnel list was not available when the presentation was created.');
+    const cols = columns(4);
+    [['Active people', f.active, C.amber], ['Automatic line', f.auto, C.teal], ['Manual packing', f.manual, C.blue], ['Stickers', f.stickers, C.pink]]
+      .forEach(([title, value, color], i) => card(slide, {...cols[i], y:1.95, h:1.45, title, value, unit:'people', color, size:26}));
+    const leftW = 7.4, x = M + leftW + GAP, w = RIGHT - x, head = {bold:true, color:C.muted, fontSize:10};
+    box(slide, M, 3.62, leftW, 3.18);
+    label(slide, 'Teams', M + 0.25, 3.79, leftW - 0.5);
+    const cell = (value, options = {}) => ({text:String(value), options:{fontFace:FONT, fontSize:12, color:C.text, valign:'middle', ...options}});
+    slide.addTable([
+      ['Team', 'People', 'Automatic', 'Manual', 'Packed', 't / person'].map((value, i) => cell(value, {...head, align:i ? 'right' : 'left'})),
+      ...f.teams.map(row => [cell(row.team, {bold:true}), cell(row.people, {align:'right'}), cell(row.auto, {align:'right', color:C.teal}), cell(row.manual, {align:'right', color:C.blue}),
+        cell(row.packedT + ' t', {align:'right'}), cell(row.perPersonT, {align:'right', bold:true, color:C.amber})])
+    ], {x:M + 0.25, y:4.15, w:leftW - 0.5, colW:[1.5, 1.0, 1.1, 1.0, 1.35, 0.95], rowH:0.45, border:{type:'solid', color:C.border, pt:0.5}, fill:{color:C.panel}, margin:0.05});
+    text(slide, `Headcount is today's roster. All teams: ${f.perPersonT} t per person. Stickers are counted separately.`,
+      M + 0.25, 6.45, leftW - 0.5, 0.3, {fontSize:9, color:C.muted});
+    box(slide, x, 3.62, w, 3.18);
+    label(slide, 'Packed tonnage per person', x + 0.25, 3.79, w - 0.5);
+    slide.addChart(pptx.ChartType.bar, [{name:'t / person', labels:f.teams.map(row => row.team), values:f.teams.map(row => row.perPerson)}],
+      {x:x + 0.15, y:4.1, w:w - 0.3, h:2.6, barDir:'col', barGapWidthPct:70, chartColors:[C.amber], ...chartText,
+        showLegend:false, showValue:true, dataLabelColor:C.text, dataLabelFontSize:10, dataLabelFormatCode:'#,##0.0', dataLabelPosition:'outEnd'});
+  }
+
   // improvements: lines "Title: description"; specialLabel names the special production row.
   function build(PptxGenJS, v, {improvements = [], specialLabel = ''} = {}) {
     const pptx = new PptxGenJS();
@@ -197,7 +254,7 @@ const MonthlyPresentationDeck = (() => {
       return at > 0 ? {title:line.slice(0, at).trim(), body:line.slice(at + 1).trim()} : {title:line, body:''};
     });
     cover(pptx, v); overview(pptx, v); reconciliation(pptx, v, String(specialLabel).trim() || 'Special production');
-    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items);
+    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v); people(pptx, v);
     return pptx;
   }
   return {build};
