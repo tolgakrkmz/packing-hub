@@ -23,11 +23,14 @@
 - ⏱️ **Downtime** — causes, durations and line breakdowns.
 - 👥 **Teams & targets** — rotating shifts, packer pairs, goals and actual results.
 - ✅ **Shift tasks** — assignments, recurring plans, progress and approvals.
-- ✅ **Global problems** — board for issues outside the team's control and the solutions proposed for them.
+- 🧩 **Global problems** — board for issues outside the team's control and the solutions proposed for them; server mode only.
+- 🕙 **Shift closeout** — one screen and toolbar counter for missing tonnage and pending pair results, with reminders; server mode only.
 - 👍 **Team spot-ratings** — required 👍/👌/👎 for 2–3 people after a pair result and an internal report; server mode only.
 - 🍺 **Shift leads wall** — informal posts with one photo, reactions and comments; server mode only, removed after 90 days.
 - 📦 **Packing instructions** — searchable profiles, folders and attachments.
 - 🔔 **Shared workspace** — live updates, account permissions and optional Web Push.
+- 📽️ **Monthly presentation** — administrators download an editable PowerPoint built in the browser from the month's statistics.
+- 🛠️ **Administration** — accounts and permissions, activity log, system status, report history with recoverable deletion, JSON import/export, scheduled backups and verified restore.
 
 Responsive dark interface, Bulgarian / English switching, and two ways to run:
 **offline with local JSON files** or **shared through a Node.js + SQLite server**.
