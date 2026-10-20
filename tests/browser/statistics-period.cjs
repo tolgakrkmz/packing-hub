@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const {assertResponsive} = require('./responsive.cjs');
 const fs = require('node:fs');
-const zlib = require('node:zlib');
+const {unzipText, slideText} = require('../pptx-zip.cjs');
 
 function statisticsFixture() {
   const members = [1, 2].map(id => ({id:'demo-period-person-' + id, name:'Demo Period Person ' + id, category:'auto', role:'Опаковчик'}));
@@ -139,41 +139,36 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   console.log('PASS shared statistics period, monthly scrap totals, BG/EN phone/desktop and refresh without fallback');
 }
 
-// Minimal stored .pptx with template fields; the real company template stays on the local machine.
-function presentationTemplate() {
-  const files = [['ppt/slides/slide1.xml', '<a:t>{{coverDate}}|{{monthName}} {{year}}|{{packedT}}|{{p1PackedT}}|{{p2PackedT}}|{{stations}}|{{stationLoading}}|{{extrudedT}}</a:t>'], ['ppt/media/image1.png', 'PNG']];
-  const parts = [], central = [];
-  let offset = 0;
-  for (const [name, text] of files) {
-    const data = Buffer.from(text), nameBytes = Buffer.from(name), head = Buffer.alloc(30), dir = Buffer.alloc(46);
-    head.writeUInt32LE(0x04034b50, 0); head.writeUInt32LE(zlib.crc32(data), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(nameBytes.length, 26);
-    dir.writeUInt32LE(0x02014b50, 0); dir.writeUInt32LE(zlib.crc32(data), 16); dir.writeUInt32LE(data.length, 20); dir.writeUInt32LE(data.length, 24); dir.writeUInt16LE(nameBytes.length, 28); dir.writeUInt32LE(offset, 42);
-    parts.push(head, nameBytes, data); central.push(dir, nameBytes); offset += 30 + nameBytes.length + data.length;
-  }
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(Buffer.concat(central).length, 12); end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...parts, ...central, end]);
-}
-
 async function exerciseMonthlyPresentation({page, expect}) {
-  console.log('RUN monthly presentation from a local template');
+  console.log('RUN monthly presentation built from statistics');
   // Offline files have no accounts, so the administrator-only button stays hidden there.
   if (await page.evaluate(() => typeof HubServer === 'undefined')) { await expect(page.locator('#presentationBtn')).toBeHidden(); return; }
   const dialog = page.locator('#presentationDialog'), feedback = page.locator('#presentationFeedback');
   await page.locator('#presentationBtn').click();
   await expect(dialog).toBeVisible();
   await expect(page.locator('#presentationPeriod')).toHaveText('Октомври 2026');
-  await page.locator('#presentationSubmit').click();
-  await expect(feedback).toHaveText('Избери шаблона (.pptx).');
   await dialog.locator('input[name=stations]').fill('2.5');
-  await dialog.locator('input[name=template]').setInputFiles({name:'template.pptx', mimeType:'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer:presentationTemplate()});
+  await dialog.locator('input[name=specialLabel]').fill('Fictional special line');
+  await dialog.locator('textarea[name=improvements]').fill('Fictional count: Stock checked.');
   const download = page.waitForEvent('download');
   await page.locator('#presentationSubmit').click();
   const file = await download;
   assert.equal(file.suggestedFilename(), 'packing-presentation-2026-10.pptx');
-  // Filled parts are stored uncompressed; September comes from a separate server read of the previous month.
-  assert.ok(fs.readFileSync(await file.path()).toString().includes('<a:t>05.10.2026|October 2026|3|1|0|2.5|50.0%|—</a:t>'));
+  // September comes from a separate server read of the previous month.
+  const files = unzipText(fs.readFileSync(await file.path()));
+  const slide = n => slideText(files[`ppt/slides/slide${n}.xml`]);
+  for (const line of ['October 2026', 'Prepared 05.10.2026']) assert.ok(slide(1).includes(line), line);
+  assert.ok(slide(2).includes('3 t'));
+  assert.ok(slide(3).includes('Fictional special line'));
+  for (const line of ['3 t', '1 t', '0 t']) assert.ok(slide(4).includes(line), line);
+  assert.ok(slide(5).includes('50.0%'));
+  assert.ok(slide(6).includes('Fictional count') && slide(6).includes('Stock checked.'));
   await expect(feedback).toHaveText('Свалено. За някой от предишните два месеца няма отчети.');
+  // Repeated settings return on the next visit; monthly figures do not.
+  await page.reload();
+  await page.locator('#presentationBtn').click();
+  await expect(dialog.locator('input[name=specialLabel]')).toHaveValue('Fictional special line');
+  await expect(dialog.locator('input[name=stations]')).toHaveValue('');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 }

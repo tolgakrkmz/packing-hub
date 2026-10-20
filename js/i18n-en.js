@@ -1991,8 +1991,6 @@ Object.assign(HUB_EN_MESSAGES, {
   "без причината": "no reason recorded",
   "Още няма оценки или отчетени двойки за избрания период и екип.": "No ratings or reported pairs for the selected period and team yet.",
   "Месечна презентация": "Monthly presentation",
-  "Тонажът, касите, автоматичната и ръчната линия, стикерите, бракът и престоите идват от сайта. Шаблонът остава на този компютър.": "Tonnage, crates, automatic and manual line, stickers, scrap and downtime come from the site. The template stays on this computer.",
-  "Шаблон (.pptx)": "Template (.pptx)",
   "Опаковани профили (бр.)": "Packed profiles (pcs)",
   "Експедирано (т)": "Dispatched (t)",
   "Екструзия → Опаковане": "Extrusion → Packing",
@@ -2006,15 +2004,15 @@ Object.assign(HUB_EN_MESSAGES, {
   "Логистика": "Logistics",
   "Камиони на ден": "Trucks per day",
   "Цел камиони на ден": "Target trucks per day",
-  "Празно поле остава „—“ в презентацията. Текстовете за причини и подобрения се допълват в PowerPoint.": "An empty field stays “—” in the deck. Reasons and improvements are written in PowerPoint.",
   "Свали презентацията": "Download presentation",
   "Свържи тонажния дневник и дневника за престои.": "Connect the production log and the downtime log.",
-  "Избери шаблона (.pptx).": "Choose the template (.pptx).",
   "Подготовка…": "Preparing…",
   "Свалено, но за месеца няма производствени отчети.": "Downloaded, but the month has no production reports.",
   "Свалено. За някой от предишните два месеца няма отчети.": "Downloaded. One of the two previous months has no reports.",
   "Презентацията е свалена.": "The presentation was downloaded.",
-  "Файлът не е шаблон за презентация с полета {{…}}.": "The file is not a presentation template with {{…}} fields.",
   "Презентацията не беше създадена. Опитай отново.": "The presentation was not created. Try again.",
-  "Свалено. Непознати полета в шаблона:": "Downloaded. Unknown template fields:"
+  "Тонажът, касите, автоматичната и ръчната линия, стикерите, бракът и престоите идват от сайта. Презентацията се създава на този компютър.": "Tonnage, crates, automatic and manual line, stickers, scrap and downtime come from the site. The presentation is created on this computer.",
+  "Име на специалното производство": "Special production name",
+  "Подобрения през месеца (до 3, по едно на ред: „Заглавие: описание“)": "Improvements this month (up to 3, one per line: “Title: description”)",
+  "Празно поле остава „—“ в презентацията. Всеки текст може да се промени в PowerPoint.": "An empty field stays “—” in the deck. Any text can be changed in PowerPoint."
 });
