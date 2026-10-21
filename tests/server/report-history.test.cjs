@@ -177,7 +177,7 @@ test('pair plan corrections require a reason; first reports and cancellation ret
   store.reportOperation('pair-targets',op('update',cancelled),created.versions[other.id],reporter);
   assert.equal(store.reportHistory('pair-targets',other.id,admin).events[0].reason,'Чистене');
 });
-test('restoring a raised pair keeps its raised targets unless the account has the right to change them',t => {
+test('restoring a raised pair cannot lower its targets unless the account has the right',t => {
   const store=openStore(':memory:',productionClock);t.after(()=>store.close());
   store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
   const pairEditor={id:4,username:'demo-history-pair-editor',role:'observer',taskTeam:'СТИКЕРИ',permissions:{canCreatePairs:true,canEditPairs:true}};
