@@ -333,6 +333,9 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         const source = db.prepare('SELECT before_data,after_data FROM report_history WHERE kind=? AND entry_id=? AND version=?').get(kind,input.entryId,input.sourceVersion);
         if (!source) throw problem(404, 'NOT_FOUND');
         restored = JSON.parse(source.after_data || source.before_data);
+        // Restoring an older snapshot must not undo a raise: the last state before deletion keeps its targets.
+        const last = kind === 'pair-targets' && JSON.parse(db.prepare('SELECT before_data FROM report_history WHERE kind=? AND entry_id=? ORDER BY version DESC LIMIT 1').get(kind,input.entryId)?.before_data || 'null');
+        if (last?.raisedAt && !can(user, 'canChangeRaisedPairs') && ['raisedAt','targetKg','targetCrates'].some(field => restored[field] !== last[field])) throw problem(403, 'FORBIDDEN');
         if (kind === 'pair-targets' && !restored.cancellation && current.data.entries.some(item => !item.cancellation && pairModel.inScope(item,restored) && item.members.some(person => restored.members.some(member => member.id === person.id)))) throw problem(409,'REPORT_CONFLICT');
       }
       const entries = input.action === 'restore' ? [...current.data.entries, restored] : input.action === 'create' ? [...current.data.entries, input.entry] : input.action === 'delete' ? current.data.entries.filter(item => item.id !== input.entryId) : current.data.entries.map(item => item.id === input.entryId ? input.entry : item);

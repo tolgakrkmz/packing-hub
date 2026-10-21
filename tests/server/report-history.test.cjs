@@ -177,3 +177,15 @@ test('pair plan corrections require a reason; first reports and cancellation ret
   store.reportOperation('pair-targets',op('update',cancelled),created.versions[other.id],reporter);
   assert.equal(store.reportHistory('pair-targets',other.id,admin).events[0].reason,'Чистене');
 });
+test('restoring a raised pair keeps its raised targets unless the account has the right to change them',t => {
+  const store=openStore(':memory:',productionClock);t.after(()=>store.close());
+  store.put('personnel',{...store.get('personnel').data,employees:people},1,admin);
+  const pairEditor={id:4,username:'demo-history-pair-editor',role:'observer',taskTeam:'СТИКЕРИ',permissions:{canCreatePairs:true,canEditPairs:true}};
+  const value=JSON.parse(JSON.stringify(model.plan({data:model.emptyData(),employees:people,context:scope,memberIds:people.map(person => person.id),targetKg:1000,targetCrates:40,workAreas:['manual'],id:'demo-history-raised',now:'2026-10-05T06:00:00.000Z'})));
+  const first=store.reportOperation('pair-targets',op('create',value),undefined,admin);
+  const raised=store.reportOperation('pair-targets',op('update',{...value,targetKg:15000,raisedAt:'2026-10-05T06:10:00.000Z'},{reason:'Fictional raise'}),first.versions[value.id],admin);
+  store.reportOperation('pair-targets',op('delete',value.id,{reason:'Fictional deletion'}),raised.versions[value.id],admin);
+  const deleted=store.reportHistory('pair-targets',value.id,admin).version;
+  assert.throws(()=>store.reportOperation('pair-targets',op('restore',value.id,{sourceVersion:first.versions[value.id],reason:'Fictional restore'}),deleted,pairEditor),{code:'FORBIDDEN'});
+  assert.equal(store.reportOperation('pair-targets',op('restore',value.id,{sourceVersion:deleted,reason:'Fictional restore'}),deleted,pairEditor).data.entries[0].targetKg,15000);
+});
