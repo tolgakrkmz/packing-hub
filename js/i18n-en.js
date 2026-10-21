@@ -1540,6 +1540,8 @@ Object.assign(HUB_EN_MESSAGES, {
   "Преглед на двойките": "View pairs",
   "Планиране и първи отчет на двойки": "Plan pairs and record first results",
   "Корекции на отчетени двойки": "Correct reported pairs",
+  "Промяна на таргети след „Повиши таргетите“": "Change targets after “Raise targets”",
+  "Таргетите са повишени и не могат да се променят.": "The targets were raised and cannot be changed.",
   "Преглед на персонала": "View personnel",
   "Управление на персонала": "Manage personnel",
   "Преглед на инструкциите": "View instructions",

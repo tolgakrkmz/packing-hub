@@ -282,8 +282,10 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
               if (!isDeepStrictEqual(JSON.parse(JSON.stringify(cancelled)), entry)) throw new Error();
               continue;
             }
+            const canChangeRaised = can(user, 'canChangeRaisedPairs');
+            if (previous?.raisedAt && entry.raisedAt !== previous.raisedAt && !canChangeRaised) throw new Error();
             if (!previous || planFields.some(field => !same(previous[field], entry[field]))) {
-              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.interval(entry.date,entry.team)?.extraordinary===true});
+              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.interval(entry.date,entry.team)?.extraordinary===true, canChangeRaised});
               if (planFields.some(field => !same(planned[field], entry[field]))) throw new Error();
             }
             if (previous?.result && !entry.result) throw new Error();

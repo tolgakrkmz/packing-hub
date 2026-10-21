@@ -54,7 +54,7 @@ const PairTargets = (() => {
     if(!entry.result) return 'pending';
     return entry.result.kg >= entry.targetKg && entry.result.crates >= entry.targetCrates ? 'achieved' : 'missed';
   }
-  function plan({data, employees, context, memberIds, targetKg, targetCrates, workAreas, existingId = null, id, now, extraordinary = false}) {
+  function plan({data, employees, context, memberIds, targetKg, targetCrates, workAreas, existingId = null, id, now, extraordinary = false, canChangeRaised = false}) {
     ShiftSchedule.parseDate(context.date);
     if(![1,2,3].includes(Number(context.shiftCode)) || !TEAMS.includes(context.team) || !ShiftSchedule.isScheduled(context) && !(extraordinary && context.team === 'СТИКЕРИ' && Number(context.shiftCode) === 1)) {
       throw new Error('Избраният екип не работи тази смяна според ротацията.');
@@ -78,11 +78,13 @@ const PairTargets = (() => {
     if(occupied.some(entry => entry.members.some(person => memberIds.includes(person.id)))) {
       throw new Error('Някой от избраните хора вече участва в друга двойка за тази смяна.');
     }
+    const kg = number(targetKg,'Целта в килограми',true), crates = number(targetCrates,'Целта в каси',true,true);
+    // After "Повиши таргетите" the targets are fixed; only an account with the explicit right may change them.
+    if(existing?.raisedAt && !canChangeRaised && (kg !== existing.targetKg || crates !== existing.targetCrates)) throw new Error('Таргетите са повишени и не могат да се променят.');
     return {
       id:existing ? existing.id : id, date:context.date, shiftCode:Number(context.shiftCode), team:context.team,
-      members, areas:areas(workAreas), targetKg:number(targetKg,'Целта в килограми',true),
-      targetCrates:number(targetCrates,'Целта в каси',true,true), result:null,
-      createdAt:existing ? existing.createdAt : now, updatedAt:now
+      members, areas:areas(workAreas), targetKg:kg, targetCrates:crates, result:null,
+      createdAt:existing ? existing.createdAt : now, updatedAt:now, ...(existing?.raisedAt ? {raisedAt:existing.raisedAt} : {})
     };
   }
   // legacy: stored reports may still use 'other' or free text only; new reports must pick a specific reason.
@@ -140,12 +142,12 @@ const PairTargets = (() => {
   // Стикери work to their own plan, so the 30 t shift goal does not apply to them.
   function hasShiftGoal(team) { return team !== 'СТИКЕРИ'; }
   // Splits what reported pairs leave of 30 t across the unreported pairs in proportion to their history.
-  // A target the supervisor set higher is never lowered; the rest is shared by the others. Rounded up to 100 kg.
+  // A target the supervisor set higher is never lowered and an already raised one is fixed; the rest is shared by the others. Rounded up to 100 kg.
   function equalize(entries, now, history = []) {
     const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
     if(!open.length || !hasShiftGoal(open[0].team) || active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG) return [];
     const strength = pairStrengths(open,history);
-    let remaining = SHIFT_GOAL_KG-active.filter(entry => entry.result).reduce((sum,entry) => sum+entry.targetKg,0), free = open, kept;
+    let remaining = SHIFT_GOAL_KG-active.filter(entry => entry.result || entry.raisedAt).reduce((sum,entry) => sum+entry.targetKg,0), free = open.filter(entry => !entry.raisedAt), kept;
     do {
       const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
       kept = free.filter(entry => remaining*strength.get(entry.id).kg/total <= entry.targetKg);
@@ -153,7 +155,7 @@ const PairTargets = (() => {
       free = free.filter(entry => !kept.includes(entry));
     } while(kept.length && free.length);
     const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
-    return free.map(entry => ({...entry, targetKg:Math.ceil(remaining*strength.get(entry.id).kg/total/100)*100, updatedAt:now}))
+    return free.map(entry => ({...entry, targetKg:Math.ceil(remaining*strength.get(entry.id).kg/total/100)*100, updatedAt:now, raisedAt:now}))
       .filter(entry => entry.targetKg > open.find(item => item.id === entry.id).targetKg);
   }
   function validateData(data) {
