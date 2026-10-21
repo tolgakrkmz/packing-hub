@@ -282,8 +282,10 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
               if (!isDeepStrictEqual(JSON.parse(JSON.stringify(cancelled)), entry)) throw new Error();
               continue;
             }
+            const canLowerRaised = can(user, 'canLowerRaisedPairs');
+            if (previous?.raisedAt && entry.raisedAt !== previous.raisedAt && !canLowerRaised) throw new Error();
             if (!previous || planFields.some(field => !same(previous[field], entry[field]))) {
-              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.interval(entry.date,entry.team)?.extraordinary===true});
+              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.interval(entry.date,entry.team)?.extraordinary===true, canLowerRaised});
               if (planFields.some(field => !same(planned[field], entry[field]))) throw new Error();
             }
             if (previous?.result && !entry.result) throw new Error();
@@ -331,6 +333,9 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
         const source = db.prepare('SELECT before_data,after_data FROM report_history WHERE kind=? AND entry_id=? AND version=?').get(kind,input.entryId,input.sourceVersion);
         if (!source) throw problem(404, 'NOT_FOUND');
         restored = JSON.parse(source.after_data || source.before_data);
+        // Restoring an older snapshot must not undo a raise: the targets may not fall below the last state before deletion.
+        const last = kind === 'pair-targets' && JSON.parse(db.prepare('SELECT before_data FROM report_history WHERE kind=? AND entry_id=? ORDER BY version DESC LIMIT 1').get(kind,input.entryId)?.before_data || 'null');
+        if (last?.raisedAt && !can(user, 'canLowerRaisedPairs') && (!restored.raisedAt || restored.targetKg < last.targetKg || restored.targetCrates < last.targetCrates)) throw problem(403, 'FORBIDDEN');
         if (kind === 'pair-targets' && !restored.cancellation && current.data.entries.some(item => !item.cancellation && pairModel.inScope(item,restored) && item.members.some(person => restored.members.some(member => member.id === person.id)))) throw problem(409,'REPORT_CONFLICT');
       }
       const entries = input.action === 'restore' ? [...current.data.entries, restored] : input.action === 'create' ? [...current.data.entries, input.entry] : input.action === 'delete' ? current.data.entries.filter(item => item.id !== input.entryId) : current.data.entries.map(item => item.id === input.entryId ? input.entry : item);

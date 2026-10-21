@@ -9,7 +9,7 @@
     {title: 'Край на смяната', module: 'shift-closeout', view: 'canViewShiftCloseout', flags: {canViewShiftCloseout: 'Преглед на липсващите отчети за смяната'}},
     {title: 'Производство', module: 'production-log', view: 'canViewProduction', flags: {canViewProduction: 'Преглед на производството', canCreateProduction: 'Добавяне на производствени отчети', canEditProduction: 'Корекции и изтриване в производството', canManageProductionSettings: 'Промяна на производствената цел'}},
     {title: 'Престои', module: 'line-downtime', view: 'canViewDowntime', flags: {canViewDowntime: 'Преглед на престоите', canCreateDowntime: 'Добавяне на престои', canEditDowntime: 'Корекции и изтриване на престои', canManageDowntimeSettings: 'Управление на причините за престой'}},
-    {title: 'Двойки', module: 'pair-targets', view: 'canViewPairs', flags: {canViewPairs: 'Преглед на двойките', canCreatePairs: 'Планиране и първи отчет на двойки', canEditPairs: 'Корекции на отчетени двойки'}},
+    {title: 'Двойки', module: 'pair-targets', view: 'canViewPairs', flags: {canViewPairs: 'Преглед на двойките', canCreatePairs: 'Планиране и първи отчет на двойки', canEditPairs: 'Корекции на отчетени двойки', canLowerRaisedPairs: 'Намаляване на таргети след „Повиши таргетите“'}},
     {title: 'Персонал', module: 'personnel', view: 'canViewPersonnel', flags: {canViewPersonnel: 'Преглед на персонала', canManagePersonnel: 'Управление на персонала'}},
     {title: 'Инструкции', module: 'package-instructions', view: 'canViewInstructions', flags: {canViewInstructions: 'Преглед на инструкциите', canManageInstructions: 'Управление на инструкции и приложения'}},
     {title: 'Статистика', module: 'statistics', view: 'canViewStatistics', flags: {canViewStatistics: 'Преглед на статистиката'}},

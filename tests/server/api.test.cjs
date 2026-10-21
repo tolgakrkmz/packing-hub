@@ -273,6 +273,20 @@ test('pair writes enforce the active packer roster and preserve reported plans w
   const corrector = await login('demo-operator');
   assert.equal((await put('pair-targets', {...data, entries: [{...entry, result: {...entry.result, kg: 1200, crates: 48}}]}, 3, corrector)).status, 200);
 });
+test('raised pair targets cannot be lowered unless the account has the explicit right', async t => {
+  const {request, login} = await setup(t,':memory:','СТИКЕРИ'); const admin = await login(), operator = await login('demo-operator');
+  const put = (data, revision, user = operator) => request('/api/data/pair-targets', user, {method: 'PUT', data:{data,reason:'Fictional pair correction'}, headers: {'If-Match': '"' + revision + '"'}});
+  const roster = await (await request('/api/data/personnel', admin)).json();
+  roster.data.employees = [1, 2].map(number => ({id: 'demo-person-' + number, name: 'Demo API Person ' + number, category: 'stickers', team: '1 смяна', role: 'Опаковчик', active: true, note: ''}));
+  assert.equal((await request('/api/data/personnel', admin, {method: 'PUT', data:{data:roster.data}, headers: {'If-Match': '"1"'}})).status, 200);
+  const time = '2026-10-05T05:30:00.000Z';
+  const entry = {id: 'demo-pair-raised', date: '2026-10-05', shiftCode: 1, team: 'СТИКЕРИ', members: roster.data.employees.map(({id, name, category, role}) => ({id, name, category, role})), areas: ['manual'], targetKg: 15000, targetCrates: 40, result: null, createdAt: time, updatedAt: time, raisedAt: time};
+  const data = entries => ({module: 'pair-targets', schemaVersion: 1, entries});
+  assert.equal((await put(data([entry]), 1)).status, 200);
+  for (const change of [{targetKg: 9000}, {targetCrates: 30}, {raisedAt: undefined}]) assert.equal((await put(data([{...entry, ...change}]), 2)).status, 400);
+  assert.equal((await put(data([{...entry, areas: ['auto'], targetKg: 16000}]), 2)).status, 200);
+  assert.equal((await put(data([{...entry, targetKg: 9000}]), 3, admin)).status, 200);
+});
 test('pair cancellation enforces reasons, history, permissions, revision and unchanged plans', async t => {
   const {hub, request, login} = await setup(t,':memory:','СТИКЕРИ');
   const admin = await login(), operator = await login('demo-operator'), observer = await login('demo-observer');

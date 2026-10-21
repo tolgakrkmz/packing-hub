@@ -221,3 +221,20 @@ test('history raises each pair in proportion to its people, keeps higher targets
   assert.deepEqual(plain(model.personAverages(many).get('p7')),{kg:1000,shifts:10});
   assert.equal(model.personAverages([{...many[0],date,shiftCode:1}],{date,shiftCode:1,team}).size,0);
 });
+test('raised targets cannot be lowered without the right, raising and other fields stay open',() => {
+  const [raised] = model.equalize([plan()],'2026-10-04T08:00:00Z');
+  assert.equal(raised.raisedAt,'2026-10-04T08:00:00Z');
+  const data = {...model.emptyData(),entries:[raised]};
+  const edit = overrides => plan({data,existingId:raised.id,targetKg:raised.targetKg,targetCrates:raised.targetCrates,...overrides});
+  assert.deepEqual(plain(edit({memberIds:['1','3'],workAreas:['auto']}).raisedAt),raised.raisedAt);
+  assert.equal(edit({targetKg:raised.targetKg+1,targetCrates:raised.targetCrates+1}).targetKg,raised.targetKg+1);
+  for(const change of [{targetKg:raised.targetKg-1},{targetCrates:raised.targetCrates-1}]) {
+    assert.throws(() => edit(change),/не може да се намалява/);
+    assert.equal(edit({...change,canLowerRaised:true}).raisedAt,raised.raisedAt);
+  }
+  assert.equal(report({kg:'30000'},raised).raisedAt,raised.raisedAt);
+  // A second raise keeps the first raise moment.
+  const other = plan({data,memberIds:['3','4'],id:'pair-2'});
+  const again = model.equalize([{...raised,targetKg:1000},other],'2026-10-04T09:00:00Z');
+  assert.deepEqual(plain(again.map(entry => [entry.id,entry.raisedAt])),[[raised.id,raised.raisedAt],['pair-2','2026-10-04T09:00:00Z']]);
+});

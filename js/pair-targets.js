@@ -196,6 +196,10 @@
       $('targetKg').value = entry.targetKg;
       $('targetCrates').value = entry.targetCrates;
     }
+    // The offline file version has no accounts; on the server only the explicit right may lower a raised target.
+    const floor = mode === 'plan' && entry?.raisedAt && typeof HubServer !== 'undefined' && !HubServer.can('canLowerRaisedPairs');
+    $('targetKg').min = floor ? entry.targetKg : '0.01';
+    $('targetCrates').min = floor ? entry.targetCrates : '1';
     updateMemberOptions();
     $('reasonKey').innerHTML = '<option value="">Изберете причина</option>'+PairTargets.REASONS.filter(reason => reason.key !== 'other').map(reason => `<option value="${reason.key}">${reason.label}</option>`).join('');
     if(mode === 'report') {
@@ -264,7 +268,7 @@
         }
         await rosterSync.refreshFromDisk({fresh:true});
         const entry = edit.original ? JSON.parse(edit.original) : null;
-        const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId,extraordinary:pairAccess?.extraordinary()});
+        const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:edit.newId,extraordinary:pairAccess?.extraordinary(),canLowerRaised:HubServer.can('canLowerRaisedPairs')});
         const reason = entry && (entry.result || edit.mode === 'plan') ? await HubServer.correctionReason() : undefined;
         if(reason === null) return false;
         editing.attempt = {key,operation:{...(reason ? {reason} : {}),operationId:crypto.randomUUID(),action:edit.id ? 'update' : 'create',entryId:next.id,entry:next,...(edit.id ? {version:edit.version} : {})}};
@@ -314,7 +318,7 @@
       if(!edit.id && edit.followLive && !PairTargets.inScope(edit.context,ShiftSchedule.current())) throw new Error('Работната смяна се смени, докато формата беше отворена. Затворете я и създайте двойката за текущата смяна.');
       const entry = data.entries.find(item => item.id === edit.id);
       if(edit.id && (!entry || JSON.stringify(entry) !== edit.original)) throw new Error('Двойката е променена след отваряне на формата. Отворете я отново.');
-      const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,id:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+      const next = edit.mode === 'cancel' ? PairTargets.cancel(entry,{context:edit.context,reasonKey:inputs.cancellationReason,reasonText:inputs.cancellationText,now:inputs.now}) : edit.mode === 'report' ? PairTargets.report(entry,{context:edit.context,...inputs}) : PairTargets.plan({data,employees:personnel.employees,context:edit.context,...inputs,existingId:edit.id,canLowerRaised:true,id:window.crypto?.randomUUID ? window.crypto.randomUUID() : 'pair_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
       return {...data,entries:edit.id ? data.entries.map(item => item.id === edit.id ? next : item) : [...data.entries,next]};
     },$('dialogError'));
     if(saved) { closeDialog(); if(edit.mode === 'plan' && !edit.id) remindGoal(); }
