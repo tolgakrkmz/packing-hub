@@ -1053,7 +1053,6 @@ const HUB_EN_MESSAGES = {
   "Няма въведен тонаж": "No output entered",
   "Няма въведен тонаж:": "No output entered:",
   "Смяната не е приключила": "Shift not finished yet",
-  "Смяна стикери": "Stickers shift",
   "Без таргети на двойки": "No pair targets",
   "; стикери — по таргетите на двойките за деня": "; stickers — by the day's pair targets",
   "при средно": "vs. an average of",

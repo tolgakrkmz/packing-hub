@@ -98,7 +98,7 @@ function renderStatisticsOverview({summary, liveDay, connected}) {
   <div class="ov-grid">
     <div class="wf-card"><div class="wf-card-head"><div><div class="wf-card-title">По смени</div><div class="wf-card-sub">Цел ${tons(StatisticsOverview.SHIFT_GOAL_KG)} т на смяна<span>; стикери — по таргетите на двойките за деня</span>.</div></div>${link('production', 'Производство')}</div>
       <div class="ov-shifts">${summary.shifts.map(shift => {
-        const title = shift.stickers ? `<span>Смяна стикери</span> · ${ShiftSchedule.STICKERS.hours}` : `${shiftLabel(shift.code)} · Екип ${escape(shift.team)}`;
+        const title = shift.stickers ? '<span>СТИКЕРИ</span>' : `${shiftLabel(shift.code)} · Екип ${escape(shift.team)}`;
         if (!shift.goalKg) return `<div class="ov-shift"><div class="ov-shift-head"><b>${title}</b><span>${tons(shift.kg)} т</span></div>
           <div class="ov-shift-note">${shift.reported ? `<span>Без таргети на двойки</span> · брак ${tons(shift.brak)} т` : shift.ended ? 'Няма въведен тонаж' : 'Смяната не е приключила'}</div></div>`;
         const state = shift.reported ? (shift.pct >= 100 ? 'good' : shift.ended ? 'warn' : '') : shift.ended ? 'bad' : '';
