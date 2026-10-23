@@ -58,13 +58,19 @@ test('an empty day has no attention items', () => {
   assert.deepEqual(plain([none.shifts, none.attention, none.kg]), [[], [], 0]);
 });
 
-test('a stickers shift is listed last without a goal or a missing-report alert', () => {
+test('a stickers shift is listed last, its goal is the sum of its pair targets for the day', () => {
   const weekday = '2026-10-05', interval = schedule.shiftInterval('СТИКЕРИ', weekday);
   const quiet = overview.summarize({day:weekday, now:interval.end + 1});
   const stickers = quiet.shifts.at(-1);
   assert.deepEqual(plain([stickers.team, stickers.goalKg, stickers.pct, stickers.reported]), ['СТИКЕРИ', null, null, false]);
   assert.equal(quiet.attention.some(item => item.team === 'СТИКЕРИ'), false);
-  const reported = overview.summarize({day:weekday, production:[{date:weekday, shift:'СТИКЕРИ', tonnage:1500, brak:20}], now:0});
-  assert.deepEqual(plain([reported.shifts.at(-1).kg, reported.kg]), [1500, 1500]);
+  const pairs = [
+    {date:weekday, team:'СТИКЕРИ', shiftCode:1, targetKg:1000, targetCrates:10, result:null},
+    {date:weekday, team:'СТИКЕРИ', shiftCode:1, targetKg:1000, targetCrates:10, result:null},
+    {date:weekday, team:'СТИКЕРИ', shiftCode:1, targetKg:5000, targetCrates:10, result:null, cancellation:{reasonKey:'cleaning'}},
+    {date:'2026-10-06', team:'СТИКЕРИ', shiftCode:1, targetKg:9000, targetCrates:10, result:null}
+  ];
+  const reported = overview.summarize({day:weekday, production:[{date:weekday, shift:'СТИКЕРИ', tonnage:1500, brak:20}], pairs, now:0});
+  assert.deepEqual(plain([reported.shifts.at(-1).kg, reported.shifts.at(-1).goalKg, reported.shifts.at(-1).pct, reported.kg]), [1500, 2000, 75, 1500]);
   assert.equal(overview.summarize({day}).shifts.some(shift => shift.stickers), false);
 });
