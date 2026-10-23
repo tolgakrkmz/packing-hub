@@ -24,12 +24,13 @@ const StatisticsOverview = (() => {
 
   function summarize({day, production = [], downtime = [], pairs = [], now = Date.now()}) {
     const rows = production.filter(entry => entry.date === day);
-    const shifts = ShiftSchedule.TEAMS.map(team => {
+    // The stickers shift has no tonnage goal and is listed last, after the rotating teams.
+    const shifts = [...ShiftSchedule.TEAMS, ShiftSchedule.STICKERS.team].map(team => {
       const interval = shiftInterval(team, day), records = rows.filter(entry => entry.shift === team);
-      const kg = sum(records, 'tonnage');
-      return {team, code:interval?.code ?? null, kg, brak:sum(records, 'brak'), reported:records.length > 0,
-        ended:!!interval && now >= interval.end, goalKg:SHIFT_GOAL_KG, pct:kg / SHIFT_GOAL_KG * 100};
-    }).filter(shift => shift.code !== null || shift.reported).sort((a, b) => (a.code ?? 9) - (b.code ?? 9));
+      const kg = sum(records, 'tonnage'), stickers = team === ShiftSchedule.STICKERS.team;
+      return {team, stickers, code:interval?.code ?? null, kg, brak:sum(records, 'brak'), reported:records.length > 0,
+        ended:!!interval && now >= interval.end, goalKg:stickers ? null : SHIFT_GOAL_KG, pct:stickers ? null : kg / SHIFT_GOAL_KG * 100};
+    }).filter(shift => shift.code !== null || shift.reported).sort((a, b) => a.stickers - b.stickers || (a.code ?? 9) - (b.code ?? 9));
 
     const dayPairs = pairs.filter(entry => entry.date === day && !entry.cancellation);
     const pairCounts = {planned:dayPairs.length, achieved:0, missed:0, pending:0, overdue:0};
@@ -47,7 +48,7 @@ const StatisticsOverview = (() => {
 
     const dayScrap = scrapPct(rows), monthScrap = day ? scrapPct(production.filter(entry => entry.date?.startsWith(day.slice(0, 7) + '-'))) : null;
     const attention = [
-      ...shifts.filter(shift => shift.ended && !shift.reported).map(shift => ({type:'missingShift', team:shift.team, code:shift.code})),
+      ...shifts.filter(shift => !shift.stickers && shift.ended && !shift.reported).map(shift => ({type:'missingShift', team:shift.team, code:shift.code})),
       ...(pairCounts.overdue ? [{type:'overduePairs', count:pairCounts.overdue}] : []),
       ...(dayScrap !== null && monthScrap > 0 && dayScrap > monthScrap * HIGH_SCRAP_FACTOR ? [{type:'highScrap', pct:dayScrap, average:monthScrap}] : []),
       ...stops.filter(stop => Number(stop.durationMin) >= LONG_DOWNTIME_MIN).map(stop => ({type:'longDowntime', minutes:Number(stop.durationMin), reason:stop.reason || '—', team:stop.shift}))
@@ -78,7 +79,7 @@ function renderStatisticsOverview({summary, liveDay, connected}) {
   $('overviewStatus').className = 'status-chip ' + (items.some(item => tone[item.type] === 'bad') ? 'bad' : items.length ? 'warn' : 'good');
   $('overviewStatus').textContent = items.length ? `${items.length} за внимание` : 'Всичко е наред';
   const card = (label, value, sub, cls = '') => `<div class="wf-kpi ${cls}"><div class="lab">${label}</div><div class="val">${value}</div><div class="sub">${sub}</div></div>`;
-  const planKg = summary.shifts.filter(shift => shift.code !== null).length * StatisticsOverview.SHIFT_GOAL_KG;
+  const planKg = summary.shifts.filter(shift => shift.goalKg && shift.code !== null).length * StatisticsOverview.SHIFT_GOAL_KG;
   const pairs = summary.pairs, down = summary.downtime;
   const gap = $('wfGap')?.textContent || '—', gapTone = ['good', 'warn', 'bad'].find(tone => $('wfGapKpi')?.classList.contains(tone)) || '';
   const text = item => item.type === 'missingShift' ? [`Няма въведен тонаж: ${shiftLabel(item.code)} · Екип ${escape(item.team)}`, 'production', 'Производство']
@@ -95,6 +96,8 @@ function renderStatisticsOverview({summary, liveDay, connected}) {
   <div class="ov-grid">
     <div class="wf-card"><div class="wf-card-head"><div><div class="wf-card-title">По смени</div><div class="wf-card-sub">Цел ${tons(StatisticsOverview.SHIFT_GOAL_KG)} т на смяна.</div></div>${link('production', 'Производство')}</div>
       <div class="ov-shifts">${summary.shifts.map(shift => {
+        if (shift.stickers) return `<div class="ov-shift"><div class="ov-shift-head"><b><span>Смяна стикери</span> · ${ShiftSchedule.STICKERS.hours}</b><span>${tons(shift.kg)} т</span></div>
+          <div class="ov-shift-note">${shift.reported ? `<span>Без цел за тонаж</span> · брак ${tons(shift.brak)} т` : shift.ended ? 'Няма въведен тонаж' : 'Смяната не е приключила'}</div></div>`;
         const state = shift.reported ? (shift.pct >= 100 ? 'good' : shift.ended ? 'warn' : '') : shift.ended ? 'bad' : '';
         const note = shift.reported ? `${pct(shift.pct)} от целта · брак ${tons(shift.brak)} т` : shift.ended ? 'Няма въведен тонаж' : 'Смяната не е приключила';
         return `<div class="ov-shift ${state}"><div class="ov-shift-head"><b>${shiftLabel(shift.code)} · Екип ${escape(shift.team)}</b><span>${tons(shift.kg)} / ${tons(shift.goalKg)} т</span></div>
