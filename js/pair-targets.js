@@ -160,7 +160,23 @@
     const one = $('memberOne'), two = $('memberTwo');
     Array.from(one.options).forEach(option => { option.disabled = !!option.value && option.value === two.value; });
     Array.from(two.options).forEach(option => { option.disabled = !!option.value && option.value === one.value; });
+    updateRecommendation();
   }
+  // Only a new pair gets a suggestion; a typed target is never overwritten, only the previous suggestion is.
+  function updateRecommendation() {
+    const ids = [$('memberOne').value,$('memberTwo').value];
+    const rec = editing?.mode === 'plan' && !editing.id && ids[0] && ids[1] && ids[0] !== ids[1] ? PairTargets.recommend(data.entries,editing.context,ids,editing.freeIds,data.entries) : null;
+    $('targetHint').hidden = !rec;
+    if(!rec) return;
+    if(!$('targetKg').value || $('targetKg').value === editing.recommendedKg) $('targetKg').value = String(rec.kg);
+    editing.recommendedKg = String(rec.kg);
+    $('recKg').textContent = fmt(rec.kg);
+    $('recCap').hidden = !rec.capped;
+    $('recBasis').textContent = !rec.averageKg ? 'Двамата нямат история – делът е разделен поравно.' : (rec.known ? 'Двамата правят средно ' : 'Без пълна история · очаквано ')+fmt(rec.averageKg/1000)+' т на смяна'+'. '+(rec.capped ? 'Таргетът е ограничен до постижимото.' : '');
+    $('recPlan').textContent = (rec.remaining === PairTargets.SHIFT_GOAL_KG ? 'Първа двойка · цел на смяната 30 т' : `Остават ${fmt(rec.remaining/1000)} т от 30 т`)+` · очаквани двойки: ${rec.pairsLeft}`;
+    updateRecommendationApply();
+  }
+  function updateRecommendationApply() { if(editing) $('recApply').hidden = $('targetKg').value === editing.recommendedKg; }
   function openDialog(mode, entry = null) {
     if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError || pairAccess&&!pairAccess.canSave(!!entry?.result)) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
@@ -190,6 +206,7 @@
     const options = '<option value="">Изберете човек</option>'+people.map(person => `<option translate="no" value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
     $('memberOne').innerHTML = options;
     $('memberTwo').innerHTML = options;
+    editing.freeIds = people.map(person => person.id);
     if(entry) {
       $('memberOne').value = entry.members[0].id;
       $('memberTwo').value = entry.members[1].id;
@@ -429,6 +446,8 @@
   $('historyDetails').addEventListener('toggle',renderHistory);
   ['memberOne','memberTwo'].forEach(id => $(id).addEventListener('change',updateMemberOptions));
   ['actualKg','actualCrates'].forEach(id => $(id).addEventListener('input',updateResultPreview));
+  $('targetKg').addEventListener('input',updateRecommendationApply);
+  $('recApply').addEventListener('click',() => { $('targetKg').value = editing.recommendedKg; updateRecommendationApply(); });
   $('cancellationReason').addEventListener('change',() => { $('cancellationText').required = $('cancellationReason').value === 'other'; });
   $('closeDialogBtn').addEventListener('click',closeDialog);
   $('cancelDialogBtn').addEventListener('click',closeDialog);

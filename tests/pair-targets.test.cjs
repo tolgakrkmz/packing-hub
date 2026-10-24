@@ -238,3 +238,16 @@ test('raised targets cannot be lowered without the right, raising and other fiel
   const again = model.equalize([{...raised,targetKg:1000},other],'2026-10-04T09:00:00Z');
   assert.deepEqual(plain(again.map(entry => [entry.id,entry.raisedAt])),[[raised.id,raised.raisedAt],['pair-2','2026-10-04T09:00:00Z']]);
 });
+test('recommendation aims at 30 t but stays within 15% of what the pair usually makes',() => {
+  const shift = (ids,kg) => ({id:'h'+ids+kg,date:'2026-09-01',shiftCode:1,team,members:ids.map(id => ({id})),targetKg:1,result:{kg,reasonKey:''}});
+  const free = ['p1','p2','p3','p4'], ctx = {date,shiftCode:1,team};
+  // Slow people: the 30 t share (17 143 kg) is out of reach, so the target stops at 8000 × 1.15.
+  assert.deepEqual(plain(model.recommend([],ctx,['p1','p2'],free,[shift(['p1','p2'],8000),shift(['p3','p4'],4000)])),{kg:9200,averageKg:8000,capped:true,remaining:30000,pairsLeft:2,known:true});
+  // Fast people get their share of 30 t: 30000 × 40000 / (40000 + 2 × 11000).
+  assert.equal(model.recommend([],ctx,['p1','p2'],free,[shift(['p1','p2'],40000),shift(['p3','p4'],4000)]).kg,19400);
+  // Without any history the rest is split evenly over the pairs still to come.
+  assert.deepEqual(plain(model.recommend([],ctx,['p1','p2'],free,[])),{kg:15000,averageKg:0,capped:false,remaining:30000,pairsLeft:2,known:false});
+  const full = {id:'x',...ctx,members:[{id:'p9'}],targetKg:30000,result:null};
+  assert.equal(model.recommend([full],ctx,['p1','p2'],free,[]),null);
+  assert.equal(model.recommend([],{...ctx,team:'СТИКЕРИ'},['p1','p2'],free,[]),null);
+});

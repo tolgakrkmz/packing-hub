@@ -158,6 +158,23 @@ const PairTargets = (() => {
     return free.map(entry => ({...entry, targetKg:Math.ceil(remaining*strength.get(entry.id).kg/total/100)*100, updatedAt:now, raisedAt:entry.raisedAt || now}))
       .filter(entry => entry.targetKg > open.find(item => item.id === entry.id).targetKg);
   }
+  // shortcut: fixed 15% stretch over a pair's average; tune it once there is enough real history.
+  const STRETCH = 1.15;
+  // Suggests a new pair's kg target: its share of what is left of 30 t, but never more than 15% above what the two usually make,
+  // so slow days get a reachable target instead of an impossible one. freeIds (people still without a pair, these two included)
+  // estimate how many pairs are still coming.
+  function recommend(entries, context, memberIds, freeIds, history) {
+    if(!hasShiftGoal(context.team)) return null;
+    const remaining = SHIFT_GOAL_KG-entries.filter(entry => !entry.cancellation && inScope(entry,context)).reduce((sum,entry) => sum+entry.targetKg,0);
+    if(remaining <= 0) return null;
+    const averages = personAverages(history,context), known = freeIds.map(id => averages.get(id)?.kg).filter(kg => kg > 0);
+    const person = known.length ? known.reduce((sum,kg) => sum+kg,0)/known.length : 0;
+    const strength = memberIds.reduce((sum,id) => sum+(averages.get(id)?.kg > 0 ? averages.get(id).kg : person),0);
+    const pairsLeft = Math.max(1,Math.floor(freeIds.length/2));
+    const share = strength ? remaining*strength/(strength+(pairsLeft-1)*2*person) : remaining/pairsLeft;
+    const capped = strength > 0 && share > strength*STRETCH;
+    return {kg:Math.max(100,Math.round((capped ? strength*STRETCH : share)/100)*100), averageKg:strength, capped, remaining, pairsLeft, known:memberIds.every(id => averages.get(id)?.kg > 0)};
+  }
   function validateData(data) {
     if(!data || data.module !== 'pair-targets' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) {
       throw new Error('Изберете pair-targets.json. Този файл не съдържа двойки и таргети.');
@@ -194,5 +211,5 @@ const PairTargets = (() => {
     });
     return data;
   }
-  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, HISTORY_SHIFTS, hasShiftGoal, pairNorm, personAverages, pairStrengths, equalize};
+  return {TEAMS, REASONS, CANCELLATION_REASONS, emptyData, scopeKey, inScope, roster, status, plan, report, cancel, validateData, SHIFT_GOAL_KG, HISTORY_SHIFTS, hasShiftGoal, pairNorm, personAverages, pairStrengths, equalize, STRETCH, recommend};
 })();
