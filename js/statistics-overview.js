@@ -13,12 +13,12 @@ const StatisticsOverview = (() => {
     const calendar = ShiftSchedule.sofiaDate(new Date(at));
     return at < ShiftSchedule.sofiaInstant(calendar, 6) ? ShiftSchedule.addDays(calendar, -1) : calendar;
   }
-  // Current month: like the report form, until 10:00 the previous day stays in view (the night shift reports until then).
+  // Current month: the previous day stays in view until today has its first tonnage report, so the page never shows an empty day.
   // Other months: the last reported day of that month.
-  // shortcut: on the 1st before 10:00 the previous day is in last month, which the server may not have sent; load it if that matters.
+  // shortcut: on the 1st before its first report the previous day is in last month, which the server may not have sent; load it if that matters.
   function pickDay(period, production, at = Date.now()) {
     const calendar = ShiftSchedule.sofiaDate(new Date(at));
-    if (calendar.startsWith(period + '-')) return at < ShiftSchedule.sofiaInstant(calendar, 10) ? ShiftSchedule.addDays(calendar, -1) : calendar;
+    if (calendar.startsWith(period + '-')) return production.some(entry => entry.date === calendar) ? calendar : ShiftSchedule.addDays(calendar, -1);
     return production.map(entry => entry.date).filter(date => date?.startsWith(period + '-')).sort().at(-1) || null;
   }
 

@@ -11,7 +11,7 @@ const day = '2026-10-04';
 const teams = schedule.TEAMS.filter(team => schedule.shiftInterval(team, day));
 const end = team => schedule.shiftInterval(team, day).end;
 
-test('the production day starts at 06:00 and the previous day stays in view until 10:00', () => {
+test('the production day starts at 06:00 and the previous day stays in view until today has a report', () => {
   const at = (date, hour, minute = 0) => schedule.sofiaInstant(date, hour, minute);
   assert.equal(overview.productionDay(at('2026-10-19', 5, 59)), '2026-10-18');
   assert.equal(overview.productionDay(at('2026-10-19', 6)), '2026-10-19');
@@ -19,7 +19,8 @@ test('the production day starts at 06:00 and the previous day stays in view unti
   assert.equal(overview.pickDay('2026-10', production, at('2026-10-19', 2)), '2026-10-18');
   assert.equal(overview.pickDay('2026-10', production, at('2026-10-19', 6, 28)), '2026-10-18');
   assert.equal(overview.pickDay('2026-10', production, at('2026-10-19', 9, 59)), '2026-10-18');
-  assert.equal(overview.pickDay('2026-10', production, at('2026-10-19', 10)), '2026-10-19');
+  assert.equal(overview.pickDay('2026-10', production, at('2026-10-19', 15)), '2026-10-18');
+  assert.equal(overview.pickDay('2026-10', [...production, {date:'2026-10-19'}], at('2026-10-19', 9)), '2026-10-19');
   assert.equal(overview.pickDay('2026-09', production, at('2026-10-19', 9)), '2026-09-28');
   assert.equal(overview.pickDay('2026-08', production, at('2026-10-19', 9)), null);
 });
