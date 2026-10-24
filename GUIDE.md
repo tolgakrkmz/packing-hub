@@ -2534,6 +2534,11 @@ marks retained values stale. Pair results never replace or add to tonnage.
 If an explicit pair link is invalid, selecting a valid date/shift, Current shift
 or a history record discards the rejected link context and restores reporting.
 
+A separate start reminder (`shiftPairsMissing`) goes once per shift to the
+team's supervisor when no pair, not even a cancelled one, exists 15 minutes
+after the start. It does not catch up after the shift ends. Administrators
+receive it only when it is explicitly granted in Accounts.
+
 Reminder activation and per-recipient phase state are stored additively in the
 existing notification-state table. Deploy the server and client together;
 existing production, pair and personnel documents need no conversion. The

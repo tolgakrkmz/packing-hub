@@ -88,7 +88,7 @@ function createNotifications(store, {now = Date.now, push = {}, taskNow = now} =
         if(!can(user,'canViewShiftCloseout') || user.role!=='admin' && !user.taskSupervisor)continue;
         for(const candidate of closeout.reminderCandidates(at,user)) {
           if(candidate.dueAt<Number(state('closeout:activation')))continue;
-          const type=candidate.phase==='due'?'shiftCloseoutDue':'shiftCloseoutOverdue';
+          const type={start:'shiftPairsMissing',due:'shiftCloseoutDue',overdue:'shiftCloseoutOverdue'}[candidate.phase];
           const key='closeout:'+candidate.target+':'+candidate.phase+':'+user.id;
           if(state(key)!==undefined || !enabled(user,type))continue;
           emit(type,key,[user],candidate.target);

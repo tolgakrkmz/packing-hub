@@ -75,6 +75,11 @@ function createShiftCloseout(store,{now=Date.now}={}) {
     for(const offset of [-2,-1,0])for(const team of teams) {
       const date=schedule.addDays(today,offset), interval=intervalFor(team,date);
       if(!interval)continue;
+      // One reminder per shift when no pair, not even a cancelled one, exists 15 minutes after the start.
+      if(at>=interval.start+15*MINUTE && at<interval.end) {
+        const scope={date,team,shiftCode:interval.code}, value=read(scope,user);
+        if(value.pairs?.planned===0)candidates.push({scope,phase:'start',dueAt:interval.start+15*MINUTE,target:[date,team,interval.code].join('/')});
+      }
       const phase=at>=interval.end-10*MINUTE && at<interval.end?'due':at>=interval.end+10*MINUTE && at<=interval.end+24*60*MINUTE?'overdue':null;
       if(!phase)continue;
       const scope={date,team,shiftCode:interval.code}, value=read(scope,user);
