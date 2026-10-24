@@ -31,7 +31,7 @@ const problemItems = [
   {title:'Fictional resolved later', impactLevel:'low', createdAt:at('2026-09-01'), resolvedAt:at('2026-10-02'), proposals:[]}];
 const period = {start:Date.parse('2026-09-01T00:00:00Z'), end:Date.parse('2026-10-01T00:00:00Z'), now:Date.parse('2026-10-20T00:00:00Z')};
 const counts = {auto:{А:4, Б:3, В:0, Г:2}, manual:{А:2, Б:2, В:0, Г:1}, production:{А:6, Б:5, В:0, Г:3}, autoTotal:9, manualTotal:5, productionTotal:14, stickers:3, additional:1, totalActive:17};
-const pairTeams = [{team:'А', reported:4, achieved:3, successPct:75, kgPct:96.4}, {team:'Б', reported:2, achieved:1, successPct:50, kgPct:88}];
+const pairTeams = [{team:'А', reported:4, achieved:3, successPct:75, kgPct:96.4}, {team:'Б', reported:2, achieved:1, successPct:50, kgPct:88}, {team:'СТИКЕРИ', reported:2, achieved:2, successPct:100, kgPct:104.2}];
 const taskItems = [
   {due:at('2026-09-03'), status:'completed', report:{late:false}}, {due:at('2026-09-04'), status:'completed', report:{late:true}},
   {due:at('2026-09-05'), status:'not-done'}, {due:at('2026-09-06'), status:'pending', displayStatus:'unreported'}, {due:at('2026-09-29'), status:'in-progress'},
@@ -55,7 +55,7 @@ test('performance: goal, change against last month, team pairs and tasks due in 
     ['Manual packing', '1,000 t', '1,100 t', '-9.1%', 'down', false], ['Stickers', '100.4 t', '0.0 t', '—', 'flat', null],
     ['Scrap', '20.0 t', '0.0 t', '—', 'flat', null], ['Downtime', '216 h', '10 h', '+2060.0%', 'up', false]]);
   assert.deepEqual(plain(v.teams), [{team:'Team A', packedT:'1,100', pairs:'4', met:'75%', kg:'96%'}, {team:'Team B', packedT:'700', pairs:'2', met:'50%', kg:'88%'},
-    {team:'Team C', packedT:'0', pairs:'0', met:'—', kg:'—'}, {team:'Team D', packedT:'0', pairs:'0', met:'—', kg:'—'}]);
+    {team:'Team C', packedT:'0', pairs:'0', met:'—', kg:'—'}, {team:'Team D', packedT:'0', pairs:'0', met:'—', kg:'—'}, {team:'Stickers', packedT:'100', pairs:'2', met:'100%', kg:'104%'}]);
   assert.deepEqual(plain(v.tasks), {total:5, completed:2, late:1, notDone:2, open:1, onTime:'20%'});
   assert.equal(september({taskItems:null}).tasks, null);
 });
@@ -71,11 +71,11 @@ test('problems show the month-end state: counts, impact and the longest open, wi
   assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
 });
 
-test('workforce compares team headcount with the team packed tonnage', () => {
+test('workforce counts stickers in the staff and the packed tonnage, like Statistics', () => {
   const f = september().workforce;
-  assert.deepEqual([f.active, f.auto, f.manual, f.stickers, f.perPersonT], ['17', '9', '5', '3', '128.6']);
+  assert.deepEqual([f.active, f.auto, f.manual, f.stickers, f.staff, f.packedT, f.perPersonT], ['17', '9', '5', '3', '17', '1,900', '111.8']);
   assert.deepEqual(plain(f.teams.map(row => [row.team, row.people, row.packedT, row.perPersonT, row.perPerson])),
-    [['Team A', 6, '1,100', '183.3', 183.3], ['Team B', 5, '700', '140.0', 140], ['Team C', 0, '0', '—', 0], ['Team D', 3, '0', '0.0', 0]]);
+    [['Team A', 6, '1,100', '183.3', 183.3], ['Team B', 5, '700', '140.0', 140], ['Team C', 0, '0', '—', 0], ['Team D', 3, '0', '0.0', 0], ['Stickers', 3, '100', '33.5', 33.5]]);
   assert.equal(presentation.values({month:'2026-09', production, downtime}).workforce, null);
 });
 
@@ -118,13 +118,13 @@ test('the deck has nine designed slides with the figures, native charts and edit
   assert.equal(files['ppt/slides/slide10.xml'], undefined);
   has(0, ['Packaging and Logistics Sector', 'September 2026', 'Prepared 02.10.2026']);
   has(1, ['1,900 t', '30 pcs', '450,000 pcs', '1,800 t', '81.8 t/day', 'Daily averages: packing totals ÷ 30 calendar days  |  dispatch ÷ 22 Mon–Fri working days']);
-  has(2, ['Month Performance', '95%', '1,900 t of 2,000 t goal', '100 t below goal', '▼ -5.0%', 'Team A', '75%', '96%', '20% on time', '2 (1 late)']);
+  has(2, ['Month Performance', '95%', '1,900 t of 2,000 t goal', '100 t below goal', '▼ -5.0%', 'Team A', '75%', '96%', 'TEAMS A–D AND STICKERS', '104%', '20% on time', '2 (1 late)']);
   has(3, ['Fictional line', '100 t', '280 t', '56% of the total difference · 500 − 100 − 120 = 280 t']);
   has(4, ['800 t', '1,000 t', '100.4 t', 'AL share 42.1%', 'PACKING MIX – JULY TO SEPTEMBER']);
   has(5, ['70.0%', '40.0%', '28.0%', '216 h', 'Fictional material wait', '36 h of downtime in 2 stops.']);
   has(6, ['Fictional count', 'Stock checked twice.', 'Fictional scanners', 'Add an improvement', '6 trucks/day', '+2 trucks/day', '+33.3%']);
   has(7, ['Global Problems', '3', '2 open · 1 with a proposed solution', 'Fictional old high', '91 days · Solution proposed', '8 / 9']);
-  has(8, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—']);
+  has(8, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—', 'Stickers', '33.5', 'Headcount is the current roster. Staff 17 (automatic + manual + stickers) packed 1,900 t: 111.8 t per person.']);
   const charts = Object.keys(files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map(name => files[name]);
   assert.equal(charts.length, 3);
   assert.ok(charts.some(xml => xml.includes('<c:grouping val="stacked"/>') && xml.includes('<c:v>100.4</c:v>')));

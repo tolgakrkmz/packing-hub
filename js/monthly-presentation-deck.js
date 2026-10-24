@@ -108,11 +108,11 @@ const MonthlyPresentationDeck = (() => {
         cell(`${row.trend === 'up' ? '▲ ' : row.trend === 'down' ? '▼ ' : ''}${row.change}`, {align:'right', bold:true, color:row.good === null ? C.muted : row.good ? C.teal : C.coral})])],
       tableOptions(2.4, [2.4, 1.8, 1.8, 1.48]));
     box(slide, M, 4.68, w, 2.14);
-    label(slide, 'Teams A–D', M + 0.25, 4.83, w - 0.5);
+    label(slide, 'Teams A–D and Stickers', M + 0.25, 4.83, w - 0.5);
     slide.addTable([[head('Team', 'left'), head('Packed'), head('Pairs reported'), head('Pair targets met'), head('Kg vs target')],
       ...v.teams.map(row => [cell(row.team, {bold:true}), cell(row.packedT + ' t', {align:'right'}), cell(row.pairs, {align:'right'}),
         cell(row.met, {align:'right', bold:true, color:C.amber}), cell(row.kg, {align:'right'})])],
-      {...tableOptions(5.15, [1.5, 1.5, 1.5, 1.6, 1.38]), x:M + 0.25, w:w - 0.5, rowH:0.29});
+      {...tableOptions(5.12, [1.5, 1.5, 1.5, 1.6, 1.38]), x:M + 0.25, w:w - 0.5, rowH:0.26});
     const tx = M + w + GAP, tw = RIGHT - tx, t = v.tasks;
     box(slide, tx, 4.68, tw, 2.14);
     label(slide, 'Tasks due this month', tx + 0.25, 4.83, tw - 0.5);
@@ -257,21 +257,21 @@ const MonthlyPresentationDeck = (() => {
   }
 
   function people(pptx, v) {
-    const slide = frame(pptx, v, 9, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team · for information`), f = v.workforce;
+    const slide = frame(pptx, v, 9, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team and the stickers shift · for information`), f = v.workforce;
     if (!f) return unavailable(slide, 'The personnel list was not available when the presentation was created.');
     const cols = columns(4);
     [['Active people', f.active, C.amber], ['Automatic line', f.auto, C.teal], ['Manual packing', f.manual, C.blue], ['Stickers', f.stickers, C.pink]]
       .forEach(([title, value, color], i) => card(slide, {...cols[i], y:1.95, h:1.45, title, value, unit:'people', color, size:26}));
     const leftW = 7.4, x = M + leftW + GAP, w = RIGHT - x, head = {bold:true, color:C.muted, fontSize:10};
     box(slide, M, 3.62, leftW, 3.18);
-    label(slide, 'Teams', M + 0.25, 3.79, leftW - 0.5);
+    label(slide, 'Teams and Stickers', M + 0.25, 3.79, leftW - 0.5);
     const cell = (value, options = {}) => ({text:String(value), options:{fontFace:FONT, fontSize:12, color:C.text, valign:'middle', ...options}});
     slide.addTable([
       ['Team', 'People', 'Automatic', 'Manual', 'Packed', 't / person'].map((value, i) => cell(value, {...head, align:i ? 'right' : 'left'})),
       ...f.teams.map(row => [cell(row.team, {bold:true}), cell(row.people, {align:'right'}), cell(row.auto, {align:'right', color:C.teal}), cell(row.manual, {align:'right', color:C.blue}),
         cell(row.packedT + ' t', {align:'right'}), cell(row.perPersonT, {align:'right', bold:true, color:C.amber})])
-    ], {x:M + 0.25, y:4.15, w:leftW - 0.5, colW:[1.5, 1.0, 1.1, 1.0, 1.35, 0.95], rowH:0.45, border:{type:'solid', color:C.border, pt:0.5}, fill:{color:C.panel}, margin:0.05});
-    text(slide, `Headcount is today's roster. All teams: ${f.perPersonT} t per person. Stickers are counted separately.`,
+    ], {x:M + 0.25, y:4.15, w:leftW - 0.5, colW:[1.5, 1.0, 1.1, 1.0, 1.35, 0.95], rowH:0.37, border:{type:'solid', color:C.border, pt:0.5}, fill:{color:C.panel}, margin:0.05});
+    text(slide, `Headcount is the current roster. Staff ${f.staff} (automatic + manual + stickers) packed ${f.packedT} t: ${f.perPersonT} t per person.`,
       M + 0.25, 6.45, leftW - 0.5, 0.3, {fontSize:9, color:C.muted});
     box(slide, x, 3.62, w, 3.18);
     label(slide, 'Packed tonnage per person', x + 0.25, 3.79, w - 0.5);
