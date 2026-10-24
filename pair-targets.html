@@ -84,8 +84,14 @@
     <div id="planFields" class="form-grid">
       <label>Първи човек<select id="memberOne"></select></label>
       <label>Втори човек<select id="memberTwo"></select></label>
-      <label>Таргет · кг<input id="targetKg" type="number" min="0.01" step="0.01" inputmode="decimal" aria-describedby="targetHint"><small id="targetHint" class="muted" aria-live="polite"></small></label>
+      <label>Таргет · кг<input id="targetKg" type="number" min="0.01" step="0.01" inputmode="decimal" aria-describedby="targetHint"></label>
       <label>Таргет · каси<input id="targetCrates" type="number" min="1" step="1" inputmode="numeric"></label>
+      <div id="targetHint" class="recommendation" aria-live="polite" hidden>
+        <div class="rec-head"><span class="eyebrow">Препоръчан таргет</span><span id="recCap" class="badge pending" hidden>Таван: средно +15%</span></div>
+        <div class="rec-main"><strong><span id="recKg"></span> кг</strong><button type="button" id="recApply" hidden>Приложи</button></div>
+        <p id="recBasis"></p>
+        <p id="recPlan" class="muted"></p>
+      </div>
     </div>
     <div id="reportFields">
       <p id="reportTargets" class="target-note"></p>

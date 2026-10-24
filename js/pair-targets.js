@@ -164,14 +164,19 @@
   }
   // Only a new pair gets a suggestion; a typed target is never overwritten, only the previous suggestion is.
   function updateRecommendation() {
-    const hint = $('targetHint'), ids = [$('memberOne').value,$('memberTwo').value];
-    hint.textContent = '';
-    if(editing?.mode !== 'plan' || editing.id || !ids[0] || !ids[1] || ids[0] === ids[1]) return;
-    const rec = PairTargets.recommend(data.entries,editing.context,ids,editing.freeIds,data.entries);
+    const ids = [$('memberOne').value,$('memberTwo').value];
+    const rec = editing?.mode === 'plan' && !editing.id && ids[0] && ids[1] && ids[0] !== ids[1] ? PairTargets.recommend(data.entries,editing.context,ids,editing.freeIds,data.entries) : null;
+    $('targetHint').hidden = !rec;
     if(!rec) return;
-    if(!$('targetKg').value || $('targetKg').value === editing.recommendedKg) $('targetKg').value = editing.recommendedKg = String(rec.kg);
-    hint.textContent = `Препоръка: ${fmt(rec.kg)} кг · `+(!rec.averageKg ? 'без история' : (rec.known ? 'средно ' : 'без пълна история · ')+fmt(rec.averageKg/1000)+' т на смяна'+(rec.capped ? ' · до 15% над средното' : ''));
+    if(!$('targetKg').value || $('targetKg').value === editing.recommendedKg) $('targetKg').value = String(rec.kg);
+    editing.recommendedKg = String(rec.kg);
+    $('recKg').textContent = fmt(rec.kg);
+    $('recCap').hidden = !rec.capped;
+    $('recBasis').textContent = !rec.averageKg ? 'Двамата нямат история – делът е разделен поравно.' : (rec.known ? 'Двамата правят средно ' : 'Без пълна история · очаквано ')+fmt(rec.averageKg/1000)+' т на смяна'+'. '+(rec.capped ? 'Таргетът е ограничен до постижимото.' : '');
+    $('recPlan').textContent = (rec.remaining === PairTargets.SHIFT_GOAL_KG ? 'Първа двойка · цел на смяната 30 т' : `Остават ${fmt(rec.remaining/1000)} т от 30 т`)+` · очаквани двойки: ${rec.pairsLeft}`;
+    updateRecommendationApply();
   }
+  function updateRecommendationApply() { if(editing) $('recApply').hidden = $('targetKg').value === editing.recommendedKg; }
   function openDialog(mode, entry = null) {
     if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError || pairAccess&&!pairAccess.canSave(!!entry?.result)) return;
     if(entry?.cancellation || mode === 'cancel' && entry?.result) return;
@@ -441,6 +446,8 @@
   $('historyDetails').addEventListener('toggle',renderHistory);
   ['memberOne','memberTwo'].forEach(id => $(id).addEventListener('change',updateMemberOptions));
   ['actualKg','actualCrates'].forEach(id => $(id).addEventListener('input',updateResultPreview));
+  $('targetKg').addEventListener('input',updateRecommendationApply);
+  $('recApply').addEventListener('click',() => { $('targetKg').value = editing.recommendedKg; updateRecommendationApply(); });
   $('cancellationReason').addEventListener('change',() => { $('cancellationText').required = $('cancellationReason').value === 'other'; });
   $('closeDialogBtn').addEventListener('click',closeDialog);
   $('cancelDialogBtn').addEventListener('click',closeDialog);

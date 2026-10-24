@@ -173,7 +173,7 @@ const PairTargets = (() => {
     const pairsLeft = Math.max(1,Math.floor(freeIds.length/2));
     const share = strength ? remaining*strength/(strength+(pairsLeft-1)*2*person) : remaining/pairsLeft;
     const capped = strength > 0 && share > strength*STRETCH;
-    return {kg:Math.max(100,Math.round((capped ? strength*STRETCH : share)/100)*100), averageKg:strength, capped, known:memberIds.every(id => averages.get(id)?.kg > 0)};
+    return {kg:Math.max(100,Math.round((capped ? strength*STRETCH : share)/100)*100), averageKg:strength, capped, remaining, pairsLeft, known:memberIds.every(id => averages.get(id)?.kg > 0)};
   }
   function validateData(data) {
     if(!data || data.module !== 'pair-targets' || data.schemaVersion !== 1 || !Array.isArray(data.entries)) {
