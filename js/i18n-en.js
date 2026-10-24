@@ -96,6 +96,8 @@ const HUB_EN_MESSAGES = {
   "Тонажът е задължителен за работната смяна. Резултатите на двойките се проверяват отделно и не се добавят към общия тонаж.": "Production must be reported for each working shift. Pair results are checked separately and are not added to total production.",
   "Задължителен тонаж и двойки без отчет на едно място.": "Required production and unreported pairs in one place.",
   "Преглед на липсващите отчети за смяната": "View missing shift reports",
+  "Невъведени двойки след началото на смяната": "Pairs not entered after shift start",
+  "Смяната започна. Двойките още не са въведени.": "The shift has started. Pairs are not entered yet.",
   "Липсващи отчети преди края на смяната": "Missing reports before shift end",
   "Липсващи отчети след края на смяната": "Missing reports after shift end",
   "Смяната приключва скоро. Проверете липсващите отчети.": "The shift ends soon. Check missing reports.",

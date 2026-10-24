@@ -15,7 +15,7 @@ async function setup(t,{date='2026-10-05',team,code=1,activation}={}) {
   const admin=await auth.create('demo-close-admin','Fictional-password-123','admin');
   const chief=await auth.create('demo-close-chief','Fictional-password-123','operator',admin,{},()=>{},{taskSupervisor:true,taskTeam:team});
   t.after(async()=>{await inbox.close();store.close();fs.rmSync(dir,{recursive:true,force:true});});
-  const notices=()=>store.db.prepare('SELECT * FROM notifications WHERE user_id=? AND target=? ORDER BY at').all(chief.id,target);
+  const notices=(type='shiftCloseout%',user=chief)=>store.db.prepare('SELECT * FROM notifications WHERE user_id=? AND target=? AND type LIKE ? ORDER BY at').all(user.id,target,type);
   const seed=(kind,data)=>store.db.prepare('UPDATE documents SET data=? WHERE kind=?').run(JSON.stringify(data),kind);
   return {interval,target,chief,admin,date,team,code,notices,seed,time:at=>{clock=at;},get inbox(){return inbox;},get auth(){return auth;},get store(){return store;},restart:async()=>{await inbox.close();store.close();reopen();}};
 }
@@ -47,7 +47,7 @@ test('activation and catch-up windows skip old history; pre-end never catches up
   await s.restart();s.inbox.sync();assert.equal(s.notices().length,1);
 });
 test('current team and module rights govern inbox counts; opt-out and inactive users stop reminders',async t=>{
-  const s=await setup(t);s.inbox.updatePreferences({shiftCloseoutDue:false},s.chief);
+  const s=await setup(t);s.inbox.updatePreferences({shiftCloseoutDue:false,shiftPairsMissing:false},s.chief);
   s.time(s.interval.end-600000);s.inbox.sync();assert.equal(s.notices().length,0);
   s.time(s.interval.end+600000);s.inbox.sync();assert.equal(s.inbox.summary(s.chief).count,1);
   let user=await s.auth.update(s.chief.id,{permissions:{canViewProduction:false,canViewPairs:false}},s.admin);
@@ -66,4 +66,17 @@ test('hidden production alone cannot trigger a reminder and explicit closeout de
 for(const options of [{date:'2026-10-24',code:3},{date:'2026-10-05',team:'СТИКЕРИ'}])test('night and Stickers use their actual shift end '+JSON.stringify(options),async t=>{
   const s=await setup(t,options);s.time(s.interval.end-600000);s.inbox.sync();assert.equal(s.notices().length,1);
   s.time(s.interval.end+600000);s.inbox.sync();assert.equal(s.notices().length,2);
+});
+test('missing pairs remind only the shift lead once, from 15 minutes after the start',async t=>{
+  const s=await setup(t), pairs=()=>s.notices('shiftPairsMissing');
+  s.time(s.interval.start+899999);s.inbox.sync();assert.equal(pairs().length,0);
+  s.time(s.interval.start+900000);s.inbox.sync();s.inbox.sync();assert.equal(pairs().length,1);
+  assert.equal(s.notices('shiftPairsMissing',s.admin).length,0);
+  await s.restart();s.time(s.interval.start+3600000);s.inbox.sync();assert.equal(pairs().length,1);
+  const planned=await setup(t);
+  planned.seed('pair-targets',{module:'pair-targets',schemaVersion:1,entries:[{id:'demo-cancel',date:planned.date,team:planned.team,shiftCode:1,members:[],cancellation:{reasonKey:'cleaning',reasonText:''}}]});
+  planned.time(planned.interval.start+900000);planned.inbox.sync();assert.equal(planned.notices('shiftPairsMissing').length,0);
+  const late=await setup(t);late.time(late.interval.end);late.inbox.sync();assert.equal(late.notices('shiftPairsMissing').length,0);
+  const off=await setup(t);off.inbox.updatePreferences({shiftPairsMissing:false},off.chief);
+  off.time(off.interval.start+900000);off.inbox.sync();assert.equal(off.notices('shiftPairsMissing').length,0);
 });

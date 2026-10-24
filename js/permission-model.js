@@ -51,6 +51,8 @@
     if (!explicit('canReportTasks')) result.canReportTasks = user.taskSupervisor === true;
     if (!explicit('canViewShiftCloseout')) result.canViewShiftCloseout = user.role === 'admin' || user.taskSupervisor === true;
     for (const key of ['canReceiveShiftCloseoutDue','canReceiveShiftCloseoutOverdue']) if (!explicit(key)) result[key] = user.role === 'admin' || user.taskSupervisor === true;
+    // Only the shift lead plans pairs, so admins are not reminded unless granted in Accounts.
+    if (!explicit('canReceiveShiftPairsMissing')) result.canReceiveShiftPairsMissing = user.taskSupervisor === true;
     // The wall is for shift leads only; any other account, admins included, needs an explicit grant in Accounts.
     for (const key of ['canViewWall','canPostWall','canReceiveWallPosts']) if (!explicit(key)) result[key] = user.taskSupervisor === true;
     if (!explicit('canRateTeam')) result.canRateTeam = user.taskSupervisor === true;

@@ -5,6 +5,7 @@
   else root.HubNotificationModel = value;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
   const types = {
+    shiftPairsMissing: {flag:'canReceiveShiftPairsMissing', module:'shift-closeout', label:'Невъведени двойки след началото на смяната', text:'Смяната започна. Двойките още не са въведени.', needs:['canViewPairs']},
     shiftCloseoutDue: {flag:'canReceiveShiftCloseoutDue', module:'shift-closeout', label:'Липсващи отчети преди края на смяната', text:'Смяната приключва скоро. Проверете липсващите отчети.'},
     shiftCloseoutOverdue: {flag:'canReceiveShiftCloseoutOverdue', module:'shift-closeout', label:'Липсващи отчети след края на смяната', text:'Смяната приключи. Все още има липсващи отчети.'},
     taskAssigned: {flag: 'canReceiveTaskAssigned', module: 'tasks', label: 'Възложени задачи', text: 'Имате възложена задача.', needs: ['canReportTasks']},
