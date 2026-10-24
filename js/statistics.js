@@ -1,7 +1,7 @@
 let entries = [];
 let avEntries = [];
 let goalTons = 3000;
-let productionSummary = null, downtimeSummary = null;
+let productionSummary = null, downtimeSummary = null, productionLines = null;
 let periodRequest = 0, periodPending = false;
 function retainStatisticsSource(previous, incoming) {
   return JSON.stringify(previous) === JSON.stringify(incoming) ? previous : incoming;
@@ -10,6 +10,7 @@ function acceptProduction(data) {
   entries = retainStatisticsSource(entries,data.entries || []);
   productionSummary = typeof HubServer === 'undefined' ? null : retainStatisticsSource(productionSummary,data.summary || null);
   goalTons = data.goalTons !== undefined ? Number(data.goalTons) || 0 : 3000;
+  productionLines = typeof HubServer === 'undefined' ? null : retainStatisticsSource(productionLines,data.lines || null);
 }
 function acceptDowntime(data) {
   avEntries = retainStatisticsSource(avEntries,data.entries || []);
@@ -367,7 +368,7 @@ function renderAll() {
   const period = `${selectedYear}-${selectedDashboardMonth}`, day = statisticsDay();
   statisticsCache.update('monthly-result', [entries, goalTons, el.connDot.classList.contains('on')], period + '|' + day, renderMonthlyDashboard);
   statisticsCache.update('line-shift-table', [entries], period, renderLineShiftForSelectedMonth);
-  statisticsCache.update('workforce-dashboard', [entries, pairStatistics.getVersion(), personnelEmployees, personnelCounts, personnelLoaded, goalTons], period + '|' + day, renderWorkforceDashboard);
+  statisticsCache.update('workforce-dashboard', [entries, productionLines, pairStatistics.getVersion(), personnelEmployees, personnelCounts, personnelLoaded, goalTons], period + '|' + day, renderWorkforceDashboard);
 
   const annual = currentView === 'month';
   const scope = annual ? selectedYear : 'all';

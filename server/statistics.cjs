@@ -1,5 +1,5 @@
 /* Read-only projections. Cache only the latest document revision in server memory. */
-const {problem} = require('./store.cjs');
+const {problem, lineProductivity} = require('./store.cjs');
 const shifts = ['А','Б','В','Г','СТИКЕРИ'];
 function createStatisticsReads(store) {
   const cache = new Map();
@@ -32,12 +32,21 @@ function createStatisticsReads(store) {
       years:[...years.values()].sort((a,b) => a.key.localeCompare(b.key))}};
     cache.set(kind,result); return result;
   }
+  // Line productivity covers all data, so the client cannot derive it from one month.
+  let lines = null;
+  function linesFor(production) {
+    let pairs = null;
+    try { pairs = snapshot('pair-targets'); } catch (error) { if (error.status !== 404) throw error; }
+    const key = production.revision + '|' + (pairs?.revision ?? '');
+    if (lines?.key !== key) lines = {key, value:lineProductivity.compute(production.data.entries, pairs?.data.entries || [])};
+    return lines.value;
+  }
   function read(kind, month, scope = 'year') {
     if (!['production-log','line-downtime','pair-targets'].includes(kind)) throw problem(404,'NOT_FOUND');
     if (typeof month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !['year','all'].includes(scope)) throw problem(400,'INVALID_PERIOD');
     const current = snapshot(kind);
     const entries = kind === 'line-downtime' ? scope === 'all' ? current.data.entries : current.byYear.get(month.slice(0,4)) || [] : current.byMonth.get(month) || [];
-    const data = kind === 'production-log' ? {entries,goalTons:current.data.goalTons,summary:current.summary}
+    const data = kind === 'production-log' ? {entries,goalTons:current.data.goalTons,summary:current.summary,lines:linesFor(current)}
       : kind === 'line-downtime' ? {entries,summary:current.summary}
       : {module:current.data.module,schemaVersion:current.data.schemaVersion,entries,availableYears:current.summary.availableYears};
     return {revision:current.revision,data};
