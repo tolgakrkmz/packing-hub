@@ -23,7 +23,6 @@
 .stats-empty-month a{display:inline-flex;align-items:center;text-decoration:none;margin-right:8px}
 #statsBreakdownControls .view-toggle{margin-bottom:14px}
 .pair-stats .stats-details>h3,.pair-stats .stats-details>p{margin-left:12px;margin-right:12px}
-.wf-calc .stats-details .wf-calc-note{padding:0 12px 12px}
 @media(max-width:600px){.stats-navigation button{flex:1 1 40%;white-space:normal}.stats-month-filters{width:100%;display:grid;grid-template-columns:1fr 1fr}.stats-month-filters .year-select-row,.stats-month-filters .dashboard-filter{display:grid;gap:6px;width:auto;justify-content:stretch}.stats-month-filters select{width:100%;max-width:none;font-size:12px;padding:8px}.stats-toolbar{flex-wrap:wrap}.month-dashboard .dashboard-top{padding:16px 14px 0}.month-dashboard .dashboard-main{padding:14px;gap:14px}.month-dashboard .pace-strip{margin-left:14px;margin-right:14px;margin-bottom:14px}.month-dashboard .stats-details{margin-left:14px;margin-right:14px}}
 .prod-stats .wf-title{margin:0}
 .prod-stats .chart-wrap{margin:10px 0 0;background:transparent;border:0;padding:0}

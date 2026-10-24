@@ -1,8 +1,8 @@
 /* Statistics: workforce and capacity dashboard. */
 
-/* Workforce capacity assumes three operating shifts per day. Stickers are
- * excluded from production headcount. Historical periods use the current roster
- * because dated roster snapshots are not available. */
+/* Linear model: tonnage per person per calendar day × staff × days in the month.
+ * Staff is auto + manual + stickers, and the stickers shift tonnage counts too.
+ * Historical periods use the current roster because dated roster snapshots are not available. */
 
 function getPersonnelSnapshot() {
   return statisticsCache.get('personnel-counts', [personnelEmployees, personnelCounts, personnelLoaded], ShiftSchedule.sofiaDate(), calculatePersonnelSnapshot);
@@ -46,178 +46,66 @@ function calculateWorkforceMonth(counts) {
   const year = Number(selectedYear);
   const month = Number(selectedDashboardMonth);
   const prefix = `${selectedYear}-${selectedDashboardMonth}-`;
-  const groups = new Map();
-
-  entries.forEach(e => {
-    if (!e.date || !e.date.startsWith(prefix) || !WF_TEAMS.includes(e.shift)) return;
-    const key = `${e.date}|${e.shift}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        date: e.date,
-        shift: e.shift,
-        kg: 0,
-        autoKg: 0,
-        manKg: 0,
-        hasBreakdown: false
-      });
-    }
-    const g = groups.get(key);
-    g.kg += Number(e.tonnage) || 0;
-    if (e.breakdown && typeof e.breakdown === 'object') {
-      g.autoKg += Number(e.breakdown.autoKg) || 0;
-      g.manKg += Number(e.breakdown.manKg) || 0;
-      g.hasBreakdown = true;
-    }
-  });
-
-  const shifts = Array.from(groups.values());
-  const productionKg = shifts.reduce((sum, r) => sum + r.kg, 0);
-  const loggedPersonShifts = shifts.reduce(
-    (sum, r) => sum + (counts.production[r.shift] || 0),
-    0
-  );
-
-  let autoKg = 0;
-  let manKg = 0;
-  let autoPersonShifts = 0;
-  let manPersonShifts = 0;
-
-  shifts.forEach(r => {
-    if (!r.hasBreakdown) return;
-    autoKg += r.autoKg;
-    manKg += r.manKg;
-    autoPersonShifts += counts.auto[r.shift] || 0;
-    manPersonShifts += counts.manual[r.shift] || 0;
-  });
+  const shifts = [...WF_TEAMS, ShiftSchedule.STICKERS.team];
+  const rows = entries.filter(e => e.date && e.date.startsWith(prefix) && shifts.includes(e.shift));
+  const productionKg = rows.reduce((sum, e) => sum + (Number(e.tonnage) || 0), 0);
+  const staff = workforceStaff(counts);
 
   const daysTotal = new Date(year, month, 0).getDate();
-  const lastEntryDay = shifts.reduce((max, r) => {
-    const day = Number(String(r.date).slice(8,10)) || 0;
-    return Math.max(max, day);
-  }, 0);
+  const lastEntryDay = rows.reduce((max, e) => Math.max(max, Number(String(e.date).slice(8,10)) || 0), 0);
   const now = new Date();
-  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
-  const selectedStart = new Date(year, month - 1, 1);
-  const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const isPastMonth = selectedStart < currentStart;
-  const measurementDays = isPastMonth
-    ? daysTotal
-    : Math.max(1, Math.min(daysTotal, isCurrentMonth ? Math.max(lastEntryDay, now.getDate()) : lastEntryDay));
-
-  let scheduledPersonShifts = 0;
-  let scheduledTeamShifts = 0;
-
-  for (let day = 1; day <= daysTotal; day++) {
-    const date = new Date(year, month - 1, day);
-    WF_TEAMS.forEach(team => {
-      if (wfShiftCodeFor(team, date) !== 'Н') {
-        scheduledTeamShifts += 1;
-        scheduledPersonShifts += counts.production[team] || 0;
-      }
-    });
-  }
+  const isPastMonth = new Date(year, month - 1, 1) < new Date(now.getFullYear(), now.getMonth(), 1);
+  // The open month is measured up to the last reported day, so late reports do not lower productivity.
+  const measurementDays = isPastMonth ? daysTotal : Math.max(1, Math.min(daysTotal, lastEntryDay));
 
   return {
     year,
     month,
     daysTotal,
-    loggedTeamShifts: shifts.length,
+    reportCount: rows.length,
     productionKg,
-    loggedPersonShifts,
-    measuredProductivityTons: loggedPersonShifts > 0
-      ? (productionKg / 1000) / loggedPersonShifts
-      : 0,
     measurementDays,
-    rosterProductivityTonsPerDay: counts.productionTotal > 0 && measurementDays > 0
-      ? (productionKg / 1000) / (counts.productionTotal * measurementDays)
-      : 0,
-    autoProductivityTons: autoPersonShifts > 0
-      ? (autoKg / 1000) / autoPersonShifts
-      : 0,
-    manualProductivityTons: manPersonShifts > 0
-      ? (manKg / 1000) / manPersonShifts
-      : 0,
-    scheduledPersonShifts,
-    scheduledTeamShifts,
-    shiftsPerRosterHead: counts.productionTotal > 0
-      ? scheduledPersonShifts / counts.productionTotal
-      : 0,
-    avgPeoplePerOperatingShift: scheduledTeamShifts > 0
-      ? scheduledPersonShifts / scheduledTeamShifts
-      : 0
+    rosterProductivityTonsPerDay: staff > 0 ? (productionKg / 1000) / (staff * measurementDays) : 0
   };
 }
 
+function workforceStaff(counts) {
+  return (Number(counts.productionTotal) || 0) + (Number(counts.stickers) || 0);
+}
+
 function workforceScenario(monthData, counts) {
-  if (!monthData || !counts || !counts.productionTotal) return null;
+  const staff = counts ? workforceStaff(counts) : 0;
+  if (!monthData || !staff) return null;
 
-  // Use the production goal and reserve headcount from their source files.
-  // Productivity is output divided by active production headcount and calendar days.
   const target = Math.max(0, Number(goalTons) || 0);
-  const reservePeople = Math.max(0, Number(counts.additional) || 0);
-  const reservePct = counts.productionTotal > 0
-    ? reservePeople / counts.productionTotal * 100
-    : 0;
   const productivity = Math.max(0, Number(monthData.rosterProductivityTonsPerDay) || 0);
-  const measured = productivity;
+  if (!target || !productivity || !monthData.daysTotal) return {target, productivity, staff, valid: false};
 
-  if (!target || !productivity || !monthData.daysTotal) {
-    return {
-      target,
-      reservePeople,
-      reservePct,
-      productivity,
-      measured,
-      valid: false
-    };
-  }
-
-  const capacity = productivity * counts.productionTotal * monthData.daysTotal;
-  const baseRequiredRaw = target / (productivity * monthData.daysTotal);
-  const baseRequired = Math.ceil(baseRequiredRaw);
-  const reserveRequired = baseRequired + reservePeople;
-  const gap = reserveRequired - counts.productionTotal;
-  const targetPerShift = monthData.scheduledTeamShifts > 0
-    ? target / monthData.scheduledTeamShifts
-    : 0;
-  const requiredPerShift = baseRequiredRaw / 4;
-  const requiredProductivityAtCurrentStaff = monthData.scheduledPersonShifts > 0
-    ? target / monthData.scheduledPersonShifts
-    : 0;
-  const avgRosterTonsPerCalendarDay = counts.productionTotal > 0 && monthData.daysTotal > 0
-    ? target / (counts.productionTotal * monthData.daysTotal)
-    : 0;
-
+  const capacity = productivity * staff * monthData.daysTotal;
+  const requiredRaw = target / (productivity * monthData.daysTotal);
+  const required = Math.ceil(requiredRaw);
   return {
     target,
-    reservePeople,
-    reservePct,
     productivity,
-    measured,
+    staff,
     capacity,
-    baseRequiredRaw,
-    baseRequired,
-    reserveRequired,
-    gap,
-    targetPerShift,
-    requiredPerShift,
-    requiredProductivityAtCurrentStaff,
-    avgRosterTonsPerCalendarDay,
+    requiredRaw,
+    required,
+    gap: required - staff,
+    requiredProductivity: target / (staff * monthData.daysTotal),
     valid: true
   };
 }
 
-function renderWorkforceCapacityChart(monthData, counts, scenario) {
+function renderWorkforceCapacityChart(monthData, scenario) {
   if (!el.wfCapacityChart) return;
   if (!scenario || !scenario.valid) {
     el.wfCapacityChart.innerHTML = '<div class="wf-chart-empty">Нужни са данни за тонаж и производителност, за да се изчертае капацитетът.</div>';
     return;
   }
 
-  const current = counts.productionTotal;
-  const required = scenario.baseRequired;
-  const reserve = scenario.reserveRequired;
-  const maxStaff = Math.max(40, Math.ceil(Math.max(current, required, reserve) * 1.18 / 10) * 10);
+  const current = scenario.staff;
+  const maxStaff = Math.max(40, Math.ceil(Math.max(current, scenario.required) * 1.18 / 10) * 10);
   const yMax = Math.max(scenario.target * 1.18, scenario.productivity * monthData.daysTotal * maxStaff);
 
   const W = 760, H = 285;
@@ -236,18 +124,17 @@ function renderWorkforceCapacityChart(monthData, counts, scenario) {
   }
   for (let i = 0; i <= 4; i++) {
     const staff = maxStaff * i / 4;
-    const xx = x(staff);
-    grid += `<text x="${xx}" y="${H-16}" fill="#8b929e" font-size="9" text-anchor="middle">${Math.round(staff)}</text>`;
+    grid += `<text x="${x(staff)}" y="${H-16}" fill="#8b929e" font-size="9" text-anchor="middle">${Math.round(staff)}</text>`;
   }
 
   const targetY = y(scenario.target);
   const currentX = x(current), currentY = y(capAt(current));
-  const reqX = x(scenario.baseRequiredRaw), reqY = y(scenario.target);
+  const reqX = x(scenario.requiredRaw), reqY = y(scenario.target);
   const lineEndY = y(capAt(maxStaff));
   const capColor = scenario.capacity >= scenario.target ? '#3fbfa0' : '#9b7bd1';
 
   el.wfCapacityChart.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Капацитет спрямо активния щат">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Месечен тонаж според броя хора">
       <defs>
         <linearGradient id="wfAreaGradient" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="${capColor}" stop-opacity=".18"/>
@@ -261,11 +148,11 @@ function renderWorkforceCapacityChart(monthData, counts, scenario) {
       <line x1="${x(0)}" y1="${y(0)}" x2="${x(maxStaff)}" y2="${lineEndY}" stroke="${capColor}" stroke-width="3" stroke-linecap="round"/>
       <line x1="${currentX}" y1="${T}" x2="${currentX}" y2="${H-B}" stroke="rgba(255,255,255,.13)" stroke-width="1" stroke-dasharray="3 5"/>
       <circle cx="${currentX}" cy="${currentY}" r="5.5" fill="${capColor}" stroke="#1a1d22" stroke-width="3"/>
-      <text x="${currentX}" y="${Math.max(T+11,currentY-11)}" fill="#e6e9ee" font-size="10" text-anchor="middle" font-weight="800">Текущ ${current}</text>
+      <text x="${currentX}" y="${Math.max(T+11,currentY-11)}" fill="#e6e9ee" font-size="10" text-anchor="middle" font-weight="800">Текущ щат ${current}</text>
       <circle cx="${reqX}" cy="${reqY}" r="5.5" fill="#f5a623" stroke="#1a1d22" stroke-width="3"/>
-      <text x="${reqX}" y="${Math.min(H-B-10,reqY+20)}" fill="#f5a623" font-size="10" text-anchor="middle" font-weight="800">База ${scenario.baseRequired}</text>
-      <text x="${L}" y="12" fill="#8b929e" font-size="9">Месечен капацитет</text>
-      <text x="${W-R}" y="${H-2}" fill="#8b929e" font-size="9" text-anchor="end">Активен производствен щат</text>
+      ${Math.abs(reqX - currentX) < 70 ? '' : `<text x="${reqX}" y="${Math.min(H-B-10,reqY+20)}" fill="#f5a623" font-size="10" text-anchor="middle" font-weight="800">Нужен щат ${scenario.required}</text>`}
+      <text x="${L}" y="12" fill="#8b929e" font-size="9">Месечен тонаж</text>
+      <text x="${W-R}" y="${H-2}" fill="#8b929e" font-size="9" text-anchor="end">Брой хора в щата</text>
     </svg>`;
 }
 
@@ -294,12 +181,13 @@ function renderWorkforceDashboard() {
     return;
   }
 
+  const staff = workforceStaff(counts);
   const monthData = aggregateWorkforceMonth(counts);
-  if (!monthData || !monthData.loggedTeamShifts || !monthData.measuredProductivityTons) {
+  if (!monthData || !monthData.reportCount || !monthData.rosterProductivityTonsPerDay) {
     el.wfNoData.style.display = 'block';
     el.wfBody.style.display = 'none';
-    el.wfNoData.innerHTML = '<strong>Няма достатъчно тонажни записи за избрания месец.</strong> Капацитетът се изчислява от реалните записи А / Б / В / Г и текущия активен състав.';
-    el.wfStaffSource.textContent = `${counts.productionTotal} производствени`;
+    el.wfNoData.innerHTML = '<strong>Няма достатъчно тонажни записи за избрания месец.</strong> Капацитетът се изчислява от реалните записи А / Б / В / Г / Стикери и текущия активен състав.';
+    el.wfStaffSource.textContent = `${staff} души`;
     el.wfStatus.className = 'status-chip neutral';
     el.wfStatus.textContent = 'Няма база за изчисление';
     return;
@@ -309,73 +197,49 @@ function renderWorkforceDashboard() {
   el.wfBody.style.display = 'block';
 
   const scenario = workforceScenario(monthData, counts);
-  const monthName = MONTH_FULL_LABELS[monthData.month - 1];
-  el.wfStaffSource.textContent = `${counts.productionTotal} производствени + ${counts.additional} допълнителни`;
-  el.wfSubtitle.textContent = `${monthName} ${monthData.year}: цел ${StatisticsUnits.formatTons(goalTons)} т от „Тонаж и брак“, производителност от реалния тонаж и текущия активен състав, резерв от ${counts.additional} души в „Допълнителни“. Изчислението използва текущия активен състав.`;
+  const tons = StatisticsUnits.formatTons;
+  el.wfStaffSource.textContent = `${staff} души`;
+  el.wfSubtitle.textContent = `${MONTH_FULL_LABELS[monthData.month - 1]} ${monthData.year}: колко хора са нужни за месечната цел при реалния тонаж на човек.`;
 
-  el.wfCurrentStaff.textContent = `${counts.productionTotal}`;
-  el.wfCurrentStaffSub.textContent = `Автоматична ${counts.autoTotal} + Ръчна ${counts.manualTotal}`;
-  el.wfMeasuredProductivity.textContent = `${StatisticsUnits.formatTons(monthData.rosterProductivityTonsPerDay)} т`;
-  el.wfMeasuredProductivitySub.textContent = `${fmtTons(monthData.productionKg)} т / (${counts.productionTotal} души × ${monthData.measurementDays} дни)`;
-  el.wfAutoProd.textContent = monthData.autoProductivityTons > 0 ? `${StatisticsUnits.formatTons(monthData.autoProductivityTons)} т / човек-смяна` : 'няма breakdown';
-  el.wfManualProd.textContent = monthData.manualProductivityTons > 0 ? `${StatisticsUnits.formatTons(monthData.manualProductivityTons)} т / човек-смяна` : 'няма breakdown';
+  el.wfCurrentStaff.textContent = `${staff}`;
+  el.wfAutoCount.textContent = `${counts.autoTotal} души`;
+  el.wfManualCount.textContent = `${counts.manualTotal} души`;
   el.wfStickersCount.textContent = `${counts.stickers} души`;
-
-  if (el.wfCalcTarget) el.wfCalcTarget.textContent = `${StatisticsUnits.formatTons(goalTons)} т`;
-  if (el.wfCalcReserve) el.wfCalcReserve.textContent = `${counts.additional} души`;
-  if (el.wfCalcReserveSub) {
-    const reserveEq = counts.productionTotal > 0 ? counts.additional / counts.productionTotal * 100 : 0;
-    el.wfCalcReserveSub.textContent = `от „Допълнителни“ · ${wfFmt(reserveEq,1)}% спрямо производствения щат`;
-  }
-  if (el.wfCalcProductivity) el.wfCalcProductivity.textContent = `${StatisticsUnits.formatTons(monthData.rosterProductivityTonsPerDay)} т`;
+  el.wfMeasuredProductivity.textContent = `${tons(monthData.rosterProductivityTonsPerDay)} т`;
+  el.wfMeasuredProductivitySub.textContent = `${fmtTons(monthData.productionKg)} т ÷ (${staff} души × ${monthData.measurementDays} дни)`;
+  el.wfCalcTarget.textContent = `${tons(goalTons)} т`;
+  el.wfAdditionalNote.textContent = `„Допълнителни“ (${counts.additional} души) не влизат в щата.`;
+  el.wfStepProductivity.innerHTML = `${fmtTons(monthData.productionKg)} т ÷ (${staff} души × ${monthData.measurementDays} дни) = <b>${tons(monthData.rosterProductivityTonsPerDay)} т</b>`;
 
   if (!scenario || !scenario.valid) {
-    el.wfRequiredProductivity.textContent = '—';
-    el.wfTargetPerShift.textContent = '—';
-    el.wfCurrentCapacity.textContent = '—';
-    el.wfGap.textContent = '—';
-    el.wfRequiredBase.textContent = '—';
-    el.wfRequiredReserve.textContent = '—';
-    el.wfResultGap.textContent = '—';
-    el.wfRequiredPerShift.textContent = '—';
-    el.wfCalcNote.textContent = 'Нужни са валидна месечна цел, Personnel данни и реален тонаж за избрания месец, за да изчислим необходимия щат.';
+    for (const node of [el.wfRequiredProductivity, el.wfRequiredProductivitySub, el.wfCurrentCapacity, el.wfCurrentCapacitySub, el.wfRequiredBase, el.wfRequiredBaseSub, el.wfGap, el.wfStepRequired, el.wfStepGap]) node.textContent = '—';
+    setWfKpiClass(el.wfCapacityKpi, '');
+    setWfKpiClass(el.wfGapKpi, '');
     el.wfStatus.className = 'status-chip neutral';
-    el.wfStatus.textContent = 'Недостатъчно данни';
-    renderWorkforceCapacityChart(monthData, counts, scenario);
+    el.wfStatus.textContent = 'Няма месечна цел';
+    renderWorkforceCapacityChart(monthData, scenario);
     return;
   }
 
-  const coverage = scenario.target > 0 ? scenario.capacity / scenario.target : 0;
-  let statusCls = 'good';
-  let statusText = 'Капацитетът покрива целта';
-  if (scenario.gap > 0) {
-    statusCls = coverage >= .9 ? 'warn' : 'bad';
-    statusText = `Нужни още ${scenario.gap} с резерв`;
-  } else if (scenario.gap < 0) {
-    statusText = `Резерв ${Math.abs(scenario.gap)} души`;
-  }
-  el.wfStatus.className = `status-chip ${statusCls}`;
-  el.wfStatus.textContent = statusText;
+  const coverage = scenario.capacity / scenario.target;
+  const gapText = scenario.gap > 0 ? `+${scenario.gap}` : String(scenario.gap);
+  const gapCls = scenario.gap <= 0 ? 'good' : (scenario.gap <= 5 ? 'warn' : 'bad');
+  el.wfStatus.className = `status-chip ${scenario.gap <= 0 ? 'good' : (coverage >= .9 ? 'warn' : 'bad')}`;
+  el.wfStatus.textContent = scenario.gap > 0 ? `Не достигат ${scenario.gap} души` : 'Щатът покрива целта';
 
-  el.wfRequiredProductivity.textContent = `${StatisticsUnits.formatTons(scenario.avgRosterTonsPerCalendarDay)} т`;
-  el.wfTargetPerShift.textContent = `${StatisticsUnits.formatTons(scenario.targetPerShift)} т`;
-  el.wfCurrentCapacity.textContent = `${StatisticsUnits.formatTons(scenario.capacity)} т`;
-  el.wfCurrentCapacitySub.textContent = `${wfFmt(coverage*100,0)}% от целта ${StatisticsUnits.formatTons(scenario.target)} т`;
-  el.wfGap.textContent = scenario.gap > 0 ? `+${scenario.gap}` : String(scenario.gap);
-  el.wfGapSub.textContent = `база ${scenario.baseRequired} + ${scenario.reservePeople} допълнителни → ${scenario.reserveRequired}`;
-
+  el.wfRequiredProductivity.textContent = `${tons(scenario.requiredProductivity)} т`;
+  el.wfRequiredProductivitySub.textContent = `${tons(scenario.target)} т ÷ (${staff} души × ${monthData.daysTotal} дни)`;
+  el.wfCurrentCapacity.textContent = `${tons(scenario.capacity)} т`;
+  el.wfCurrentCapacitySub.textContent = `${wfFmt(coverage*100,0)}% от целта ${tons(scenario.target)} т`;
+  el.wfRequiredBase.textContent = `${scenario.required}`;
+  el.wfRequiredBaseSub.textContent = `души за ${tons(scenario.target)} т`;
+  el.wfGap.textContent = gapText;
+  el.wfGapSub.textContent = `${scenario.required} нужни − ${staff} в щата`;
   setWfKpiClass(el.wfCapacityKpi, coverage >= 1 ? 'good' : (coverage >= .9 ? 'warn' : 'bad'));
-  setWfKpiClass(el.wfGapKpi, scenario.gap <= 0 ? 'good' : (scenario.gap <= 5 ? 'warn' : 'bad'));
+  setWfKpiClass(el.wfGapKpi, gapCls);
 
-  el.wfRequiredBase.textContent = `${scenario.baseRequired} души`;
-  el.wfRequiredReserve.textContent = `${scenario.reserveRequired} души`;
-  el.wfResultGap.textContent = scenario.gap === 0
-    ? 'точно'
-    : (scenario.gap > 0 ? `+${scenario.gap} души` : `${scenario.gap} души`);
-  el.wfRequiredPerShift.textContent = `${wfFmt(scenario.requiredPerShift,1)} души`;
-  el.wfResultGapRow.className = `wf-result ${scenario.gap <= 0 ? 'good' : (scenario.gap <= 5 ? 'warn' : 'bad')}`;
+  el.wfStepRequired.innerHTML = `${tons(scenario.target)} т ÷ (${tons(scenario.productivity)} т × ${monthData.daysTotal} дни) = <b>${scenario.required} души</b>`;
+  el.wfStepGap.innerHTML = `${scenario.required} − ${staff} = <b>${gapText} души</b>`;
 
-  el.wfCalcNote.innerHTML = `Всичко се смята автоматично: целта <strong>${StatisticsUnits.formatTons(scenario.target)} т</strong> идва от „Тонаж и брак“; измерената производителност е <strong>${StatisticsUnits.formatTons(scenario.productivity)} т / щатен човек / ден</strong> за ${monthData.measurementDays} дни; резервът е <strong>${scenario.reservePeople} души</strong> — текущият брой в „Допълнителни“ (${wfFmt(scenario.reservePct,1)}% спрямо активния производствен щат). За целта са нужни средно <strong>${StatisticsUnits.formatTons(scenario.targetPerShift)} т на работна смяна</strong>. Базов необходим щат: <strong>${scenario.baseRequired}</strong>; с текущия резерв: <strong>${scenario.reserveRequired}</strong>.`;
-
-  renderWorkforceCapacityChart(monthData, counts, scenario);
+  renderWorkforceCapacityChart(monthData, scenario);
 }

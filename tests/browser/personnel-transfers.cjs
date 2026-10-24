@@ -112,7 +112,7 @@ async function exerciseTransferConsumers({page,expect,go,connect,setTime,replace
   await connect('#personnelOpenFileBtn','personnel.json','#personnelConnDot');
   await page.locator('[data-stats-tab=workforce]').click();await expect(page.locator('#wfCurrentStaff')).toHaveText('3');await expect(page.locator('#wfStickersCount')).toHaveText('0 души');
   await setTime('2026-10-15T22:00:00Z');await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-  await expect(page.locator('#wfCurrentStaff')).toHaveText('2');await expect(page.locator('#wfStickersCount')).toHaveText('1 души');
+  await expect(page.locator('#wfCurrentStaff')).toHaveText('3');await expect(page.locator('#wfStickersCount')).toHaveText('1 души');
   await go('personnel');await expect(page.locator('#connDot')).toHaveClass(/\bon\b/);await page.locator('[data-edit-person="demo-transfer-stickers"]').click();
   await page.locator('#personCategory').selectOption('auto');await page.locator('#personTeam').selectOption('Г');
   await page.locator('#transferEffectiveDate').fill('2026-10-17');await page.locator('#transferEffectiveDate').dispatchEvent('change');

@@ -192,27 +192,16 @@
 .wf-line-metric{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);}
 .wf-line-metric .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;}.wf-line-metric .v{font-size:14px;font-weight:850;margin-top:4px;}
 .wf-calc{display:flex;flex-direction:column;gap:11px;}
-.wf-auto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.wf-auto-source{padding:10px 11px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);min-width:0;}
-.wf-auto-source .l{font-size:9px;color:var(--text-muted);font-weight:760;text-transform:uppercase;letter-spacing:.045em;line-height:1.3;}
-.wf-auto-source .v{font-size:17px;font-weight:880;color:var(--text);margin-top:5px;white-space:nowrap;}
-.wf-auto-source .s{font-size:9px;color:var(--text-muted);margin-top:4px;line-height:1.35;}
-.wf-auto-source.target .v{color:var(--amber);}
-.wf-auto-source.reserve .v{color:#c3a8ee;}
-.wf-auto-source.productivity .v{color:var(--teal);}
-.wf-field label{display:block;font-size:9.5px;color:var(--text-muted);font-weight:750;margin:0 0 5px;line-height:1.25;}
-.wf-field input{width:100%;box-sizing:border-box;background:#171a1f;border:1px solid #353b45;color:var(--text);border-radius:8px;padding:9px 10px;font:700 13px inherit;outline:none;}
-.wf-field input:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(155,123,209,.08);}
-.wf-productivity-row{display:flex;gap:7px;align-items:flex-end;}.wf-productivity-row .wf-field{flex:1;}.wf-mini-btn{border:1px solid var(--border);background:var(--panel-2);color:var(--text-muted);border-radius:8px;padding:9px 10px;font-size:10px;font-weight:750;cursor:pointer;white-space:nowrap;}.wf-mini-btn:hover{color:var(--text);border-color:#4a505c;}
-.wf-results{display:grid;gap:7px;margin-top:2px;}
-.wf-result{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);font-size:10.5px;color:var(--text-muted);}
-.wf-result b{font-size:15px;color:var(--text);font-weight:880;white-space:nowrap;}.wf-result.strong{border-color:rgba(155,123,209,.2);background:rgba(155,123,209,.055);}.wf-result.strong b{color:#c3a8ee;}
-.wf-result.good b{color:var(--teal);}.wf-result.bad b{color:var(--red);}.wf-result.warn b{color:var(--amber);}
-.wf-calc-note{font-size:9.5px;color:var(--text-muted);line-height:1.5;padding-top:2px;}
-.wf-calc-note strong{color:var(--text);font-weight:800;}
+.wf-steps{margin:0;padding:0;list-style:none;counter-reset:wf;display:grid;gap:7px;}
+.wf-steps li{counter-increment:wf;display:grid;grid-template-columns:auto 1fr;gap:3px 9px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);font-size:10.5px;color:var(--text-muted);line-height:1.45;}
+.wf-steps li::before{content:counter(wf);grid-row:span 2;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:rgba(155,123,209,.16);color:#c3a8ee;font-size:10px;font-weight:850;}
+.wf-steps li span:first-child{color:var(--text);font-weight:800;}
+.wf-steps b{color:var(--text);font-weight:880;}
+.wf-calc-note{margin:0;padding-left:16px;font-size:9.5px;color:var(--text-muted);line-height:1.5;display:grid;gap:3px;}
+.wf-calc-note b{color:var(--text);font-weight:800;}
 .wf-no-data{margin:18px 22px 22px;padding:14px 16px;border:1px dashed #3a404a;border-radius:10px;color:var(--text-muted);font-size:11px;line-height:1.6;position:relative;z-index:1;}
 @media (max-width:980px){.wf-kpis{grid-template-columns:repeat(3,1fr)}.wf-main{grid-template-columns:1fr}.wf-chart{height:280px;}}
-@media (max-width:640px){.wf-head{flex-direction:column}.wf-head-right{justify-content:flex-start}.wf-kpis{grid-template-columns:1fr 1fr;padding-left:14px;padding-right:14px}.wf-main{padding-left:14px;padding-right:14px}.wf-line-metrics{grid-template-columns:1fr}.wf-auto-grid{grid-template-columns:1fr}.wf-chart{height:250px}}
+@media (max-width:640px){.wf-head{flex-direction:column}.wf-head-right{justify-content:flex-start}.wf-kpis{grid-template-columns:1fr 1fr;padding-left:14px;padding-right:14px}.wf-main{padding-left:14px;padding-right:14px}.wf-line-metrics{grid-template-columns:1fr}.wf-chart{height:250px}}
 
 .presentation-dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:18px 20px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);box-sizing:border-box;}
 .presentation-dialog::backdrop{background:rgba(0,0,0,.6);}
@@ -441,7 +430,7 @@
         <div>
           <div class="dashboard-eyebrow">Състав и капацитет</div>
           <div class="wf-title">Персонал спрямо производствената цел</div>
-          <div class="wf-subtitle" id="wfSubtitle">Измерена производителност от избрания месец × текущ активен производствен състав.</div>
+          <div class="wf-subtitle" id="wfSubtitle">Колко хора са нужни за месечната цел при реалния тонаж на човек.</div>
         </div>
         <div class="wf-head-right">
           <span class="wf-source-pill">Щат: <b id="wfStaffSource">—</b></span>
@@ -454,34 +443,34 @@
       <div id="wfBody">
         <div class="wf-kpis">
           <div class="wf-kpi">
-            <div class="lab">Производствен щат</div>
+            <div class="lab">Щат</div>
             <div class="val" id="wfCurrentStaff">—</div>
-            <div class="sub" id="wfCurrentStaffSub">Автоматична + Ръчна</div>
+            <div class="sub">Автоматична + Ръчна + Стикери</div>
           </div>
           <div class="wf-kpi emphasis">
             <div class="lab">Реално т / човек / ден</div>
             <div class="val" id="wfMeasuredProductivity">—</div>
-            <div class="sub" id="wfMeasuredProductivitySub">по текущия щат и избрания месец</div>
+            <div class="sub" id="wfMeasuredProductivitySub">—</div>
           </div>
           <div class="wf-kpi">
             <div class="lab">Нужно т / човек / ден</div>
             <div class="val" id="wfRequiredProductivity">—</div>
-            <div class="sub">за зададената цел при текущия щат</div>
-          </div>
-          <div class="wf-kpi">
-            <div class="lab">Нужно т / смяна</div>
-            <div class="val" id="wfTargetPerShift">—</div>
-            <div class="sub">3 работни смени на ден</div>
+            <div class="sub" id="wfRequiredProductivitySub">—</div>
           </div>
           <div class="wf-kpi" id="wfCapacityKpi">
-            <div class="lab">Капацитет с текущия щат</div>
+            <div class="lab">Прогноза за месеца</div>
             <div class="val" id="wfCurrentCapacity">—</div>
-            <div class="sub" id="wfCurrentCapacitySub">при измерената производителност</div>
+            <div class="sub" id="wfCurrentCapacitySub">—</div>
+          </div>
+          <div class="wf-kpi">
+            <div class="lab">Нужен щат</div>
+            <div class="val" id="wfRequiredBase">—</div>
+            <div class="sub" id="wfRequiredBaseSub">—</div>
           </div>
           <div class="wf-kpi" id="wfGapKpi">
             <div class="lab">Разлика в щата</div>
             <div class="val" id="wfGap">—</div>
-            <div class="sub" id="wfGapSub">спрямо щата с резерв</div>
+            <div class="sub" id="wfGapSub">нужен щат − текущ щат</div>
           </div>
         </div>
 
@@ -489,51 +478,31 @@
           <div class="wf-card">
             <div class="wf-card-head">
               <div>
-                <div class="wf-card-title">Капацитет спрямо активния щат</div>
-                <div class="wf-card-sub">Колко месечен тонаж поддържа различен размер щат при измерената производителност на щатен човек / ден.</div>
+                <div class="wf-card-title">Месечен тонаж според броя хора</div>
+                <div class="wf-card-sub">Линията показва колко тона се постигат с даден щат при реалния тонаж на човек / ден.</div>
               </div>
-              <div class="wf-source-pill">Модел: <b>3 смени / ден</b></div>
             </div>
             <div class="wf-chart" id="wfCapacityChart"></div>
             <div class="wf-line-metrics">
-              <div class="wf-line-metric"><div class="l">Автоматична</div><div class="v" id="wfAutoProd">—</div></div>
-              <div class="wf-line-metric"><div class="l">Ръчна</div><div class="v" id="wfManualProd">—</div></div>
+              <div class="wf-line-metric"><div class="l">Автоматична</div><div class="v" id="wfAutoCount">—</div></div>
+              <div class="wf-line-metric"><div class="l">Ръчна</div><div class="v" id="wfManualCount">—</div></div>
               <div class="wf-line-metric"><div class="l">Стикери</div><div class="v" id="wfStickersCount">—</div></div>
             </div>
           </div>
 
           <div class="wf-card wf-calc">
-            <div>
-              <div class="wf-card-title">Автоматичен калкулатор за необходим щат</div>
-              <div class="wf-card-sub">Всички входни стойности идват автоматично от „Тонаж и брак“ и Personnel / Shift.</div>
-            </div>
-
-            <div class="wf-auto-grid">
-              <div class="wf-auto-source target">
-                <div class="l">Месечна цел</div>
-                <div class="v" id="wfCalcTarget">—</div>
-                <div class="s">от „Тонаж и брак“</div>
-              </div>
-              <div class="wf-auto-source reserve">
-                <div class="l">Резерв / отсъствия</div>
-                <div class="v" id="wfCalcReserve">—</div>
-                <div class="s" id="wfCalcReserveSub">от „Допълнителни“</div>
-              </div>
-              <div class="wf-auto-source productivity">
-                <div class="l">Производителност</div>
-                <div class="v" id="wfCalcProductivity">—</div>
-                <div class="s">т / щатен човек / ден · изчислено</div>
-              </div>
-            </div>
-
-            <div class="wf-results">
-              <div class="wf-result"><span>Базов необходим щат</span><b id="wfRequiredBase">—</b></div>
-              <div class="wf-result strong"><span>Щат с резерв</span><b id="wfRequiredReserve">—</b></div>
-              <div class="wf-result" id="wfResultGapRow"><span>Спрямо текущия щат</span><b id="wfResultGap">—</b></div>
-              <div class="wf-result"><span>Средно нужни хора / работна смяна</span><b id="wfRequiredPerShift">—</b></div>
-            </div>
-
-            <details class="stats-details"><summary>Как се изчислява?</summary><div class="wf-calc-note" id="wfCalcNote">—</div></details>
+            <div class="wf-card-title">Как се смята</div>
+            <ol class="wf-steps" id="wfSteps">
+              <li><span>Реално т / човек / ден</span><span id="wfStepProductivity">—</span></li>
+              <li><span>Нужен щат</span><span id="wfStepRequired">—</span></li>
+              <li><span>Разлика в щата</span><span id="wfStepGap">—</span></li>
+            </ol>
+            <ul class="wf-calc-note">
+              <li>Целта <b id="wfCalcTarget">—</b> е от „Тонаж и брак“. Тонажът включва А, Б, В, Г и Стикери.</li>
+              <li>Щатът е текущият активен състав и се използва за всички месеци, защото историята на състава не се пази.</li>
+              <li id="wfAdditionalNote">„Допълнителни“ не влизат в щата.</li>
+              <li>Моделът приема, че тонажът расте пропорционално на хората. Престоите не се изваждат.</li>
+            </ul>
           </div>
         </div>
       </div>
