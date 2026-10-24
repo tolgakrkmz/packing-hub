@@ -190,7 +190,7 @@
 .wf-chart-empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.5;padding:20px;}
 .wf-line-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px;}
 .wf-line-metric{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);}
-.wf-line-metric .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;}.wf-line-metric .v{font-size:14px;font-weight:850;margin-top:4px;}
+.wf-line-metric .s{font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.35;}.wf-line-metric .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;}.wf-line-metric .v{font-size:14px;font-weight:850;margin-top:4px;}
 .wf-calc{display:flex;flex-direction:column;gap:11px;}
 .wf-steps{margin:0;padding:0;list-style:none;counter-reset:wf;display:grid;gap:7px;}
 .wf-steps li{counter-increment:wf;display:grid;grid-template-columns:auto 1fr;gap:3px 9px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);font-size:10.5px;color:var(--text-muted);line-height:1.45;}
@@ -484,9 +484,9 @@
             </div>
             <div class="wf-chart" id="wfCapacityChart"></div>
             <div class="wf-line-metrics">
-              <div class="wf-line-metric"><div class="l">Автоматична</div><div class="v" id="wfAutoCount">—</div></div>
-              <div class="wf-line-metric"><div class="l">Ръчна</div><div class="v" id="wfManualCount">—</div></div>
-              <div class="wf-line-metric"><div class="l">Стикери</div><div class="v" id="wfStickersCount">—</div></div>
+              <div class="wf-line-metric"><div class="l">Автоматична · т / човек / смяна</div><div class="v" id="wfAutoLive">—</div><div class="s" id="wfAutoLiveSub">—</div></div>
+              <div class="wf-line-metric"><div class="l">Ръчна · т / човек / смяна</div><div class="v" id="wfManualLive">—</div><div class="s" id="wfManualLiveSub">—</div></div>
+              <div class="wf-line-metric"><div class="l">Стикери в щата</div><div class="v" id="wfStickersCount">—</div></div>
             </div>
           </div>
 
@@ -502,6 +502,7 @@
               <li>Щатът е текущият активен състав и се използва за всички месеци, защото историята на състава не се пази.</li>
               <li id="wfAdditionalNote">„Допълнителни“ не влизат в щата.</li>
               <li>Моделът приема, че тонажът расте пропорционално на хората. Престоите не се изваждат.</li>
+              <li>Т / човек / смяна по линии е за целия избран месец, от живите данни: хората от двойките на всяка смяна и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.</li>
             </ul>
           </div>
         </div>
