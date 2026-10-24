@@ -69,6 +69,42 @@ function calculateWorkforceMonth(counts) {
   };
 }
 
+// Roster line assignments change often, so the line split uses live data: people from that
+// shift's pairs (a mixed pair counts half of its people on each line) and tonnage from the
+// shift's auto/manual breakdown. Shifts missing either side are left out.
+function liveLineProductivity(production, pairs, prefix) {
+  const people = new Map(), tonnage = new Map();
+  pairs.forEach(pair => {
+    if (!pair.date || !pair.date.startsWith(prefix) || !WF_TEAMS.includes(pair.team) || pair.cancellation || !pair.areas?.length) return;
+    const key = `${pair.date}|${pair.team}`, row = people.get(key) || {auto:0, manual:0};
+    pair.areas.forEach(area => { if (area in row) row[area] += pair.members.length / pair.areas.length; });
+    people.set(key, row);
+  });
+  production.forEach(e => {
+    if (!e.breakdown || !e.date || !e.date.startsWith(prefix) || !WF_TEAMS.includes(e.shift)) return;
+    const key = `${e.date}|${e.shift}`, row = tonnage.get(key) || {auto:0, manual:0};
+    row.auto += Number(e.breakdown.autoKg) || 0;
+    row.manual += Number(e.breakdown.manKg) || 0;
+    tonnage.set(key, row);
+  });
+  const result = {auto:{kg:0, people:0, shifts:0}, manual:{kg:0, people:0, shifts:0}};
+  tonnage.forEach((kg, key) => {
+    const row = people.get(key);
+    if (!row) return;
+    for (const line of ['auto', 'manual']) {
+      if (!row[line]) continue;
+      result[line].kg += kg[line];
+      result[line].people += row[line];
+      result[line].shifts += 1;
+    }
+  });
+  for (const line of ['auto', 'manual']) {
+    const r = result[line];
+    r.tonsPerPerson = r.people ? r.kg / 1000 / r.people : null;
+  }
+  return result;
+}
+
 function workforceStaff(counts) {
   return (Number(counts.productionTotal) || 0) + (Number(counts.stickers) || 0);
 }
@@ -202,8 +238,8 @@ function renderWorkforceDashboard() {
   el.wfSubtitle.textContent = `${MONTH_FULL_LABELS[monthData.month - 1]} ${monthData.year}: колко хора са нужни за месечната цел при реалния тонаж на човек.`;
 
   el.wfCurrentStaff.textContent = `${staff}`;
-  // All data, not only the selected month: the server sends it precomputed because it reads one month at a time.
-  const live = productionLines || statisticsCache.get('workforce-lines', [entries, pairStatistics.getVersion()], '', () => LineProductivity.compute(entries, pairStatistics.getEntries()));
+  const prefix = `${monthData.year}-${String(monthData.month).padStart(2,'0')}-`;
+  const live = statisticsCache.get('workforce-lines', [entries, pairStatistics.getVersion()], prefix, () => liveLineProductivity(entries, pairStatistics.getEntries(), prefix));
   for (const [line, value, sub] of [['auto', el.wfAutoLive, el.wfAutoLiveSub], ['manual', el.wfManualLive, el.wfManualLiveSub]]) {
     const r = live[line];
     value.textContent = r.tonsPerPerson === null ? '—' : `${tons(r.tonsPerPerson)} т`;

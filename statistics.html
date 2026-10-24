@@ -484,8 +484,8 @@
             </div>
             <div class="wf-chart" id="wfCapacityChart"></div>
             <div class="wf-line-metrics">
-              <div class="wf-line-metric"><div class="l">Автоматична · т / човек / смяна · всички данни</div><div class="v" id="wfAutoLive">—</div><div class="s" id="wfAutoLiveSub">—</div></div>
-              <div class="wf-line-metric"><div class="l">Ръчна · т / човек / смяна · всички данни</div><div class="v" id="wfManualLive">—</div><div class="s" id="wfManualLiveSub">—</div></div>
+              <div class="wf-line-metric"><div class="l">Автоматична · т / човек / смяна</div><div class="v" id="wfAutoLive">—</div><div class="s" id="wfAutoLiveSub">—</div></div>
+              <div class="wf-line-metric"><div class="l">Ръчна · т / човек / смяна</div><div class="v" id="wfManualLive">—</div><div class="s" id="wfManualLiveSub">—</div></div>
               <div class="wf-line-metric"><div class="l">Стикери в щата</div><div class="v" id="wfStickersCount">—</div></div>
             </div>
           </div>
@@ -502,7 +502,7 @@
               <li>Щатът е текущият активен състав и се използва за всички месеци, защото историята на състава не се пази.</li>
               <li id="wfAdditionalNote">„Допълнителни“ не влизат в щата.</li>
               <li>Моделът приема, че тонажът расте пропорционално на хората. Престоите не се изваждат.</li>
-              <li>Т / човек / смяна по линии е за всички налични данни, не само за избрания месец, и е от живите данни: хората от двойките на смяната и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.</li>
+              <li>Т / човек / смяна по линии е от живите данни: хората от двойките на смяната и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.</li>
             </ul>
           </div>
         </div>
@@ -675,7 +675,6 @@
 <script src="js/statistics-monthly.js"></script>
 <script src="js/statistics-monthly-chart.js"></script>
 <script src="js/statistics-downtime.js"></script>
-<script src="js/line-productivity-model.js"></script>
 <script src="js/statistics-workforce.js"></script>
 <script src="js/statistics-line-shifts.js"></script>
 <script src="js/statistics.js"></script>

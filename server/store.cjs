@@ -8,12 +8,11 @@ const {can, canViewModule, reports} = require('./permissions.cjs');
 const {createProductionAccess} = require('./production-access.cjs');
 const root = path.resolve(__dirname, '..');
 const sandbox = vm.createContext({});
-for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', 'personnel-model', 'line-productivity-model']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), sandbox);
+for (const file of ['shift-schedule', 'pair-targets-model', 'data-validation', 'personnel-model']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), sandbox);
 const validate = vm.runInContext('HubDataValidation.validate', sandbox);
 const pairModel = vm.runInContext('PairTargets', sandbox);
 const personnelModel = vm.runInContext('PersonnelModel', sandbox);
 const shiftSchedule = vm.runInContext('ShiftSchedule', sandbox);
-const lineProductivity = vm.runInContext('LineProductivity', sandbox);
 const defaults = {
   'production-log': {entries: [], goalTons: 3000},
   'line-downtime': {entries: [], reasons: ['Друго']},
@@ -519,4 +518,4 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
   }
   return {db, get, put, requestLog, productionAccess, pairRosterAt, updateDocument, personnelDate, validatePersonnelChange, reportOperation, reportHistory, reportHistoryList, reportHistorySnapshot, previewProductionImport, applyProductionImport, backupForImport, node, createNode, writeFile, children, audit, transaction, close: () => db.close()};
 }
-module.exports = {openStore, moduleData, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, lineProductivity, reportChanges, notificationTargets};
+module.exports = {openStore, moduleData, defaults, problem, safePath, validateData, personnelModel, shiftSchedule, reportChanges, notificationTargets};

@@ -48,20 +48,6 @@ test('a revision change invalidates cached detail buckets, summaries and year me
   assert.deepEqual(reads.read('production-log','2026-10').data.summary.availableYears,[]);
   seed(store,data); assert.equal(reads.read('production-log','2026-10').data.entries.length,2);
 });
-test('line productivity covers every month and follows pair revisions',t => {
-  const store = openStore(':memory:'); t.after(() => store.close()); const data = statisticsFixture();
-  data['production-log'].entries = [{id:'demo-line-sep',date:'2026-09-02',shift:'В',tonnage:6000,brak:0,breakdown:{autoKg:4000,autoCrates:0,manKg:2000,manCrates:0}},
-    {id:'demo-line-oct',date:'2026-10-02',shift:'В',tonnage:2000,brak:0,breakdown:{autoKg:2000,autoCrates:0,manKg:0,manCrates:0}}];
-  const pair = (id, date, areas) => ({id,date,shiftCode:1,team:'В',members:[{id:id+'-1',name:'Demo One'},{id:id+'-2',name:'Demo Two'}],areas,targetKg:1000,targetCrates:40,result:null});
-  data['pair-targets'].entries = [pair('demo-line-p1','2026-09-02',['auto','manual']),pair('demo-line-p2','2026-10-02',['auto'])];
-  seed(store,data); const reads = createStatisticsReads(store);
-  const october = reads.read('production-log','2026-10').data.lines;
-  assert.equal(reads.read('production-log','2026-09').data.lines,october);
-  assert.deepEqual(JSON.parse(JSON.stringify(october.auto)),{kg:6000,people:3,shifts:2,tonsPerPerson:2});
-  assert.deepEqual(JSON.parse(JSON.stringify(october.manual)),{kg:2000,people:1,shifts:1,tonsPerPerson:2});
-  data['pair-targets'].entries.pop(); seed(store,{'pair-targets':data['pair-targets']});
-  assert.deepEqual(JSON.parse(JSON.stringify(reads.read('production-log','2026-10').data.lines.auto)),{kg:4000,people:1,shifts:1,tonsPerPerson:4});
-});
 test('invalid periods are rejected before reading any document',t => {
   const store = openStore(':memory:'); t.after(() => store.close()); const reads = createStatisticsReads(store);
   for (const month of [null,'','2026','2026-00','2026-13','2026-1','2026-10-01','2026-10 OR 1=1'])
