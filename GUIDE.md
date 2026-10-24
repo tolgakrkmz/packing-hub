@@ -1327,7 +1327,8 @@ Ordinary server production, pair planning, targets and pair results require the
 assigned team and dated rotation, from shift start until **four hours after its
 end**. The deadline is exclusive and uses the server's Europe/Sofia shift
 boundaries plus four elapsed hours. Before the shift starts, on a rest day, for
-another team or outside the dated reporting window, writes are rejected.
+another team or outside the dated reporting window, writes are rejected
+(Stickers excepted, see below).
 A 06:00–14:00 shift can report until 18:00; a 22:00–06:00 shift retains its starting
 date and can report until 10:00 the next day, including daylight-saving changes.
 
@@ -1341,15 +1342,11 @@ Create, correction, delete and restore operations, including legacy document
 replacements, check every changed source and destination scope. Production goal
 changes alone retain their separate permission.
 
-Stickers normally works weekdays, 09:00–17:30. An administrator with production
-settings permission can select a rest-day date and Stickers in Production,
-expand Extra shift, and authorize its start/end times with a mandatory reason.
-The dated authorization applies to tonnage, pairs and targets with the same
-four-hour deadline; revocation
-blocks subsequent ordinary writes. Authorization is stored in SQLite and its
-changes are audited. Times skipped by the spring clock change are rejected.
-Pair planning still validates the dated roster; an extraordinary shift requires
-the stored administrator authorization and regular shift code.
+Stickers normally works weekdays, 09:00–17:30, but its tonnage, pairs and
+targets have no reporting window: an account assigned to Stickers can report
+for any date, at any time, including rest days. Only the team assignment and
+the one-tonnage-record-per-date rule apply. There is no extra-shift
+authorization; the shift closeout still treats Stickers rest days as rest.
 
 Administrators retain their existing workflows and normal module rights.
 Exceptional out-of-window or other-team production needs a reason recorded with

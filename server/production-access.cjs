@@ -2,14 +2,9 @@
 const {isDeepStrictEqual}=require('node:util');
 const {can}=require('./permissions.cjs');
 function createProductionAccess(store,{schedule,problem,now=Date.now}) {
-  const {db}=store, teams=[...schedule.TEAMS,'СТИКЕРИ'];
+  const teams=[...schedule.TEAMS,'СТИКЕРИ'];
   const GRACE=4*60*60*1000;
-  const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Sofia',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
-  db.exec(`CREATE TABLE IF NOT EXISTS production_shift_authorizations(
-    date TEXT PRIMARY KEY, start TEXT NOT NULL, end TEXT NOT NULL,
-    enabled INTEGER NOT NULL, reason TEXT NOT NULL, user_id INTEGER, at INTEGER NOT NULL)`);
   const validReason=value=>typeof value==='string'&&value.trim().length>0&&value.length<=1000;
-  const instant=(date,time)=>{const [hour,minute]=time.split(':').map(Number);return schedule.sofiaInstant(date,hour,minute);};
   function scope(date,team) {
     try {schedule.parseDate(date);if(!teams.includes(team))throw new Error();}
     catch {throw problem(400,'INVALID_PRODUCTION_SCOPE');}
@@ -18,18 +13,15 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
   function interval(date,team) {
     scope(date,team);
     const regular=schedule.shiftInterval(team,date);
-    if(regular)return {...regular,extraordinary:false};
-    if(team!=='СТИКЕРИ')return null;
-    const extra=db.prepare('SELECT start,end FROM production_shift_authorizations WHERE date=? AND enabled=1').get(date);
-    if(!extra)return null;
-    return {start:instant(date,extra.start),end:instant(date,extra.end),code:1,extraordinary:true};
+    return regular?{...regular,extraordinary:false}:null;
   }
+  // Stickers report any day and time; only the team assignment applies.
   function status(date,team,user,at=now(),kind='production-log',shiftCode=null) {
-    const value=interval(date,team), assigned=user.taskTeam===team;
-    const inWindow=!!value&&at>=value.start&&at<value.end+GRACE&&(shiftCode===null||Number(shiftCode)===value.code);
+    const stickers=team==='СТИКЕРИ', value=interval(date,team)??(stickers?{code:1,extraordinary:true}:null), assigned=user.taskTeam===team;
+    const inWindow=stickers?shiftCode===null||Number(shiftCode)===1:!!value&&at>=value.start&&at<value.end+GRACE&&(shiftCode===null||Number(shiftCode)===value.code);
     const prefix=kind==='pair-targets'?'PAIR':'PRODUCTION';
     const code=!teams.includes(user.taskTeam)?prefix+'_TEAM_REQUIRED':!assigned?prefix+'_TEAM_MISMATCH':!inWindow?prefix+'_WINDOW_CLOSED':null;
-    return {date,team,now:at,interval:value,deadline:value?value.end+GRACE:null,
+    return {date,team,now:at,interval:value,deadline:value&&!stickers?value.end+GRACE:null,
       allowed:!code,code,adminException:user.role==='admin'&&!!code};
   }
   function currentScope(user,at=now()) {
@@ -51,7 +43,7 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
     const reported=!pairs&&store.get('production-log').data.entries.some(entry=>entry.date===date&&entry.shift===team);
     return {...value,reported,canCreate:(!reported||pairs||user.role==='admin')&&can(user,pairs?'canCreatePairs':'canCreateProduction')&&(value.allowed||value.adminException),
       canEdit:can(user,pairs?'canEditPairs':'canEditProduction')&&(value.allowed||value.adminException),
-      canAuthorize:!pairs&&user.role==='admin'&&can(user,'canManageProductionSettings'),currentScope:pairs?{...current,shiftCode:interval(current.date,current.team)?.code||1}:current};
+currentScope:pairs?{...current,shiftCode:interval(current.date,current.team)?.code||1}:current};
   }
   function requireChanges(before,after,user,reason,kind='production-log') {
     const pairs=kind==='pair-targets';
@@ -80,22 +72,6 @@ function createProductionAccess(store,{schedule,problem,now=Date.now}) {
     }
     if(exceptions.length)store.audit(user,'production-exception','production-log',{scopes:exceptions,reason:reason.trim()});
   }
-  function configure(input,user) {
-    if(user.role!=='admin'||!can(user,'canViewProduction')||!can(user,'canManageProductionSettings'))throw problem(403,'FORBIDDEN');
-    if(!input||Object.keys(input).some(key=>!['date','start','end','enabled','reason'].includes(key))||typeof input.enabled!=='boolean'||typeof input.start!=='string'||typeof input.end!=='string'||!validReason(input.reason)||
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.end)||input.start>=input.end)throw problem(400,'INVALID_PRODUCTION_AUTHORIZATION');
-    scope(input.date,'СТИКЕРИ');
-    if(schedule.shiftInterval('СТИКЕРИ',input.date))throw problem(400,'INVALID_PRODUCTION_AUTHORIZATION');
-    const start=instant(input.date,input.start),end=instant(input.date,input.end);
-    if(clock.format(start)!==input.start||clock.format(end)!==input.end||end<=start)throw problem(400,'INVALID_PRODUCTION_AUTHORIZATION');
-    return store.transaction(()=>{
-      db.prepare(`INSERT INTO production_shift_authorizations VALUES(?,?,?,?,?,?,?)
-        ON CONFLICT(date) DO UPDATE SET start=excluded.start,end=excluded.end,enabled=excluded.enabled,reason=excluded.reason,user_id=excluded.user_id,at=excluded.at`)
-        .run(input.date,input.start,input.end,input.enabled?1:0,input.reason.trim(),user.id??null,now());
-      store.audit(user,'production-shift-authorize','production-log',{date:input.date,start:input.start,end:input.end,enabled:input.enabled,reason:input.reason.trim()});
-      return read({date:input.date,team:'СТИКЕРИ'},user);
-    });
-  }
-  return {interval,status,read,currentScope,requireChanges,configure};
+  return {interval,status,read,currentScope,requireChanges};
 }
 module.exports={createProductionAccess};

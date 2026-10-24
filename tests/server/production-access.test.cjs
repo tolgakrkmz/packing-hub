@@ -3,8 +3,9 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {randomUUID}=require('node:crypto');
 const {openStore,shiftSchedule:schedule}=require('../../server/store.cjs');
-const actor={id:1,role:'admin'}, operator={id:2,role:'operator',taskTeam:'СТИКЕРИ'};
-const row=(id='demo-shift-report',date='2026-10-16',shift='СТИКЕРИ')=>({id,date,shift,tonnage:1000,brak:0});
+// Team Г works 06:00–14:00 on 2026-10-16; its reporting closes at 18:00.
+const actor={id:1,role:'admin'}, operator={id:2,role:'operator',taskTeam:'Г'}, stickers={id:3,role:'operator',taskTeam:'СТИКЕРИ'};
+const row=(id='demo-shift-report',date='2026-10-16',shift='Г')=>({id,date,shift,tonnage:1000,brak:0});
 const op=entry=>({operationId:randomUUID(),action:'create',entryId:entry.id,entry});
 function fixture(t,at='2026-10-16T12:00:00+03:00') {
   let time=Date.parse(at);
@@ -13,7 +14,7 @@ function fixture(t,at='2026-10-16T12:00:00+03:00') {
 }
 test('tonnage accepts the shift interval plus four hours, with an exclusive end boundary',t=>{
   const {store,setTime}=fixture(t);
-  for(const [time,allowed] of [['08:59:59.999',false],['09:00:00.000',true],['17:29:59.999',true],['17:30:00.000',true],['21:29:59.999',true],['21:30:00.000',false]]) {
+  for(const [time,allowed] of [['05:59:59.999',false],['06:00:00.000',true],['13:59:59.999',true],['14:00:00.000',true],['17:59:59.999',true],['18:00:00.000',false]]) {
     setTime('2026-10-16T'+time+'+03:00');const input=op(row('demo-boundary-'+time));
     const before=store.get('production-log');
     if(allowed) {
@@ -45,18 +46,15 @@ test('night shifts keep their start date across midnight and DST, then stop four
     assert.equal(store.reportOperation('production-log',input,undefined,user).replayed,true);
   }
 });
-test('Saturday Stickers needs an explicit dated administrator authorization and respects revocation',t=>{
-  const {store}=fixture(t,'2026-10-17T12:00:00+03:00'), entry=row('demo-saturday','2026-10-17');
-  assert.throws(()=>store.reportOperation('production-log',op(entry),undefined,operator),{code:'PRODUCTION_WINDOW_CLOSED'});
-  const config={date:entry.date,start:'09:00',end:'17:30',enabled:true,reason:'Fictional overtime approval'};
-  assert.throws(()=>store.productionAccess.configure(config,operator),{status:403});
-  assert.throws(()=>store.productionAccess.configure({...config,reason:''},actor),{status:400});
-  store.productionAccess.configure(config,actor);
-  assert.equal(store.productionAccess.read({date:entry.date,team:'СТИКЕРИ'},operator).allowed,true);
-  store.reportOperation('production-log',op(entry),undefined,operator);
-  store.productionAccess.configure({...config,enabled:false,reason:'Fictional cancellation'},actor);
-  assert.throws(()=>store.reportOperation('production-log',op({...entry,id:'demo-revoked'}),undefined,operator),{code:'PRODUCTION_WINDOW_CLOSED'});
-  assert.equal(store.db.prepare("SELECT count(*) n FROM audit WHERE action='production-shift-authorize'").get().n,2);
+test('Stickers report on any day and at any time; only the team assignment applies',t=>{
+  const {store,setTime}=fixture(t,'2026-10-17T03:00:00+03:00');
+  const state=store.productionAccess.read({date:'2026-10-17',team:'СТИКЕРИ'},stickers);
+  assert.equal(state.allowed,true);assert.equal(state.deadline,null);
+  store.reportOperation('production-log',op(row('demo-saturday','2026-10-17','СТИКЕРИ')),undefined,stickers);
+  setTime('2026-10-20T23:30:00+03:00');
+  store.reportOperation('production-log',op(row('demo-old-weekday','2026-10-14','СТИКЕРИ')),undefined,stickers);
+  assert.throws(()=>store.reportOperation('production-log',op(row('demo-foreign','2026-10-18','СТИКЕРИ')),undefined,operator),{code:'PRODUCTION_TEAM_MISMATCH'});
+  assert.throws(()=>store.reportOperation('production-log',op(row('demo-duplicate','2026-10-17','СТИКЕРИ')),undefined,stickers),{code:'PRODUCTION_ALREADY_REPORTED'});
 });
 test('an administrator exception requires a reason, preserves permissions and records the exception',t=>{
   const {store}=fixture(t), input=op(row('demo-late','2026-10-15'));
@@ -66,12 +64,11 @@ test('an administrator exception requires a reason, preserves permissions and re
   assert.equal(store.db.prepare("SELECT count(*) n FROM audit WHERE action='production-exception'").get().n,1);
   assert.equal(store.reportHistory('production-log',input.entryId,actor).events[0].reason,'Fictional late report');
   assert.throws(()=>store.reportOperation('production-log',{...op(row('demo-hidden')),reason:'Fictional override'},undefined,{...actor,permissionOverrides:{canCreateProduction:false}}),{code:'FORBIDDEN'});
-  assert.throws(()=>store.productionAccess.configure({date:'2026-10-17',start:'09:00',end:'17:30',enabled:true,reason:'Fictional approval'},{...actor,permissionOverrides:{canManageProductionSettings:false}}),{code:'FORBIDDEN'});
 });
 test('corrections, deletion and restore do not reopen an expired reporting window',t=>{
   const {store,setTime}=fixture(t), input=op(row()), editor={...operator,permissionOverrides:{canEditProduction:true}};
   const saved=store.reportOperation('production-log',input,undefined,operator), version=saved.versions[input.entryId];
-  setTime('2026-10-16T21:30:00+03:00');
+  setTime('2026-10-16T18:00:00+03:00');
   for(const action of ['update','delete']) {
     const change={operationId:randomUUID(),action,entryId:input.entryId,reason:'Fictional correction',...(action==='update'?{entry:{...input.entry,tonnage:2000}}:{})};
     assert.throws(()=>store.reportOperation('production-log',change,version,editor),{code:'PRODUCTION_WINDOW_CLOSED'});
@@ -81,11 +78,11 @@ test('corrections, deletion and restore do not reopen an expired reporting windo
 });
 test('assignment works for operators without granting responsibility for tasks',async t=>{
   const {store}=fixture(t), {accounts}=require('../../server/accounts.cjs'), auth=accounts(store);
-  const user=await auth.create('demo-shift-operator','Fictional-password-123','operator',null,{},()=>{},{taskTeam:'СТИКЕРИ'});
-  assert.equal(user.taskTeam,'СТИКЕРИ');assert.equal(user.taskSupervisor,false);assert.equal(user.permissions.canReportTasks,false);
+  const user=await auth.create('demo-shift-operator','Fictional-password-123','operator',null,{},()=>{},{taskTeam:'Г'});
+  assert.equal(user.taskTeam,'Г');assert.equal(user.taskSupervisor,false);assert.equal(user.permissions.canReportTasks,false);
   store.reportOperation('production-log',op(row()),undefined,user);
 });
-test('HTTP policy and grants require current permissions, CSRF and valid scopes',async t=>{
+test('HTTP policy is read-only and Stickers closeout has no deadline',async t=>{
   const {createHubServer}=require('../../server/server.cjs');
   let now=Date.parse('2026-10-17T12:00:00+03:00');
   const hub=createHubServer({filename:':memory:',publicOrigin:'http://127.0.0.1:0',allowHttp:true,taskNow:()=>now});
@@ -95,22 +92,15 @@ test('HTTP policy and grants require current permissions, CSRF and valid scopes'
   const base='http://127.0.0.1:'+hub.server.address().port;
   const login=async user=>{const session=await hub.auth.login(user.username,'Fictional-password-123');return {Origin:base,Cookie:'hub-local-session='+session.token,'X-CSRF-Token':session.csrf,'Content-Type':'application/json'};};
   const ah=await login(admin),oh=await login(chief);
-  const config={date:'2026-10-17',start:'08:00',end:'16:00',enabled:true,reason:'Fictional Saturday shift'};
-  const post=(headers,input=config)=>fetch(base+'/api/production-access',{method:'POST',headers,body:JSON.stringify(input)});
   assert.equal((await fetch(base+'/api/production-access')).status,401);
-  assert.equal((await post(oh)).status,403);
-  assert.equal((await post({...ah,'X-CSRF-Token':''})).status,403);
-  for(const bad of [{...config,date:'2026-02-30'},{...config,date:'2026-10-16'},{...config,end:'07:00'},{...config,start:'25:00'},{...config,start:['09:00']},{...config,team:'А'}])assert.equal((await post(ah,bad)).status,400);
-  assert.equal((await post(ah)).status,200);
-  const closeout=await (await fetch(base+'/api/shift-closeout?date=2026-10-17',{headers:oh})).json();
-  assert.equal(closeout.interval.start,Date.parse('2026-10-17T08:00:00+03:00'));
-  assert.equal(closeout.canReportProduction,true);
-  now=Date.parse('2026-10-17T20:00:00+03:00');
-  const late=await (await fetch(base+'/api/shift-closeout?date=2026-10-17',{headers:oh})).json();
-  assert.equal(late.canReportProduction,false);assert.equal(late.productionAccess.code,'PRODUCTION_WINDOW_CLOSED');
+  // Shift authorizations were removed; the policy endpoint is read-only.
+  assert.equal((await fetch(base+'/api/production-access',{method:'POST',headers:ah,body:'{}'})).status,405);
+  for(const at of ['2026-10-17T12:00:00+03:00','2026-10-17T23:00:00+03:00']) {
+    now=Date.parse(at);
+    const closeout=await (await fetch(base+'/api/shift-closeout?date=2026-10-17',{headers:oh})).json();
+    assert.equal(closeout.canReportProduction,true);assert.equal(closeout.productionAccess.deadline,null);
+  }
   for(const query of ['date=bad','date=2026-10-17&date=2026-10-18','team=bad','clock=0'])assert.equal((await fetch(base+'/api/production-access?'+query,{headers:oh})).status,400);
-  await hub.auth.update(admin.id,{permissions:{canManageProductionSettings:false}},admin);
-  assert.equal((await post(await login(admin))).status,403);
 });
 test('closeout uses the previous production date through the night reporting deadline',t=>{
   let at=Date.parse('2026-10-25T05:59:59.999+02:00');
@@ -122,23 +112,4 @@ test('closeout uses the previous production date through the night reporting dea
   at=Date.parse('2026-10-25T10:00:00+02:00');
   assert.equal(closeout.read({},user).scope.date,'2026-10-25');
   assert.equal(closeout.read({date:'2026-10-24',team:'В',shiftCode:3},user).canReportProduction,false);
-});
-test('overtime rejects nonexistent local times during the spring DST jump',t=>{
-  const {store}=fixture(t);
-  assert.throws(()=>store.productionAccess.configure({date:'2026-03-29',start:'03:30',end:'04:00',enabled:true,reason:'Fictional invalid local time'},actor),{code:'INVALID_PRODUCTION_AUTHORIZATION'});
-});
-test('dated overtime survives SQLite reopen and never authorizes another day or a revoked account',t=>{
-  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-shift-authorization-demo-'));
-  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const filename=path.join(dir,'demo.sqlite'),clock={productionNow:()=>Date.parse('2026-10-17T12:00:00+03:00')};
-  let store=openStore(filename,clock);
-  store.productionAccess.configure({date:'2026-10-17',start:'10:00',end:'18:00',enabled:true,reason:'Fictional Saturday assignment'},actor);store.close();
-  store=openStore(filename,clock);t.after(()=>store.close());
-  const state=store.productionAccess.read({date:'2026-10-17',team:'СТИКЕРИ'},operator);
-  assert.equal(state.allowed,true);assert.equal(state.interval.start,Date.parse('2026-10-17T10:00:00+03:00'));assert.equal(state.deadline,Date.parse('2026-10-17T22:00:00+03:00'));
-  assert.equal(store.productionAccess.read({date:'2026-10-18',team:'СТИКЕРИ'},operator).allowed,false);
-  const input=op(row('demo-persistent-grant','2026-10-17'));
-  assert.throws(()=>store.reportOperation('production-log',input,undefined,{...operator,permissionOverrides:{canCreateProduction:false}}),{code:'FORBIDDEN'});
-  store.reportOperation('production-log',input,undefined,operator);
 });

@@ -156,21 +156,6 @@
     </div>
 
     <p id="productionAccessMessage" role="status" aria-live="polite" hidden></p>
-    <details id="productionExtraShift" hidden>
-      <summary>Извънредна смяна — Стикери</summary>
-      <p>Разрешението важи за избраната смяна. Срокът за въвеждане е до 4 часа след края ѝ.</p>
-      <div class="row">
-        <label>Начало <input type="time" id="productionExtraStart" value="09:00"></label>
-        <label>Край <input type="time" id="productionExtraEnd" value="17:30"></label>
-      </div>
-      <label for="productionExtraReason">Причина за разрешаване или отмяна</label>
-      <textarea id="productionExtraReason" maxlength="1000"></textarea>
-      <div class="row">
-        <button type="button" class="conn-btn" id="productionExtraAllow">Разреши за избраната дата</button>
-        <button type="button" class="conn-btn" id="productionExtraRevoke">Отмени разрешението</button>
-      </div>
-      <p id="productionExtraMessage" role="status" aria-live="polite"></p>
-    </details>
     <button class="save-btn" id="saveBtn" disabled>Изберете смяна за запис</button>
     <button type="button" class="conn-btn" id="cancelReportEdit" hidden>Откажи редакцията</button>
     <div class="msg" id="msg" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></div>

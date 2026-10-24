@@ -8,7 +8,7 @@ function createPairAccessControls({scope,onState}) {
     message.hidden=false;
     const reasons={PAIR_TEAM_REQUIRED:'Акаунтът няма зададен екип. Обърнете се към администратор.',PAIR_TEAM_MISMATCH:'Можете да въвеждате двойки и таргети само за екипа на акаунта си.',PAIR_WINDOW_CLOSED:state?.interval?'Въвеждането е извън разрешения срок. Черновата остава във формата.':'Няма разрешена смяна за този екип на избраната дата.'};
     const format=new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',dateStyle:'short',timeStyle:'short'});
-    message.textContent=pending?'Проверка на разрешената смяна…':!state?'Не може да се провери разрешената смяна. Опреснете връзката.':state.allowed?'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':state.adminException?'Административен достъп според правата на акаунта.':reasons[state.code];
+    message.textContent=pending?'Проверка на разрешената смяна…':!state?'Не може да се провери разрешената смяна. Опреснете връзката.':state.allowed?state.deadline?'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':'Въвеждането за Стикери няма срок.':state.adminException?'Административен достъп според правата на акаунта.':reasons[state.code];
     onState(state);
   }
   async function refresh() {

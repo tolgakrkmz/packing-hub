@@ -205,10 +205,6 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         if(pathname==='/api/production-access') {
           if(request.method==='GET')return json(response,200,store.productionAccess.read(url.searchParams,authorized('canViewProduction')));
-          if(request.method==='POST') {
-            const input=await jsonBody(request,4096),result=store.productionAccess.configure(input,authorized('canManageProductionSettings'));
-            broadcast('production-access',0);return json(response,200,result);
-          }
           throw problem(405,'METHOD_REJECTED');
         }
         if (pathname === '/api/shift-closeout') {
