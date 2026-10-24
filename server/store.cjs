@@ -285,7 +285,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
             const canLowerRaised = can(user, 'canLowerRaisedPairs');
             if (previous?.raisedAt && entry.raisedAt !== previous.raisedAt && !canLowerRaised) throw new Error();
             if (!previous || planFields.some(field => !same(previous[field], entry[field]))) {
-              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:productionAccess.writeInterval(entry.date,entry.team)?.extraordinary===true, canLowerRaised});
+              const planned = pairModel.plan({data: {...current.data, entries: current.data.entries.filter(item => remaining.has(item.id))}, employees: get('personnel').data.employees, context: entry, memberIds: entry.members.map(person => person.id), targetKg: entry.targetKg, targetCrates: entry.targetCrates, workAreas: entry.areas, existingId: previous?.id, id: entry.id, now: entry.createdAt, extraordinary:entry.team==='СТИКЕРИ'||productionAccess.interval(entry.date,entry.team)?.extraordinary===true, canLowerRaised});
               if (planFields.some(field => !same(planned[field], entry[field]))) throw new Error();
             }
             if (previous?.result && !entry.result) throw new Error();
@@ -495,7 +495,7 @@ function openStore(filename, {personnelNow = Date.now, productionNow = Date.now}
     if (name === 'data') list.push({name: 'package-instructions.json', kind: 'file'});
     return list;
   }
-  const productionAccess=createProductionAccess({db,audit,transaction,get,updateDocument},{schedule:shiftSchedule,problem,now:productionNow});
+  const productionAccess=createProductionAccess({db,audit,transaction,get},{schedule:shiftSchedule,problem,now:productionNow});
   const pairRosterAt = (employees, team, date) => pairModel.roster(employees, team, date);
   // Per-account request receipts make retries idempotent; `at` lets each module prune them by age.
   function requestLog(table, invalid, now) {

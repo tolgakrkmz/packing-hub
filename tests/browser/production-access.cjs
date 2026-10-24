@@ -6,18 +6,10 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   const query=new URLSearchParams({date:'2026-10-17',team:'СТИКЕРИ',shiftCode:1});
   setTime('2026-10-17T12:00:00+03:00');
   await operator.goto(base+'/production-log?'+query);
-  // A rest day without a decision accepts the report; it waits for approval.
-  await expect(operator.locator('#productionAccessMessage')).toContainText('чакат одобрение');
+  // Stickers report on any day and at any time; the page shows no deadline.
+  await expect(operator.locator('#productionAccessMessage')).toContainText('няма срок');
   await operator.locator('#tonInput').fill('1234');
   await expect(operator.locator('#saveBtn')).toBeEnabled();
-  await admin.goto(base+'/production-log?'+query);
-  await expect(admin.locator('#productionAccessMessage')).toContainText('Чака одобрение');
-  await admin.locator('#productionExtraShift summary').click();
-  await admin.locator('#productionExtraReason').fill('Fictional Saturday approval');
-  await admin.locator('#productionExtraAllow').click();
-  await expect(admin.locator('#productionExtraMessage')).toContainText('Разрешението е записано');
-  await expect(operator.locator('#saveBtn')).toBeEnabled();
-  await expect(operator.locator('#tonInput')).toHaveValue('1234');
   await operator.locator('#saveBtn').click();
   await expect(operator.locator('#msg')).toHaveAttribute('data-state','success');
   assert.equal(hub.store.get('production-log').data.entries.at(-1).tonnage,1234);
@@ -25,35 +17,20 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   await operator.locator('.shift-btn[data-shift="СТИКЕРИ"]').click();
   await expect(operator.locator('#productionAccessMessage')).toContainText('вече е въведен');
   const first=hub.store.get('production-log');
-  hub.store.reportOperation('production-log',{operationId:require('node:crypto').randomUUID(),action:'delete',entryId:first.data.entries[0].id,reason:'Fictional deadline setup'},first.versions[first.data.entries[0].id],actor);
-  await operator.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-  // A deadline can pass between the preflight and the write. The server rejects
-  // the write, and both the draft and its operation identity remain recoverable.
-  await operator.locator('.shift-btn[data-shift="СТИКЕРИ"]').click();
-  await expect(operator.locator('#saveBtn')).toBeEnabled();await operator.locator('#tonInput').fill('2222');
-  setTime('2026-10-17T21:30:00+03:00');
-  await operator.locator('#saveBtn').click();
-  await expect(operator.locator('#msg')).toHaveAttribute('data-state','rejected');
-  await expect(operator.locator('#msg')).toContainText('Черновата остава');
-  await expect(operator.locator('#tonInput')).toHaveValue('2222');
-  assert.equal(hub.store.get('production-log').data.entries.length,0);
-  // Explicit administrative exception for a late report, with a visible reason.
+  hub.store.reportOperation('production-log',{operationId:require('node:crypto').randomUUID(),action:'delete',entryId:first.data.entries[0].id,reason:'Fictional exception setup'},first.versions[first.data.entries[0].id],actor);
+  // Explicit administrative exception for a team outside the account, with a visible reason.
   const exceptions=hub.store.db.prepare("SELECT count(*) n FROM audit WHERE action='production-exception'").get().n;
-  await admin.reload();await admin.locator('#tonInput').fill('3333');await admin.locator('#saveBtn').click();
+  await admin.goto(base+'/production-log?'+query);
+  await admin.locator('.shift-btn[data-shift="СТИКЕРИ"]').click();
+  await admin.locator('#tonInput').fill('3333');await admin.locator('#saveBtn').click();
   await expect(admin.locator('#reportCorrectionDialog')).toBeVisible();
   await expect(admin.locator('#reportCorrectionDialog h2')).toContainText('Административно изключение');
-  await admin.locator('#reportCorrectionReason').fill('Fictional late report exception');
+  await admin.locator('#reportCorrectionReason').fill('Fictional administrative report');
   await admin.locator('#reportCorrectionConfirm').click();await expect(admin.locator('#msg')).toHaveAttribute('data-state','success');
   assert.equal(hub.store.db.prepare("SELECT count(*) n FROM audit WHERE action='production-exception'").get().n,exceptions+1);
-  await admin.locator('.shift-btn[data-shift="СТИКЕРИ"]').click();
-  await admin.locator('#productionExtraShift summary').click();
-  await admin.locator('#productionExtraReason').fill('Fictional overtime cancellation');
-  admin.once('dialog',dialog=>dialog.accept());
-  await admin.locator('#productionExtraRevoke').click();
-  await expect(admin.locator('#productionExtraMessage')).toContainText('записите са изтрити');
-  assert.equal(hub.store.get('production-log').data.entries.filter(e=>e.date==='2026-10-17'&&e.shift==='СТИКЕРИ').length,0);
   await operator.locator('[data-hub-language=en]').click();
-  await expect(operator.locator('#productionAccessMessage')).toContainText('No authorized shift');
+  await operator.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+  await expect(operator.locator('#productionAccessMessage')).toContainText('already');
   for(const width of [320,390,1440]) {await admin.setViewportSize({width,height:900});await require('./responsive.cjs').assertResponsive(admin,'production access '+width);}
   await operator.context().close();
   setTime('2026-10-16T06:30:00+03:00');
@@ -91,7 +68,7 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   await pairs.clock.setFixedTime(new Date('2026-10-16T19:00:00+03:00'));
   await pairs.goto(base+'/pair-targets');
   await expect(pairs.locator('#contextTeam')).toHaveValue('СТИКЕРИ');
-  await expect(pairs.locator('#pairAccessMessage')).toContainText('21:30');
+  await expect(pairs.locator('#pairAccessMessage')).toContainText('няма срок');
   async function plan(first,second) {
     await pairs.locator('#addPairBtn').click();
     await pairs.locator('#memberOne').selectOption(people[first].id);await pairs.locator('#memberTwo').selectOption(people[second].id);
@@ -100,18 +77,12 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   await plan(0,1);await pairs.locator('#savePairBtn').click();await expect(pairs.locator('#pairDialog')).not.toBeVisible();
   await pairs.locator('#pairsList [data-action=report]').click();
   await pairs.locator('#actualKg').fill('100');await pairs.locator('#actualCrates').fill('1');
-  setTime('2026-10-16T21:29:59.999+03:00');
+  setTime('2026-10-16T23:30:00+03:00');
   await pairs.locator('#savePairBtn').click();await expect(pairs.locator('#pairDialog')).not.toBeVisible();
   assert.equal(hub.store.get('pair-targets').data.entries.at(-1).result.kg,100);
-  await plan(2,3);
-  setTime('2026-10-16T21:30:00+03:00');
-  await pairs.locator('#savePairBtn').click();
-  await expect(pairs.locator('#dialogError')).toHaveAttribute('data-state','rejected');
-  await expect(pairs.locator('#targetKg')).toHaveValue('100');await expect(pairs.locator('#pairDialog')).toBeVisible();
-  await pairs.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-  await expect(pairs.locator('#savePairBtn')).toBeDisabled();
-  assert.equal(hub.store.get('pair-targets').data.entries.length,1);
-  await pairs.locator('#cancelDialogBtn').click();
+  // Stickers keep planning after the regular end; there is no reporting deadline.
+  await plan(2,3);await pairs.locator('#savePairBtn').click();await expect(pairs.locator('#pairDialog')).not.toBeVisible();
+  assert.equal(hub.store.get('pair-targets').data.entries.length,2);
   setTime('2026-10-19T10:00:00+03:00');
   await pairs.clock.setFixedTime(new Date('2026-10-19T10:00:00+03:00'));
   await pairs.locator('#contextDate').fill('2026-10-19');await pairs.locator('#contextDate').dispatchEvent('change');
@@ -119,6 +90,6 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   await expect(pairs.locator('#savePairBtn')).toBeEnabled();
   await pairs.locator('#cancelDialogBtn').click();
   await pairs.context().close();
-  console.log('PASS four-hour production/pair/target deadline, pair-only permissions, retained drafts, dated overtime, exceptions and responsive BG/EN');
+  console.log('PASS four-hour deadline for rotation teams, Stickers without a deadline, pair-only permissions, exceptions and responsive BG/EN');
 }
 module.exports={exerciseProductionAccess};

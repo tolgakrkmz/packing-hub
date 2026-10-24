@@ -4,16 +4,11 @@ const shifts = ['А','Б','В','Г','СТИКЕРИ'];
 function createStatisticsReads(store) {
   const cache = new Map();
   const revision = store.db.prepare('SELECT revision FROM documents WHERE kind=?');
-  const decisions = store.db.prepare('SELECT (SELECT count(*)||\'/\'||ifnull(max(at),0) FROM production_shift_authorizations)||\'/\'||(SELECT count(*) FROM production_pending_shifts) state');
-  // Stickers rest-day reports stay out of statistics until an administrator approves the date.
-  const approved = (kind, data) => kind === 'line-downtime' ? data : {...data, entries: data.entries.filter(entry => (entry.shift ?? entry.team) !== 'СТИКЕРИ' || !store.productionAccess.awaiting(entry.date))};
-  function document(kind) { const value = store.get(kind); return {...value, data: approved(kind, value.data)}; }
   function snapshot(kind) {
     const current = revision.get(kind);
     if (!current) throw problem(404,'NOT_FOUND');
-    const decided = decisions.get(), key = current.revision + '/' + decided.state;
-    if (cache.get(kind)?.key === key) return cache.get(kind);
-    const data = approved(kind, store.get(kind).data), months = new Map(), years = new Map(), byMonth = new Map(), byYear = new Map();
+    if (cache.get(kind)?.revision === current.revision) return cache.get(kind);
+    const data = store.get(kind).data, months = new Map(), years = new Map(), byMonth = new Map(), byYear = new Map();
     for (const entry of data.entries) for (const [rows,key] of [[byMonth,entry.date.slice(0,7)],[byYear,entry.date.slice(0,4)]]) {
       if (!rows.has(key)) rows.set(key,[]);
       rows.get(key).push(entry);
@@ -32,7 +27,7 @@ function createStatisticsReads(store) {
         } else row.durationMin += Number(entry.durationMin) || 0;
       }
     }
-    const result = {key,revision:current.revision,data,byMonth,byYear,summary:{availableYears,
+    const result = {revision:current.revision,data,byMonth,byYear,summary:{availableYears,
       months:[...months.values()].sort((a,b) => a.key.localeCompare(b.key)),
       years:[...years.values()].sort((a,b) => a.key.localeCompare(b.key))}};
     cache.set(kind,result); return result;
@@ -47,6 +42,6 @@ function createStatisticsReads(store) {
       : {module:current.data.module,schemaVersion:current.data.schemaVersion,entries,availableYears:current.summary.availableYears};
     return {revision:current.revision,data};
   }
-  return {read, document};
+  return {read};
 }
 module.exports = {createStatisticsReads};
