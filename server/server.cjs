@@ -207,7 +207,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           if(request.method==='GET')return json(response,200,store.productionAccess.read(url.searchParams,authorized('canViewProduction')));
           if(request.method==='POST') {
             const input=await jsonBody(request,4096),result=store.productionAccess.configure(input,authorized('canManageProductionSettings'));
-            broadcast('production-access',0);return json(response,200,result);
+            broadcast('production-access',0);for(const kind of ['production-log','pair-targets'])broadcast(kind,store.get(kind).revision);return json(response,200,result);
           }
           throw problem(405,'METHOD_REJECTED');
         }
@@ -402,7 +402,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (statisticsData) {
           if (!canViewModule(session.user, 'statistics')) throw problem(403, 'FORBIDDEN');
           if (request.method !== 'GET') throw problem(405, 'METHOD_REJECTED');
-          return json(response, 200, store.get(statisticsData[1]));
+          return json(response, 200, statistics.document(statisticsData[1]));
         }
         const document = pathname.match(/^\/api\/data\/([a-z-]+)$/);
         if (document && !canViewModule(session.user, document[1])) throw problem(403, 'FORBIDDEN');

@@ -12,11 +12,11 @@ function createProductionAccessControls({scope,busy,onState,onDefault}) {
     else {
       const reasons={PRODUCTION_TEAM_REQUIRED:'Акаунтът няма зададен екип. Обърнете се към администратор.',PRODUCTION_TEAM_MISMATCH:'Можете да въвеждате тонаж само за екипа на акаунта си.',PRODUCTION_WINDOW_CLOSED:state.interval?'Въвеждането е извън разрешения срок. Черновата остава във формата.':'Няма разрешена смяна за този екип на избраната дата.'};
       const format=new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',dateStyle:'short',timeStyle:'short'});
-      message.textContent=state.allowed&&state.reported&&!state.canCreate?'Тонажът за тази смяна вече е въведен. Втори запис не е разрешен.':state.allowed?'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':state.adminException?'Административно изключение: при запис е задължителна причина в журнала.':reasons[state.code];
+      message.textContent=state.allowed&&state.reported&&!state.canCreate?'Тонажът за тази смяна вече е въведен. Втори запис не е разрешен.':state.allowed?(state.interval?.pending?'Почивен ден: записите чакат одобрение от администратор. ':'')+'Разрешено въвеждане до '+format.format(state.deadline)+' · Europe/Sofia':state.adminException?'Административно изключение: при запис е задължителна причина в журнала.':reasons[state.code];
     }
     const selected=scope();
-    const weekend=/^\d{4}-\d{2}-\d{2}$/.test(selected.date)&&[0,6].includes(new Date(selected.date+'T12:00:00Z').getUTCDay());
-    extra.hidden=!(state?.canAuthorize&&selected.team==='СТИКЕРИ'&&weekend);
+    extra.hidden=!(state?.canAuthorize&&state.restDay);
+    if(state?.canAuthorize&&state.restDay&&state.interval?.pending)message.textContent='Чака одобрение: записите на Стикери за този почивен ден не влизат в статистиките.';
     if(state&&loadedKey!==key&&!authorizationDraft?.hasDraft()) {
       loadedKey=key;
       const time=value=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Sofia',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(value);
@@ -42,11 +42,12 @@ function createProductionAccessControls({scope,busy,onState,onDefault}) {
     if(configuring||busy()||pending)return;
     const reason=$('productionExtraReason').value.trim(),feedback=$('productionExtraMessage');
     if(!reason){feedback.textContent='Добави причина за разрешението.';$('productionExtraReason').focus();return;}
+    if(!enabled&&!confirm('Да отхвърля ли смяната? Тонажът и двойките на Стикери за тази дата ще бъдат изтрити.'))return;
     const date=scope().date;
     configuring=true;render();feedback.textContent='Записва се...';
     try {
       await HubServer.send('/api/production-access','POST',{date,start:$('productionExtraStart').value,end:$('productionExtraEnd').value,enabled,reason});
-      feedback.textContent=enabled?'Разрешението е записано.':'Разрешението е отменено.';
+      feedback.textContent=enabled?'Разрешението е записано.':'Смяната е отхвърлена и записите са изтрити.';
       $('productionExtraReason').value='';authorizationDraft?.accept();await refresh();
     } catch(error) {feedback.textContent=error.message;}
     finally {configuring=false;render();}

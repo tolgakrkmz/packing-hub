@@ -81,7 +81,11 @@ test('pair-only users can read their deadline without production permission',t=>
   assert.throws(()=>store.productionAccess.read({}, {...actor,permissionOverrides:{canViewPairs:false}},'pair-targets'),{code:'FORBIDDEN'});
 });
 test('a dated extraordinary Stickers shift allows pair planning through the same deadline',t=>{
-  const {store,setTime}=fixture(t,'2026-10-17T19:00:00+03:00'),entry=pair('demo-extra-pair','2026-10-17');
+  const {store,setTime}=fixture(t,'2026-10-17T19:00:00+03:00'),waiting=pair('demo-waiting-pair','2026-10-17'),entry=pair('demo-extra-pair','2026-10-17');
+  // Without a decision the rest-day pair is accepted; a rejection deletes it and closes the date.
+  store.reportOperation('pair-targets',create(waiting),undefined,user);
+  store.productionAccess.configure({date:entry.date,start:'09:00',end:'17:30',enabled:false,reason:'Fictional rejection'},admin);
+  assert.equal(store.get('pair-targets').data.entries.length,0);
   assert.throws(()=>store.reportOperation('pair-targets',create(entry),undefined,user),{code:'PAIR_WINDOW_CLOSED'});
   store.productionAccess.configure({date:entry.date,start:'09:00',end:'17:30',enabled:true,reason:'Fictional extra shift'},admin);
   store.reportOperation('pair-targets',create(entry),undefined,user);

@@ -45,18 +45,38 @@ test('night shifts keep their start date across midnight and DST, then stop four
     assert.equal(store.reportOperation('production-log',input,undefined,user).replayed,true);
   }
 });
-test('Saturday Stickers needs an explicit dated administrator authorization and respects revocation',t=>{
-  const {store}=fixture(t,'2026-10-17T12:00:00+03:00'), entry=row('demo-saturday','2026-10-17');
-  assert.throws(()=>store.reportOperation('production-log',op(entry),undefined,operator),{code:'PRODUCTION_WINDOW_CLOSED'});
+test('Saturday Stickers reports wait for approval and a rejection deletes them',t=>{
+  const {store,setTime}=fixture(t,'2026-10-17T12:00:00+03:00'), entry=row('demo-saturday','2026-10-17');
+  const statistics=require('../../server/statistics.cjs').createStatisticsReads(store);
+  const counted=()=>statistics.read('production-log','2026-10').data.entries.length;
+  const state=store.productionAccess.read({date:entry.date,team:'СТИКЕРИ'},operator);
+  assert.equal(state.allowed,true);assert.equal(state.interval.pending,true);assert.equal(state.restDay,true);
+  store.reportOperation('production-log',op(entry),undefined,operator);
+  assert.equal(counted(),0);
+  assert.equal(statistics.document('production-log').data.entries.length,0);
+  setTime('2026-10-17T21:30:00+03:00');
+  assert.throws(()=>store.reportOperation('production-log',op({...entry,id:'demo-late-pending'}),undefined,operator),{code:'PRODUCTION_WINDOW_CLOSED'});
+  setTime('2026-10-17T12:00:00+03:00');
   const config={date:entry.date,start:'09:00',end:'17:30',enabled:true,reason:'Fictional overtime approval'};
   assert.throws(()=>store.productionAccess.configure(config,operator),{status:403});
   assert.throws(()=>store.productionAccess.configure({...config,reason:''},actor),{status:400});
   store.productionAccess.configure(config,actor);
-  assert.equal(store.productionAccess.read({date:entry.date,team:'СТИКЕРИ'},operator).allowed,true);
-  store.reportOperation('production-log',op(entry),undefined,operator);
-  store.productionAccess.configure({...config,enabled:false,reason:'Fictional cancellation'},actor);
+  assert.equal(store.productionAccess.read({date:entry.date,team:'СТИКЕРИ'},operator).interval.pending,undefined);
+  assert.equal(counted(),1);
+  store.productionAccess.configure({...config,enabled:false,reason:'Fictional rejection'},actor);
+  assert.equal(store.get('production-log').data.entries.length,0);
+  assert.equal(store.reportHistory('production-log',entry.id,actor).events[0].reason,'Fictional rejection');
   assert.throws(()=>store.reportOperation('production-log',op({...entry,id:'demo-revoked'}),undefined,operator),{code:'PRODUCTION_WINDOW_CLOSED'});
   assert.equal(store.db.prepare("SELECT count(*) n FROM audit WHERE action='production-shift-authorize'").get().n,2);
+});
+test('a weekday holiday is a Stickers rest day; other teams keep their rotation',t=>{
+  const {store}=fixture(t,'2026-12-24T12:00:00+02:00');
+  assert.equal(schedule.shiftInterval('СТИКЕРИ','2026-12-24'),null);
+  assert.equal(schedule.shiftInterval('СТИКЕРИ','2026-12-28'),null);
+  assert.ok(schedule.shiftInterval('СТИКЕРИ','2026-12-29'));
+  assert.ok(schedule.shiftInterval(schedule.teamFor(schedule.parseDate('2026-12-24'),1),'2026-12-24'));
+  assert.equal(store.productionAccess.read({date:'2026-12-24',team:'СТИКЕРИ'},operator).interval.pending,true);
+  assert.equal(store.productionAccess.interval('2026-12-24','СТИКЕРИ'),null);
 });
 test('an administrator exception requires a reason, preserves permissions and records the exception',t=>{
   const {store}=fixture(t), input=op(row('demo-late','2026-10-15'));

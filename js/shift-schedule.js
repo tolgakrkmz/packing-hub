@@ -7,6 +7,8 @@ const ShiftSchedule = (() => {
   const LABELS = {1:'1-ва смяна', 2:'2-ра смяна', 3:'Нощна смяна', 'Н':'Почивка'};
   const HOURS = {1:'06:00–14:00', 2:'14:00–22:00', 3:'22:00–06:00'};
   const STICKERS = {team:'СТИКЕРИ', start:'09:00', end:'17:30', hours:'09:00–17:30'};
+  const FIXED_HOLIDAYS = [[1,1],[3,3],[5,1],[5,6],[5,24],[9,6],[9,22],[12,24],[12,25],[12,26]];
+  const holidayYears = new Map();
 
   function localDate(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
@@ -48,8 +50,27 @@ const ShiftSchedule = (() => {
     const end=team===STICKERS.team ? sofiaInstant(date,17,30) : sofiaInstant(code===3?addDays(date,1):date,code===1?14:code===2?22:6);
     return {start,end,code};
   }
+  // Bulgarian official holidays: fixed dates moved off weekends, plus Orthodox Easter Friday–Monday.
+  // shortcut: one-off government rest days are not listed; add them here when a decree appears.
+  function holidays(year) {
+    if(holidayYears.has(year)) return holidayYears.get(year);
+    const days = new Set(), weekend = date => [0,6].includes(date.getDay());
+    const a=year%4, b=year%7, c=year%19, d=(19*c+15)%30, e=(2*a+4*b-d+34)%7;
+    const easter = new Date(year, Math.floor((d+e+114)/31)-1, (d+e+114)%31+1+13);
+    for(let offset=-2; offset<=1; offset++) days.add(localDate(new Date(easter.getFullYear(), easter.getMonth(), easter.getDate()+offset)));
+    for(const [month, day] of FIXED_HOLIDAYS) days.add(localDate(new Date(year, month-1, day)));
+    for(const [month, day] of FIXED_HOLIDAYS) {
+      const date = new Date(year, month-1, day);
+      if(!weekend(date)) continue;
+      do date.setDate(date.getDate()+1); while(weekend(date) || days.has(localDate(date)));
+      days.add(localDate(date));
+    }
+    holidayYears.set(year, days);
+    return days;
+  }
+  function isHoliday(date) { return holidays(date.getFullYear()).has(localDate(date)); }
   function shiftCodeFor(team, date) {
-    if(team === STICKERS.team) return [0,6].includes(date.getDay()) ? 'Н' : 1;
+    if(team === STICKERS.team) return [0,6].includes(date.getDay()) || isHoliday(date) ? 'Н' : 1;
     if(!TEAMS.includes(team)) throw new Error('Невалиден екип.');
     const days = Math.round((Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-EPOCH)/86400000);
     return PATTERN[((days+OFFSETS[team])%16+16)%16];
@@ -79,5 +100,5 @@ const ShiftSchedule = (() => {
     const minutes = at.getHours()*60 + at.getMinutes();
     return context.date === localDate(at) && isScheduled(context) && minutes >= 9*60 && minutes < 17*60+30;
   }
-  return {TEAMS, LABELS, HOURS, STICKERS, localDate, parseDate, addDays, sofiaDate, sofiaInstant, shiftInterval, shiftCodeFor, teamFor, current, isScheduled, hoursFor, isCurrent};
+  return {TEAMS, LABELS, HOURS, STICKERS, localDate, parseDate, addDays, sofiaDate, sofiaInstant, shiftInterval, shiftCodeFor, isHoliday, teamFor, current, isScheduled, hoursFor, isCurrent};
 })();

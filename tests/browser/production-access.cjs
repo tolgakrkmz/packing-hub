@@ -6,10 +6,12 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   const query=new URLSearchParams({date:'2026-10-17',team:'СТИКЕРИ',shiftCode:1});
   setTime('2026-10-17T12:00:00+03:00');
   await operator.goto(base+'/production-log?'+query);
-  await expect(operator.locator('#productionAccessMessage')).toContainText('Няма разрешена смяна');
+  // A rest day without a decision accepts the report; it waits for approval.
+  await expect(operator.locator('#productionAccessMessage')).toContainText('чакат одобрение');
   await operator.locator('#tonInput').fill('1234');
-  await expect(operator.locator('#saveBtn')).toBeDisabled();
+  await expect(operator.locator('#saveBtn')).toBeEnabled();
   await admin.goto(base+'/production-log?'+query);
+  await expect(admin.locator('#productionAccessMessage')).toContainText('Чака одобрение');
   await admin.locator('#productionExtraShift summary').click();
   await admin.locator('#productionExtraReason').fill('Fictional Saturday approval');
   await admin.locator('#productionExtraAllow').click();
@@ -46,8 +48,10 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   await admin.locator('.shift-btn[data-shift="СТИКЕРИ"]').click();
   await admin.locator('#productionExtraShift summary').click();
   await admin.locator('#productionExtraReason').fill('Fictional overtime cancellation');
+  admin.once('dialog',dialog=>dialog.accept());
   await admin.locator('#productionExtraRevoke').click();
-  await expect(admin.locator('#productionExtraMessage')).toContainText('Разрешението е отменено');
+  await expect(admin.locator('#productionExtraMessage')).toContainText('записите са изтрити');
+  assert.equal(hub.store.get('production-log').data.entries.filter(e=>e.date==='2026-10-17'&&e.shift==='СТИКЕРИ').length,0);
   await operator.locator('[data-hub-language=en]').click();
   await expect(operator.locator('#productionAccessMessage')).toContainText('No authorized shift');
   for(const width of [320,390,1440]) {await admin.setViewportSize({width,height:900});await require('./responsive.cjs').assertResponsive(admin,'production access '+width);}

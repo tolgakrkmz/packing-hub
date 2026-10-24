@@ -1341,12 +1341,16 @@ Create, correction, delete and restore operations, including legacy document
 replacements, check every changed source and destination scope. Production goal
 changes alone retain their separate permission.
 
-Stickers normally works weekdays, 09:00–17:30. An administrator with production
-settings permission can select a rest-day date and Stickers in Production,
-expand Extra shift, and authorize its start/end times with a mandatory reason.
-The dated authorization applies to tonnage, pairs and targets with the same
-four-hour deadline; revocation
-blocks subsequent ordinary writes. Authorization is stored in SQLite and its
+Stickers normally works weekdays, 09:00–17:30, except Bulgarian official
+holidays (fixed dates moved off weekends, plus Orthodox Easter Friday–Monday).
+On a rest day without an administrator decision, Stickers can still report
+tonnage, pairs and targets within 09:00–17:30 plus four hours; the date then
+waits for approval and its Stickers reports stay out of statistics. An
+administrator with production settings permission selects the date and Stickers
+in Production, expands Extra shift, and approves it with start/end times and a
+mandatory reason, or rejects it. A rejection deletes that date's Stickers tonnage
+and pairs (report history keeps them for a restore) and blocks subsequent
+ordinary writes. Rest-day history reported before this rule stays counted. Authorization is stored in SQLite and its
 changes are audited. Times skipped by the spring clock change are rejected.
 Pair planning still validates the dated roster; an extraordinary shift requires
 the stored administrator authorization and regular shift code.
