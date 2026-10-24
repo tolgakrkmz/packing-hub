@@ -160,6 +160,17 @@
     const one = $('memberOne'), two = $('memberTwo');
     Array.from(one.options).forEach(option => { option.disabled = !!option.value && option.value === two.value; });
     Array.from(two.options).forEach(option => { option.disabled = !!option.value && option.value === one.value; });
+    updateRecommendation();
+  }
+  // Only a new pair gets a suggestion; a typed target is never overwritten, only the previous suggestion is.
+  function updateRecommendation() {
+    const hint = $('targetHint'), ids = [$('memberOne').value,$('memberTwo').value];
+    hint.textContent = '';
+    if(editing?.mode !== 'plan' || editing.id || !ids[0] || !ids[1] || ids[0] === ids[1]) return;
+    const rec = PairTargets.recommend(data.entries,editing.context,ids,editing.freeIds,data.entries);
+    if(!rec) return;
+    if(!$('targetKg').value || $('targetKg').value === editing.recommendedKg) $('targetKg').value = editing.recommendedKg = String(rec.kg);
+    hint.textContent = `Препоръка: ${fmt(rec.kg)} кг · `+(!rec.averageKg ? 'без история' : (rec.known ? 'средно ' : 'без пълна история · ')+fmt(rec.averageKg/1000)+' т на смяна'+(rec.capped ? ' · до 15% над средното' : ''));
   }
   function openDialog(mode, entry = null) {
     if(busy || !pairsLoaded || !rosterLoaded || scopeLinkError || pairAccess&&!pairAccess.canSave(!!entry?.result)) return;
@@ -190,6 +201,7 @@
     const options = '<option value="">Изберете човек</option>'+people.map(person => `<option translate="no" value="${escape(person.id)}">${escape(person.name)}</option>`).join('');
     $('memberOne').innerHTML = options;
     $('memberTwo').innerHTML = options;
+    editing.freeIds = people.map(person => person.id);
     if(entry) {
       $('memberOne').value = entry.members[0].id;
       $('memberTwo').value = entry.members[1].id;
