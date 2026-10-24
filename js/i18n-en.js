@@ -2079,5 +2079,5 @@ Object.assign(HUB_EN_MESSAGES, {
   "Стикери в щата": "Stickers in headcount",
   "няма смени с двойки и разбивка": "no shifts with pairs and a breakdown",
   "души-смени": "person-shifts",
-  "Т / човек / смяна по линии е от живите данни: хората от двойките на смяната и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.": "Line t / person / shift uses live data: the people in that shift's pairs and the Automatic / Manual breakdown in Production & Scrap. A mixed pair counts half on each line."
+  "Т / човек / смяна по линии е за целия избран месец, от живите данни: хората от двойките на всяка смяна и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.": "Line t / person / shift covers the whole selected month and uses live data: the people in each shift's pairs and the Automatic / Manual breakdown in Production & Scrap. A mixed pair counts half on each line."
 });
