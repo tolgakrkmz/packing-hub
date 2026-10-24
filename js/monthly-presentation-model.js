@@ -19,6 +19,7 @@ const MonthlyPresentation = (() => {
   // Site figures the user may replace with numbers from company systems; the site value stays the default.
   const EDITABLE = ['autoT','manualT','stickersT','cases','scrapT','downtimeH','goalT','p1AutoT','p1ManualT','p1StickersT','p1ScrapT','p1DowntimeH','p2AutoT','p2ManualT','p2StickersT'];
   const TEAMS = [['А', 'A'], ['Б', 'B'], ['В', 'C'], ['Г', 'D']];
+  const SHIFTS = [...TEAMS.map(([team, label]) => [team, 'Team ' + label]), [STICKERS, 'Stickers']];
 
   // Totals in tonnes. Reports without a breakdown count as manual packing so the routes add up to the total.
   function packing(entries, month) {
@@ -64,15 +65,16 @@ const MonthlyPresentation = (() => {
   }
 
   // Team totals only: today's roster headcount (no dated snapshots exist) against the month's packed tonnage per team.
+  // Like the Statistics workforce view, staff is auto + manual + stickers and the stickers shift tonnage counts too.
   function workforce(counts, rows) {
     if (!counts) return null;
-    const teams = [['А', 'A'], ['Б', 'B'], ['В', 'C'], ['Г', 'D']].map(([team, label]) => {
-      const people = Number(counts.production?.[team]) || 0, packed = sum(rows.filter(entry => entry.shift === team), entry => entry.tonnage) / 1000;
-      return {team:'Team ' + label, people, auto:Number(counts.auto?.[team]) || 0, manual:Number(counts.manual?.[team]) || 0, packedT:num(packed), perPerson:people ? finite(packed / people) : 0, perPersonT:num(people ? packed / people : NaN, 1)};
-    });
-    const production = Number(counts.productionTotal) || 0, packed = sum(rows.filter(entry => entry.shift !== STICKERS), entry => entry.tonnage) / 1000;
-    return {active:num(Number(counts.totalActive) || 0), auto:num(Number(counts.autoTotal) || 0), manual:num(Number(counts.manualTotal) || 0), stickers:num(Number(counts.stickers) || 0),
-      perPersonT:num(production ? packed / production : NaN, 1), teams};
+    const packedBy = team => sum(rows.filter(entry => entry.shift === team), entry => entry.tonnage) / 1000;
+    const row = (team, people, auto, manual, packed) => ({team, people, auto, manual, packedT:num(packed), perPerson:people ? finite(packed / people) : 0, perPersonT:num(people ? packed / people : NaN, 1)});
+    const teams = TEAMS.map(([team, label]) => row('Team ' + label, Number(counts.production?.[team]) || 0, Number(counts.auto?.[team]) || 0, Number(counts.manual?.[team]) || 0, packedBy(team)));
+    const stickers = Number(counts.stickers) || 0, staff = (Number(counts.productionTotal) || 0) + stickers;
+    const packed = sum(rows.filter(entry => entry.shift === STICKERS || TEAMS.some(([team]) => team === entry.shift)), entry => entry.tonnage) / 1000;
+    return {active:num(Number(counts.totalActive) || 0), auto:num(Number(counts.autoTotal) || 0), manual:num(Number(counts.manualTotal) || 0), stickers:num(stickers),
+      staff:num(staff), packedT:num(packed), perPersonT:num(staff ? packed / staff : NaN, 1), teams:[...teams, row('Stickers', stickers, '—', '—', packedBy(STICKERS))]};
   }
 
   // Shift tasks and global tasks due in the month; cancelled and not applicable ones are left out.
@@ -93,7 +95,7 @@ const MonthlyPresentation = (() => {
 
   // production: entries covering the month and the two before it; downtime: line-downtime entries; inputs: numbers or empty; today: YYYY-MM-DD for the cover.
   // problemItems: /api/problems items or null; period: {start, end, now} instants of the month in Sofia; counts: workforce counts or null.
-  // goalTons: production log goal; pairTeams: [{team, reported, achieved, successPct, kgPct}] per team; taskItems: /api/tasks items or null.
+  // goalTons: production log goal; pairTeams: [{team, reported, achieved, successPct, kgPct}] per team and the stickers shift; taskItems: /api/tasks items or null.
   // EDITABLE inputs replace the site figures; empty ones fall back to them.
   function values({month, production, downtime, inputs = {}, today = '', problemItems = null, period = null, counts = null, goalTons = 0, pairTeams = [], taskItems = null}) {
     const input = key => inputs[key] === '' || inputs[key] === null || inputs[key] === undefined ? NaN : Number(inputs[key]);
@@ -142,9 +144,9 @@ const MonthlyPresentation = (() => {
         gap:Number.isFinite(goalRatio) ? `${num(Math.abs(now.total - goal))} t ${now.total >= goal ? 'above' : 'below'} goal` : '—', met:now.total >= goal && goal > 0},
       comparison:[change('Packed tonnage', now.total, p1.total, 't'), change('Automatic line', now.auto, p1.auto, 't'), change('Manual packing', now.manual, p1.manual, 't'),
         change('Stickers', now.stickers, p1.stickers, 't', false, 1), change('Scrap', now.scrap, p1.scrap, 't', true, 1), change('Downtime', downtimeH, pick('p1DowntimeH'), 'h', true)],
-      teams:TEAMS.map(([team, label]) => {
+      teams:SHIFTS.map(([team, label]) => {
         const pairs = pairTeams.find(row => row.team === team) || {}, finitePct = value => Number.isFinite(value) ? `${Math.round(value)}%` : '—';
-        return {team:'Team ' + label, packedT:num(sum(inMonth(production, month).filter(entry => entry.shift === team), entry => entry.tonnage) / 1000),
+        return {team:label, packedT:num(sum(inMonth(production, month).filter(entry => entry.shift === team), entry => entry.tonnage) / 1000),
           pairs:String(pairs.reported || 0), met:finitePct(pairs.successPct), kg:finitePct(pairs.kgPct)};
       }),
       tasks:period ? tasks(taskItems, period.start, period.end) : null,
