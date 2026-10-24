@@ -74,7 +74,7 @@ async function exerciseStatisticsCache({page, expect, replaceSource}) {
   await page.clock.setFixedTime(new Date('2026-10-06T08:30:00+03:00'));
   await page.evaluate(() => renderAll());
   assert.deepEqual(await page.evaluate(() => ({changed:getMonthlyDashboardData() !== window.__statisticsOldDay,
-    elapsed:getMonthlyDashboardData().elapsedDays, measurement:aggregateWorkforceMonth(getPersonnelSnapshot()).measurementDays})), {changed:true, elapsed:6, measurement:6});
+    elapsed:getMonthlyDashboardData().elapsedDays, measurement:aggregateWorkforceMonth(getPersonnelSnapshot()).measurementDays})), {changed:true, elapsed:6, measurement:5}); // workforce measures the open month up to the last reported day
   await retained({chartContainer:true, tableContainer:true, monthlyTrendChart:false, wfCapacityChart:false, pairStatsBody:true, avTableContainer:true});
   await replaceSource('production-log', {...production, entries:[]});
   await expect(page.locator('#monthlyResultEmpty')).toBeVisible();

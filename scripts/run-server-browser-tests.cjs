@@ -486,7 +486,7 @@ async function main() {
     await observer.goto(base + '/statistics');
     await observer.locator('[data-stats-tab=workforce]').click();
     await expect(observer.locator('#personnelConnDot')).toHaveClass(/\bon\b/);
-    await expect(observer.locator('#wfStaffSource')).toHaveText('0 производствени');
+    await expect(observer.locator('#wfStaffSource')).toHaveText('2 души');
     await observer.locator('[data-stats-tab=pairs]').click();
     await operator.goto(base + '/pair-targets'); await expect(operator.locator('#pairsConnDot')).toHaveClass(/\bon\b/); await operator.locator('#stickersShiftBtn').click(); await operator.locator('#addPairBtn').click();
     const employees = hub.store.get('personnel').data.employees;

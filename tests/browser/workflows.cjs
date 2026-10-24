@@ -211,7 +211,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await expect(page.locator('#avTableContainer')).toContainText('Тестов престой');
     await page.locator('[data-stats-tab=workforce]').click();
     await expect(page.locator('#wfCurrentStaff')).toHaveText('5');
-    await expect(page.locator('#wfStaffSource')).toHaveText('5 производствени + 0 допълнителни');
+    await expect(page.locator('#wfStaffSource')).toHaveText('5 души');
     await expect(page.locator('#wfMeasuredProductivity')).toHaveText('0,2 т');
     await page.locator('[data-stats-tab=pairs]').click();
     await page.locator('#pairStatsTeam').selectOption(team);
