@@ -59,7 +59,7 @@ async function exerciseStatisticsCache({page, expect, replaceSource}) {
   pairs.entries[0].result.kg = 2000;
   await remember(); await replaceSource('pair-targets', pairs);
   await expect(page.locator('#pairStatsBody')).toContainText('2 / 1');
-  await retained({chartContainer:true, tableContainer:true, monthlyTrendChart:true, lineShiftContainer:true, wfCapacityChart:true, pairStatsBody:false, avTableContainer:true});
+  await retained({chartContainer:true, tableContainer:true, monthlyTrendChart:true, lineShiftContainer:true, wfCapacityChart:false, pairStatsBody:false, avTableContainer:true});
   await expect(page.locator('#pairStatsBody details[data-group^="team-"]').first()).toHaveAttribute('open', '');
   await page.locator('#pairStatsTeam').selectOption('Б');
   await expect(page.locator('#pairStatsBody')).toContainText('Няма двойки');

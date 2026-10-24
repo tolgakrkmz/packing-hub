@@ -2073,5 +2073,11 @@ Object.assign(HUB_EN_MESSAGES, {
   "души за": "people for",
   "Текущ щат": "Current headcount",
   "Месечен тонаж": "Monthly output",
-  "Брой хора в щата": "People in headcount"
+  "Брой хора в щата": "People in headcount",
+  "Автоматична · т / човек / смяна": "Automatic · t / person / shift",
+  "Ръчна · т / човек / смяна": "Manual · t / person / shift",
+  "Стикери в щата": "Stickers in headcount",
+  "няма смени с двойки и разбивка": "no shifts with pairs and a breakdown",
+  "души-смени": "person-shifts",
+  "Т / човек / смяна по линии е от живите данни: хората от двойките на смяната и разбивката Автоматична / Ръчна в „Тонаж и брак“. Смесена двойка се брои по половина на всяка линия.": "Line t / person / shift uses live data: the people in that shift's pairs and the Automatic / Manual breakdown in Production & Scrap. A mixed pair counts half on each line."
 });

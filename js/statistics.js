@@ -151,8 +151,10 @@ const el = {
   wfGap: document.getElementById('wfGap'),
   wfGapSub: document.getElementById('wfGapSub'),
   wfCapacityChart: document.getElementById('wfCapacityChart'),
-  wfAutoCount: document.getElementById('wfAutoCount'),
-  wfManualCount: document.getElementById('wfManualCount'),
+  wfAutoLive: document.getElementById('wfAutoLive'),
+  wfAutoLiveSub: document.getElementById('wfAutoLiveSub'),
+  wfManualLive: document.getElementById('wfManualLive'),
+  wfManualLiveSub: document.getElementById('wfManualLiveSub'),
   wfStickersCount: document.getElementById('wfStickersCount'),
   wfStepProductivity: document.getElementById('wfStepProductivity'),
   wfStepRequired: document.getElementById('wfStepRequired'),
@@ -365,7 +367,7 @@ function renderAll() {
   const period = `${selectedYear}-${selectedDashboardMonth}`, day = statisticsDay();
   statisticsCache.update('monthly-result', [entries, goalTons, el.connDot.classList.contains('on')], period + '|' + day, renderMonthlyDashboard);
   statisticsCache.update('line-shift-table', [entries], period, renderLineShiftForSelectedMonth);
-  statisticsCache.update('workforce-dashboard', [entries, personnelEmployees, personnelCounts, personnelLoaded, goalTons], period + '|' + day, renderWorkforceDashboard);
+  statisticsCache.update('workforce-dashboard', [entries, pairStatistics.getVersion(), personnelEmployees, personnelCounts, personnelLoaded, goalTons], period + '|' + day, renderWorkforceDashboard);
 
   const annual = currentView === 'month';
   const scope = annual ? selectedYear : 'all';
