@@ -2,6 +2,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   if (typeof HubServer === 'undefined') { $('orderMessage').textContent = 'Заданието е достъпно в сървърната версия след вход с личен акаунт.'; $('newOrders').hidden = true; return; }
+  const manager = HubServer.can('canManageUrgentOrders');
   let state = null, busy = false, requestKey = null, sequence = 0;
   const today = () => ShiftSchedule.sofiaDate(), tomorrow = () => ShiftSchedule.addDays(today(), 1);
   const english = () => typeof HubI18n !== 'undefined' && HubI18n.language === 'en';
@@ -16,18 +17,21 @@
     return 'Камион на ' + shortDate(date);
   }
   function card(item) {
-    const node = el('article', '', 'task-card order-card' + (item.packedAt ? '' : item.truckDate <= tomorrow() ? ' is-alert' : ''));
-    const meta = item.packedAt ? '✓ ' + item.packedBy.username + ' · ' + time(item.packedAt) : item.createdBy.username + ' · ' + time(item.createdAt);
+    const open = item.status === 'open';
+    const node = el('article', '', 'task-card order-card' + (item.status === 'missing' ? ' is-missing' : open && item.truckDate <= tomorrow() ? ' is-alert' : ''));
+    const meta = open ? item.createdBy.username + ' · ' + time(item.createdAt) : (item.status === 'packed' ? '✓ ' : '✗ ') + item.markedBy.username + ' · ' + time(item.markedAt) + ' · ' + dayLabel(item.truckDate);
     const actions = el('div', '', 'order-actions');
-    if (item.packedAt) actions.append(button('Върни', () => act(item, 'unpack')));
-    else actions.append(button('✓ Опаковано', () => act(item, 'pack'), 'order-done'), button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
+    if (open) actions.append(button('✓ Опаковано', () => act(item, 'pack'), 'order-done'), button('Не е намерено', () => act(item, 'missing'), 'secondary order-missing'));
+    else actions.append(button('Върни', () => act(item, 'reopen')));
+    if (manager) actions.append(button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
     node.append(el('p', item.text, 'order-text', true), el('p', meta, 'task-meta', true), actions);
     return node;
   }
   function render() {
     if (!state) return;
-    const open = state.items.filter(item => !item.packedAt).sort((a, b) => a.truckDate.localeCompare(b.truckDate) || a.createdAt - b.createdAt);
-    const packed = state.items.filter(item => item.packedAt).sort((a, b) => b.packedAt - a.packedAt);
+    const open = state.items.filter(item => item.status === 'open').sort((a, b) => a.truckDate.localeCompare(b.truckDate) || a.createdAt - b.createdAt);
+    const marked = status => state.items.filter(item => item.status === status).sort((a, b) => b.markedAt - a.markedAt);
+    const packed = marked('packed'), missing = marked('missing');
     if (!open.length) $('orderList').replaceChildren(el('div', 'Няма чакащи поръчки за камиона.', 'task-empty'));
     else $('orderList').replaceChildren(...[...new Set(open.map(item => item.truckDate))].map(date => {
       const items = open.filter(item => item.truckDate === date), group = el('section', '', 'order-group'), heading = el('h2');
@@ -35,6 +39,8 @@
       group.append(heading, ...items.map(card));
       return group;
     }));
+    $('missingSection').hidden = !missing.length; $('missingCount').textContent = String(missing.length);
+    $('missingList').replaceChildren(...missing.map(card));
     $('packedSection').hidden = !packed.length; $('packedCount').textContent = String(packed.length);
     $('packedList').replaceChildren(...packed.map(card));
   }
@@ -73,6 +79,7 @@
     } catch (error) { $('editorFeedback').textContent = failure(error); }
     finally { busy = false; for (const control of controls) control.disabled = false; }
   });
+  $('newOrders').hidden = !manager;
   $('newOrders').addEventListener('click', () => {
     $('orderForm').reset(); requestKey = null; $('editorFeedback').textContent = ''; $('orderTruckDate').value = tomorrow();
     $('orderEditor').showModal(); $('orderText').focus();

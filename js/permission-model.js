@@ -15,7 +15,7 @@
     {title: 'Статистика', module: 'statistics', view: 'canViewStatistics', flags: {canViewStatistics: 'Преглед на статистиката'}},
     {title: 'Задачи', module: 'tasks', view: 'canViewTasks', flags: {canViewTasks: 'Преглед на „Задачи“', canAssignTasks: 'Може да възлага задачи', canReportTasks: 'Отчитане на собствени задачи', canManageTasks: 'Редакция, отмяна и повторно отваряне', canReviewTasks: 'Потвърждаване и връщане за работа'}},
     {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Записване на проблеми и предложения', canManageProblems: 'Редакция и решаване на всички проблеми'}},
-    {title: 'Задание', module: 'urgent-orders', view: 'canViewUrgentOrders', flags: {canViewUrgentOrders: 'Задание: преглед, добавяне и отбелязване на поръчките за камиона'}},
+    {title: 'Задание', module: 'urgent-orders', view: 'canViewUrgentOrders', flags: {canViewUrgentOrders: 'Задание: преглед и отбелязване на поръчките за камиона', canManageUrgentOrders: 'Задание: добавяне и изтриване на поръчки'}},
     {title: 'Стена', module: 'wall', view: 'canViewWall', flags: {canViewWall: 'Преглед на „Стена“ и реакции', canPostWall: 'Публикации и коментари в „Стена“'}},
     // No view flag: rating the own team must never open the ratings report.
     {title: 'Оценки на екипа', flags: {canRateTeam: 'Бързи оценки на хората от собствения екип', canViewRatings: 'Справка за оценките на всички екипи'}},

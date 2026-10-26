@@ -1,4 +1,4 @@
-/* Orders ready for packing that must leave on a truck soon; shift leads add them by hand and mark them packed. */
+/* Orders ready for packing that must leave on a truck soon; one manager adds them by hand, shift leads mark them packed or not found. */
 const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
@@ -8,7 +8,9 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS urgent_orders(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);`);
   const requests = store.requestLog('urgent_order_requests', 'INVALID_ORDER', now), idempotent = requests.run;
   const access = user => { if (!can(user, 'canViewUrgentOrders')) throw problem(403, 'FORBIDDEN'); };
+  const manager = user => { if (!can(user, 'canManageUrgentOrders')) throw problem(403, 'FORBIDDEN'); };
   const actor = user => ({id: user.id, username: user.username});
+  const MARKS = {pack: 'packed', missing: 'missing'};
   function row(id) {
     const found = db.prepare('SELECT * FROM urgent_orders WHERE id=?').get(id);
     if (!found) throw problem(404, 'NOT_FOUND');
@@ -20,14 +22,14 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
   }
   // One pasted line is one order; the text stays free so any order number or note format fits.
   function create(input, user) {
-    access(user);
+    access(user); manager(user);
     const lines = typeof input.text === 'string' ? input.text.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
     const truckDate = input.truckDate;
     if (!lines.length || lines.length > 50 || lines.some(line => line.length > 200) || typeof truckDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(truckDate) || new Date(Date.parse(truckDate + 'T00:00:00Z') || 0).toISOString().slice(0, 10) !== truckDate) throw problem(400, 'INVALID_ORDER');
     return idempotent(input, user, () => {
       const at = now(), ids = lines.map(text => {
         const id = randomUUID();
-        db.prepare('INSERT INTO urgent_orders(id,data) VALUES(?,?)').run(id, JSON.stringify({text, truckDate, createdAt: at, createdBy: actor(user), packedAt: null, packedBy: null}));
+        db.prepare('INSERT INTO urgent_orders(id,data) VALUES(?,?)').run(id, JSON.stringify({text, truckDate, createdAt: at, createdBy: actor(user), status: 'open', markedAt: null, markedBy: null}));
         return id;
       });
       store.audit(user, 'urgent-order-create', 'urgent-orders');
@@ -40,14 +42,15 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
       const item = row(id);
       if (item.revision !== expected) throw problem(409, 'CONFLICT');
       if (input.action === 'remove') {
+        manager(user);
         db.prepare('DELETE FROM urgent_orders WHERE id=?').run(id);
         store.audit(user, 'urgent-order-remove', 'urgent-orders');
         return {removed: id};
       }
-      if (input.action !== 'pack' && input.action !== 'unpack') throw problem(400, 'INVALID_ORDER');
-      if (!item.packedAt !== (input.action === 'pack')) throw problem(409, 'ORDER_STATE');
+      if (!MARKS[input.action] && input.action !== 'reopen') throw problem(400, 'INVALID_ORDER');
+      if ((item.status === 'open') !== (input.action !== 'reopen')) throw problem(409, 'ORDER_STATE');
       const {id: _, revision, ...data} = item;
-      Object.assign(data, input.action === 'pack' ? {packedAt: now(), packedBy: actor(user)} : {packedAt: null, packedBy: null});
+      Object.assign(data, MARKS[input.action] ? {status: MARKS[input.action], markedAt: now(), markedBy: actor(user)} : {status: 'open', markedAt: null, markedBy: null});
       db.prepare('UPDATE urgent_orders SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify(data), id);
       store.audit(user, 'urgent-order-' + input.action, 'urgent-orders');
       return {item: row(id)};
@@ -55,10 +58,10 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
     if (input.requestId) return idempotent({...input, orderId: id, expected}, user, work);
     return store.transaction(work);
   }
-  // Packed orders are kept 30 days so a shift can still check or undo; request ids follow the 90-day window of the other boards.
+  // Marked orders are kept 30 days so a shift can still check or undo; request ids follow the 90-day window of the other boards.
   function prune() {
     const cutoff = now() - 30 * DAY, remove = db.prepare('DELETE FROM urgent_orders WHERE id=?');
-    for (const found of db.prepare('SELECT id,data FROM urgent_orders').all()) { const {packedAt} = JSON.parse(found.data); if (packedAt && packedAt < cutoff) remove.run(found.id); }
+    for (const found of db.prepare('SELECT id,data FROM urgent_orders').all()) { const {markedAt} = JSON.parse(found.data); if (markedAt && markedAt < cutoff) remove.run(found.id); }
     requests.prune(now() - 90 * DAY);
   }
   return {list, create, change, prune};

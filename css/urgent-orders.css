@@ -3,6 +3,9 @@
 .order-group h2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px;margin:0 4px}
 .order-card{padding:14px}
 .order-card.is-alert{border-color:var(--coral)}
+.order-card.is-missing{border-color:var(--amber)}
+.order-missing-group{max-width:720px;margin-top:24px}
+.order-missing-group #missingList{display:flex;flex-direction:column;gap:10px}
 .order-text{margin:0;font-size:16px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
 .order-card .task-meta{margin:6px 0 0}
 .order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
