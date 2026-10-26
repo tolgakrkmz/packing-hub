@@ -24,7 +24,7 @@
     if (open) actions.append(button('✓ Опаковано', () => act(item, 'pack'), 'order-done'), button('Не е намерено', () => act(item, 'missing'), 'secondary order-missing'));
     else actions.append(button('Върни', () => act(item, 'reopen')));
     if (manager) actions.append(button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
-    node.append(el('p', item.text, 'order-text', true), el('p', meta, 'task-meta', true), actions);
+    node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client + ' · ' + item.quantity, 'order-detail', true)] : []), el('p', meta, 'task-meta', true), actions);
     return node;
   }
   function render() {
@@ -74,14 +74,31 @@
     if (busy) return;
     busy = true; const controls = [...$('orderForm').querySelectorAll('input,textarea,button')]; for (const control of controls) control.disabled = true; $('editorFeedback').textContent = '';
     try {
-      await HubServer.send('/api/urgent-orders', 'POST', keyed({text: $('orderText').value, truckDate: $('orderTruckDate').value}));
-      requestKey = null; busy = false; $('orderEditor').close(); $('orderMessage').textContent = 'Поръчките са добавени.';
+      const result = await HubServer.send('/api/urgent-orders', 'POST', keyed({text: $('orderText').value, truckDate: $('orderTruckDate').value}));
+      requestKey = null; busy = false; $('orderEditor').close();
+      $('orderMessage').textContent = 'Добавени поръчки: ' + result.ids.length + (result.duplicates ? ' · вече в списъка: ' + result.duplicates : '') + (result.skipped ? ' · пропуснати редове: ' + result.skipped : '');
     } catch (error) { $('editorFeedback').textContent = failure(error); }
     finally { busy = false; for (const control of controls) control.disabled = false; }
   });
+  // The preview uses the server's parser, so what is shown is what will be saved.
+  function preview() {
+    const known = state ? state.items.map(HubUrgentOrders.keyOf) : [];
+    const {orders, skipped, duplicates} = HubUrgentOrders.parse($('orderText').value, known);
+    if (!orders.length && !skipped && !duplicates) { $('orderPreview').replaceChildren(); return; }
+    const summary = el('p', 'Ще бъдат добавени: ' + orders.length + (duplicates ? ' · вече в списъка: ' + duplicates : '') + (skipped ? ' · пропуснати редове: ' + skipped : ''), 'task-meta');
+    const parts = [summary];
+    if (orders.some(order => order.client)) {
+      const table = el('table', '', 'order-preview-table'), head = el('tr');
+      for (const label of ['Поръчка', 'Клиент', 'Профил', 'Вариант', 'Количество']) head.append(el('th', label));
+      table.append(head, ...orders.slice(0, 50).map(order => { const tr = el('tr'); for (const key of ['order', 'client', 'profile', 'variant', 'quantity']) tr.append(el('td', order[key] || '', '', true)); return tr; }));
+      const wrap = el('div', '', 'order-preview-scroll'); wrap.append(table); parts.push(wrap);
+    }
+    $('orderPreview').replaceChildren(...parts);
+  }
+  $('orderText').addEventListener('input', preview);
   $('newOrders').hidden = !manager;
   $('newOrders').addEventListener('click', () => {
-    $('orderForm').reset(); requestKey = null; $('editorFeedback').textContent = ''; $('orderTruckDate').value = tomorrow();
+    $('orderForm').reset(); $('orderPreview').replaceChildren(); requestKey = null; $('editorFeedback').textContent = ''; $('orderTruckDate').value = tomorrow();
     $('orderEditor').showModal(); $('orderText').focus();
   });
   for (const control of document.querySelectorAll('[data-close]')) control.addEventListener('click', () => { if (!busy) $(control.dataset.close).close(); });

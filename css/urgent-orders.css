@@ -8,6 +8,12 @@
 .order-missing-group #missingList{display:flex;flex-direction:column;gap:10px}
 .order-text{margin:0;font-size:16px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
 .order-card .task-meta{margin:6px 0 0}
+.order-detail{margin:4px 0 0;font-size:14px;overflow-wrap:anywhere}
+.order-preview .task-meta{margin:0 0 8px}
+.order-preview-scroll{overflow-x:auto;max-height:260px;margin-bottom:12px;border:1px solid var(--border);border-radius:8px}
+.order-preview-table{width:100%;border-collapse:collapse;font-size:13px}
+.order-preview-table th,.order-preview-table td{padding:6px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)}
+.order-preview-table th{position:sticky;top:0;background:var(--panel-2)}
 .order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .tasks-wrap .order-actions button{min-height:44px;padding:8px 14px}
 .tasks-wrap .order-actions button.order-done{flex:1 1 auto}

@@ -53,7 +53,7 @@ test('during the pilot only admins and granted accounts have access; input is ch
   assert.equal((await s.request('/api/urgent-orders', s.operator)).status, 403);
   assert.equal((await s.add('Fictional', s.operator)).status, 403);
   assert.equal((await s.request('/urgent-orders', s.operator)).status, 403);
-  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(201)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(51).fill('Fictional').join('\n')}]) {
+  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(301)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(301).fill('Fictional').join('\n')}]) {
     assert.equal((await s.request('/api/urgent-orders', s.admin, 'POST', {text: 'Fictional', truckDate: '2026-10-27', requestId: randomUUID(), ...extra})).status, 400, JSON.stringify(extra).slice(0, 40));
   }
   await s.add('Fictional'); const [item] = await s.list();
@@ -67,4 +67,13 @@ test('marked orders are removed after 30 days, open ones stay', async t => {
   await s.change(packed, s.lead, 'pack'); await s.change(missing, s.lead, 'missing');
   s.clock.at += 31 * 86400000; s.hub.urgentOrders.prune();
   assert.deepEqual((await s.list()).map(value => value.status), ['open']);
+});
+test('pasted report rows keep their columns and a second paste adds only new orders', async t => {
+  const s = await setup(t);
+  const row = n => 'DP000000' + n + '_10000\tFictional Client Ltd\t500-000' + n + '\tA000001\t10' + n + '\t0\t10' + n;
+  const post = text => s.request('/api/urgent-orders', s.admin, 'POST', {text, truckDate: '2026-10-27', requestId: randomUUID()}).then(response => response.json());
+  assert.deepEqual(await post(['Поръчка\tКлиент', row(1), row(2)].join('\n')).then(({ids, ...rest}) => [ids.length, rest]), [2, {skipped: 1, duplicates: 0}]);
+  assert.deepEqual(await post([row(2), row(3)].join('\n')).then(({ids, ...rest}) => [ids.length, rest]), [1, {skipped: 0, duplicates: 1}]);
+  const saved = (await s.list()).find(item => item.order === 'DP0000001_10000');
+  assert.deepEqual([saved.client, saved.profile, saved.variant, saved.quantity, saved.text], ['Fictional Client Ltd', '500-0001', 'A000001', '101', 'DP0000001_10000 · 500-0001 · A000001']);
 });
