@@ -516,6 +516,8 @@ const HUB_EN_MESSAGES = {
   "Без име": "Unnamed",
   "Без посочена причина": "No reason specified",
   "Бележка": "Note",
+  "Налично": "Available",
+  "Пещ": "Furnace",
   "Бележка (незадължително)": "Note (optional)",
   "Брак (кг)": "Scrap (kg)",
   "Браузърът не поддържа директен достъп до папки. Моля, използвайте Chrome/Edge.": "This browser does not support direct folder access. Please use Chrome or Edge.",

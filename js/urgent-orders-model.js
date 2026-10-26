@@ -4,15 +4,18 @@
   if (typeof module === 'object' && module.exports) module.exports = model;
   else root.HubUrgentOrders = model;
 })(typeof globalThis === 'object' ? globalThis : this, () => {
-  // A copied report row: order_position, client, profile (500-…), profile variant (A…), three quantities, then an optional note.
+  // A copied report row: order_position, client, profile (500-…), profile variant (A…), then numbers and an optional note.
+  // Numbers: ordered, produced, remaining, then in the newer report available kg and the furnace.
   // Matched by field shape, not by column separators: Excel gives tabs, screens give one or more spaces.
-  const NUMBER = '-?\\d+(?:[.,]\\d+)?';
-  const ROW = new RegExp('^(\\S+)\\s+(.+?)\\s+(\\d+-\\d+)\\s+([A-Z]\\d+)\\s+(' + NUMBER + ')\\s+' + NUMBER + '\\s+' + NUMBER + '(?:\\s+(.*))?$');
+  const ROW = /^(\S+)\s+(.+?)\s+(\d+-\d+)\s+([A-Z]\d+)\s+(.+)$/, NUMBER = /^-?\d+(?:[.,]\d+)?$/;
   function row(line) {
     const found = line.match(ROW);
     if (!found) return null;
-    const [, order, client, profile, variant, quantity, note = ''] = found;
-    return {order, client, profile, variant, quantity, note: note.trim()};
+    const [, order, client, profile, variant, rest] = found, tokens = rest.split(/\s+/), numbers = [];
+    while (numbers.length < 5 && NUMBER.test(tokens[0] ?? '')) numbers.push(tokens.shift());
+    if (numbers.length < 3) return null;
+    // shortcut: a 4-number row is read as the newer report (4th = available kg); an older row ending in a bare furnace number reads the same way.
+    return {order, client, profile, variant, quantity: numbers[0], available: numbers[3] ?? '', furnace: numbers[4] ?? '', note: tokens.join(' ')};
   }
   // When any line is a report row, other lines (headers, totals) are skipped; otherwise each line is one free-text order.
   // One order can sit on several rows with different notes, so only identical rows count as repeats.
