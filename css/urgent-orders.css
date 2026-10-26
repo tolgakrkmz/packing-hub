@@ -9,6 +9,7 @@
 .order-text{margin:0;font-size:16px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
 .order-card .task-meta{margin:6px 0 0}
 .order-note{margin:6px 0 0;padding:4px 8px;border-left:3px solid var(--amber);background:var(--amber-dark);border-radius:0 6px 6px 0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.order-client{margin:6px 0 0;font-size:15px;font-weight:700;overflow-wrap:anywhere}
 .order-detail{margin:4px 0 0;font-size:14px;overflow-wrap:anywhere}
 .order-preview .task-meta{margin:0 0 8px}
 .order-preview-scroll{overflow-x:auto;max-height:260px;margin-bottom:12px;border:1px solid var(--border);border-radius:8px}
