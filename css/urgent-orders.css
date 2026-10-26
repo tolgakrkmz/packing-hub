@@ -1,11 +1,11 @@
-.order-list{display:flex;flex-direction:column;gap:18px;max-width:720px}
-.order-group{display:flex;flex-direction:column;gap:10px}
-.order-group h2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px;margin:0 4px}
-.order-card{padding:14px}
-.order-card.is-alert{border-color:var(--coral)}
-.order-card.is-missing{border-color:var(--amber)}
-.order-missing-group{max-width:720px;margin-top:24px}
-.order-missing-group #missingList{display:flex;flex-direction:column;gap:10px}
+/* Cards fill the page width like the other boards; one column on phones. */
+.order-list{display:flex;flex-direction:column;gap:24px;margin-top:24px}
+.order-group,.order-missing-group #missingList,.order-packed>div{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start}
+.order-group h2{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px;margin:0 4px}
+.order-card{padding:16px}
+.order-card.is-missing{border-left-color:var(--amber)}
+.order-missing-group{margin-top:28px}
+.order-missing-group #missingList{grid-column:1/-1}
 .order-text{margin:0;font-size:16px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
 .order-card .task-meta{margin:6px 0 0}
 .order-detail{margin:4px 0 0;font-size:14px;overflow-wrap:anywhere}
@@ -17,6 +17,8 @@
 .order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .tasks-wrap .order-actions button{min-height:44px;padding:8px 14px}
 .tasks-wrap .order-actions button.order-done{flex:1 1 auto}
-.order-packed{max-width:720px;margin-top:24px}
+.order-packed{margin-top:28px}
 .order-packed summary{cursor:pointer;font-weight:600;padding:8px 4px}
-.order-packed .order-card{margin-top:10px;opacity:.75}
+.order-packed>div{margin-top:10px}
+.order-packed .order-card{opacity:.75}
+@media(max-width:650px){.order-group,.order-missing-group #missingList,.order-packed>div{grid-template-columns:1fr}.tasks-wrap .order-actions button{flex:1 1 0}.tasks-wrap .order-actions button.order-done{flex-basis:100%}}
