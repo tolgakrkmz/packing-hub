@@ -92,3 +92,16 @@ test('the magic button splits kilograms by team output, keeps live shifts and se
   const load = key => items.filter(item => (placed[item.id] || (item.id === 'kept' && slotKey(second))) === key).reduce((sum, item) => sum + Number(item.quantity), 0);
   assert.deepEqual([load(slotKey(first)), load(slotKey(second))], [1300, 4200]); // 5500 kg at 1:3 is ideally 1375 / 4125
 });
+test('the running shift counts only its time left; with under an hour left nothing new goes to it', () => {
+  const {remaining} = require('../js/urgent-orders-model.js');
+  const at = sofia('2026-10-26', 18), [running, night] = slots(shiftSchedule, at, '2026-10-27');
+  assert.equal(remaining(shiftSchedule, at, running).share, 0.5); // 18:00 in the 14–22 shift
+  // Equal teams: the half-time running shift takes a third of the kilograms, the full night shift two thirds.
+  const items = ['a', 'b', 'c'].map(id => ({id, status: 'open', truckDate: '2026-10-27', quantity: '1000'}));
+  const placed = distribute(shiftSchedule, at, items).map(entry => slotKey(entry.shift));
+  assert.deepEqual([placed.filter(key => key === slotKey(running)).length, placed.filter(key => key === slotKey(night)).length], [1, 2]);
+  // At 05:30 only the night shift is left before a truck due that day, with 30 minutes: the order stays without a shift.
+  const late = sofia('2026-10-27', 5) + 30 * 60000;
+  assert.deepEqual(slots(shiftSchedule, late, '2026-10-27').map(slotKey), ['2026-10-26/3']);
+  assert.deepEqual(distribute(shiftSchedule, late, [{id: 'x', status: 'open', truckDate: '2026-10-27', quantity: '500'}]), []);
+});

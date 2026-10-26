@@ -27,15 +27,27 @@
     if (item.shift) return el('p', 'Не е опакована от ' + slotLabel(item.shift) + ' · чака нова смяна', 'order-shift is-late', true);
     return el('p', options(item).length ? 'Без смяна' : 'Без смяна · няма време до камиона', 'order-shift is-waiting');
   }
+  const duration = ms => { const minutes = Math.round(ms / 60000); return (minutes >= 60 ? Math.floor(minutes / 60) + ' ч ' : '') + minutes % 60 + ' мин'; };
+  // A running shift shows the time it has left; a later one its start.
+  function timing(slot) {
+    const {start, ms} = HubUrgentOrders.remaining(ShiftSchedule, at(), slot);
+    return start <= at() ? 'остават ' + duration(ms) : 'започва ' + (ShiftSchedule.sofiaDate(new Date(start)) === today() ? 'в ' : shortDate(ShiftSchedule.sofiaDate(new Date(start))) + ' в ') + ShiftSchedule.HOURS[slot.code].slice(0, 5);
+  }
+  // A shift lead's own work: the running shift of their team, else its next one.
+  function myShift() {
+    const team = HubServer.user.taskTeam;
+    if (!ShiftSchedule.TEAMS.includes(team)) return null;
+    return HubUrgentOrders.slots(ShiftSchedule, at(), ShiftSchedule.addDays(today(), 4)).find(slot => slot.team === team) || null;
+  }
   function shiftPicker(item) {
     const select = el('select', '', 'order-shift-select'); select.setAttribute('aria-label', 'Смяна за ' + item.text);
-    select.append(new Option('Без смяна', ''), ...options(item).map(slot => new Option(slotLabel(slot), HubUrgentOrders.slotKey(slot))));
+    select.append(new Option('Без смяна', ''), ...options(item).map(slot => new Option(slotLabel(slot) + (HubUrgentOrders.remaining(ShiftSchedule, at(), slot).start <= at() ? ' (' + timing(slot) + ')' : ''), HubUrgentOrders.slotKey(slot))));
     select.value = live(item) ? HubUrgentOrders.slotKey(item.shift) : '';
     select.addEventListener('change', () => { const [date, code] = select.value.split('/'); act(item, 'assign', {shift: select.value ? {date, code: Number(code)} : null}); });
     return select;
   }
   const figures = item => ['Поръчка ' + item.quantity + ' кг', ...(item.available ? ['Налично ' + item.available + ' кг'] : []), ...(item.furnace ? ['Пещ ' + item.furnace] : [])].join(' · ');
-  function card(item) {
+  function card(item, own = false) {
     const open = item.status === 'open';
     const node = el('article', '', 'task-card order-card' + (item.status === 'missing' ? ' is-missing' : open && item.truckDate <= tomorrow() ? ' is-alert' : ''));
     const meta = open ? item.createdBy.username + ' · ' + time(item.createdAt) : (item.status === 'packed' ? '✓ ' : '✗ ') + item.markedBy.username + ' · ' + time(item.markedAt) + ' · ' + dayLabel(item.truckDate);
@@ -44,14 +56,18 @@
     else actions.append(button('Върни', () => act(item, 'reopen')));
     if (manager) actions.append(button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
     node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client, 'order-client', true), el('p', figures(item), 'order-detail')] : []), ...(item.note ? [el('p', '⚠ ' + item.note, 'order-note', true)] : []),
-      ...(open ? [...(manager && live(item) ? [] : [shiftLine(item)]), ...(manager ? [shiftPicker(item)] : [])] : []), el('p', meta, 'task-meta', true), actions);
+      ...(open ? [...((manager || own === true) && live(item) ? [] : [shiftLine(item)]), ...(manager ? [shiftPicker(item)] : [])] : []), el('p', meta, 'task-meta', true), actions);
     return node;
   }
   function render() {
     if (!state) return;
     const all = state.items.filter(item => item.status === 'open').sort((a, b) => a.truckDate.localeCompare(b.truckDate) || a.createdAt - b.createdAt);
     filterOptions(all);
-    const chosen = $('shiftFilter').value, open = all.filter(item => chosen === 'all' || (chosen === 'team' ? live(item) && item.shift.team === HubServer.user.taskTeam : placeOf(item) === chosen));
+    const chosen = $('shiftFilter').value, mine = myShift(), mineKey = mine && HubUrgentOrders.slotKey(mine);
+    const own = mine ? all.filter(item => placeOf(item) === mineKey) : [];
+    renderMine(mine, own);
+    // The lead's own shift is shown on top, so the full list below leaves it out.
+    const open = all.filter(item => chosen === 'all' ? !own.includes(item) : chosen === 'team' ? live(item) && item.shift.team === HubServer.user.taskTeam : placeOf(item) === chosen);
     const marked = status => state.items.filter(item => item.status === status).sort((a, b) => b.markedAt - a.markedAt);
     const packed = marked('packed'), missing = marked('missing');
     if (!open.length) $('orderList').replaceChildren(el('div', 'Няма чакащи поръчки за камиона.', 'task-empty'));
@@ -65,6 +81,14 @@
     $('missingList').replaceChildren(...missing.map(card));
     $('packedSection').hidden = !packed.length; $('packedCount').textContent = String(packed.length);
     $('packedList').replaceChildren(...packed.map(card));
+  }
+  function renderMine(slot, items) {
+    const section = $('myShift');
+    section.hidden = !slot;
+    if (!slot) return;
+    const heading = el('h2'), kg = Math.round(items.reduce((sum, item) => sum + HubUrgentOrders.weight(item), 0)).toLocaleString('bg-BG');
+    heading.append(el('span', 'Твоето задание · ' + slotLabel(slot), '', true), el('span', String(items.length), 'task-badge'));
+    section.replaceChildren(heading, el('p', timing(slot) + ' · ' + kg + ' кг', 'order-mine-meta'), ...(items.length ? items.map(item => card(item, true)) : [el('p', 'Няма поръчки за твоята смяна.', 'task-muted')]));
   }
   // Options list every shift that holds or can still take an open order, with its order count and kilograms.
   function filterOptions(open) {
@@ -134,7 +158,7 @@
   $('distributeOrders').addEventListener('click', async () => {
     if (busy || !confirm('Поръчките без смяна и тези, чиято смяна е минала, ще се разпределят по смените до камиона според обичайния тонаж на екипите. Продължи?')) return;
     busy = true;
-    try { const result = await HubServer.send('/api/urgent-orders/distribute', 'POST', {requestId: crypto.randomUUID()}); $('orderMessage').textContent = 'Разпределени поръчки: ' + result.assigned; }
+    try { const result = await HubServer.send('/api/urgent-orders/distribute', 'POST', {requestId: crypto.randomUUID()}); $('orderMessage').textContent = 'Разпределени поръчки: ' + result.assigned + (result.unplaced ? ' · ⚠ без смяна с достатъчно време: ' + result.unplaced + ' — дай им смяна ръчно' : ''); }
     catch (error) { $('orderMessage').textContent = failure(error); }
     finally { busy = false; await refresh(); }
   });

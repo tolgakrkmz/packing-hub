@@ -29,3 +29,6 @@
 .order-shift.is-waiting{color:var(--text-muted)}
 .order-shift.is-late{color:var(--coral)}
 .tasks-wrap .order-shift-select{width:100%;margin-top:6px}
+.order-mine{margin:8px 0 24px;padding:16px;border:1px solid var(--teal);border-radius:12px;background:var(--panel-2)}
+.order-mine h2{font-size:17px}
+.order-mine-meta{grid-column:1/-1;margin:-4px 4px 4px;font-size:14px;font-weight:600;color:var(--teal)}

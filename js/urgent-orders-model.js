@@ -56,17 +56,24 @@
   const pressing = item => item.available === '0' || /пресова/i.test(item.note || '');
   // An open order keeps its shift while that shift can still pack it; otherwise it is waiting for one.
   const live = (schedule, at, item) => !!item.shift && slots(schedule, at, item.truckDate).some(slot => slotKey(slot) === slotKey(item.shift));
-  // The magic button: split waiting kilograms so each shift's load follows its team's usual output.
+  // Time a shift still has: the running shift counts only from now; MIN_LEFT is the least worth handing new orders to.
+  const MIN_LEFT = 3600000;
+  function remaining(schedule, at, slot) {
+    const {start, end} = schedule.shiftInterval(slot.team, slot.date);
+    return {start, end, ms: Math.max(0, end - Math.max(at, start)), share: Math.max(0, end - Math.max(at, start)) / (end - start)};
+  }
+  // The magic button: split waiting kilograms so each shift's load follows its team's usual output and the time it has left.
   // Earlier trucks and heavier orders go first; orders still to be pressed skip the first shift when there is a later one.
+  // Orders with no shift that has an hour left stay without one, so the manager decides.
   function distribute(schedule, at, items, capacity = {}) {
     const open = items.filter(item => item.status === 'open'), loads = new Map();
     const known = Object.values(capacity).filter(value => value > 0);
     const average = known.length ? known.reduce((sum, value) => sum + value, 0) / known.length : 1;
-    const score = (slot, extra) => ((loads.get(slotKey(slot)) || 0) + extra) / (capacity[slot.team] > 0 ? capacity[slot.team] : average);
+    const score = (slot, extra) => ((loads.get(slotKey(slot)) || 0) + extra) / ((capacity[slot.team] > 0 ? capacity[slot.team] : average) * remaining(schedule, at, slot).share);
     for (const item of open) if (live(schedule, at, item)) loads.set(slotKey(item.shift), (loads.get(slotKey(item.shift)) || 0) + weight(item));
     const plan = [];
     for (const item of open.filter(item => !live(schedule, at, item)).sort((a, b) => a.truckDate.localeCompare(b.truckDate) || weight(b) - weight(a))) {
-      let options = slots(schedule, at, item.truckDate);
+      let options = slots(schedule, at, item.truckDate).filter(slot => remaining(schedule, at, slot).ms >= MIN_LEFT);
       if (!options.length) continue;
       if (pressing(item) && options.length > 1) options = options.slice(1);
       const best = options.reduce((chosen, slot) => score(slot, weight(item)) < score(chosen, weight(item)) ? slot : chosen);
@@ -75,5 +82,5 @@
     }
     return plan;
   }
-  return {parse, keyOf, slots, slotKey, weight, live, distribute};
+  return {parse, keyOf, slots, slotKey, weight, live, remaining, distribute};
 });

@@ -2,7 +2,7 @@
 const {randomUUID} = require('node:crypto');
 const {problem, shiftSchedule} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
-const {parse, keyOf, slots, slotKey, distribute} = require('../js/urgent-orders-model.js');
+const {parse, keyOf, slots, slotKey, live, distribute} = require('../js/urgent-orders-model.js');
 const DAY = 86400000;
 function createUrgentOrders(store, {now = Date.now} = {}) {
   const {db} = store;
@@ -90,7 +90,8 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
       const plan = distribute(shiftSchedule, now(), items, output), update = db.prepare('UPDATE urgent_orders SET data=?,revision=revision+1 WHERE id=?');
       for (const {id, shift} of plan) { const {id: _, ...data} = items.find(item => item.id === id); update.run(JSON.stringify({...data, shift}), id); }
       store.audit(user, 'urgent-order-distribute', 'urgent-orders');
-      return {assigned: plan.length};
+      const placed = new Set(plan.map(entry => entry.id));
+      return {assigned: plan.length, unplaced: items.filter(item => item.status === 'open' && !placed.has(item.id) && !live(shiftSchedule, now(), item)).length};
     });
   }
   // Marked orders are kept 30 days so a shift can still check or undo; request ids follow the 90-day window of the other boards.
