@@ -25,6 +25,8 @@ const autoKgInput = document.getElementById('autoKgInput');
 const autoCrateInput = document.getElementById('autoCrateInput');
 const manKgInput = document.getElementById('manKgInput');
 const manCrateInput = document.getElementById('manCrateInput');
+const crateInput = document.getElementById('crateInput');
+const stickerCrateField = document.getElementById('stickerCrateField');
 const totalReadout = document.getElementById('totalReadout');
 
 function readQuantity(control){
@@ -36,12 +38,16 @@ function quantityError(){
   msg.dataset.state = 'error';
 }
 
-breakdownToggle.addEventListener('change', ()=>{
+// Смените А–Г винаги отчитат разбивка Автоматична / Ръчна опаковка, а СТИКЕРИ — общ тонаж и каси.
+// Чекбоксът е скрит и се задава от смяната; стар запис без разбивка се редактира в простия вид.
+function applyEntryMode(){
   const on = breakdownToggle.checked;
   simpleTonRow.style.display = on ? 'none' : 'flex';
   breakdownRows.style.display = on ? 'block' : 'none';
+  stickerCrateField.hidden = selectedShift !== 'СТИКЕРИ';
   updateTotalReadout();
-});
+}
+breakdownToggle.addEventListener('change', applyEntryMode);
 
 function updateTotalReadout(){
   const auto = readQuantity(autoKgInput), manual = readQuantity(manKgInput);
@@ -75,11 +81,11 @@ const writer = createReportWriter({
   controls: () => Array.from(document.querySelectorAll('input, select, textarea, button, .shift-btn')),
   message: msg, retryButton: document.getElementById('retrySaveBtn')
 });
-for(const control of [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]) {
+for(const control of [tonInput,brakInput,crateInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]) {
   for(const event of ['input','change']) control.addEventListener(event, () => { reportDraft = true; });
 }
 const productionDraft = typeof HubServer === 'undefined' ? null : HubServer.formDraft?.(
-  {querySelectorAll:() => [tonInput,brakInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]},
+  {querySelectorAll:() => [tonInput,brakInput,crateInput,autoKgInput,autoCrateInput,manKgInput,manCrateInput,breakdownToggle]},
   {extra:() => [selectedShift,editingReport ? dateInput.value : null]});
 if(typeof HubServer !== 'undefined') HubServer.guardUpdate?.({isBusy:() => writer.busy,
   hasDraft:() => (productionDraft ? productionDraft.hasDraft() : reportDraft || !!selectedShift || !!editingReport) || goalDraft && goalInput.value !== String(goalTons)});
@@ -100,8 +106,11 @@ document.getElementById('shiftGrid').addEventListener('click', (e)=>{
   const btn = e.target.closest('.shift-btn');
   if(!btn) return;
   selectedShift = btn.dataset.shift;
+  // Стар запис на смяна без разбивка остава в простия вид, докато не се смени към/от СТИКЕРИ.
+  if(!editingReport || editingReport.entry.breakdown || selectedShift === 'СТИКЕРИ' || editingReport.entry.shift === 'СТИКЕРИ') breakdownToggle.checked = selectedShift !== 'СТИКЕРИ';
   reportDate.selectShift(selectedShift);
   markShiftButtons();
+  applyEntryMode();
   updateSaveEnabled();
 });
 
@@ -123,7 +132,7 @@ function updateSaveEnabled(){
 }
 document.getElementById('cancelReportEdit').addEventListener('click', () => {
   if(writer.busy) return;
-  editingReport = null; writer.clearRetry(); selectedShift = null; updateSaveEnabled();
+  editingReport = null; writer.clearRetry(); selectedShift = null; markShiftButtons(); applyEntryMode(); updateSaveEnabled();
 });
 function editEntry(id) {
   if(!canEditReports || writer.busy || typeof HubServer === 'undefined') return;
@@ -131,12 +140,11 @@ function editEntry(id) {
   if(!entry) return;
   writer.clearRetry(); editingReport = {entry:JSON.parse(JSON.stringify(entry)),version:sync.recordVersion(id)};
   selectedShift = entry.shift; dateInput.value = entry.date;
-  tonInput.value = entry.tonnage; brakInput.value = entry.brak;
+  tonInput.value = entry.tonnage; brakInput.value = entry.brak; crateInput.value = entry.crates || 0;
   breakdownToggle.checked = !!entry.breakdown;
-  simpleTonRow.style.display = entry.breakdown ? 'none' : 'flex'; breakdownRows.style.display = entry.breakdown ? 'block' : 'none';
   for(const [control,key] of [[autoKgInput,'autoKg'],[autoCrateInput,'autoCrates'],[manKgInput,'manKg'],[manCrateInput,'manCrates']]) control.value = entry.breakdown?.[key] || 0;
   markShiftButtons();
-  updateTotalReadout(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
+  applyEntryMode(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
   productionDraft?.accept();
   dateInput.scrollIntoView?.({block:'center'});
 }
@@ -291,7 +299,8 @@ saveBtn.addEventListener('click', async ()=>{
     tonnage = readQuantity(tonInput);
   }
   const brak = readQuantity(brakInput);
-  if(!Number.isSafeInteger(tonnage) || brak === null) { quantityError(); return; }
+  const crates = selectedShift === 'СТИКЕРИ' ? readQuantity(crateInput) : undefined;
+  if(!Number.isSafeInteger(tonnage) || brak === null || crates === null) { quantityError(); return; }
   const draft = {
     date: dateInput.value,
     shift: selectedShift,
@@ -299,7 +308,9 @@ saveBtn.addEventListener('click', async ()=>{
     brak: brak,
     breakdown: breakdown
   };
+  if(crates !== undefined) draft.crates = crates;
   const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);
+  if(crates === undefined) delete entry.crates;
   const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
@@ -308,6 +319,7 @@ saveBtn.addEventListener('click', async ()=>{
     addedHistoryMonth = entry.date.slice(0,7);
     tonInput.value = 0;
     brakInput.value = 0;
+    crateInput.value = 0;
     autoKgInput.value = 0;
     autoCrateInput.value = 0;
     manKgInput.value = 0;
@@ -316,6 +328,7 @@ saveBtn.addEventListener('click', async ()=>{
     selectedShift = null;
     productionDraft?.accept();
     markShiftButtons();
+    applyEntryMode();
   }, 'Записано: смяна ' + entry.shift + ', ' + fmt(entry.tonnage) + ' кг тонаж, ' + fmt(entry.brak) + ' кг брак.',operation);
 });
 
@@ -333,7 +346,7 @@ function historyTable(rows) {
     + '</tr></thead><tbody>';
     rows.forEach(e=>{
       const bd = e.breakdown;
-      const crates = bd ? (bd.autoCrates + bd.manCrates) : null;
+      const crates = bd ? (bd.autoCrates + bd.manCrates) : e.crates ?? null;
       let detailRow = '';
       if(bd){
         detailRow = '<tr class="bd-detail"><td></td><td colspan="5" style="padding:0 8px 9px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">'
@@ -434,7 +447,8 @@ if(explicitReportScope) {
   dateInput.value=explicitReportScope.date;
   dateInput.dispatchEvent(new Event('input',{bubbles:true}));
   selectedShift=explicitReportScope.team;
-  markShiftButtons();
+  breakdownToggle.checked=selectedShift!=='СТИКЕРИ';
+  markShiftButtons();applyEntryMode();
   updateSaveEnabled();productionDraft?.accept();
 }
 if(scopeLinkError) {msg.textContent=scopeLinkError;msg.dataset.state='error';updateSaveEnabled();}
@@ -445,7 +459,8 @@ if(typeof createProductionAccessControls!=='undefined')productionAccess=createPr
     if(explicitReportScope||scopeLinkError||selectedShift||reportDraft||editingReport||dateInput.value!==initialProductionDate||!HubServer.user.taskTeam)return;
     dateInput.value=scope.date;selectedShift=scope.team;
     dateInput.dispatchEvent(new Event('input',{bubbles:true}));
-    markShiftButtons();
+    breakdownToggle.checked=selectedShift!=='СТИКЕРИ';
+    markShiftButtons();applyEntryMode();
     renderDayTotal();productionDraft?.accept();
   }
 });

@@ -29,7 +29,7 @@ async function exerciseProductionQuantities({page, expect, read, replaceGoal}) {
   await page.locator('#tonInput').fill('1.5'); await increment.click();
   await expect(page.locator('#tonInput')).toHaveValue('1.5');
 
-  await page.locator('#breakdownToggle').check();
+  await page.locator('[data-shift="А"]').click();
   for (const [id, value] of Object.entries({autoKgInput:'1e3', manKgInput:'2e3', autoCrateInput:'1e2', manCrateInput:'2e2'})) await page.locator('#' + id).fill(value);
   await expect(page.locator('#totalReadout')).toHaveText((3000).toLocaleString('bg-BG') + ' кг');
   await page.locator('#saveBtn').click();

@@ -44,20 +44,20 @@ async function exerciseProductionAccess({admin,hub,base,device,expect,setTime}) 
   for(let n=0;n<1;n++) {
     await day.locator('.shift-btn[data-shift="Г"]').click();
     await expect(day.locator('#dateInput')).toHaveValue('2026-10-16');
-    await day.locator('#tonInput').fill(String(444+n));await day.locator('#saveBtn').click();
+    await day.locator('#autoKgInput').fill(String(444+n));await day.locator('#saveBtn').click();
     await expect(day.locator('#msg')).toHaveAttribute('data-state','success');
   }
   await expect(day.locator('#saveBtn')).toBeDisabled();
   const morning=hub.store.get('production-log'),morningRow=morning.data.entries.find(e=>e.shift==='Г');
   hub.store.reportOperation('production-log',{operationId:require('node:crypto').randomUUID(),action:'delete',entryId:morningRow.id,reason:'Fictional connection setup'},morning.versions[morningRow.id],actor);
   await day.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-  await day.locator('.shift-btn[data-shift="Г"]').click();await day.locator('#tonInput').fill('555');
+  await day.locator('.shift-btn[data-shift="Г"]').click();await day.locator('#autoKgInput').fill('555');
   await day.route('**/api/production-access?*',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"UNAVAILABLE"}'}));
   await day.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
   await expect(day.locator('#productionAccessMessage')).toContainText('Не може да се провери');
-  await expect(day.locator('#saveBtn')).toBeDisabled();await expect(day.locator('#tonInput')).toHaveValue('555');
+  await expect(day.locator('#saveBtn')).toBeDisabled();await expect(day.locator('#autoKgInput')).toHaveValue('555');
   await day.unroute('**/api/production-access?*');await day.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-  await expect(day.locator('#saveBtn')).toBeEnabled();await expect(day.locator('#tonInput')).toHaveValue('555');
+  await expect(day.locator('#saveBtn')).toBeEnabled();await expect(day.locator('#autoKgInput')).toHaveValue('555');
   await day.context().close();
   setTime('2026-10-16T19:00:00+03:00');
   const people=[1,2,3,4].map(n=>({id:'demo-grace-browser-'+n,name:'Demo Grace Browser '+n,category:'stickers',team:'1 смяна',role:'Опаковчик',active:true}));

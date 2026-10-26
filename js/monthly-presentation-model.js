@@ -27,7 +27,7 @@ const MonthlyPresentation = (() => {
     const total = sum(rows, entry => entry.tonnage) / 1000, stickers = sum(rows.filter(entry => entry.shift === STICKERS), entry => entry.tonnage) / 1000;
     const auto = sum(line, entry => entry.breakdown?.autoKg) / 1000;
     return {name:name(month), rows:rows.length, total, auto, stickers, manual:total - auto - stickers, scrap:sum(rows, entry => entry.brak) / 1000,
-      cases:sum(rows, entry => (Number(entry.breakdown?.autoCrates) || 0) + (Number(entry.breakdown?.manCrates) || 0))};
+      cases:sum(rows, entry => (Number(entry.breakdown?.autoCrates) || 0) + (Number(entry.breakdown?.manCrates) || 0) + (Number(entry.crates) || 0))};
   }
 
   // Defaults for EDITABLE, rounded as the dialog shows them. goalTons is the production log goal in tonnes.

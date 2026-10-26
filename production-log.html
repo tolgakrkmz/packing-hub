@@ -63,7 +63,8 @@
       <button type="button" class="shift-btn" aria-pressed="false" data-shift="СТИКЕРИ">СТИКЕРИ</button>
     </div>
 
-    <label class="toggle-row">
+    <!-- Видът на формата следва смяната: А–Г винаги с разбивка, СТИКЕРИ с общ тонаж и каси. -->
+    <label class="toggle-row" hidden>
       <input type="checkbox" id="breakdownToggle">
       Разбивка по вид опаковане (автоматична машина / ръчна опаковка)
     </label>
@@ -80,6 +81,18 @@
           <button type="button" data-target="tonInput" data-step="500">+500</button>
           <button type="button" data-target="tonInput" data-step="1000">+1000</button>
           <button type="button" data-target="tonInput" data-set="0">Нулирай</button>
+        </div>
+      </div>
+      <div class="field" id="stickerCrateField" hidden>
+        <label for="crateInput">Брой каси</label>
+        <div class="stepper">
+          <button type="button" data-target="crateInput" data-step="-1">−</button>
+          <input type="number" id="crateInput" value="0" min="0">
+          <button type="button" data-target="crateInput" data-step="1">+</button>
+        </div>
+        <div class="quick">
+          <button type="button" data-target="crateInput" data-step="10">+10</button>
+          <button type="button" data-target="crateInput" data-set="0">Нулирай</button>
         </div>
       </div>
     </div>

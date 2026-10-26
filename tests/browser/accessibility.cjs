@@ -94,7 +94,9 @@ async function exerciseAccessibility({admin, hub, base, device, expect}) {
         await page.goto(base + route);
         await page.locator(`[data-hub-language=${language}]`).click();
         await expect(page.locator('html')).toHaveAttribute('lang', language);
-        await checkPage(page, `${role} ${language} ${route}`, role === 'admin' && route === '/tasks' ? ['newTask', ...expected] : expected);
+        // The operator's own team В is preselected, so its form opens with the automatic / manual breakdown.
+        const fields = role === 'operator' && route === '/production-log' ? expected.map(id => id === 'tonInput' ? 'autoKgInput' : id) : expected;
+        await checkPage(page, `${role} ${language} ${route}`, role === 'admin' && route === '/tasks' ? ['newTask', ...fields] : fields);
       }
     }
     await page.locator('[data-hub-language=bg]').click();
@@ -134,7 +136,7 @@ async function exerciseAccessibility({admin, hub, base, device, expect}) {
       await expect(page.locator('#saveBtn')).toBeDisabled();
       continue;
     }
-    await page.locator('#tonInput').fill('1200');
+    await page.locator('#autoKgInput').fill('1200');
     await expect(page.locator('#saveBtn')).toBeEnabled();
     await page.route(operations, unavailable);
     await page.locator('#saveBtn').focus(); await page.keyboard.press('Enter');

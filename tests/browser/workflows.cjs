@@ -76,10 +76,9 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await page.locator(`[data-shift="${shift}"]`).click();
     await page.locator('#dateInput').fill(date);
     await page.locator('#dateInput').dispatchEvent('change');
-    await page.locator('#breakdownToggle').setChecked(!!breakdown);
     if (breakdown) {
       for (const [id, value] of Object.entries(breakdown)) await page.locator('#' + id).fill(String(value));
-    } else await page.locator('#tonInput').fill(String(kg));
+    } else await page.locator(shift === 'СТИКЕРИ' ? '#tonInput' : '#autoKgInput').fill(String(kg));
     await page.locator('#brakInput').fill(String(brak));
     await page.locator('#saveBtn').click();
     await expect(page.locator('#msg')).toContainText('Записано');
@@ -234,17 +233,17 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     for (const stage of ['read', 'open', 'close']) {
       const before = (await read('production-log.json')).entries.length;
       await page.locator('[data-shift="А"]').click();
-      await page.locator('#tonInput').fill('1234');
+      await page.locator('#autoKgInput').fill('1234');
       await page.locator('#brakInput').fill('12');
       await page.evaluate(stage => { window.__browserTest.fault = {file: 'production-log.json', stage}; }, stage);
       await page.locator('#saveBtn').click();
       await expect(page.locator('#retrySaveBtn')).toBeVisible();
-      await expect(page.locator('#tonInput')).toHaveValue('1234');
+      await expect(page.locator('#autoKgInput')).toHaveValue('1234');
       assert.equal((await read('production-log.json')).entries.length, before + (stage === 'close' ? 1 : 0));
       await page.locator('#retrySaveBtn').click();
       await expect(page.locator('#msg')).toContainText('Записано');
       await saved('production-log.json', data => data.entries.length === before + 1);
-      await expect(page.locator('#tonInput')).toHaveValue('0');
+      await expect(page.locator('#autoKgInput')).toHaveValue('0');
     }
     await page.reload();
     await expect(page.locator('#connDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
@@ -408,9 +407,9 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await go('production-log');
     await expect(page.locator('#connDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
     await page.locator('[data-shift="В"]').click();
-    await page.locator('[data-target=tonInput][data-step="500"]').click();
-    await page.locator('[data-target=tonInput][data-step="-50"]').click();
-    await expect(page.locator('#tonInput')).toHaveValue('450');
+    await page.locator('[data-target=autoKgInput][data-step="500"]').click();
+    await page.locator('[data-target=autoKgInput][data-step="-50"]').click();
+    await expect(page.locator('#autoKgInput')).toHaveValue('450');
     await page.locator('#saveBtn').click();
     await saved('production-log.json', data => data.entries.length === 1);
     if (!await page.locator('#historyWrap details').evaluate(details => details.open)) await page.locator('#historyWrap details summary').click();
@@ -598,7 +597,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
       await window.__browserTest.write('production-log.json', data);
     });
     await page.locator('[data-shift="В"]').click();
-    await page.locator('#tonInput').fill('500');
+    await page.locator('#autoKgInput').fill('500');
     await page.locator('#saveBtn').click();
     await saved('production-log.json', data => data.entries.length === 3);
     assert.equal((await read('production-log.json')).entries.reduce((sum, row) => sum + row.tonnage, 0), 8500);
@@ -611,7 +610,7 @@ async function run(browser, base, {headed = false, packingOnly = false} = {}) {
     await page.locator('#importFallback').setInputFiles({name: 'demo-import.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({entries: [], goalTons: 15}))});
     await expect(page.locator('#connDot')).toHaveClass(/(?:^|\s)on(?:\s|$)/);
     await page.locator('[data-shift="А"]').click();
-    await page.locator('#tonInput').fill('2500');
+    await page.locator('#autoKgInput').fill('2500');
     await page.locator('#brakInput').fill('25');
     await page.locator('#saveBtn').click();
     await expect(page.locator('#msg')).toContainText('Записано');
