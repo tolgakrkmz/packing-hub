@@ -255,7 +255,11 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
     const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
     if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
     const ordersLink = document.querySelector('a[href="/urgent-orders"],a[href="urgent-orders.html"]');
-    if (ordersLink && can('canViewUrgentOrders')) ordersLink.hidden = false;
+    // Pilot: everyone sees that Задание is coming; only granted accounts can open it.
+    if (ordersLink) {
+      ordersLink.hidden = false;
+      if (!can('canViewUrgentOrders')) { ordersLink.removeAttribute('href'); ordersLink.classList.add('is-soon'); ordersLink.setAttribute('aria-disabled', 'true'); const soon = document.createElement('span'); soon.className = 'tile-soon'; soon.textContent = 'В разработка'; ordersLink.querySelector('h2').append(soon); }
+    }
     const problemsLink = document.querySelector('a[href="/problems"],a[href="problems.html"]');
     if (problemsLink && can('canViewProblems')) problemsLink.hidden = false;
     const wallLink = document.querySelector('a[href="/wall"],a[href="wall.html"]');
