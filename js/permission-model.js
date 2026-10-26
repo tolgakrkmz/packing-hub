@@ -15,6 +15,7 @@
     {title: 'Статистика', module: 'statistics', view: 'canViewStatistics', flags: {canViewStatistics: 'Преглед на статистиката'}},
     {title: 'Задачи', module: 'tasks', view: 'canViewTasks', flags: {canViewTasks: 'Преглед на „Задачи“', canAssignTasks: 'Може да възлага задачи', canReportTasks: 'Отчитане на собствени задачи', canManageTasks: 'Редакция, отмяна и повторно отваряне', canReviewTasks: 'Потвърждаване и връщане за работа'}},
     {title: 'Глобални проблеми', module: 'problems', view: 'canViewProblems', flags: {canViewProblems: 'Преглед на „Глобални проблеми“', canCreateProblems: 'Записване на проблеми и предложения', canManageProblems: 'Редакция и решаване на всички проблеми'}},
+    {title: 'Задание', module: 'urgent-orders', view: 'canViewUrgentOrders', flags: {canViewUrgentOrders: 'Задание: преглед и отбелязване на поръчките за камиона', canManageUrgentOrders: 'Задание: добавяне и изтриване на поръчки'}},
     {title: 'Стена', module: 'wall', view: 'canViewWall', flags: {canViewWall: 'Преглед на „Стена“ и реакции', canPostWall: 'Публикации и коментари в „Стена“'}},
     // No view flag: rating the own team must never open the ratings report.
     {title: 'Оценки на екипа', flags: {canRateTeam: 'Бързи оценки на хората от собствения екип', canViewRatings: 'Справка за оценките на всички екипи'}},
@@ -55,6 +56,8 @@
     if (!explicit('canReceiveShiftPairsMissing')) result.canReceiveShiftPairsMissing = user.taskSupervisor === true;
     // The wall is for shift leads only; any other account, admins included, needs an explicit grant in Accounts.
     for (const key of ['canViewWall','canPostWall','canReceiveWallPosts']) if (!explicit(key)) result[key] = user.taskSupervisor === true;
+    // Pilot: admins only until the truck list is released; then add `|| user.taskSupervisor === true` for shift leads.
+    if (!explicit('canViewUrgentOrders')) result.canViewUrgentOrders = user.role === 'admin';
     if (!explicit('canRateTeam')) result.canRateTeam = user.taskSupervisor === true;
     for (const report of Object.values(reports)) {
       for (const [action, legacy] of [['create', 'canCreateReports'], ['edit', 'canEditReports']]) {

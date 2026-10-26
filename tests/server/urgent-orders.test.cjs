@@ -1,0 +1,70 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {randomUUID} = require('node:crypto');
+const {createHubServer} = require('../../server/server.cjs');
+const password = 'Fictional-orders-password-123';
+async function setup(t, clock = {at: Date.parse('2026-10-26T08:00:00Z')}) {
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => clock.at});
+  const admin0 = await hub.auth.create('demo-admin', password, 'admin');
+  // Pilot: shift leads get the module only by an explicit grant until release.
+  await hub.auth.create('demo-lead', password, 'operator', admin0, {canViewUrgentOrders: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
+  await hub.auth.create('demo-lead-2', password, 'operator', admin0, {}, () => {}, {taskSupervisor: true, taskTeam: 'Б'});
+  await hub.auth.create('demo-operator', password, 'operator');
+  await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
+  const base = 'http://127.0.0.1:' + hub.server.address().port;
+  const login = async name => { const logged = await hub.auth.login(name, password); return {...logged, cookie: 'hub-local-session=' + logged.token}; };
+  const request = (route, user, method = 'GET', data, headers = {}) => fetch(base + route, {method, headers: {Origin: base, Cookie: user.cookie, 'X-CSRF-Token': user.csrf, 'Content-Type': 'application/json', ...headers}, ...(data === undefined ? {} : {body: JSON.stringify(data)})});
+  const [admin, lead, operator] = await Promise.all(['demo-admin', 'demo-lead', 'demo-operator'].map(login));
+  const add = (text, user = admin) => request('/api/urgent-orders', user, 'POST', {text, truckDate: '2026-10-27', requestId: randomUUID()});
+  const list = async (user = lead) => (await (await request('/api/urgent-orders', user)).json()).items;
+  const change = (item, user, action) => request('/api/urgent-orders/' + item.id, user, 'PATCH', {action, requestId: randomUUID()}, {'If-Match': '"' + item.revision + '"'});
+  return {hub, clock, admin, lead, operator, request, list, change, add};
+}
+test('the manager adds pasted lines as separate orders; shift leads mark them packed or not found and undo', async t => {
+  const s = await setup(t);
+  const input = {text: 'Fictional 4521 · 5 pallets\n\n  Fictional 4530  \n', truckDate: '2026-10-27', requestId: randomUUID()};
+  assert.equal((await s.request('/api/urgent-orders', s.lead, 'POST', input)).status, 403);
+  const first = await s.request('/api/urgent-orders', s.admin, 'POST', input);
+  assert.equal(first.status, 201);
+  assert.equal((await s.request('/api/urgent-orders', s.admin, 'POST', input)).status, 201); // retry with the same id adds nothing
+  const items = await s.list();
+  assert.deepEqual(items.map(item => item.text).sort(), ['Fictional 4521 · 5 pallets', 'Fictional 4530']);
+  const [item, other] = items;
+  const find = id => s.list().then(list => list.find(value => value.id === id));
+  assert.equal((await s.change(item, s.lead, 'pack')).status, 200);
+  assert.equal((await s.change(item, s.lead, 'missing')).status, 409); // stale revision
+  const packed = await find(item.id);
+  assert.equal(packed.status, 'packed'); assert.equal(packed.markedBy.username, 'demo-lead');
+  assert.equal((await s.change(packed, s.lead, 'missing')).status, 409);
+  assert.equal((await s.change(other, s.lead, 'missing')).status, 200);
+  assert.equal((await find(other.id)).status, 'missing');
+  assert.equal((await s.change(packed, s.lead, 'reopen')).status, 200);
+  const restored = await find(item.id);
+  assert.equal(restored.status, 'open'); assert.equal(restored.markedAt, null);
+  assert.equal((await s.change(restored, s.lead, 'reopen')).status, 409);
+  assert.equal((await s.change(restored, s.lead, 'remove')).status, 403);
+  assert.equal((await s.change(restored, s.admin, 'remove')).status, 200);
+  assert.equal((await s.list()).length, 1);
+});
+test('during the pilot only admins and granted accounts have access; input is checked at the server', async t => {
+  const s = await setup(t);
+  const otherLead = await s.hub.auth.login('demo-lead-2', password);
+  assert.equal((await s.request('/api/urgent-orders', {...otherLead, cookie: 'hub-local-session=' + otherLead.token})).status, 403);
+  assert.equal((await s.request('/api/urgent-orders', s.operator)).status, 403);
+  assert.equal((await s.add('Fictional', s.operator)).status, 403);
+  assert.equal((await s.request('/urgent-orders', s.operator)).status, 403);
+  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(201)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(51).fill('Fictional').join('\n')}]) {
+    assert.equal((await s.request('/api/urgent-orders', s.admin, 'POST', {text: 'Fictional', truckDate: '2026-10-27', requestId: randomUUID(), ...extra})).status, 400, JSON.stringify(extra).slice(0, 40));
+  }
+  await s.add('Fictional'); const [item] = await s.list();
+  assert.equal((await s.change(item, s.lead, 'explode')).status, 400);
+  assert.equal((await s.request('/api/urgent-orders', s.lead, 'PUT', {})).status, 405);
+});
+test('marked orders are removed after 30 days, open ones stay', async t => {
+  const s = await setup(t);
+  await s.add('Fictional A\nFictional B\nFictional C');
+  const [packed, missing] = await s.list();
+  await s.change(packed, s.lead, 'pack'); await s.change(missing, s.lead, 'missing');
+  s.clock.at += 31 * 86400000; s.hub.urgentOrders.prune();
+  assert.deepEqual((await s.list()).map(value => value.status), ['open']);
+});

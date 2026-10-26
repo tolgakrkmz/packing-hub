@@ -44,7 +44,7 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
   const moduleLabel = document.createElement('label'); moduleLabel.setAttribute('for', 'serverModuleSelect'); moduleLabel.textContent = 'Модул';
   const moduleSelect = document.createElement('select'); moduleSelect.id = 'serverModuleSelect';
   const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.disabled = true; placeholder.textContent = 'Избери модул'; moduleSelect.append(placeholder);
-  const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['shift-closeout','Край на смяната'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики'], ['problems', 'Глобални проблеми'], ['wall', 'Стена']];
+  const modules = [['index', 'Начална страница'], ['tasks', 'Задачи'], ['shift-closeout','Край на смяната'], ['production-log', 'Тонаж и брак'], ['line-downtime', 'Аварии на линията'], ['personnel', 'Смени и хора'], ['pair-targets', 'Двойки и таргети'], ['urgent-orders', 'Задание'], ['package-instructions', 'Инструкции за опаковане'], ['statistics', 'Статистики'], ['problems', 'Глобални проблеми'], ['wall', 'Стена']];
   for (const [name, title] of modules) {
     if (name !== 'index' && !canViewModule(name)) continue;
     const option = document.createElement('option'); option.value = name === 'index' ? '/' : '/' + name; option.textContent = title;
@@ -254,6 +254,12 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
   if (currentModule === 'index') {
     const tasksLink = document.querySelector('a[href="/tasks"],a[href="tasks.html"]');
     if (tasksLink && can('canViewTasks')) tasksLink.hidden = false;
+    const ordersLink = document.querySelector('a[href="/urgent-orders"],a[href="urgent-orders.html"]');
+    // Pilot: everyone sees that Задание is coming; only granted accounts can open it.
+    if (ordersLink) {
+      ordersLink.hidden = false;
+      if (!can('canViewUrgentOrders')) { ordersLink.removeAttribute('href'); ordersLink.classList.add('is-soon'); ordersLink.setAttribute('aria-disabled', 'true'); const soon = document.createElement('span'); soon.className = 'tile-soon'; soon.textContent = 'В разработка'; ordersLink.querySelector('h2').append(soon); }
+    }
     const problemsLink = document.querySelector('a[href="/problems"],a[href="problems.html"]');
     if (problemsLink && can('canViewProblems')) problemsLink.hidden = false;
     const wallLink = document.querySelector('a[href="/wall"],a[href="wall.html"]');
