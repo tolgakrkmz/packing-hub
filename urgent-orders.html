@@ -5,7 +5,7 @@
 <title>Задание · Package Hub</title>
 <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/tasks.css"><link rel="stylesheet" href="css/urgent-orders.css"><link rel="stylesheet" href="css/i18n.css">
 <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
-<script src="js/shift-schedule.js" defer></script><script src="js/urgent-orders.js" defer></script>
+<script src="js/shift-schedule.js" defer></script><script src="js/urgent-orders-model.js" defer></script><script src="js/urgent-orders.js" defer></script>
 <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/package-hub-icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -21,7 +21,8 @@
 <details id="packedSection" class="order-packed" hidden><summary>Опаковани <span id="packedCount" class="task-badge"></span></summary><div id="packedList"></div></details>
 <dialog id="orderEditor" class="task-dialog">
 <form id="orderForm"><div class="dialog-heading"><h2>Добави поръчки</h2><button type="button" data-close="orderEditor" class="secondary" aria-label="Затвори">×</button></div>
-<label>Поръчки — по една на ред<textarea id="orderText" required rows="6" placeholder="напр. 4521 · профил 60×40 · 5 палета"></textarea></label>
+<label>Поръчки — постави редовете от таблицата или по една на ред<textarea id="orderText" required rows="6" placeholder="Копирай редовете от Excel и ги постави тук"></textarea></label>
+<div id="orderPreview" class="order-preview" aria-live="polite"></div>
 <label>Камион на<input id="orderTruckDate" type="date" required></label>
 <p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Запази</button><button type="button" data-close="orderEditor" class="secondary">Отказ</button></div>
 </form></dialog>

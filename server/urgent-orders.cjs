@@ -2,6 +2,7 @@
 const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
+const {parse, keyOf} = require('../js/urgent-orders-model.js');
 const DAY = 86400000;
 function createUrgentOrders(store, {now = Date.now} = {}) {
   const {db} = store;
@@ -20,20 +21,23 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
     access(user);
     return {items: db.prepare('SELECT * FROM urgent_orders').all().map(found => ({...JSON.parse(found.data), id: found.id, revision: found.revision}))};
   }
-  // One pasted line is one order; the text stays free so any order number or note format fits.
+  // Report rows keep their columns; any other line stays free text. Orders already on the list are skipped, so a re-paste adds only new ones.
   function create(input, user) {
     access(user); manager(user);
-    const lines = typeof input.text === 'string' ? input.text.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
     const truckDate = input.truckDate;
-    if (!lines.length || lines.length > 50 || lines.some(line => line.length > 200) || typeof truckDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(truckDate) || new Date(Date.parse(truckDate + 'T00:00:00Z') || 0).toISOString().slice(0, 10) !== truckDate) throw problem(400, 'INVALID_ORDER');
+    if (typeof input.text !== 'string' || input.text.length > 100000) throw problem(400, 'INVALID_ORDER');
+    const lines = input.text.split(/\r?\n/).filter(line => line.trim());
+    if (!lines.length || lines.length > 300 || lines.some(line => line.trim().length > 300) || typeof truckDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(truckDate) || new Date(Date.parse(truckDate + 'T00:00:00Z') || 0).toISOString().slice(0, 10) !== truckDate) throw problem(400, 'INVALID_ORDER');
     return idempotent(input, user, () => {
-      const at = now(), ids = lines.map(text => {
+      const known = db.prepare('SELECT data FROM urgent_orders').all().map(found => keyOf(JSON.parse(found.data)));
+      const {orders, skipped, duplicates} = parse(input.text, known);
+      const at = now(), ids = orders.map(order => {
         const id = randomUUID();
-        db.prepare('INSERT INTO urgent_orders(id,data) VALUES(?,?)').run(id, JSON.stringify({text, truckDate, createdAt: at, createdBy: actor(user), status: 'open', markedAt: null, markedBy: null}));
+        db.prepare('INSERT INTO urgent_orders(id,data) VALUES(?,?)').run(id, JSON.stringify({...order, truckDate, createdAt: at, createdBy: actor(user), status: 'open', markedAt: null, markedBy: null}));
         return id;
       });
       store.audit(user, 'urgent-order-create', 'urgent-orders');
-      return {ids};
+      return {ids, skipped, duplicates};
     });
   }
   function change(id, input, expected, user) {
