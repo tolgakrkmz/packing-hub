@@ -24,7 +24,7 @@
     if (open) actions.append(button('✓ Опаковано', () => act(item, 'pack'), 'order-done'), button('Не е намерено', () => act(item, 'missing'), 'secondary order-missing'));
     else actions.append(button('Върни', () => act(item, 'reopen')));
     if (manager) actions.append(button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
-    node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client + ' · ' + item.quantity, 'order-detail', true)] : []), el('p', meta, 'task-meta', true), actions);
+    node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client + ' · ' + item.quantity, 'order-detail', true)] : []), ...(item.note ? [el('p', item.note, 'order-note', true)] : []), el('p', meta, 'task-meta', true), actions);
     return node;
   }
   function render() {
@@ -89,8 +89,8 @@
     const parts = [summary];
     if (orders.some(order => order.client)) {
       const table = el('table', '', 'order-preview-table'), head = el('tr');
-      for (const label of ['Поръчка', 'Клиент', 'Профил', 'Вариант', 'Количество']) head.append(el('th', label));
-      table.append(head, ...orders.slice(0, 50).map(order => { const tr = el('tr'); for (const key of ['order', 'client', 'profile', 'variant', 'quantity']) tr.append(el('td', order[key] || '', '', true)); return tr; }));
+      for (const label of ['Поръчка', 'Клиент', 'Профил', 'Вариант', 'Количество', 'Бележка']) head.append(el('th', label));
+      table.append(head, ...orders.slice(0, 50).map(order => { const tr = el('tr'); for (const key of ['order', 'client', 'profile', 'variant', 'quantity', 'note']) tr.append(el('td', order[key] || '', '', true)); return tr; }));
       const wrap = el('div', '', 'order-preview-scroll'); wrap.append(table); parts.push(wrap);
     }
     $('orderPreview').replaceChildren(...parts);

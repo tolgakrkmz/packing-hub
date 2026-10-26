@@ -1853,6 +1853,7 @@ Object.assign(HUB_EN_MESSAGES, {
   "Профил": "Profile",
   "Вариант": "Variant",
   "Количество": "Quantity",
+  "Бележка": "Note",
   "В разработка": "In development",
   "Задание: преглед и отбелязване на поръчките за камиона": "Assignment: view and mark truck orders",
   "Задание: добавяне и изтриване на поръчки": "Assignment: add and delete orders",

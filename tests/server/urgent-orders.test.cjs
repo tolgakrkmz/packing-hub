@@ -75,5 +75,5 @@ test('pasted report rows keep their columns and a second paste adds only new ord
   assert.deepEqual(await post(['Поръчка\tКлиент', row(1), row(2)].join('\n')).then(({ids, ...rest}) => [ids.length, rest]), [2, {skipped: 1, duplicates: 0}]);
   assert.deepEqual(await post([row(2), row(3)].join('\n')).then(({ids, ...rest}) => [ids.length, rest]), [1, {skipped: 0, duplicates: 1}]);
   const saved = (await s.list()).find(item => item.order === 'DP0000001_10000');
-  assert.deepEqual([saved.client, saved.profile, saved.variant, saved.quantity, saved.text], ['Fictional Client Ltd', '500-0001', 'A000001', '101', 'DP0000001_10000 · 500-0001 · A000001']);
+  assert.deepEqual([saved.client, saved.profile, saved.variant, saved.quantity, saved.note, saved.text], ['Fictional Client Ltd', '500-0001', 'A000001', '101', '', 'DP0000001_10000 · 500-0001 · A000001']);
 });
