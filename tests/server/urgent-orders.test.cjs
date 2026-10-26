@@ -89,7 +89,7 @@ test('the manager assigns possible shifts and the magic button places every wait
   const spread = user => s.request('/api/urgent-orders/distribute', user, 'POST', {requestId: randomUUID()});
   assert.equal((await spread(s.lead)).status, 403);
   const result = await spread(s.admin);
-  assert.equal(result.status, 200); assert.deepEqual(await result.json(), {assigned: 3});
+  assert.equal(result.status, 200); assert.deepEqual(await result.json(), {assigned: 3, unplaced: 0});
   const shifts = (await s.list()).map(value => value.shift?.date + '/' + value.shift?.code);
   assert.ok(shifts.every(key => ['2026-10-26/1', '2026-10-26/2', '2026-10-26/3'].includes(key)), shifts.join());
   assert.equal(new Set(shifts).size, 3); // four equal orders over three equal shifts use all three
