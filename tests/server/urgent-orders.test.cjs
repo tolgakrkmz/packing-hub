@@ -53,7 +53,7 @@ test('during the pilot only admins and granted accounts have access; input is ch
   assert.equal((await s.request('/api/urgent-orders', s.operator)).status, 403);
   assert.equal((await s.add('Fictional', s.operator)).status, 403);
   assert.equal((await s.request('/urgent-orders', s.operator)).status, 403);
-  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(301)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(301).fill('Fictional').join('\n')}]) {
+  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(301)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: '9999-12-31'}, {truckDate: '2026-10-18'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(301).fill('Fictional').join('\n')}]) {
     assert.equal((await s.request('/api/urgent-orders', s.admin, 'POST', {text: 'Fictional', truckDate: '2026-10-27', requestId: randomUUID(), ...extra})).status, 400, JSON.stringify(extra).slice(0, 40));
   }
   await s.add('Fictional'); const [item] = await s.list();

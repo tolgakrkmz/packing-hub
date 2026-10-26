@@ -28,6 +28,8 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
     if (typeof input.text !== 'string' || input.text.length > 100000) throw problem(400, 'INVALID_ORDER');
     const lines = input.text.split(/\r?\n/).filter(line => line.trim());
     if (!lines.length || lines.length > 300 || lines.some(line => line.trim().length > 300) || typeof truckDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(truckDate) || new Date(Date.parse(truckDate + 'T00:00:00Z') || 0).toISOString().slice(0, 10) !== truckDate) throw problem(400, 'INVALID_ORDER');
+    const today = shiftSchedule.sofiaDate(new Date(now()));
+    if (truckDate < shiftSchedule.addDays(today, -7) || truckDate > shiftSchedule.addDays(today, 60)) throw problem(400, 'INVALID_ORDER');
     return idempotent(input, user, () => {
       const known = db.prepare('SELECT data FROM urgent_orders').all().map(found => keyOf(JSON.parse(found.data)));
       const {orders, skipped, duplicates} = parse(input.text, known);

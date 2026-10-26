@@ -41,8 +41,8 @@
   // Shifts that can still pack for a truck: from the running shift to the night shift before the truck day.
   // Trucks carry a date only, so a truck due today gets the rest of today's shifts.
   function slots(schedule, at, truckDate) {
-    const list = [];
-    for (let date = schedule.addDays(schedule.sofiaDate(new Date(at)), -1); date <= truckDate; date = schedule.addDays(date, 1)) {
+    const list = [], today = schedule.sofiaDate(new Date(at)), last = schedule.addDays(today, 14); // a far-off date never walks more than two weeks
+    for (let date = schedule.addDays(today, -1); date <= truckDate && date <= last; date = schedule.addDays(date, 1)) {
       for (const code of [1, 2, 3]) {
         const team = schedule.teamFor(schedule.parseDate(date), code);
         if (team && schedule.shiftInterval(team, date).end > at) list.push({date, code, team});

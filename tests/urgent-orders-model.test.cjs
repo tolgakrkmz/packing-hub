@@ -76,6 +76,7 @@ test('a truck gets the shifts from the running one to the night before its day; 
   assert.deepEqual(keys('2026-10-28'), ['2026-10-26/2', '2026-10-26/3', '2026-10-27/1', '2026-10-27/2', '2026-10-27/3']);
   assert.deepEqual(keys('2026-10-26'), ['2026-10-26/2', '2026-10-26/3']);
   assert.deepEqual(slots(shiftSchedule, sofia('2026-10-27', 3), '2026-10-28').map(slotKey)[0], '2026-10-26/3'); // the night shift still runs after midnight
+  assert.equal(slots(shiftSchedule, at, '9999-12-31').length, 44); // capped at two weeks ahead: 15 days × 3 shifts, less today's finished first shift
   for (const slot of slots(shiftSchedule, at, '2026-10-28')) assert.equal(slot.team, shiftSchedule.teamFor(shiftSchedule.parseDate(slot.date), slot.code));
 });
 test('the magic button splits kilograms by team output, keeps live shifts and sends unpressed orders later', () => {
