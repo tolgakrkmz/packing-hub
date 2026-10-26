@@ -47,3 +47,22 @@ test('the newer report adds available kilograms and the furnace before the note'
     ['Demo NV', '500', '0', '', 'ще се пресова']
   ]);
 });
+// Regression rows: each layout seen in a pasted report is kept here with fictional values.
+test('report variants: long client names, a note instead of the furnace and a dash before the note', () => {
+  const {orders, skipped} = parse([
+    'DP0000011_10000   DEMO METALS s.r.o.     500-10011   A000002     2000  1380  620   2148.31     1800',
+    'DP0000012_120000  DEMO-METAL-SPOT s.r.o.    500-0012    A000001     500   0     500   544.5 2000 - ЧАКА ПЕЧКА',
+    'DP0000013_10000   DEMO - SHADE EXPERTS Sp. z o.o. 500-0013    A000003     1020.6      0     1020.6      1073.6      ПРАХОВО',
+    'DP0000014_110000  Demo S.A. 500-0014    A000001     1443.42     0     1443.42     1600  600',
+    'DP0000015_70000   Demo S.A. 500-0015    A000002     510.51      291   219.51      600   елокс/тц'
+  ].join('\n'));
+  assert.equal(skipped, 0);
+  assert.deepEqual(orders.map(order => [order.client, order.profile, order.quantity, order.available, order.furnace, order.note]), [
+    ['DEMO METALS s.r.o.', '500-10011', '2000', '2148.31', '1800', ''],
+    ['DEMO-METAL-SPOT s.r.o.', '500-0012', '500', '544.5', '2000', 'ЧАКА ПЕЧКА'],
+    ['DEMO - SHADE EXPERTS Sp. z o.o.', '500-0013', '1020.6', '1073.6', '', 'ПРАХОВО'],
+    ['Demo S.A.', '500-0014', '1443.42', '1600', '600', ''],
+    ['Demo S.A.', '500-0015', '510.51', '600', '', 'елокс/тц']
+  ]);
+});
+

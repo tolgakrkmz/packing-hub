@@ -15,7 +15,7 @@
     while (numbers.length < 5 && NUMBER.test(tokens[0] ?? '')) numbers.push(tokens.shift());
     if (numbers.length < 3) return null;
     // shortcut: a 4-number row is read as the newer report (4th = available kg); an older row ending in a bare furnace number reads the same way.
-    return {order, client, profile, variant, quantity: numbers[0], available: numbers[3] ?? '', furnace: numbers[4] ?? '', note: tokens.join(' ')};
+    return {order, client, profile, variant, quantity: numbers[0], available: numbers[3] ?? '', furnace: numbers[4] ?? '', note: tokens.join(' ').replace(/^[-–—:]+\s*/, '')};
   }
   // When any line is a report row, other lines (headers, totals) are skipped; otherwise each line is one free-text order.
   // One order can sit on several rows with different notes, so only identical rows count as repeats.
