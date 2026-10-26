@@ -77,3 +77,20 @@ test('pasted report rows keep their columns and a second paste adds only new ord
   const saved = (await s.list()).find(item => item.order === 'DP0000001_10000');
   assert.deepEqual([saved.client, saved.profile, saved.variant, saved.quantity, saved.note, saved.text], ['Fictional Client Ltd', '500-0001', 'A000001', '101', '', 'DP0000001_10000 · 500-0001 · A000001']);
 });
+test('the manager assigns possible shifts and the magic button places every waiting order; shift leads only read', async t => {
+  const s = await setup(t); // the clock is 2026-10-26 10:00 Sofia: the first shift runs
+  await s.add('Fictional A\nFictional B\nFictional C\nFictional D');
+  const [item] = await s.list();
+  const assign = (user, shift) => s.request('/api/urgent-orders/' + item.id, user, 'PATCH', {action: 'assign', shift, requestId: randomUUID()}, {'If-Match': '"' + item.revision + '"'});
+  assert.equal((await assign(s.lead, {date: '2026-10-26', code: 2})).status, 403);
+  assert.equal((await assign(s.admin, {date: '2026-10-27', code: 1})).status, 400); // the truck day itself is too late
+  assert.equal((await assign(s.admin, {date: '2026-10-26', code: 2})).status, 200);
+  assert.deepEqual((await s.list()).find(value => value.id === item.id).shift.code, 2);
+  const spread = user => s.request('/api/urgent-orders/distribute', user, 'POST', {requestId: randomUUID()});
+  assert.equal((await spread(s.lead)).status, 403);
+  const result = await spread(s.admin);
+  assert.equal(result.status, 200); assert.deepEqual(await result.json(), {assigned: 3});
+  const shifts = (await s.list()).map(value => value.shift?.date + '/' + value.shift?.code);
+  assert.ok(shifts.every(key => ['2026-10-26/1', '2026-10-26/2', '2026-10-26/3'].includes(key)), shifts.join());
+  assert.equal(new Set(shifts).size, 3); // four equal orders over three equal shifts use all three
+});
