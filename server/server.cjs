@@ -13,6 +13,7 @@ const {createNotifications} = require('./notifications.cjs');
 const {createTasks} = require('./tasks.cjs');
 const {createProblems} = require('./problems.cjs');
 const {createWall} = require('./wall.cjs');
+const {createUrgentOrders} = require('./urgent-orders.cjs');
 const {createTeamRatings} = require('./team-ratings.cjs');
 const {createStatisticsReads} = require('./statistics.cjs');
 const {createStaticAssets} = require('./static-assets.cjs');
@@ -32,6 +33,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const problems = createProblems(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const urgentOrders = createUrgentOrders(store, taskNow ? {now: taskNow} : {});
   const wall = createWall(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const teamRatings = createTeamRatings(store, productionNow ? {now: productionNow} : {});
   const statistics = createStatisticsReads(store);
@@ -366,6 +368,13 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
           return response.end(request.method === 'HEAD' ? undefined : content);
         }
+        const orderRoute = pathname.match(/^\/api\/urgent-orders(?:\/([0-9a-f-]{36}))?$/);
+        if (orderRoute) {
+          if (!orderRoute[1] && request.method === 'GET') return json(response, 200, urgentOrders.list(currentUser()));
+          if (!orderRoute[1] && request.method === 'POST') { const result = urgentOrders.create(await jsonBody(request), currentUser()); broadcast('urgent-orders', 0); return json(response, 201, result); }
+          if (orderRoute[1] && request.method === 'PATCH') { const result = urgentOrders.change(orderRoute[1], await jsonBody(request), revisionFor(request), currentUser()); broadcast('urgent-orders', 0); return json(response, 200, result); }
+          throw problem(405, 'METHOD_REJECTED');
+        }
         const problemRoute = pathname.match(/^\/api\/problems(?:\/([0-9a-f-]{36}))?$/);
         if (problemRoute) {
           if (!problemRoute[1] && request.method === 'GET') return json(response, 200, problems.list(currentUser()));
@@ -514,7 +523,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
-  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } try { tasks.pruneRequests(); problems.pruneRequests(); notifications.prune(); } catch (error) { logFailure('job retention', error); } }, 3600000);
+  const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } try { tasks.pruneRequests(); problems.pruneRequests(); urgentOrders.prune(); notifications.prune(); } catch (error) { logFailure('job retention', error); } }, 3600000);
   photoCleanup.unref();
   let statusRunning = false, notificationStopped = false, statusWork;
   function checkNotificationStatus() {
@@ -525,7 +534,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(error => logFailure('job push-delivery', error)); }, 30000); notificationTick.unref();
   const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
   const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
-  return {server, store, auth, imports, tasks, problems, wall, maintenance, notifications, close};
+  return {server, store, auth, imports, tasks, problems, urgentOrders, wall, maintenance, notifications, close};
 }
 if (require.main === module) {
   process.umask(0o077);
