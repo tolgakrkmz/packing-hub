@@ -56,8 +56,8 @@
     if (!explicit('canReceiveShiftPairsMissing')) result.canReceiveShiftPairsMissing = user.taskSupervisor === true;
     // The wall is for shift leads only; any other account, admins included, needs an explicit grant in Accounts.
     for (const key of ['canViewWall','canPostWall','canReceiveWallPosts']) if (!explicit(key)) result[key] = user.taskSupervisor === true;
-    // Shift leads keep the truck list; admins see it too for the pilot.
-    if (!explicit('canViewUrgentOrders')) result.canViewUrgentOrders = user.role === 'admin' || user.taskSupervisor === true;
+    // Pilot: admins only until the truck list is released; then add `|| user.taskSupervisor === true` for shift leads.
+    if (!explicit('canViewUrgentOrders')) result.canViewUrgentOrders = user.role === 'admin';
     if (!explicit('canRateTeam')) result.canRateTeam = user.taskSupervisor === true;
     for (const report of Object.values(reports)) {
       for (const [action, legacy] of [['create', 'canCreateReports'], ['edit', 'canEditReports']]) {

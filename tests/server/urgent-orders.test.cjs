@@ -6,7 +6,9 @@ const password = 'Fictional-orders-password-123';
 async function setup(t, clock = {at: Date.parse('2026-10-26T08:00:00Z')}) {
   const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => clock.at});
   const admin0 = await hub.auth.create('demo-admin', password, 'admin');
-  await hub.auth.create('demo-lead', password, 'operator', admin0, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
+  // Pilot: shift leads get the module only by an explicit grant until release.
+  await hub.auth.create('demo-lead', password, 'operator', admin0, {canViewUrgentOrders: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
+  await hub.auth.create('demo-lead-2', password, 'operator', admin0, {}, () => {}, {taskSupervisor: true, taskTeam: 'Б'});
   await hub.auth.create('demo-operator', password, 'operator');
   await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve)); t.after(() => hub.close());
   const base = 'http://127.0.0.1:' + hub.server.address().port;
@@ -44,8 +46,10 @@ test('the manager adds pasted lines as separate orders; shift leads mark them pa
   assert.equal((await s.change(restored, s.admin, 'remove')).status, 200);
   assert.equal((await s.list()).length, 1);
 });
-test('only shift leads and admins have access; input is checked at the server', async t => {
+test('during the pilot only admins and granted accounts have access; input is checked at the server', async t => {
   const s = await setup(t);
+  const otherLead = await s.hub.auth.login('demo-lead-2', password);
+  assert.equal((await s.request('/api/urgent-orders', {...otherLead, cookie: 'hub-local-session=' + otherLead.token})).status, 403);
   assert.equal((await s.request('/api/urgent-orders', s.operator)).status, 403);
   assert.equal((await s.add('Fictional', s.operator)).status, 403);
   assert.equal((await s.request('/urgent-orders', s.operator)).status, 403);
