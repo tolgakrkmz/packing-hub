@@ -24,3 +24,8 @@
 .order-packed>div{margin-top:10px}
 .order-packed .order-card{opacity:.75}
 @media(max-width:650px){.order-group,.order-missing-group #missingList,.order-packed>div{grid-template-columns:1fr}.tasks-wrap .order-actions button{flex:1 1 0}.tasks-wrap .order-actions button.order-done{flex-basis:100%}}
+.order-head-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.order-shift{margin:8px 0 0;font-size:14px;font-weight:600;color:var(--teal)}
+.order-shift.is-waiting{color:var(--text-muted)}
+.order-shift.is-late{color:var(--coral)}
+.tasks-wrap .order-shift-select{width:100%;margin-top:6px}

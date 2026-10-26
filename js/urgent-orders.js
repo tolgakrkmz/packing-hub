@@ -16,6 +16,24 @@
     if (date === tomorrow()) return 'Камион утре · ' + shortDate(date);
     return 'Камион на ' + shortDate(date);
   }
+  const SHIFTS = {1: '1-ва', 2: '2-ра', 3: 'Нощна'};
+  const slotLabel = slot => SHIFTS[slot.code] + ' · ' + shortDate(slot.date) + ' · Екип ' + slot.team;
+  const at = () => Date.now(), live = item => HubUrgentOrders.live(ShiftSchedule, at(), item);
+  const options = item => HubUrgentOrders.slots(ShiftSchedule, at(), item.truckDate);
+  // The filter key an open order sits under: its live shift, or waiting for one.
+  const placeOf = item => live(item) ? HubUrgentOrders.slotKey(item.shift) : 'waiting';
+  function shiftLine(item) {
+    if (live(item)) return el('p', 'Смяна: ' + slotLabel(item.shift), 'order-shift', true);
+    if (item.shift) return el('p', 'Не е опакована от ' + slotLabel(item.shift) + ' · чака нова смяна', 'order-shift is-late', true);
+    return el('p', options(item).length ? 'Без смяна' : 'Без смяна · няма време до камиона', 'order-shift is-waiting');
+  }
+  function shiftPicker(item) {
+    const select = el('select', '', 'order-shift-select'); select.setAttribute('aria-label', 'Смяна за ' + item.text);
+    select.append(new Option('Без смяна', ''), ...options(item).map(slot => new Option(slotLabel(slot), HubUrgentOrders.slotKey(slot))));
+    select.value = live(item) ? HubUrgentOrders.slotKey(item.shift) : '';
+    select.addEventListener('change', () => { const [date, code] = select.value.split('/'); act(item, 'assign', {shift: select.value ? {date, code: Number(code)} : null}); });
+    return select;
+  }
   const figures = item => ['Поръчка ' + item.quantity + ' кг', ...(item.available ? ['Налично ' + item.available + ' кг'] : []), ...(item.furnace ? ['Пещ ' + item.furnace] : [])].join(' · ');
   function card(item) {
     const open = item.status === 'open';
@@ -25,12 +43,15 @@
     if (open) actions.append(button('✓ Опаковано', () => act(item, 'pack'), 'order-done'), button('Не е намерено', () => act(item, 'missing'), 'secondary order-missing'));
     else actions.append(button('Върни', () => act(item, 'reopen')));
     if (manager) actions.append(button('Изтрий', () => { if (confirm('Да се изтрие ли поръчката от списъка?')) act(item, 'remove'); }));
-    node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client, 'order-client', true), el('p', figures(item), 'order-detail')] : []), ...(item.note ? [el('p', '⚠ ' + item.note, 'order-note', true)] : []), el('p', meta, 'task-meta', true), actions);
+    node.append(el('p', item.text, 'order-text', true), ...(item.client ? [el('p', item.client, 'order-client', true), el('p', figures(item), 'order-detail')] : []), ...(item.note ? [el('p', '⚠ ' + item.note, 'order-note', true)] : []),
+      ...(open ? [...(manager && live(item) ? [] : [shiftLine(item)]), ...(manager ? [shiftPicker(item)] : [])] : []), el('p', meta, 'task-meta', true), actions);
     return node;
   }
   function render() {
     if (!state) return;
-    const open = state.items.filter(item => item.status === 'open').sort((a, b) => a.truckDate.localeCompare(b.truckDate) || a.createdAt - b.createdAt);
+    const all = state.items.filter(item => item.status === 'open').sort((a, b) => a.truckDate.localeCompare(b.truckDate) || a.createdAt - b.createdAt);
+    filterOptions(all);
+    const chosen = $('shiftFilter').value, open = all.filter(item => chosen === 'all' || (chosen === 'team' ? live(item) && item.shift.team === HubServer.user.taskTeam : placeOf(item) === chosen));
     const marked = status => state.items.filter(item => item.status === status).sort((a, b) => b.markedAt - a.markedAt);
     const packed = marked('packed'), missing = marked('missing');
     if (!open.length) $('orderList').replaceChildren(el('div', 'Няма чакащи поръчки за камиона.', 'task-empty'));
@@ -44,6 +65,17 @@
     $('missingList').replaceChildren(...missing.map(card));
     $('packedSection').hidden = !packed.length; $('packedCount').textContent = String(packed.length);
     $('packedList').replaceChildren(...packed.map(card));
+  }
+  // Options list every shift that holds or can still take an open order, with its order count and kilograms.
+  function filterOptions(open) {
+    const select = $('shiftFilter'), chosen = select.value, shifts = new Map(), kg = list => Math.round(list.reduce((sum, item) => sum + HubUrgentOrders.weight(item), 0)).toLocaleString('bg-BG') + ' кг';
+    for (const item of open) for (const slot of options(item)) shifts.set(HubUrgentOrders.slotKey(slot), slot);
+    const count = key => open.filter(item => placeOf(item) === key);
+    const waiting = count('waiting'), team = HubServer.user.taskTeam && open.filter(item => live(item) && item.shift.team === HubServer.user.taskTeam);
+    select.replaceChildren(new Option('Всички (' + open.length + ')', 'all'), ...(team ? [new Option('Моят екип ' + HubServer.user.taskTeam + ' (' + team.length + ')', 'team')] : []),
+      new Option('Без смяна (' + waiting.length + ')', 'waiting'),
+      ...[...shifts.values()].sort((a, b) => a.date.localeCompare(b.date) || a.code - b.code).map(slot => { const list = count(HubUrgentOrders.slotKey(slot)); return new Option(slotLabel(slot) + ' (' + list.length + ' · ' + kg(list) + ')', HubUrgentOrders.slotKey(slot)); }));
+    select.value = [...select.options].some(option => option.value === chosen) ? chosen : 'all';
   }
   async function refresh() {
     if (busy || $('orderEditor').open) return;
@@ -64,9 +96,9 @@
     return {...payload, requestId: requestKey.id};
   }
   const failure = error => error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.';
-  async function act(item, action) {
+  async function act(item, action, extra = {}) {
     if (busy) return; busy = true;
-    try { await HubServer.send('/api/urgent-orders/' + item.id, 'PATCH', keyed({action}), {'If-Match': '"' + item.revision + '"'}); requestKey = null; $('orderMessage').textContent = 'Промяната е записана.'; }
+    try { await HubServer.send('/api/urgent-orders/' + item.id, 'PATCH', keyed({action, ...extra}), {'If-Match': '"' + item.revision + '"'}); requestKey = null; $('orderMessage').textContent = 'Промяната е записана.'; }
     catch (error) { $('orderMessage').textContent = failure(error); }
     finally { busy = false; await refresh(); }
   }
@@ -97,7 +129,15 @@
     $('orderPreview').replaceChildren(...parts);
   }
   $('orderText').addEventListener('input', preview);
-  $('newOrders').hidden = !manager;
+  $('newOrders').hidden = !manager; $('distributeOrders').hidden = !manager;
+  $('shiftFilter').addEventListener('change', render);
+  $('distributeOrders').addEventListener('click', async () => {
+    if (busy || !confirm('Поръчките без смяна и тези, чиято смяна е минала, ще се разпределят по смените до камиона според обичайния тонаж на екипите. Продължи?')) return;
+    busy = true;
+    try { const result = await HubServer.send('/api/urgent-orders/distribute', 'POST', {requestId: crypto.randomUUID()}); $('orderMessage').textContent = 'Разпределени поръчки: ' + result.assigned; }
+    catch (error) { $('orderMessage').textContent = failure(error); }
+    finally { busy = false; await refresh(); }
+  });
   $('newOrders').addEventListener('click', () => {
     $('orderForm').reset(); $('orderPreview').replaceChildren(); requestKey = null; $('editorFeedback').textContent = ''; $('orderTruckDate').value = tomorrow();
     $('orderEditor').showModal(); $('orderText').focus();

@@ -368,6 +368,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
           return response.end(request.method === 'HEAD' ? undefined : content);
         }
+        if (pathname === '/api/urgent-orders/distribute') {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          const result = urgentOrders.spread(await jsonBody(request), currentUser()); broadcast('urgent-orders', 0); return json(response, 200, result);
+        }
         const orderRoute = pathname.match(/^\/api\/urgent-orders(?:\/([0-9a-f-]{36}))?$/);
         if (orderRoute) {
           if (!orderRoute[1] && request.method === 'GET') return json(response, 200, urgentOrders.list(currentUser()));

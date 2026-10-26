@@ -53,7 +53,7 @@ test('during the pilot only admins and granted accounts have access; input is ch
   assert.equal((await s.request('/api/urgent-orders', s.operator)).status, 403);
   assert.equal((await s.add('Fictional', s.operator)).status, 403);
   assert.equal((await s.request('/urgent-orders', s.operator)).status, 403);
-  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(301)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(301).fill('Fictional').join('\n')}]) {
+  for (const extra of [{text: ' \n '}, {text: 'x'.repeat(301)}, {truckDate: '2026-02-30'}, {truckDate: '2026-13-45'}, {truckDate: '9999-12-31'}, {truckDate: '2026-10-18'}, {truckDate: 'tomorrow'}, {requestId: 'nope'}, {text: Array(301).fill('Fictional').join('\n')}]) {
     assert.equal((await s.request('/api/urgent-orders', s.admin, 'POST', {text: 'Fictional', truckDate: '2026-10-27', requestId: randomUUID(), ...extra})).status, 400, JSON.stringify(extra).slice(0, 40));
   }
   await s.add('Fictional'); const [item] = await s.list();
@@ -76,4 +76,21 @@ test('pasted report rows keep their columns and a second paste adds only new ord
   assert.deepEqual(await post([row(2), row(3)].join('\n')).then(({ids, ...rest}) => [ids.length, rest]), [1, {skipped: 0, duplicates: 1}]);
   const saved = (await s.list()).find(item => item.order === 'DP0000001_10000');
   assert.deepEqual([saved.client, saved.profile, saved.variant, saved.quantity, saved.note, saved.text], ['Fictional Client Ltd', '500-0001', 'A000001', '101', '', 'DP0000001_10000 · 500-0001 · A000001']);
+});
+test('the manager assigns possible shifts and the magic button places every waiting order; shift leads only read', async t => {
+  const s = await setup(t); // the clock is 2026-10-26 10:00 Sofia: the first shift runs
+  await s.add('Fictional A\nFictional B\nFictional C\nFictional D');
+  const [item] = await s.list();
+  const assign = (user, shift) => s.request('/api/urgent-orders/' + item.id, user, 'PATCH', {action: 'assign', shift, requestId: randomUUID()}, {'If-Match': '"' + item.revision + '"'});
+  assert.equal((await assign(s.lead, {date: '2026-10-26', code: 2})).status, 403);
+  assert.equal((await assign(s.admin, {date: '2026-10-27', code: 1})).status, 400); // the truck day itself is too late
+  assert.equal((await assign(s.admin, {date: '2026-10-26', code: 2})).status, 200);
+  assert.deepEqual((await s.list()).find(value => value.id === item.id).shift.code, 2);
+  const spread = user => s.request('/api/urgent-orders/distribute', user, 'POST', {requestId: randomUUID()});
+  assert.equal((await spread(s.lead)).status, 403);
+  const result = await spread(s.admin);
+  assert.equal(result.status, 200); assert.deepEqual(await result.json(), {assigned: 3});
+  const shifts = (await s.list()).map(value => value.shift?.date + '/' + value.shift?.code);
+  assert.ok(shifts.every(key => ['2026-10-26/1', '2026-10-26/2', '2026-10-26/3'].includes(key)), shifts.join());
+  assert.equal(new Set(shifts).size, 3); // four equal orders over three equal shifts use all three
 });

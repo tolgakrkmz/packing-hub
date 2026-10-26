@@ -1,8 +1,8 @@
 /* Orders ready for packing that must leave on a truck soon; one manager adds them by hand, shift leads mark them packed or not found. */
 const {randomUUID} = require('node:crypto');
-const {problem} = require('./store.cjs');
+const {problem, shiftSchedule} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
-const {parse, keyOf} = require('../js/urgent-orders-model.js');
+const {parse, keyOf, slots, slotKey, distribute} = require('../js/urgent-orders-model.js');
 const DAY = 86400000;
 function createUrgentOrders(store, {now = Date.now} = {}) {
   const {db} = store;
@@ -28,6 +28,8 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
     if (typeof input.text !== 'string' || input.text.length > 100000) throw problem(400, 'INVALID_ORDER');
     const lines = input.text.split(/\r?\n/).filter(line => line.trim());
     if (!lines.length || lines.length > 300 || lines.some(line => line.trim().length > 300) || typeof truckDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(truckDate) || new Date(Date.parse(truckDate + 'T00:00:00Z') || 0).toISOString().slice(0, 10) !== truckDate) throw problem(400, 'INVALID_ORDER');
+    const today = shiftSchedule.sofiaDate(new Date(now()));
+    if (truckDate < shiftSchedule.addDays(today, -7) || truckDate > shiftSchedule.addDays(today, 60)) throw problem(400, 'INVALID_ORDER');
     return idempotent(input, user, () => {
       const known = db.prepare('SELECT data FROM urgent_orders').all().map(found => keyOf(JSON.parse(found.data)));
       const {orders, skipped, duplicates} = parse(input.text, known);
@@ -51,6 +53,16 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
         store.audit(user, 'urgent-order-remove', 'urgent-orders');
         return {removed: id};
       }
+      if (input.action === 'assign') {
+        manager(user);
+        if (item.status !== 'open') throw problem(409, 'ORDER_STATE');
+        const shift = input.shift === null ? null : slots(shiftSchedule, now(), item.truckDate).find(slot => input.shift && slotKey(slot) === slotKey(input.shift));
+        if (shift === undefined) throw problem(400, 'INVALID_ORDER');
+        const {id: _, revision, ...data} = item;
+        db.prepare('UPDATE urgent_orders SET data=?,revision=revision+1 WHERE id=?').run(JSON.stringify({...data, shift}), id);
+        store.audit(user, 'urgent-order-assign', 'urgent-orders');
+        return {item: row(id)};
+      }
       if (!MARKS[input.action] && input.action !== 'reopen') throw problem(400, 'INVALID_ORDER');
       if ((item.status === 'open') !== (input.action !== 'reopen')) throw problem(409, 'ORDER_STATE');
       const {id: _, revision, ...data} = item;
@@ -62,12 +74,31 @@ function createUrgentOrders(store, {now = Date.now} = {}) {
     if (input.requestId) return idempotent({...input, orderId: id, expected}, user, work);
     return store.transaction(work);
   }
+  // Each team's usual output: average shift tonnage over the last 8 weeks of production reports; missing teams count as average.
+  function capacity() {
+    const since = shiftSchedule.addDays(shiftSchedule.sofiaDate(new Date(now())), -56), sums = {};
+    let entries = [];
+    try { entries = store.get('production-log').data.entries || []; } catch (error) { if (error.status !== 404) throw error; }
+    for (const entry of entries) if (shiftSchedule.TEAMS.includes(entry.shift) && entry.date >= since && Number(entry.tonnage) > 0) (sums[entry.shift] ||= []).push(Number(entry.tonnage));
+    return Object.fromEntries(Object.entries(sums).map(([team, values]) => [team, values.reduce((sum, value) => sum + value, 0) / values.length]));
+  }
+  function spread(input, user) {
+    access(user); manager(user);
+    const output = capacity(); // read before the write transaction: report reads may open their own
+    return idempotent(input, user, () => {
+      const items = db.prepare('SELECT * FROM urgent_orders').all().map(found => ({...JSON.parse(found.data), id: found.id}));
+      const plan = distribute(shiftSchedule, now(), items, output), update = db.prepare('UPDATE urgent_orders SET data=?,revision=revision+1 WHERE id=?');
+      for (const {id, shift} of plan) { const {id: _, ...data} = items.find(item => item.id === id); update.run(JSON.stringify({...data, shift}), id); }
+      store.audit(user, 'urgent-order-distribute', 'urgent-orders');
+      return {assigned: plan.length};
+    });
+  }
   // Marked orders are kept 30 days so a shift can still check or undo; request ids follow the 90-day window of the other boards.
   function prune() {
     const cutoff = now() - 30 * DAY, remove = db.prepare('DELETE FROM urgent_orders WHERE id=?');
     for (const found of db.prepare('SELECT id,data FROM urgent_orders').all()) { const {markedAt} = JSON.parse(found.data); if (markedAt && markedAt < cutoff) remove.run(found.id); }
     requests.prune(now() - 90 * DAY);
   }
-  return {list, create, change, prune};
+  return {list, create, change, spread, prune};
 }
 module.exports = {createUrgentOrders};

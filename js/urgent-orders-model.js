@@ -37,5 +37,43 @@
   }
   // Orders saved before `source` existed fall back to their order number or text.
   const keyOf = order => (order.source || order.order || order.text).toLocaleLowerCase('bg');
-  return {parse, keyOf};
+
+  // Shifts that can still pack for a truck: from the running shift to the night shift before the truck day.
+  // Trucks carry a date only, so a truck due today gets the rest of today's shifts.
+  function slots(schedule, at, truckDate) {
+    const list = [], today = schedule.sofiaDate(new Date(at)), last = schedule.addDays(today, 14); // a far-off date never walks more than two weeks
+    for (let date = schedule.addDays(today, -1); date <= truckDate && date <= last; date = schedule.addDays(date, 1)) {
+      for (const code of [1, 2, 3]) {
+        const team = schedule.teamFor(schedule.parseDate(date), code);
+        if (team && schedule.shiftInterval(team, date).end > at) list.push({date, code, team});
+      }
+    }
+    const before = list.filter(slot => slot.date < truckDate);
+    return before.length ? before : list.filter(slot => slot.date === truckDate);
+  }
+  const slotKey = slot => slot.date + '/' + slot.code;
+  const weight = item => Number(String(item.quantity ?? '').replace(',', '.')) || 500; // free-text orders count as one average order
+  const pressing = item => item.available === '0' || /пресова/i.test(item.note || '');
+  // An open order keeps its shift while that shift can still pack it; otherwise it is waiting for one.
+  const live = (schedule, at, item) => !!item.shift && slots(schedule, at, item.truckDate).some(slot => slotKey(slot) === slotKey(item.shift));
+  // The magic button: split waiting kilograms so each shift's load follows its team's usual output.
+  // Earlier trucks and heavier orders go first; orders still to be pressed skip the first shift when there is a later one.
+  function distribute(schedule, at, items, capacity = {}) {
+    const open = items.filter(item => item.status === 'open'), loads = new Map();
+    const known = Object.values(capacity).filter(value => value > 0);
+    const average = known.length ? known.reduce((sum, value) => sum + value, 0) / known.length : 1;
+    const score = (slot, extra) => ((loads.get(slotKey(slot)) || 0) + extra) / (capacity[slot.team] > 0 ? capacity[slot.team] : average);
+    for (const item of open) if (live(schedule, at, item)) loads.set(slotKey(item.shift), (loads.get(slotKey(item.shift)) || 0) + weight(item));
+    const plan = [];
+    for (const item of open.filter(item => !live(schedule, at, item)).sort((a, b) => a.truckDate.localeCompare(b.truckDate) || weight(b) - weight(a))) {
+      let options = slots(schedule, at, item.truckDate);
+      if (!options.length) continue;
+      if (pressing(item) && options.length > 1) options = options.slice(1);
+      const best = options.reduce((chosen, slot) => score(slot, weight(item)) < score(chosen, weight(item)) ? slot : chosen);
+      loads.set(slotKey(best), (loads.get(slotKey(best)) || 0) + weight(item));
+      plan.push({id: item.id, shift: best});
+    }
+    return plan;
+  }
+  return {parse, keyOf, slots, slotKey, weight, live, distribute};
 });

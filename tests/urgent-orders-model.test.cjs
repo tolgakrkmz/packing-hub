@@ -66,3 +66,29 @@ test('report variants: long client names, a note instead of the furnace and a da
   ]);
 });
 
+
+const {slots, distribute, slotKey} = require('../js/urgent-orders-model.js');
+const {shiftSchedule} = require('../server/store.cjs');
+const sofia = (date, hour) => shiftSchedule.sofiaInstant(date, hour);
+test('a truck gets the shifts from the running one to the night before its day; a truck due today gets the rest of today', () => {
+  const at = sofia('2026-10-26', 15), keys = truck => slots(shiftSchedule, at, truck).map(slotKey);
+  assert.deepEqual(keys('2026-10-27'), ['2026-10-26/2', '2026-10-26/3']);
+  assert.deepEqual(keys('2026-10-28'), ['2026-10-26/2', '2026-10-26/3', '2026-10-27/1', '2026-10-27/2', '2026-10-27/3']);
+  assert.deepEqual(keys('2026-10-26'), ['2026-10-26/2', '2026-10-26/3']);
+  assert.deepEqual(slots(shiftSchedule, sofia('2026-10-27', 3), '2026-10-28').map(slotKey)[0], '2026-10-26/3'); // the night shift still runs after midnight
+  assert.equal(slots(shiftSchedule, at, '9999-12-31').length, 44); // capped at two weeks ahead: 15 days × 3 shifts, less today's finished first shift
+  for (const slot of slots(shiftSchedule, at, '2026-10-28')) assert.equal(slot.team, shiftSchedule.teamFor(shiftSchedule.parseDate(slot.date), slot.code));
+});
+test('the magic button splits kilograms by team output, keeps live shifts and sends unpressed orders later', () => {
+  const at = sofia('2026-10-26', 15), [first, second] = slots(shiftSchedule, at, '2026-10-27');
+  const order = (id, quantity, extra = {}) => ({id, status: 'open', truckDate: '2026-10-27', quantity: String(quantity), ...extra});
+  const items = [order('a', 1000), order('b', 1000), order('c', 1000), order('d', 1000), order('e', 500, {available: '0', note: 'ще се пресова'}),
+    order('kept', 700, {shift: second}), order('late', 300, {shift: {date: '2026-10-26', code: 1, team: 'А'}}), {...order('done', 900), status: 'packed'}];
+  // The second shift's team usually packs three times as much.
+  const plan = distribute(shiftSchedule, at, items, {[first.team]: 1000, [second.team]: 3000});
+  const placed = Object.fromEntries(plan.map(entry => [entry.id, slotKey(entry.shift)]));
+  assert.deepEqual(Object.keys(placed).sort(), ['a', 'b', 'c', 'd', 'e', 'late']); // the live, the packed and nothing else stay as they are
+  assert.equal(placed.e, slotKey(second));
+  const load = key => items.filter(item => (placed[item.id] || (item.id === 'kept' && slotKey(second))) === key).reduce((sum, item) => sum + Number(item.quantity), 0);
+  assert.deepEqual([load(slotKey(first)), load(slotKey(second))], [1300, 4200]); // 5500 kg at 1:3 is ideally 1375 / 4125
+});
