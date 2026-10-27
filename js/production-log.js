@@ -39,6 +39,7 @@ function quantityError(){
 }
 
 // Смените А–Г винаги отчитат разбивка Автоматична / Ръчна опаковка, а СТИКЕРИ — общ тонаж и каси.
+// Касите на стикерите се пазят на същото място като на смените: breakdown като ръчна опаковка.
 // Чекбоксът е скрит и се задава от смяната; стар запис без разбивка се редактира в простия вид.
 function applyEntryMode(){
   const on = breakdownToggle.checked;
@@ -140,8 +141,8 @@ function editEntry(id) {
   if(!entry) return;
   writer.clearRetry(); editingReport = {entry:JSON.parse(JSON.stringify(entry)),version:sync.recordVersion(id)};
   selectedShift = entry.shift; dateInput.value = entry.date;
-  tonInput.value = entry.tonnage; brakInput.value = entry.brak; crateInput.value = entry.crates || 0;
-  breakdownToggle.checked = !!entry.breakdown;
+  tonInput.value = entry.tonnage; brakInput.value = entry.brak; crateInput.value = entry.breakdown?.manCrates || 0;
+  breakdownToggle.checked = !!entry.breakdown && entry.shift !== 'СТИКЕРИ';
   for(const [control,key] of [[autoKgInput,'autoKg'],[autoCrateInput,'autoCrates'],[manKgInput,'manKg'],[manCrateInput,'manCrates']]) control.value = entry.breakdown?.[key] || 0;
   markShiftButtons();
   applyEntryMode(); updateSaveEnabled(); msg.textContent = 'Редакция на запис. Промените се проверяват спрямо отворената версия.';
@@ -297,10 +298,14 @@ saveBtn.addEventListener('click', async ()=>{
     breakdown = { autoKg, autoCrates, manKg, manCrates };
   } else {
     tonnage = readQuantity(tonInput);
+    if(selectedShift === 'СТИКЕРИ') {
+      const manCrates = readQuantity(crateInput);
+      if(manCrates === null) { quantityError(); return; }
+      if(Number.isSafeInteger(tonnage)) breakdown = { autoKg: 0, autoCrates: 0, manKg: tonnage, manCrates };
+    }
   }
   const brak = readQuantity(brakInput);
-  const crates = selectedShift === 'СТИКЕРИ' ? readQuantity(crateInput) : undefined;
-  if(!Number.isSafeInteger(tonnage) || brak === null || crates === null) { quantityError(); return; }
+  if(!Number.isSafeInteger(tonnage) || brak === null) { quantityError(); return; }
   const draft = {
     date: dateInput.value,
     shift: selectedShift,
@@ -308,9 +313,7 @@ saveBtn.addEventListener('click', async ()=>{
     brak: brak,
     breakdown: breakdown
   };
-  if(crates !== undefined) draft.crates = crates;
   const entry = editingReport ? {...editingReport.entry,...draft} : writer.entry(draft);
-  if(crates === undefined) delete entry.crates;
   const operation = writer.operation(editingReport ? 'update' : 'create',entry,editingReport?.version);
   await writer.run(current => writer.append(current,entry), () => {
     writer.confirmEntry(entry);
@@ -346,9 +349,9 @@ function historyTable(rows) {
     + '</tr></thead><tbody>';
     rows.forEach(e=>{
       const bd = e.breakdown;
-      const crates = bd ? (bd.autoCrates + bd.manCrates) : e.crates ?? null;
+      const crates = bd ? (bd.autoCrates + bd.manCrates) : null;
       let detailRow = '';
-      if(bd){
+      if(bd && e.shift !== 'СТИКЕРИ'){
         detailRow = '<tr class="bd-detail"><td></td><td colspan="5" style="padding:0 8px 9px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);">'
           + 'Авт. машина: '+fmt(bd.autoKg)+' кг ('+fmt(bd.autoCrates)+' каси) · Ръчна опаковка: '+fmt(bd.manKg)+' кг ('+fmt(bd.manCrates)+' каси)'
           + '</td></tr>';

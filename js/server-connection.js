@@ -308,7 +308,7 @@ const HubServer = (() => {
     dialog.append(heading, description);
     if (entry) {
       const details = document.createElement('dl');
-      const labels = {date:'Дата',shift:'Смяна',shiftCode:'Смяна',team:'Екип',tonnage:'Тонаж (кг)',brak:'Брак (кг)',crates:'Каси',start:'Начало',end:'Край',durationMin:'Минути',reason:'Причина',reasonNote:'Обяснение',note:'Бележка',targetKg:'Цел (кг)',targetCrates:'Цел (каси)'};
+      const labels = {date:'Дата',shift:'Смяна',shiftCode:'Смяна',team:'Екип',tonnage:'Тонаж (кг)',brak:'Брак (кг)',start:'Начало',end:'Край',durationMin:'Минути',reason:'Причина',reasonNote:'Обяснение',note:'Бележка',targetKg:'Цел (кг)',targetCrates:'Цел (каси)'};
       const values = Object.entries(labels).filter(([key]) => entry[key] !== undefined).map(([key,label]) => [label,entry[key]]);
       if (entry.breakdown) values.push(['Автоматична / ръчна (кг)',entry.breakdown.autoKg+' / '+entry.breakdown.manKg],['Автоматична / ръчна (каси)',entry.breakdown.autoCrates+' / '+entry.breakdown.manCrates]);
       if (entry.members) values.push(['Двойка',entry.members.map(person => person.name).join(' + ')],['Зони',entry.areas.map(area => area === 'auto' ? 'Автоматична' : 'Ръчна').join(', ')]);

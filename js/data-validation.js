@@ -25,7 +25,6 @@ const HubDataValidation = (() => {
     return !('reasons' in data) && !('employees' in data) &&
       (data.goalTons === undefined || number(data.goalTons)) &&
       records(data.entries,row => date(row.date) && shifts.includes(row.shift) && number(row.tonnage) && number(row.brak) &&
-        (row.crates === undefined || number(row.crates)) &&
         (row.breakdown == null || object(row.breakdown) && ['autoKg','autoCrates','manKg','manCrates'].every(key => number(row.breakdown[key])) &&
           matchingTonnage(row)));
   }
