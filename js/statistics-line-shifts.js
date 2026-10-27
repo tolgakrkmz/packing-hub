@@ -10,7 +10,8 @@ function calculateLineShifts(
 ) {
   const byShift = {};
 
-  SHIFT_ORDER.forEach(
+  // Стикерите пазят касите си в breakdown като ръчна опаковка, но не са линия: държим ги отделно от А–Г.
+  SHIFT_ORDER.filter(shift => shift !== 'СТИКЕРИ').forEach(
     shift =>
       byShift[shift] = {
         shift,
@@ -60,11 +61,7 @@ function calculateLineShifts(
       ) || 0;
   });
 
-  return SHIFT_ORDER
-    .map(
-      s =>
-        byShift[s]
-    )
+  return Object.values(byShift)
     .filter(
       r =>
         r.autoKg ||
