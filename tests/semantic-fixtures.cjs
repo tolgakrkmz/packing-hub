@@ -10,6 +10,7 @@ const accepted = [
   sample('legacy null breakdown','production-log',{...production,breakdown:null}),
   sample('legacy fractional kilograms','production-log',{...production,tonnage:0.3,breakdown:{autoKg:0.1,autoCrates:1,manKg:0.2,manCrates:2}}),
   sample('empty kilogram breakdown','production-log',{...production,tonnage:0,breakdown:{autoKg:0,autoCrates:4,manKg:0,manCrates:8}}),
+  sample('sticker crates stored as manual packing','production-log',{...production,shift:'СТИКЕРИ',breakdown:{autoKg:0,autoCrates:0,manKg:300,manCrates:42}}),
   sample('overnight downtime','line-downtime',downtime),
   sample('same-day downtime','line-downtime',{...downtime,start:'09:00',end:'09:20'}),
   sample('one-minute midnight crossing','line-downtime',{...downtime,start:'23:59',end:'00:00',durationMin:1}),

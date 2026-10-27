@@ -457,7 +457,6 @@ async function main() {
     await expect(operator.locator('#reportEntryPanel')).toBeVisible(); await expect(operator.locator('#dayFilter')).toBeHidden();
     await operator.locator('[data-shift="В"]').click();
     await operator.locator('#dateInput').fill('2026-10-05');
-    await operator.locator('#breakdownToggle').check();
     for (const [id, value] of Object.entries({autoKgInput: '2400', autoCrateInput: '96', manKgInput: '600', manCrateInput: '24', brakInput: '30'})) await operator.locator('#' + id).fill(value);
     await operator.locator('#saveBtn').click(); await expect(operator.locator('#msg')).toContainText('Записано');
     await expect(observer.locator('#dashboardActual')).toHaveText('3 т');
@@ -621,7 +620,7 @@ async function main() {
     const correctedId = hub.store.get('production-log').data.entries.find(entry => entry.shift==='В').id;
     const correctable = firstMonth.locator('.edit-report-btn[data-id="' + correctedId + '"]');
     await correctable.click(); await expect(limited.locator('#saveBtn')).toBeVisible();
-    await limited.locator('#breakdownToggle').uncheck();await limited.locator('#tonInput').fill('1234'); await limited.locator('#saveBtn').click();
+    await limited.locator('#autoKgInput').fill('1234');await limited.locator('#manKgInput').fill('0'); await limited.locator('#saveBtn').click();
     // History-enabled releases require a reason before confirming a correction.
     // Both the dialog and a direct committed result are valid readiness signals.
     const correctionDialog = limited.locator('#reportCorrectionDialog');

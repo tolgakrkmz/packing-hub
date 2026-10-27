@@ -87,3 +87,31 @@ test('a rejected or actively typed monthly goal survives background refresh unti
     assert.equal(Number(env.controls.goalInput.value), 6000);
   }
 });
+
+test('a regular shift always reports the automatic / manual breakdown', async () => {
+  const env = await environment('production-log'); await env.draft(); await env.select('А');
+  assert.equal(env.controls.breakdownToggle.checked, true);
+  assert.equal(env.controls.stickerCrateField.hidden, true);
+  for (const [id, value] of Object.entries({autoKgInput:'700', manKgInput:'300', autoCrateInput:'28', manCrateInput:'12'})) env.controls[id].value = value;
+  await env.save();
+  assert.equal(env.data.entries[0].tonnage, 1000);
+  assert.deepEqual(env.data.entries[0].breakdown, {autoKg:700, manKg:300, autoCrates:28, manCrates:12});
+});
+
+test('stickers report total tonnage with their own crate count', async () => {
+  const env = await environment('production-log'); await env.draft();
+  assert.equal(env.controls.breakdownToggle.checked, false);
+  assert.equal(env.controls.stickerCrateField.hidden, false);
+  env.controls.crateInput.value = '42';
+  await env.save();
+  assert.equal(env.data.entries[0].tonnage, 125);
+  // Same place as the shifts' crates: the breakdown, counted as manual packing.
+  assert.deepEqual(env.data.entries[0].breakdown, {autoKg:0, autoCrates:0, manKg:125, manCrates:42});
+});
+
+test('invalid sticker crates stop the write', async () => {
+  const env = await environment('production-log'); await env.draft();
+  env.controls.crateInput.value = '-1';
+  const writes = env.writes; await env.save();
+  assert.equal(env.writes, writes); assert.equal(env.data.entries.length, 0);
+});

@@ -178,6 +178,7 @@ tbody tr:last-child td{border-bottom:none;}
   display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--text);
   margin-bottom:14px;
 }
+.toggle-row[hidden]{display:none;}
 .toggle-row input{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;}
 .breakdown-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
 @media (max-width:520px){.breakdown-grid{grid-template-columns:1fr;}}

@@ -79,7 +79,7 @@ for(const module of ['production-log','line-downtime']) {
     const env = await environment(module); await env.draft();
     env.fail('close-applied'); await env.save();
     const file = disk(env), entry = file.entries[0];
-    const revised = module === 'production-log' ? {...entry,tonnage:250} : {...entry,note:'Demo revised'};
+    const revised = module === 'production-log' ? {...entry,tonnage:250,breakdown:{...entry.breakdown,manKg:250}} : {...entry,note:'Demo revised'};
     env.handle.text = JSON.stringify({...file,entries:[revised]});
     const writes = env.writes;
     await env.retry();
@@ -121,7 +121,7 @@ for(const module of ['production-log','line-downtime']) {
     for(const changed of [false,true]) {
       const env = await environment(module); await env.draft(); await env.save();
       const original = env.data.entries[0];
-      const revised = module === 'production-log' ? {...original,tonnage:250} : {...original,note:'Demo revised'};
+      const revised = module === 'production-log' ? {...original,tonnage:250,breakdown:{...original.breakdown,manKg:250}} : {...original,note:'Demo revised'};
       env.handle.text = JSON.stringify({...disk(env),entries:changed ? [revised] : []});
       const writes = env.writes; await env.remove(original.id);
       assert.equal(env.writes,writes);

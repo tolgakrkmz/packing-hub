@@ -10,7 +10,7 @@ async function exerciseShiftCloseout({admin,hub,base,device,expect,setTime}) {
     await expect(admin.locator('.shift-btn[data-shift="'+team+'"]').first()).toHaveClass(new RegExp('sel-'+team));
   }
   await expect(admin.locator('#connDot')).toHaveClass(/\bon\b/);
-  await admin.locator('#tonInput').fill('0');await admin.locator('#saveBtn').click();
+  await admin.locator('#autoKgInput').fill('0');await admin.locator('#saveBtn').click();
   await expect(admin.locator('#msg')).toContainText('Записано');
   assert.ok(hub.store.get('production-log').data.entries.some(e=>e.date===date&&e.shift===team&&e.tonnage===0));
   const employees=[1,2].map(n=>({id:'demo-close-packer-'+n,name:'Demo Close Packer '+n,category:'manual',team,role:'Опаковчик',active:true,note:''}));
