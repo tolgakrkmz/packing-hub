@@ -203,23 +203,44 @@ test('shift goal is always 30 t and without history the rest is split equally ac
   assert.equal(model.hasShiftGoal(team),true);
   assert.deepEqual(plain(model.equalize([pair('a',1000,{team:'СТИКЕРИ'}),pair('b',1000,{team:'СТИКЕРИ'})],'x')),[]);
 });
-test('history raises each pair in proportion to its people, keeps higher targets and skips downtime',() => {
+test('history raises each pair in proportion to its people up to 15%, keeps higher targets and skips downtime',() => {
   const shift = (day,shiftCode,ids,kg,reasonKey = '') => ({id:'h'+day+shiftCode+ids,date:'2026-09-'+String(day).padStart(2,'0'),shiftCode,team,members:ids.map(id => ({id})),targetKg:1,result:{kg,reasonKey}});
   const history = [shift(1,1,['p1','p2'],8000),shift(2,1,['p3','p4'],4000),shift(3,1,['p3','p4'],0,'downtime'),shift(4,1,['p3','p4'],0,'materials'),shift(5,1,['p3','p4'],4000,'quality')];
   const now = (members,targetKg) => ({id:members.join(''),date,shiftCode:1,team,members:members.map(id => ({id})),targetKg,result:null});
   const kg = list => plain(list.map(entry => [entry.id,entry.targetKg]));
-  // Strengths 8000 and 4000 -> 30 t split 2:1.
-  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000)],'x',history)),[['p1p2',20000],['p3p4',10000]]);
+  // Strengths 8000 and 4000 -> 30 t would need 2.5 times their average, so both stop at +15%.
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000)],'x',history)),[['p1p2',9200],['p3p4',4600]]);
   // Newcomers get the average of the known people in the shift (3000 each) -> strengths 8000, 4000, 6000.
-  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000),now(['p5','p6'],1000)],'x',history)),[['p1p2',13400],['p3p4',6700],['p5p6',10000]]);
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],1000),now(['p5','p6'],1000)],'x',history)),[['p1p2',9200],['p3p4',4600],['p5p6',6900]]);
   const strengths = model.pairStrengths([now(['p1','p2'],1),now(['p1','p6'],1)],history);
   assert.deepEqual(plain([...strengths.values()]),[{kg:8000,known:true},{kg:8000,known:false}]);
-  // A supervisor target above the share stays; the others share the rest 8:6.
-  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],12000),now(['p5','p6'],1000)],'x',history)),[['p1p2',10300],['p5p6',7800]]);
+  // A supervisor target above the share stays; the others are still capped.
+  assert.deepEqual(kg(model.equalize([now(['p1','p2'],1000),now(['p3','p4'],12000),now(['p5','p6'],1000)],'x',history)),[['p1p2',9200],['p5p6',6900]]);
   // Only the latest 10 shifts count, and the current shift is never history.
   const many = [...Array(12)].map((_,index) => shift(index+1,2,['p7','p8'],index < 2 ? 20000 : 2000));
   assert.deepEqual(plain(model.personAverages(many).get('p7')),{kg:1000,shifts:10});
   assert.equal(model.personAverages([{...many[0],date,shiftCode:1}],{date,shiftCode:1,team}).size,0);
+});
+test('raise fills automatic packing first, then manual, and never promises more than 15% over history',() => {
+  const shift = (ids,kg,areas) => ({id:'h'+ids+kg+areas,date:'2026-09-01',shiftCode:1,team,members:ids.map(id => ({id})),areas,targetKg:1,result:{kg,reasonKey:''}});
+  const now = (members,targetKg,areas) => ({id:members.join(''),date,shiftCode:1,team,members:members.map(id => ({id})),areas,targetKg,result:null});
+  const kg = list => plain(list.map(entry => [entry.id,entry.targetKg]));
+  const history = [shift(['a1','a2'],12000,['auto']),shift(['m1','m2'],8000,['manual'])];
+  // Gap 2 t: auto can take it alone (limit 13 800), manual stays.
+  assert.deepEqual(kg(model.equalize([now(['a1','a2'],10000,['auto']),now(['m1','m2'],18000,['manual'])],'x',history)),[['a1a2',12000]]);
+  // Gap 6 t: auto stops at its limit, manual gets the rest up to its own limit.
+  assert.deepEqual(kg(model.equalize([now(['a1','a2'],10000,['auto']),now(['m1','m2'],14000,['manual'])],'x',history)),[['a1a2',13800]]);
+  assert.deepEqual(kg(model.equalize([now(['a1','a2'],10000,['auto']),now(['m1','m2'],7000,['manual'])],'x',history)),[['a1a2',13800],['m1m2',9200]]);
+  // A pair working both areas counts as automatic.
+  assert.deepEqual(kg(model.equalize([now(['a1','a2'],10000,['auto','manual']),now(['m1','m2'],18000,['manual'])],'x',history)),[['a1a2',12000]]);
+  // Own area wins over a mixed average: 20 t in auto stays the measure on auto, 4 t on manual.
+  const mixed = [shift(['b1','b2'],20000,['auto']),shift(['b1','b2'],4000,['manual'])];
+  assert.deepEqual(kg(model.equalize([now(['b1','b2'],1000,['auto'])],'x',mixed)),[['b1b2',23000]]);
+  assert.deepEqual(kg(model.equalize([now(['b1','b2'],1000,['manual'])],'x',mixed)),[['b1b2',4600]]);
+  // People with history only in the other area fall back to it.
+  assert.deepEqual(kg(model.equalize([now(['b1','b2'],1000,['auto'])],'x',[shift(['b1','b2'],4000,['manual'])])),[['b1b2',4600]]);
+  // Already at the limit: nothing to raise, even though 30 t is not reached.
+  assert.deepEqual(kg(model.equalize([now(['a1','a2'],13800,['auto']),now(['m1','m2'],9200,['manual'])],'x',history)),[]);
 });
 test('raised targets cannot be lowered without the right, raising and other fields stay open',() => {
   const [raised] = model.equalize([plan()],'2026-10-04T08:00:00Z');

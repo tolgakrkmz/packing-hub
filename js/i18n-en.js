@@ -1,7 +1,10 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
   "Повиши таргетите": "Raise targets",
-  "Повишение до 30 т": "Raise to 30 t",
+  "Повишение към 30 т": "Raise towards 30 t",
+  "След повишението сборът е": "After the raise the total is",
+  "По-високи таргети не биха били реални за тези двойки.": "Higher targets would not be realistic for these pairs.",
+  "Първо се вдига автоматичната опаковка, после ръчната. Таргет на двойка не минава средния ѝ резултат с повече от 15%.": "Automatic packing is raised first, then manual. A pair's target stays within 15% of its average result.",
   "Целта от": "The goal of",
   "за смяната е достигната": "for the shift is reached",
   "сбор": "total",

@@ -129,37 +129,55 @@ const PairTargets = (() => {
       }));
     return new Map([...shifts].map(([id,list]) => [id,{kg:list.reduce((sum,kg) => sum+kg,0)/list.length,shifts:list.length}]));
   }
-  // Expected kg of each pair; people without history get the average of the known people in the same shift.
+  const isAuto = entry => !!entry.areas?.includes('auto');
+  // Expected kg of each pair; a person's result in the pair's own packing area counts first, then their overall average.
+  // People without history get the average of the known people in the same shift.
   function pairStrengths(entries, history) {
-    const averages = personAverages(history,entries[0]);
-    const people = entries.flatMap(entry => entry.members.map(person => averages.get(person.id)?.kg)).filter(kg => kg > 0);
+    const overall = personAverages(history,entries[0]);
+    const inArea = new Map([true,false].map(auto => [auto,personAverages(history.filter(entry => isAuto(entry) === auto),entries[0])]));
+    const average = (entry, person) => inArea.get(isAuto(entry)).get(person.id)?.kg || overall.get(person.id)?.kg || 0;
+    const people = entries.flatMap(entry => entry.members.map(person => average(entry,person))).filter(kg => kg > 0);
     const fallback = people.length ? people.reduce((sum,kg) => sum+kg,0)/people.length : 1;
     return new Map(entries.map(entry => {
-      const known = entry.members.every(person => averages.get(person.id)?.kg > 0);
-      return [entry.id,{kg:entry.members.reduce((sum,person) => sum+(averages.get(person.id)?.kg > 0 ? averages.get(person.id).kg : fallback),0),known}];
+      const known = entry.members.every(person => average(entry,person) > 0);
+      return [entry.id,{kg:entry.members.reduce((sum,person) => sum+(average(entry,person) || fallback),0),known}];
     }));
   }
   // Стикери work to their own plan, so the 30 t shift goal does not apply to them.
   function hasShiftGoal(team) { return team !== 'СТИКЕРИ'; }
-  // Splits what reported pairs leave of 30 t across the unreported pairs in proportion to their history.
-  // A target the supervisor set higher is never lowered; the rest is shared by the others. Rounded up to 100 kg.
-  function equalize(entries, now, history = []) {
-    const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
-    if(!open.length || !hasShiftGoal(open[0].team) || active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG) return [];
-    const strength = pairStrengths(open,history);
-    let remaining = SHIFT_GOAL_KG-active.filter(entry => entry.result).reduce((sum,entry) => sum+entry.targetKg,0), free = open, kept;
+  // shortcut: fixed 15% stretch over a pair's average; tune it once there is enough real history.
+  const STRETCH = 1.15;
+  // Shares budget in proportion to strength, capped at stretch × strength. A target already higher is never lowered; the rest is shared by the others.
+  function shareTargets(pairs, budget, strength, stretch) {
+    let free = pairs, kept;
     do {
       const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
-      kept = free.filter(entry => remaining*strength.get(entry.id).kg/total <= entry.targetKg);
-      remaining -= kept.reduce((sum,entry) => sum+entry.targetKg,0);
+      kept = free.filter(entry => budget*strength.get(entry.id).kg/total <= entry.targetKg);
+      budget -= kept.reduce((sum,entry) => sum+entry.targetKg,0);
       free = free.filter(entry => !kept.includes(entry));
     } while(kept.length && free.length);
     const total = free.reduce((sum,entry) => sum+strength.get(entry.id).kg,0);
-    return free.map(entry => ({...entry, targetKg:Math.ceil(remaining*strength.get(entry.id).kg/total/100)*100, updatedAt:now, raisedAt:entry.raisedAt || now}))
-      .filter(entry => entry.targetKg > open.find(item => item.id === entry.id).targetKg);
+    return new Map(pairs.map(entry => {
+      const kg = strength.get(entry.id).kg;
+      return [entry.id,free.includes(entry) ? Math.max(entry.targetKg,Math.ceil(Math.min(budget*kg/total,kg*stretch)/100)*100) : entry.targetKg];
+    }));
   }
-  // shortcut: fixed 15% stretch over a pair's average; tune it once there is enough real history.
-  const STRETCH = 1.15;
+  // Fills what reported pairs leave of 30 t: automatic packing first, then manual, each pair at most 15% above its history,
+  // so the total may stay under 30 t. Without any history in the shift there is nothing to cap against: equal split. Rounded up to 100 kg.
+  function equalize(entries, now, history = []) {
+    const active = entries.filter(entry => !entry.cancellation), open = active.filter(entry => !entry.result);
+    if(!open.length || !hasShiftGoal(open[0].team) || active.reduce((sum,entry) => sum+entry.targetKg,0) >= SHIFT_GOAL_KG) return [];
+    const strength = pairStrengths(open,history), averages = personAverages(history,open[0]);
+    const measured = open.some(entry => entry.members.some(person => averages.get(person.id)?.kg > 0));
+    const reported = active.filter(entry => entry.result).reduce((sum,entry) => sum+entry.targetKg,0);
+    const targets = new Map(open.map(entry => [entry.id,entry.targetKg]));
+    (measured ? [open.filter(isAuto),open.filter(entry => !isAuto(entry))] : [open]).filter(group => group.length).forEach(group => {
+      const others = open.filter(entry => !group.includes(entry)).reduce((sum,entry) => sum+targets.get(entry.id),0);
+      shareTargets(group,SHIFT_GOAL_KG-reported-others,strength,measured ? STRETCH : Infinity).forEach((kg,id) => targets.set(id,kg));
+    });
+    return open.filter(entry => targets.get(entry.id) > entry.targetKg)
+      .map(entry => ({...entry, targetKg:targets.get(entry.id), updatedAt:now, raisedAt:entry.raisedAt || now}));
+  }
   // Suggests a new pair's kg target: its share of what is left of 30 t, but never more than 15% above what the two usually make,
   // so slow days get a reachable target instead of an impossible one. freeIds (people still without a pair, these two included)
   // estimate how many pairs are still coming.
