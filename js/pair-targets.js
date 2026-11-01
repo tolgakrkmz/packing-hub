@@ -129,7 +129,7 @@
     $('shiftGoalText').textContent = gap > 0
       ? `Сбор на таргетите: ${fmt(totalKg/1000)} т от ${fmt(goal/1000)} т · липсват ${fmt(gap/1000)} т · средно ${fmt(PairTargets.pairNorm(entries.length)/1000)} т на двойка`
       : `Целта от ${fmt(goal/1000)} т за смяната е достигната · сбор ${fmt(totalKg/1000)} т`;
-    $('equalizeBtn').hidden = !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false) || !PairTargets.equalize(entries,'').length;
+    $('equalizeBtn').hidden = !!scopeLinkError || !!pairAccess&&!pairAccess.canSave(false) || !PairTargets.equalize(entries,'',data.entries).length;
     $('equalizeBtn').disabled = busy;
     $('pairsList').innerHTML = selected.map(entry => pairCard(entry,!scopeLinkError)).join('') || '<p class="empty">Няма двойки за избраната смяна.</p>';
     renderHistory();
@@ -348,10 +348,13 @@
     const before = new Map(selected.map(entry => [entry.id,entry.targetKg]));
     const goal = PairTargets.SHIFT_GOAL_KG;
     equalizing = {context:{...context},raised};
-    $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Повишение до 30 т';
+    $('equalizeTitle').textContent = reminder ? 'Сборът е под целта на смяната' : 'Повишение към 30 т';
     $('equalizeIntro').textContent = (reminder ? 'Всички свободни хора са разпределени. ' : '')+`Липсващото до ${fmt(goal/1000)} т се разпределя според средния резултат на хората за последните ${PairTargets.HISTORY_SHIFTS} смени, без смените с престой или липса на материал.`;
+    const raisedKg = new Map(raised.map(entry => [entry.id,entry.targetKg]));
+    const totalAfter = selected.filter(entry => !entry.cancellation).reduce((sum,entry) => sum+(raisedKg.get(entry.id) ?? entry.targetKg),0);
+    $('equalizeShort').textContent = totalAfter < goal ? `След повишението сборът е ${fmt(totalAfter/1000)} т · липсват ${fmt((goal-totalAfter)/1000)} т. По-високи таргети не биха били реални за тези двойки.` : '';
     const strength = PairTargets.pairStrengths(selected.filter(entry => !entry.cancellation && !entry.result),data.entries);
-    $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг <small class="muted">(${strength.get(entry.id).known ? 'средно '+fmt(strength.get(entry.id).kg/1000)+' т на смяна' : 'без пълна история · средно за смяната'})</small></li>`).join('');
+    $('equalizeList').innerHTML = raised.map(entry => `<li><span translate="no">${entry.members.map(person => escape(person.name)).join(' + ')}</span>: ${fmt(before.get(entry.id))} → ${fmt(entry.targetKg)} кг <small class="muted">(${entry.areas?.includes('auto') ? areaLabels.auto : areaLabels.manual} · ${strength.get(entry.id).known ? 'средно '+fmt(strength.get(entry.id).kg/1000)+' т на смяна' : 'без пълна история · средно за смяната'})</small></li>`).join('');
     $('equalizeError').textContent = '';
     $('equalizeDialog').showModal();
   }
