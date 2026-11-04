@@ -5,7 +5,7 @@
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
   const administrator = admin && HubServer.user.role === 'admin';
-  let state, view = 'shift', historyView = 'reported', editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
+  let state, view = 'shift', historyView = 'completed', periodChosen = false, editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const pageSize = 50;
   let listPage = 1, searchTimer;
   let pendingRead = null, displayedSnapshot = null;
@@ -76,12 +76,15 @@
   HubServer.guardUpdate({isBusy:() => busy || problemPicker.pending || solutionPicker.pending,
     hasDraft:() => editorDraft.hasDraft() || actionDraft.hasDraft()});
   function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
+  const historyGroup = item => item.status === 'cancelled' ? 'cancelled' : item.status === 'completed' ? 'completed' : item.report ? 'reported' : 'unreported';
+  // A shift counts once it is reported, or once its grace period ends without a report.
+  const decided = item => item.status !== 'pending' || item.due + state.graceMinutes * 60000 < state.now;
   function historyIncludes(item, group) {
-    const kind = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
+    const kind = historyGroup(item);
     return kind === group && (group === 'unreported' || period(item));
   }
   function summarize(items) {
-    const shifts = items.filter(item => item.kind === 'shift' && item.due + state.graceMinutes * 60000 < state.now && !['cancelled', 'not-applicable'].includes(item.status));
+    const shifts = items.filter(item => item.kind === 'shift' && decided(item) && !['cancelled', 'not-applicable'].includes(item.status));
     return {total: shifts.length, done: shifts.filter(item => item.status === 'completed').length, failed: shifts.filter(item => item.status === 'not-done').length, missing: shifts.filter(item => item.displayStatus === 'unreported').length,
       missingShifts: new Set(shifts.filter(item => item.displayStatus === 'unreported').map(item => `${item.shift.date}:${item.shift.code}:${item.shift.team}`)).size, late: shifts.filter(item => item.late).length};
   }
@@ -98,7 +101,7 @@
     const global = relevant.filter(item => item.kind === 'global');
     wrap.append(el('h2', 'Глобални задачи'), el('p', `Общо: ${global.length} · Приключени: ${global.filter(item => item.status === 'completed').length} · Просрочени: ${global.filter(item => item.overdue).length} · Готови за проверка: ${global.filter(item => item.status === 'review').length}`, 'task-muted'));
     const series = new Map();
-    for (const item of relevant.filter(item => item.scheduleId && item.due + state.graceMinutes * 60000 < state.now).sort((a, b) => a.due - b.due)) {
+    for (const item of relevant.filter(item => item.scheduleId && decided(item)).sort((a, b) => a.due - b.due)) {
       const key = item.scheduleId + ':' + item.owner.id, prior = series.get(key) || {item, failed: 0, missing: 0};
       prior.item = item; prior.failed = item.status === 'not-done' ? prior.failed + 1 : 0; prior.missing = item.displayStatus === 'unreported' ? prior.missing + 1 : 0; series.set(key, prior);
     }
@@ -106,7 +109,7 @@
     const streaks = [...series.values()].filter(value => value.failed || value.missing);
     for (const value of streaks) { const entry = el('p', '', 'task-muted'); entry.append(el('span', value.item.title, '', true), document.createTextNode(' · '), el('span', value.item.owner.username, '', true), document.createTextNode(` · Неизпълнени поред: ${value.failed} · Неотчетени поред: ${value.missing}`)); wrap.append(entry); }
     if (!streaks.length) wrap.append(el('p', 'Няма последователни пропуски в избрания период.', 'task-muted'));
-    wrap.append(el('p', 'Броят се само приключили смени след гратисния период. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.', 'task-muted'));
+    wrap.append(el('p', 'Броят се отчетените задачи и смените с изтекъл гратисен период без отчет. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.', 'task-muted'));
     return wrap;
   }
   function renderHistory(items, allItems = items) {
@@ -116,7 +119,8 @@
     wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
     const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
     for (const [key, label, description, noMatch] of [
-      ['reported', 'Отчетени', 'Имат подаден отчет, независимо от резултата.', 'Няма отчетени задачи по тези критерии.'],
+      ['completed', 'Изпълнени', 'Изпълнени задачи, включително потвърдените глобални.', 'Няма изпълнени задачи по тези критерии.'],
+      ['reported', 'Отчетени', 'Имат отчет с друг резултат: неизпълнени, неприложими, в процес, с пречка или за проверка.', 'Няма отчетени задачи по тези критерии.'],
       ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние. Показани са всички дати.', 'Няма неотчетени задачи по тези критерии.'],
       ['cancelled', 'Отменени', 'Задачи с отменено възлагане.', 'Няма отменени задачи по тези критерии.']
     ]) {
@@ -238,7 +242,7 @@
       state = result; $('taskMessage').textContent = '';
       // Clock ticks alone do not change cards, but crossing a start/due/grace
       // boundary changes actions and overdue totals even with the same records.
-      const snapshot = JSON.stringify({...result, now:undefined, timeBoundaries:result.items.map(item => [
+      const snapshot = JSON.stringify({...result, now:undefined, day:periodChosen ? null : date(result.now), timeBoundaries:result.items.map(item => [
         result.now >= item.shift?.start, result.now < item.due, item.due + result.graceMinutes * 60000 < result.now
       ])});
       if (snapshot === displayedSnapshot) return;
@@ -246,7 +250,8 @@
       renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
-      if (!$('statsUntil').value) {
+      // An open page keeps the default period on the current day until the user picks dates.
+      if (!periodChosen) {
         const today = date(state.now);
         $('statsUntil').value = today;
         $('statsFrom').value = new Date(Date.parse(today) - 2 * 86400000).toISOString().slice(0, 10);
@@ -257,7 +262,7 @@
         if (state.schedules.includes(item)) {
           view = 'schedules'; values = [...state.schedules].sort((a,b) => Date.parse(a.from) - Date.parse(b.from));
         } else {
-          view = 'history'; historyView = item.status === 'cancelled' ? 'cancelled' : item.report ? 'reported' : 'unreported';
+          view = 'history'; historyView = historyGroup(item); periodChosen = true;
           const day = item.kind === 'shift' ? item.shift.date : date(item.due);
           $('statsFrom').value = day; $('statsUntil').value = day;
           values = state.items.filter(value => historyIncludes(value, historyView)).sort((a,b) => b.createdAt-a.createdAt || b.due-a.due);
@@ -370,7 +375,7 @@
   for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom', 'taskRequiresPhotos']) $(id).addEventListener('change', editorFields);
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
-  for (const id of ['ownerFilter', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', () => { listPage = 1; render(); });
+  for (const id of ['ownerFilter', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', () => { if (id !== 'ownerFilter') periodChosen = true; listPage = 1; render(); });
   $('taskSearch').addEventListener('input', () => {
     listPage = 1; clearTimeout(searchTimer); $('taskContent').setAttribute('aria-busy', 'true');
     searchTimer = setTimeout(render, 150);

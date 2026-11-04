@@ -41,6 +41,8 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await expect(chief.locator('#taskAction')).not.toBeVisible();
   await expect(chief.locator('.tasks-heading .task-count')).toBeHidden();
   await chief.locator('[data-view=history]').click(); await expect(chief.locator('#taskContent')).toContainText('Изпълнена');
+  // A completed report counts in statistics during its shift, before the grace period ends.
+  await chief.locator('[data-view=stats]').click(); await expect(chief.locator('#taskContent')).toContainText('Отчетени като изпълнени: 1 / 1 (100%).');
   await assign('Fictional recurring check one', {repeat: true}); await assign('Fictional recurring check two', {repeat: true});
   await assign('Fictional global packing problem', {global: true});
   await expect(chief.locator('.tasks-heading .task-count')).toHaveText('3');
@@ -80,7 +82,7 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await chief.route('**/api/tasks/items/**', route => route.abort()); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#actionFeedback')).not.toBeEmpty(); await expect(chief.locator('#actionNote')).toHaveValue('Fictional blocker explanation');
   await chief.unroute('**/api/tasks/items/**'); await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
-  await chief.locator('[data-view=history]').click(); await expect(chief.locator('#taskContent')).toContainText('Закъснял отчет');
+  await chief.locator('[data-view=history]').click(); await chief.locator('[data-history-view=reported]').click(); await expect(chief.locator('#taskContent')).toContainText('Закъснял отчет');
   await chief.reload(); await expect(chief.locator('#taskOverview')).toContainText('Неотчетени');
   await admin.locator('[data-view=schedules]').click(); await expect(admin.locator('#taskContent')).toContainText('Fictional recurring check one');
   await admin.locator('.task-card').filter({hasText: 'Fictional recurring check one'}).getByRole('button', {name: 'Спри повторението'}).click();

@@ -1337,7 +1337,8 @@ Object.assign(HUB_EN_MESSAGES, {
   'Отмени': 'Cancel task', 'Отвори отново': 'Reopen', 'Активни задачи': 'Active tasks', 'Неотчетени': 'Unreported',
   'Готови за проверка': 'Ready for review', 'Просрочени глобални': 'Overdue global tasks', 'Избери валиден период.': 'Select a valid period.',
   'Няма повтарящи се задачи.': 'No recurring tasks.', 'Няма задачи по тези критерии.': 'No tasks match these filters.',
-  'Отчетени': 'Reported', 'Отчети в историята': 'History reports', 'Имат подаден отчет, независимо от резултата.': 'Have a submitted report, regardless of the result.',
+  'Отчетени': 'Reported', 'Отчети в историята': 'History reports', 'Имат отчет с друг резултат: неизпълнени, неприложими, в процес, с пречка или за проверка.': 'Have a report with another result: not done, not applicable, in progress, blocked or ready for review.',
+  'Изпълнени задачи, включително потвърдените глобални.': 'Completed tasks, including approved global tasks.', 'Няма изпълнени задачи по тези критерии.': 'No completed tasks match these filters.',
   'Нямат подаден отчет за текущото състояние. Показани са всички дати.': 'Have no submitted report for the current state. All dates are shown.',
   'Няма отчетени задачи по тези критерии.': 'No reported tasks match these filters.',
   'Няма неотчетени задачи по тези критерии.': 'No unreported tasks match these filters.',
@@ -1364,7 +1365,7 @@ Object.assign(HUB_EN_MESSAGES, {
   'Закъснели отчети': 'Late reports', 'Отчетени като изпълнени': 'Reported completed', 'Няма приключили смени в избрания период.': 'No completed shifts in this period.',
   'Приключени': 'Closed', 'Просрочени': 'Overdue', 'Последователни пропуски': 'Consecutive misses', 'Неизпълнени поред': 'Consecutive not done', 'Неотчетени поред': 'Consecutive unreported',
   'Няма последователни пропуски в избрания период.': 'No consecutive misses in this period.',
-  'Броят се само приключили смени след гратисния период. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.': 'Only ended shifts after the grace period are counted. Cancelled and inapplicable tasks are excluded from the rate. A shift with several missing reports is counted once.',
+  'Броят се отчетените задачи и смените с изтекъл гратисен период без отчет. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.': 'Reported tasks and shifts whose grace period ended without a report are counted. Cancelled and inapplicable tasks are excluded from the rate. A shift with several missing reports is counted once.',
   'Задачите са достъпни в сървърната версия след вход с личен акаунт.': 'Tasks are available in server mode after signing in with a personal account.',
   'Възлагане на сменни и глобални задачи, отчитане и проследяване на изпълнението.': 'Assign shift and global tasks, report results and track completion.'
 });

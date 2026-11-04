@@ -53,7 +53,7 @@ async function exerciseNotificationTargets({admin, hub, base, device, expect, se
   hub.tasks.change(task.id, {action: 'report', status: 'review', note: 'Fictional linked result'}, 1, chief);
   hub.tasks.change(task.id, {action: 'approve'}, 2, actor);
   await opened(admin, 'taskOutcome', task.id);
-  await expect(admin.locator('[data-history-view=reported]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(admin.locator('[data-history-view=completed]')).toHaveAttribute('aria-pressed', 'true');
   const schedule = hub.tasks.create({...payload('Fictional linked recurring plan'), kind: 'shift', repeat: 'every-shift', from: '2026-10-05', until: '2026-10-10'}, actor);
   await opened(admin, 'taskChanged', schedule.id);
   await expect(admin.locator('[data-view=schedules]')).toHaveAttribute('aria-pressed', 'true');

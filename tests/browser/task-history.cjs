@@ -56,28 +56,32 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
     await page.locator('#statsFrom').fill('2026-12-01'); await page.locator('#statsUntil').fill('2026-12-03');
   }
   await open(admin); await admin.locator('#ownerFilter').selectOption(String(owner.id));
-  await expect(toggle(admin, 'reported')).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle(admin, 'completed')).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle(admin, 'reported')).toHaveAttribute('aria-pressed', 'false');
   await expect(toggle(admin, 'unreported')).toHaveAttribute('aria-pressed', 'false');
   await expect(toggle(admin, 'cancelled')).toHaveAttribute('aria-pressed', 'false');
   await expect(group(admin, 'unreported')).toHaveCount(0);
   // Assignment order differs from both deadline order and the last report time.
-  const reportedTitles = ['review', 'blocked', 'not-done', 'not-applicable', 'completed', 'approved'].map(key => 'Fictional history ' + key);
+  const completedTitles = ['completed', 'approved'].map(key => 'Fictional history ' + key);
+  const reportedTitles = ['review', 'blocked', 'not-done', 'not-applicable'].map(key => 'Fictional history ' + key);
   const unreportedTitles = ['pending-shift', 'pending-global'].map(key => 'Fictional history ' + key);
   const cancelledTitles = ['cancelled-with-report', 'cancelled'].map(key => 'Fictional history ' + key);
-  await expect(titles(admin, 'reported')).toHaveText(reportedTitles);
+  await expect(titles(admin, 'completed')).toHaveText(completedTitles);
+  await choose(admin, 'reported'); await expect(titles(admin, 'reported')).toHaveText(reportedTitles);
   await toggle(admin, 'reported').focus(); await admin.keyboard.press('Tab');
   await expect(toggle(admin, 'unreported')).toBeFocused(); await admin.keyboard.press('Enter');
   await expect(toggle(admin, 'unreported')).toBeFocused();
   await expect(group(admin, 'reported')).toHaveCount(0);
   await expect(titles(admin, 'unreported')).toHaveText(unreportedTitles);
-  await expect(count(admin, 'reported')).toHaveText('6'); await expect(count(admin, 'unreported')).toHaveText('2');
+  await expect(count(admin, 'completed')).toHaveText('2'); await expect(count(admin, 'reported')).toHaveText('4'); await expect(count(admin, 'unreported')).toHaveText('2');
   await expect(count(admin, 'cancelled')).toHaveText('2');
   await expect(group(admin, 'unreported')).toContainText('Неотчетена'); await expect(group(admin, 'unreported')).not.toContainText('Отменена');
   await choose(admin, 'cancelled'); await expect(titles(admin, 'cancelled')).toHaveText(cancelledTitles);
   const chief = await device(owner.username, true); await open(chief);
-  await expect(count(chief, 'reported')).toHaveText('6'); await expect(count(chief, 'unreported')).toHaveText('2');
+  await expect(count(chief, 'completed')).toHaveText('2'); await expect(count(chief, 'reported')).toHaveText('4'); await expect(count(chief, 'unreported')).toHaveText('2');
   await expect(count(chief, 'cancelled')).toHaveText('2');
-  await expect(titles(chief, 'reported')).toHaveText(reportedTitles);
+  await expect(titles(chief, 'completed')).toHaveText(completedTitles);
+  await choose(chief, 'reported'); await expect(titles(chief, 'reported')).toHaveText(reportedTitles);
   await choose(chief, 'unreported'); await expect(titles(chief, 'unreported')).toHaveText(unreportedTitles);
   await choose(chief, 'cancelled'); await expect(titles(chief, 'cancelled')).toHaveText(cancelledTitles);
   await expect(chief.locator('#taskContent')).not.toContainText('Fictional history other-owner');
@@ -86,10 +90,11 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
     await admin.setViewportSize({width, height: 900});
     for (const language of ['en', 'bg']) {
       await admin.locator(`[data-hub-language=${language}]`).click();
+      await expect(toggle(admin, 'completed').locator('span').first()).toHaveText(language === 'en' ? 'Completed' : 'Изпълнени');
       await expect(toggle(admin, 'reported').locator('span').first()).toHaveText(language === 'en' ? 'Reported' : 'Отчетени');
       await expect(toggle(admin, 'unreported').locator('span').first()).toHaveText(language === 'en' ? 'Unreported' : 'Неотчетени');
       await expect(toggle(admin, 'cancelled').locator('span').first()).toHaveText(language === 'en' ? 'Cancelled' : 'Отменени');
-      for (const key of ['unreported', 'reported', 'cancelled']) {
+      for (const key of ['unreported', 'completed', 'reported', 'cancelled']) {
         await choose(admin, key); await assertResponsive(admin, `Task history ${key}/${language} at ${width}px`);
       }
     }
@@ -106,7 +111,7 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   }
   await choose(admin, 'reported');
   await admin.locator('#taskSearch').fill('Fictional history blocked');
-  await expect(count(admin, 'reported')).toHaveText('1'); await expect(count(admin, 'unreported')).toHaveText('0');
+  await expect(count(admin, 'reported')).toHaveText('1'); await expect(count(admin, 'completed')).toHaveText('0'); await expect(count(admin, 'unreported')).toHaveText('0');
   await choose(admin, 'unreported');
   // Unreported tasks exist outside the search, so the empty result offers to clear filters.
   await expect(group(admin, 'unreported')).toContainText('Няма задачи, които отговарят на търсенето или избрания отговорник.');
@@ -129,7 +134,7 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await choose(admin, 'reported');
   await expect(group(admin, 'reported')).toContainText('Няма задачи, които отговарят на търсенето или избрания отговорник.');
   await admin.locator('#ownerFilter').selectOption(String(owner.id)); await admin.locator('#statsUntil').fill('2026-12-02');
-  await expect(count(admin, 'reported')).toHaveText('5'); await expect(count(admin, 'unreported')).toHaveText('2');
+  await expect(count(admin, 'completed')).toHaveText('2'); await expect(count(admin, 'reported')).toHaveText('3'); await expect(count(admin, 'unreported')).toHaveText('2');
   await expect(count(admin, 'cancelled')).toHaveText('1');
   await admin.locator('#statsFrom').fill('2026-12-03'); await expect(admin.locator('#taskContent')).toHaveText('Избери валиден период.');
   await admin.locator('#statsFrom').fill('2026-12-01'); await admin.locator('#statsUntil').fill('2026-12-03');
@@ -145,24 +150,24 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await group(admin, 'reported').locator('.task-card').filter({hasText: 'Fictional history review'}).getByRole('button', {name: 'Върни за работа', exact: true}).click();
   await admin.locator('#actionNote').fill('Fictional history return reason'); await admin.locator('#actionForm button[type=submit]').click();
   await expect(admin.locator('#taskAction')).not.toBeVisible();
-  await expect(count(admin, 'reported')).toHaveText('5'); await expect(count(admin, 'unreported')).toHaveText('3');
+  await expect(count(admin, 'reported')).toHaveText('3'); await expect(count(admin, 'unreported')).toHaveText('3');
   await expect(group(admin, 'reported')).not.toContainText('Fictional history review');
   await choose(admin, 'unreported');
   await expect(group(admin, 'unreported')).toContainText('Fictional history review');
-  await choose(admin, 'reported');
-  await group(admin, 'reported').locator('.task-card').filter({hasText: 'Fictional history completed'}).getByRole('button', {name: 'Отвори отново', exact: true}).click();
+  await choose(admin, 'completed');
+  await group(admin, 'completed').locator('.task-card').filter({hasText: 'Fictional history completed'}).getByRole('button', {name: 'Отвори отново', exact: true}).click();
   await admin.locator('#actionNote').fill('Fictional history reopen reason'); await admin.locator('#actionForm button[type=submit]').click();
   await expect(admin.locator('#taskAction')).not.toBeVisible();
-  await expect(count(admin, 'reported')).toHaveText('4'); await expect(count(admin, 'unreported')).toHaveText('4');
+  await expect(count(admin, 'completed')).toHaveText('1'); await expect(count(admin, 'reported')).toHaveText('3'); await expect(count(admin, 'unreported')).toHaveText('4');
   await choose(chief, 'unreported');
   await chief.locator('#refreshTasks').click();
   await expect(group(chief, 'unreported')).toContainText('Fictional history completed');
   await group(chief, 'unreported').locator('.task-card').filter({hasText: 'Fictional history completed'}).getByRole('button', {name: 'Отчети', exact: true}).click();
   await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
-  await expect(count(chief, 'reported')).toHaveText('5'); await expect(count(chief, 'unreported')).toHaveText('3');
+  await expect(count(chief, 'completed')).toHaveText('2'); await expect(count(chief, 'reported')).toHaveText('3'); await expect(count(chief, 'unreported')).toHaveText('3');
   await expect(toggle(chief, 'unreported')).toHaveAttribute('aria-pressed', 'true');
   await expect(group(chief, 'unreported')).not.toContainText('Fictional history completed');
-  await choose(chief, 'reported'); await expect(group(chief, 'reported')).toContainText('Fictional history completed');
+  await choose(chief, 'completed'); await expect(group(chief, 'completed')).toContainText('Fictional history completed');
   await admin.locator('#refreshTasks').click(); await choose(admin, 'unreported');
   await group(admin, 'unreported').locator('.task-card').filter({hasText: 'Fictional history pending-global'}).getByRole('button', {name: 'Отмени', exact: true}).click();
   await admin.locator('#actionNote').fill('Fictional history cancellation reason'); await admin.locator('#actionForm button[type=submit]').click();
@@ -180,7 +185,7 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   // Old shift and global tasks without a report remain trackable in a new month.
   setTime('2027-02-01T10:00:00+02:00'); await admin.goto(base + '/tasks');
   await admin.locator('[data-view=history]').click();
-  await expect(count(admin, 'reported')).toHaveText('0'); await expect(count(admin, 'cancelled')).toHaveText('0');
+  await expect(count(admin, 'completed')).toHaveText('0'); await expect(count(admin, 'reported')).toHaveText('0'); await expect(count(admin, 'cancelled')).toHaveText('0');
   await expect(count(admin, 'unreported')).toHaveText('4'); await choose(admin, 'unreported');
   await expect(admin.locator('#taskPeriod')).toBeHidden();
   await expect(titles(admin, 'unreported')).toHaveText(['other-owner', 'cancelled-with-report', 'pending-shift', 'review'].map(key => 'Fictional history ' + key));
@@ -189,6 +194,12 @@ async function exerciseTaskHistory({admin, hub, base, device, expect, setTime, s
   await expect(titles(admin, 'unreported')).toHaveText(['Fictional history other-owner']);
   await choose(admin, 'reported'); await expect(admin.locator('#taskPeriod')).toBeVisible();
   await expect(admin.locator('#statsFrom')).toHaveValue('2027-01-30'); await expect(admin.locator('#statsUntil')).toHaveValue('2027-02-01');
+  // An open page follows the day until dates are picked, then keeps the chosen period.
+  setTime('2027-02-02T10:00:00+02:00'); await admin.locator('#refreshTasks').click();
+  await expect(admin.locator('#statsFrom')).toHaveValue('2027-01-31'); await expect(admin.locator('#statsUntil')).toHaveValue('2027-02-02');
+  await admin.locator('#statsFrom').fill('2027-01-15');
+  setTime('2027-02-03T10:00:00+02:00'); await admin.locator('#refreshTasks').click();
+  await expect(admin.locator('#statsFrom')).toHaveValue('2027-01-15'); await expect(admin.locator('#statsUntil')).toHaveValue('2027-02-02');
   await chief.context().close();
   console.log('PASS all-date unreported backlog, dated reported/cancelled history, selected group, keyboard focus, newest order, filters, report transitions and BG/EN layouts');
 }
