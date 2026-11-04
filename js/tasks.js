@@ -5,7 +5,7 @@
   const supervisor = HubServer.can('canReportTasks'), reader = !admin && !supervisor;
   const assigner = HubServer.can('canAssignTasks'), reviewer = HubServer.can('canReviewTasks');
   const administrator = admin && HubServer.user.role === 'admin';
-  let state, view = 'shift', historyView = 'completed', periodChosen = false, editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
+  let state, view = 'open', month = null, monthChosen = false, editing = null, acting = null, busy = false, sequence = 0, creationKey = null, actionKey = null, previewSequence = 0;
   const pageSize = 50;
   let listPage = 1, searchTimer;
   let pendingRead = null, displayedSnapshot = null;
@@ -43,7 +43,6 @@
   function clock(at) { formatters(); return clockFormatter.format(new Date(at)); }
   function shiftLabel(shift) { return shift.team === 'СТИКЕРИ' ? 'Редовна смяна' : {1: '1-ва смяна', 2: '2-ра смяна', 3: 'Нощна смяна'}[shift.code]; }
   function button(label, fn, cls = 'secondary') { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', fn); return node; }
-  function selectedOwner(item) { return !$('ownerFilter').value || String(item.owner.id) === $('ownerFilter').value; }
   function empty(text, ...actions) {
     if (!actions.length) return el('p', text, 'task-empty');
     const node = el('div', '', 'task-empty'), row = el('div', '', 'task-actions task-empty-actions');
@@ -57,7 +56,7 @@
   // Separate an empty database from filters without matches; only assigners get a create action.
   function noResults(filtered, baseText) {
     if (filtered) return empty('Няма задачи, които отговарят на търсенето или избрания отговорник.', button('Изчисти филтрите', clearFilters));
-    return assigner && view !== 'history' ? empty(baseText, button('+ Възложи задача', () => { if (state) openEditor(); }, '')) : empty(baseText);
+    return assigner && ['open', 'schedules'].includes(view) ? empty(baseText, button('+ Нова задача', () => { if (state) openEditor(); }, '')) : empty(baseText);
   }
   function loadFailed(error) {
     const retry = button('Опитай отново', () => refresh({fresh: true}));
@@ -75,74 +74,35 @@
   const actionDraft = HubServer.formDraft($('taskAction'),{isOpen:() => $('taskAction').open,extra:() => [solutionPicker.values,solutionPicker.failed,actionKey]});
   HubServer.guardUpdate({isBusy:() => busy || problemPicker.pending || solutionPicker.pending,
     hasDraft:() => editorDraft.hasDraft() || actionDraft.hasDraft()});
-  function period(item) { const key = item.kind === 'shift' ? item.shift.date : date(item.due); return key >= $('statsFrom').value && key <= $('statsUntil').value; }
-  const historyGroup = item => item.status === 'cancelled' ? 'cancelled' : item.status === 'completed' ? 'completed' : item.report ? 'reported' : 'unreported';
-  // A shift counts once it is reported, or once its grace period ends without a report.
-  const decided = item => item.status !== 'pending' || item.due + state.graceMinutes * 60000 < state.now;
-  function historyIncludes(item, group) {
-    const kind = historyGroup(item);
-    return kind === group && (group === 'unreported' || period(item));
+  // Everyone except a supervisor without other task rights sees owners, filters and the per-owner summary.
+  const overseer = !supervisor || admin || assigner || reviewer;
+  const finalStatuses = ['completed', 'cancelled', 'not-done', 'not-applicable'];
+  const placeOf = item => TaskViewModel.place(item, state.now, reviewer);
+  const monthOf = item => TaskViewModel.monthOf(item, state.timezone);
+  const groupLabels = {confirm: 'Чакат твоето потвърждение', shift: 'Тази смяна', deadline: 'Проблеми с краен срок', unreported: 'Пропуснат отчет', upcoming: 'Предстоящи'};
+  const groupOrder = Object.keys(groupLabels);
+  const monthNames = ['Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни', 'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'];
+  const monthLabel = value => monthNames[Number(value.slice(5)) - 1] + ' ' + value.slice(0, 4);
+  // Ordered items of one tab; render and notification links share it so pages match.
+  function listFor(tab, items) {
+    if (tab === 'schedules') return [...items].sort((a, b) => Date.parse(a.from) - Date.parse(b.from));
+    if (tab === 'open') return items.filter(item => placeOf(item).tab === 'open')
+      .sort((a, b) => groupOrder.indexOf(placeOf(a).group) - groupOrder.indexOf(placeOf(b).group) || a.due - b.due);
+    return items.filter(item => placeOf(item).tab === tab && monthOf(item) === month).sort((a, b) => b.due - a.due);
   }
-  function summarize(items) {
-    const shifts = items.filter(item => item.kind === 'shift' && decided(item) && !['cancelled', 'not-applicable'].includes(item.status));
-    return {total: shifts.length, done: shifts.filter(item => item.status === 'completed').length, failed: shifts.filter(item => item.status === 'not-done').length, missing: shifts.filter(item => item.displayStatus === 'unreported').length,
-      missingShifts: new Set(shifts.filter(item => item.displayStatus === 'unreported').map(item => `${item.shift.date}:${item.shift.code}:${item.shift.team}`)).size, late: shifts.filter(item => item.late).length};
-  }
-  function renderStats(items) {
-    const wrap = el('div'), relevant = items.filter(period), summary = summarize(relevant);
-    wrap.append(el('p', `Отчетени като изпълнени: ${summary.done} / ${summary.total} (${summary.total ? Math.round(summary.done / summary.total * 100) : 0}%).`, 'task-muted'));
-    const tableWrap = el('div', '', 'task-table-wrap'), table = el('table', '', 'task-table');
-    const head = el('tr'); for (const label of ['Отговорник', 'Приложими задачи', 'Изпълнени', 'Неизпълнени', 'Неотчетени', 'Смени без пълен отчет', 'Закъснели отчети']) head.append(el('th', label));
-    const thead = el('thead'); thead.append(head); table.append(thead); const tbody = el('tbody');
-    const owners = new Map(relevant.filter(item => item.kind === 'shift').map(item => [item.owner.id, item.owner.username]));
-    for (const [id, name] of owners) { const value = summarize(relevant.filter(item => item.owner.id === id)), row = el('tr'); row.append(el('td', name, '', true)); for (const key of ['total', 'done', 'failed', 'missing', 'missingShifts', 'late']) row.append(el('td', String(value[key]))); tbody.append(row); }
-    table.append(tbody); tableWrap.append(table); wrap.append(tableWrap);
-    if (!owners.size) wrap.append(empty('Няма приключили смени в избрания период.'));
-    const global = relevant.filter(item => item.kind === 'global');
-    wrap.append(el('h2', 'Глобални задачи'), el('p', `Общо: ${global.length} · Приключени: ${global.filter(item => item.status === 'completed').length} · Просрочени: ${global.filter(item => item.overdue).length} · Готови за проверка: ${global.filter(item => item.status === 'review').length}`, 'task-muted'));
-    const series = new Map();
-    for (const item of relevant.filter(item => item.scheduleId && decided(item)).sort((a, b) => a.due - b.due)) {
-      const key = item.scheduleId + ':' + item.owner.id, prior = series.get(key) || {item, failed: 0, missing: 0};
-      prior.item = item; prior.failed = item.status === 'not-done' ? prior.failed + 1 : 0; prior.missing = item.displayStatus === 'unreported' ? prior.missing + 1 : 0; series.set(key, prior);
+  function renderSummary(items) {
+    const args = [items, month, state.timezone, state.now, state.graceMinutes * 60000], total = TaskViewModel.monthSummary(...args);
+    const wrap = el('section', '', 'task-summary'); wrap.setAttribute('aria-label', 'Обобщение за месеца');
+    for (const [value, label] of [[total.pct + '%', 'Изпълнени от отчетите'], [String(total.done), 'Изпълнени смени'], [String(total.failed), 'Неизпълнени или без отчет']]) {
+      const metric = el('div', '', 'task-metric'); metric.append(el('strong', value), el('span', label)); wrap.append(metric);
     }
-    wrap.append(el('h2', 'Последователни пропуски'));
-    const streaks = [...series.values()].filter(value => value.failed || value.missing);
-    for (const value of streaks) { const entry = el('p', '', 'task-muted'); entry.append(el('span', value.item.title, '', true), document.createTextNode(' · '), el('span', value.item.owner.username, '', true), document.createTextNode(` · Неизпълнени поред: ${value.failed} · Неотчетени поред: ${value.missing}`)); wrap.append(entry); }
-    if (!streaks.length) wrap.append(el('p', 'Няма последователни пропуски в избрания период.', 'task-muted'));
-    wrap.append(el('p', 'Броят се отчетените задачи и смените с изтекъл гратисен период без отчет. Отменените и неприложимите задачи не влизат в процента. Една смяна с няколко липсващи отчета се брои веднъж.', 'task-muted'));
-    return wrap;
-  }
-  function renderHistory(items, allItems = items) {
-    const wrap = el('div', '', 'task-history');
-    const controls = el('div', '', 'task-tabs task-history-tabs');
-    controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', 'Отчети в историята');
-    wrap.append(controls, el('p', 'Последно възложените задачи са най-отгоре.', 'task-muted'));
-    const newestFirst = [...items].sort((a, b) => b.createdAt - a.createdAt || b.due - a.due);
-    for (const [key, label, description, noMatch] of [
-      ['completed', 'Изпълнени', 'Изпълнени задачи, включително потвърдените глобални.', 'Няма изпълнени задачи по тези критерии.'],
-      ['reported', 'Отчетени', 'Имат отчет с друг резултат: неизпълнени, неприложими, в процес, с пречка или за проверка.', 'Няма отчетени задачи по тези критерии.'],
-      ['unreported', 'Неотчетени', 'Нямат подаден отчет за текущото състояние. Показани са всички дати.', 'Няма неотчетени задачи по тези критерии.'],
-      ['cancelled', 'Отменени', 'Задачи с отменено възлагане.', 'Няма отменени задачи по тези критерии.']
-    ]) {
-      const values = newestFirst.filter(item => historyIncludes(item, key));
-      const control = button('', () => {
-        historyView = key; listPage = 1; render();
-        $('taskContent').querySelector(`[data-history-view="${key}"]`).focus();
-      });
-      control.dataset.historyView = key; control.setAttribute('aria-pressed', String(historyView === key));
-      control.setAttribute('aria-controls', 'taskHistoryResults');
-      control.append(el('span', label), el('span', String(values.length), 'task-badge', true)); controls.append(control);
-      if (historyView !== key) continue;
-      const section = el('section', '', 'task-history-group'); section.dataset.historyGroup = key;
-      section.id = 'taskHistoryResults';
-      const heading = el('h2', '', 'task-history-heading'); heading.id = 'taskHistoryHeading-' + key;
-      heading.append(el('span', label), el('span', String(values.length), 'task-badge', true));
-      section.setAttribute('aria-labelledby', heading.id);
-      section.append(heading, el('p', description, 'task-muted'));
-      if (!values.length) { listPage = 1; section.append(filtersActive() && allItems.some(item => historyIncludes(item, key)) ? noResults(true) : empty(noMatch)); }
-      else appendPage(section, values);
-      wrap.append(section);
+    const owners = overseer ? TaskViewModel.byOwner(...args) : [];
+    if (owners.length) {
+      const list = el('div', '', 'task-owner-list');
+      for (const owner of owners) { const row = el('p', '', 'task-owner-row'); row.append(el('span', owner.username, '', true), el('span', `${owner.done} / ${owner.total} · ${owner.pct}%`)); list.append(row); }
+      wrap.append(list);
     }
+    wrap.append(el('p', 'Броят се сменните задачи с отчет и смените с изтекъл гратисен период без отчет. Отменените и неприложимите не влизат.', 'task-muted'));
     return wrap;
   }
   function history(item) {
@@ -150,42 +110,69 @@
     for (const entry of item.events) { const row = el('div', '', 'task-history-event'); row.append(el('strong', actionLabels[entry.action]), el('p', `${clock(entry.at)} · ${entry.actor.username}`, 'task-muted', true)); if (entry.status) row.append(el('span', statusLabels[entry.status], 'task-badge')); if (entry.late) row.append(el('span', 'Закъснял отчет', 'task-badge alert')); if (entry.note) row.append(el('p', entry.note, '', true)); if (entry.transfer) row.append(el('p', `${entry.transfer.from.username} → ${entry.transfer.to.username}`, 'task-muted', true)); if (entry.snapshot) { row.append(el('p', entry.snapshot.title, '', true), el('p', entry.snapshot.description, '', true), el('p', [entry.snapshot.owner.username, ...(entry.snapshot.participants || []).map(person => person.username)].join(' · '), 'task-muted', true), el('span', photoRequirementLabel(entry.snapshot), 'task-badge')); if (entry.snapshot.due) row.append(el('p', clock(entry.snapshot.due), 'task-muted', true)); } if (entry.snapshot) row.append(...photoViews(item, problemPhotos(entry.snapshot), 'Проблем', !item.kind)); row.append(...photoViews(item, solutionPhotos(entry), 'Решение')); content.append(row); }
     $('taskHistory').showModal(); observePhotos(content);
   }
+  function menuItem(label, fn, cls = '') { const node = button(label, () => { node.closest('details').open = false; fn(); }, 'task-menu-item' + (cls ? ' ' + cls : '')); return node; }
   function card(item, recurring = false) {
-    const alert = item.displayStatus === 'unreported' || item.overdue || item.status === 'not-done';
-    const node = el('article', '', 'task-card' + (alert ? ' is-alert' : '')); node.dataset.taskId = item.id; node.dataset.notificationTarget = item.id;
-    const head = el('div', '', 'task-card-head'); head.append(el('h2', item.title, '', true), el('span', item.owner.username, 'task-meta', true)); node.append(head);
-    const badges = el('div', '', 'task-badges');
-    const status = recurring ? item.stoppedAt ? 'Повторението е спряно' : 'Активно повторение' : statusLabels[item.displayStatus];
-    badges.append(el('span', status, 'task-badge' + (alert ? ' alert' : item.status === 'completed' ? ' good' : '')));
-    badges.append(el('span', photoRequirementLabel(item), 'task-badge'));
-    if (item.priority === 'high') badges.append(el('span', 'Висок приоритет', 'task-badge alert'));
-    if (item.overdue) badges.append(el('span', 'Просрочена', 'task-badge alert')); if (item.late) badges.append(el('span', 'Закъснял отчет', 'task-badge alert'));
-    node.append(badges, el('p', item.description, 'task-description', true));
+    const place = recurring ? null : placeOf(item);
+    const alert = !recurring && (item.displayStatus === 'unreported' || item.overdue || item.status === 'not-done');
+    const node = el('article', '', 'task-card' + (alert ? ' is-alert' : place?.group === 'confirm' ? ' is-waiting' : item.status === 'completed' ? ' is-done' : ''));
+    node.dataset.taskId = item.id; node.dataset.notificationTarget = item.id;
+    const head = el('div', '', 'task-card-head'); head.append(el('h2', item.title, '', true)); node.append(head);
+    node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
+    if (overseer) { const owner = el('p', '', 'task-meta'); owner.append(el('span', 'Отговорник'), document.createTextNode(': '), el('span', item.owner.username, '', true)); node.append(owner); }
+    if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
+    const badges = el('div', '', 'task-badges'), badge = (text, cls = '') => badges.append(el('span', text, 'task-badge' + (cls ? ' ' + cls : '')));
+    if (recurring) badge(item.stoppedAt ? 'Повторението е спряно' : 'Всяка смяна', item.stoppedAt ? 'alert' : '');
+    else if (item.status !== 'pending' || item.displayStatus === 'unreported') badge(item.status === 'review' ? 'Готово — чака потвърждение' : statusLabels[item.displayStatus], alert ? 'alert' : item.status === 'completed' ? 'good' : item.status === 'review' ? 'info' : '');
+    else if (item.kind === 'shift' && state.now >= item.due) badge('Отчетът закъснява', 'alert');
+    if (!recurring && item.scheduleId) badge('Всяка смяна');
+    if (!recurring && item.kind === 'global') badge('Обща задача');
+    if (requiresPhotos(item)) badge('Изисква снимки');
+    if (item.priority === 'high') badge('Спешно', 'alert');
+    if (item.overdue) badge('Просрочена', 'alert'); if (item.late) badge('Закъснял отчет', 'alert');
+    node.append(badges);
+    if (item.description) node.append(el('p', item.description, 'task-description', true));
     if (requiresPhotos(item) || problemPhotos(item).length || solutionPhotos(item.report).length) {
       const evidence = el('div', '', 'task-photos');
       if (requiresPhotos(item) || problemPhotos(item).length) evidence.append(...photoViews(item, problemPhotos(item).length ? problemPhotos(item) : [null], 'Проблем', recurring));
       if (item.report && !solutionPhotos(item.report).length && item.events.at(-1)?.action === 'complete') evidence.append(el('p', 'Завършена от администратор без снимки.', 'task-muted'));
       else if (item.report && (requiresPhotos(item) || solutionPhotos(item.report).length)) evidence.append(...photoViews(item, solutionPhotos(item.report).length ? solutionPhotos(item.report) : [null], 'Решение')); node.append(evidence);
     }
-    node.append(el('p', recurring ? `${item.from} – ${item.until} · Екип ${item.team}` : item.kind === 'shift' ? `${item.shift.date} · Екип ${item.shift.team} · ${shiftLabel(item.shift)} · ${clock(item.shift.start)} – ${clock(item.due)}` : `Краен срок: ${clock(item.due)}`, 'task-meta'));
-    if (item.participants.length) node.append(el('p', item.participants.map(person => person.username).join(' · '), 'task-meta', true));
-    const lastNote = item.events.findLast(entry => entry.note); if (lastNote) node.append(el('p', lastNote.note, 'task-description', true));
-    const actions = el('div', '', 'task-actions'); actions.append(button('История', () => history(item)));
-    if (recurring) { if (admin && !item.stoppedAt) actions.append(button('Промени бъдещите задачи', () => openEditor(item, true)), button('Спри повторението', () => openAction(item, 'stop', true))); }
+    const lastNote = item.events.findLast(entry => entry.note); if (lastNote) node.append(el('p', lastNote.note, 'task-description task-note', true));
+    const quick = el('div', '', 'task-actions task-quick'), menu = el('details', '', 'task-more'), summary = el('summary', '•••');
+    summary.setAttribute('aria-label', 'Още действия'); const items = el('div', '', 'task-menu'); menu.append(summary, items);
+    items.append(menuItem('История', () => history(item)));
+    if (recurring) { if (admin && !item.stoppedAt) items.append(menuItem('Промени бъдещите задачи', () => openEditor(item, true)), menuItem('Спри повторението', () => openAction(item, 'stop', true), 'danger')); }
     else {
-      const final = ['completed', 'cancelled'].includes(item.status);
-      if (supervisor && item.owner.id === HubServer.user.id && !final && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Отчети', () => openAction(item, 'report'), ''));
-      if (supervisor && item.kind === 'global' && !final && (item.owner.id === HubServer.user.id || item.participants.some(person => person.id === HubServer.user.id))) actions.append(button('Добави напредък', () => openAction(item, 'progress')));
-      if (reviewer && item.status === 'review') actions.append(button('Потвърди приключване', () => openAction(item, 'approve'), ''), button('Върни за работа', () => openAction(item, 'return')));
-      if (admin && !final) {
-        if (administrator) actions.append(button('Прехвърли задача', () => openAction(item, 'transfer')));
-        if (administrator && (item.kind === 'global' || state.now >= item.shift.start)) actions.append(button('Завърши задача', () => openAction(item, 'complete'), ''));
-        if (item.kind === 'global' || state.now < item.due && !item.report) actions.append(button('Промени', () => openEditor(item)));
-        actions.append(button('Отмени', () => openAction(item, 'cancel')));
+      const final = ['completed', 'cancelled'].includes(item.status), owner = supervisor && item.owner.id === HubServer.user.id, started = item.kind === 'global' || state.now >= item.shift.start;
+      if (owner && !final && started && place.tab === 'open' && item.kind === 'shift') {
+        const done = button('✓ Изпълнена', () => requiresPhotos(item) ? openAction(item, 'report', false, 'completed') : quickDone(item, done), 'task-yes'); done.dataset.quick = 'done';
+        const failed = button('× Не е изпълнена', () => openAction(item, 'report', false, 'not-done')); failed.dataset.quick = 'not-done'; quick.append(done, failed);
       }
-      if (admin && ['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)) actions.append(button('Отвори отново', () => openAction(item, 'reopen')));
+      if (owner && !final && item.kind === 'global' && item.status !== 'review') { const ready = button('✓ Готово', () => openAction(item, 'report', false, 'review'), 'task-yes'); ready.dataset.quick = 'ready'; quick.append(ready); }
+      if (supervisor && item.kind === 'global' && !final && (owner || item.participants.some(person => person.id === HubServer.user.id))) { const note = button('Добави бележка', () => openAction(item, 'progress')); note.dataset.quick = 'note'; quick.append(note); }
+      if (reviewer && item.status === 'review') quick.append(button('✓ Потвърди', () => openAction(item, 'approve'), 'task-yes'), button('Върни', () => openAction(item, 'return')));
+      if (owner && !final && started && place.tab !== 'open') items.append(menuItem('Промени отчета', () => openAction(item, 'report')));
+      if (admin && !final) {
+        if (item.kind === 'global' || state.now < item.due && !item.report) items.append(menuItem('Промени', () => openEditor(item)));
+        if (administrator) items.append(menuItem('Прехвърли на друг', () => openAction(item, 'transfer')));
+        if (administrator && started) items.append(menuItem('Отбележи като изпълнена', () => openAction(item, 'complete')));
+      }
+      if (admin && finalStatuses.includes(item.status)) items.append(menuItem('Отвори отново', () => openAction(item, 'reopen')));
+      if (admin && !final) items.append(menuItem('Отмени задачата', () => openAction(item, 'cancel'), 'danger'));
     }
-    node.append(actions); return node;
+    head.append(menu); if (quick.childElementCount) node.append(quick); return node;
+  }
+  let quickKeys = new Map();
+  // One tap reports a shift task completed; a retry after a lost response reuses the request id.
+  async function quickDone(item, control) {
+    if (busy) return;
+    busy = true; control.disabled = true; ++sequence; pendingRead = null;
+    const requestId = quickKeys.get(item.id) || crypto.randomUUID(); quickKeys.set(item.id, requestId);
+    try {
+      await HubServer.send('/api/tasks/items/' + item.id, 'PATCH', {action: 'report', status: 'completed', note: '', requestId}, {'If-Match': '"' + item.revision + '"'});
+      quickKeys.delete(item.id); busy = false; await refresh({fresh: true}); $('taskMessage').textContent = 'Отчетено като изпълнена.';
+    } catch (error) { $('taskMessage').textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; }
+    finally { busy = false; if (control.isConnected) control.disabled = false; }
   }
   function render() {
     if (!state) return;
@@ -193,28 +180,25 @@
     $('taskContent').removeAttribute('aria-busy');
     const owner = $('ownerFilter').value, search = $('taskSearch').value.trim().toLowerCase();
     const selected = item => (!owner || String(item.owner.id) === owner) && (item.title + ' ' + item.description).toLowerCase().includes(search);
-    const items = state.items.filter(selected), overview = $('taskOverview'); overview.replaceChildren();
-    for (const [label, count] of [['Активни задачи', items.filter(item => !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status)).length], ['Неотчетени', items.filter(item => item.displayStatus === 'unreported').length], ['Готови за проверка', items.filter(item => item.status === 'review').length], ['Просрочени глобални', items.filter(item => item.overdue).length]]) { const metric = el('div', '', 'task-metric'); metric.append(el('strong', String(count)), el('span', label)); overview.append(metric); }
-    const usesPeriod = view === 'stats' || view === 'history' && historyView !== 'unreported';
-    $('taskPeriod').hidden = !usesPeriod;
+    const items = state.items.filter(selected);
+    for (const tab of $('taskTabs').querySelectorAll('[data-view]')) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.view === view));
+      const count = ['open', 'missed'].includes(tab.dataset.view) ? listFor(tab.dataset.view, items).length : 0, badge = tab.querySelector('.task-badge');
+      badge.textContent = String(count); badge.hidden = !count;
+    }
+    $('taskMonth').hidden = !['done', 'missed'].includes(view); $('monthLabel').textContent = monthLabel(month);
     const content = $('taskContent'), retainedFocus = content.contains(document.activeElement) ? document.activeElement : null;
     forgetPhotos(content); content.replaceChildren();
     try {
-    if (usesPeriod && (!$('statsFrom').value || !$('statsUntil').value || $('statsFrom').value > $('statsUntil').value)) { content.append(empty('Избери валиден период.')); return; }
-    if (view === 'stats') { content.append(renderStats(items)); return; }
-    if (view === 'history') { content.append(renderHistory(items, state.items)); return; }
-    const inView = item => view === 'shift' ? item.kind === 'shift' && !['completed', 'cancelled', 'not-done', 'not-applicable'].includes(item.status) : view === 'global' ? item.kind === 'global' && !['completed', 'cancelled'].includes(item.status) : period(item);
-    const values = view === 'schedules' ? state.schedules.filter(selected) : items.filter(inView);
-    values.sort((a, b) => (a.due || Date.parse(a.from)) - (b.due || Date.parse(b.from)));
-    if (!values.length) {
-      listPage = 1;
-      const filtered = filtersActive() && (view === 'schedules' ? state.schedules.length > 0 : state.items.some(inView));
-      content.append(noResults(filtered, {schedules: 'Няма повтарящи се задачи.', shift: 'Няма активни сменни задачи.', global: 'Няма активни глобални задачи.'}[view] || 'Няма задачи по тези критерии.'));
-    }
-    else appendPage(content, values, view === 'schedules');
+      const values = listFor(view, view === 'schedules' ? state.schedules.filter(selected) : items);
+      if (view === 'done') content.append(renderSummary(items));
+      if (!values.length) {
+        listPage = 1;
+        const filtered = filtersActive() && listFor(view, view === 'schedules' ? state.schedules : state.items).length > 0;
+        content.append(noResults(filtered, {schedules: 'Няма повтарящи се задачи.', open: 'Няма задачи за отчет.', done: 'Няма изпълнени задачи през този месец.', missed: 'Няма неизпълнени задачи през този месец.'}[view]));
+      }
+      else appendPage(content, values, view === 'schedules');
     } finally {
-      // History builds its section off-DOM. Restore focus and reveal the target
-      // only after the complete view is connected to the page.
       if (retainedFocus?.isConnected && document.activeElement === document.body) retainedFocus.focus({preventScroll: true});
       globalThis.HubNotificationTarget?.reveal(content);
     }
@@ -223,8 +207,12 @@
     listPage = HubListPagination.clamp(listPage, values.length, pageSize);
     const list = el('div', '', 'task-list');
     const nextCache = new Map();
+    let group = null;
     for (const item of values.slice((listPage - 1) * pageSize, listPage * pageSize)) {
-      const signature = JSON.stringify([item, recurring, HubI18n.language, state.timezone, state.now >= item.shift?.start, state.now < item.due]);
+      // Open tasks are listed by group; each page repeats the heading of its first group.
+      const current = view === 'open' ? placeOf(item).group : null;
+      if (current !== group) { group = current; const heading = el('h2', groupLabels[group], 'task-group'); heading.dataset.taskGroup = group; list.append(heading); }
+      const signature = JSON.stringify([item, recurring, HubI18n.language, state.timezone, state.now >= item.shift?.start, state.now < item.due, current]);
       const previous = cardCache.get(item.id), entry = previous?.signature === signature ? previous : {signature, node: card(item, recurring)};
       nextCache.set(item.id, entry); list.append(entry.node);
     }
@@ -242,7 +230,7 @@
       state = result; $('taskMessage').textContent = '';
       // Clock ticks alone do not change cards, but crossing a start/due/grace
       // boundary changes actions and overdue totals even with the same records.
-      const snapshot = JSON.stringify({...result, now:undefined, day:periodChosen ? null : date(result.now), timeBoundaries:result.items.map(item => [
+      const snapshot = JSON.stringify({...result, now:undefined, month:monthChosen ? null : date(result.now).slice(0, 7), timeBoundaries:result.items.map(item => [
         result.now >= item.shift?.start, result.now < item.due, item.due + result.graceMinutes * 60000 < result.now
       ])});
       if (snapshot === displayedSnapshot) return;
@@ -250,25 +238,14 @@
       renderPhotoPolicy();
       const value = $('ownerFilter').value, options = new Map([...state.items, ...state.schedules].map(item => [item.owner.id, item.owner.username])); for (const person of state.supervisors) options.set(person.id, person.username);
       $('ownerFilter').replaceChildren(new Option('Всички отговорници', '')); for (const [id, name] of options) { const option = new Option(name, id); option.setAttribute('translate', 'no'); $('ownerFilter').append(option); } $('ownerFilter').value = value;
-      // An open page keeps the default period on the current day until the user picks dates.
-      if (!periodChosen) {
-        const today = date(state.now);
-        $('statsUntil').value = today;
-        $('statsFrom').value = new Date(Date.parse(today) - 2 * 86400000).toISOString().slice(0, 10);
-      }
+      // An open page follows the current month until the user picks another one.
+      if (!monthChosen) month = date(state.now).slice(0, 7);
       globalThis.HubNotificationTarget?.select([...state.items, ...state.schedules], item => item.id, item => {
         $('ownerFilter').value = ''; $('taskSearch').value = '';
-        let values;
-        if (state.schedules.includes(item)) {
-          view = 'schedules'; values = [...state.schedules].sort((a,b) => Date.parse(a.from) - Date.parse(b.from));
-        } else {
-          view = 'history'; historyView = historyGroup(item); periodChosen = true;
-          const day = item.kind === 'shift' ? item.shift.date : date(item.due);
-          $('statsFrom').value = day; $('statsUntil').value = day;
-          values = state.items.filter(value => historyIncludes(value, historyView)).sort((a,b) => b.createdAt-a.createdAt || b.due-a.due);
-        }
+        view = state.schedules.includes(item) ? 'schedules' : placeOf(item).tab;
+        if (['done', 'missed'].includes(view)) { month = monthOf(item); monthChosen = true; }
+        const values = listFor(view, view === 'schedules' ? state.schedules : state.items);
         listPage = Math.floor(values.indexOf(item) / pageSize) + 1;
-        for (const tab of $('taskTabs').querySelectorAll('button')) tab.setAttribute('aria-pressed', String(tab.dataset.view === view));
       });
       $('taskSubtitle').textContent = reviewer ? assigner ? 'Възлагай задачи, следи отчетите и потвърждавай решените проблеми.' : 'Следи отчетите и потвърждавай решените проблеми.' : admin ? 'Редактирай задачи и проследявай изпълнението им.' : assigner ? 'Възлагай сменни и глобални задачи и проследявай изпълнението им.' : reader ? 'Преглед на всички задачи, отчети и история. Акаунтът няма право да ги променя.' : 'Твоите сменни задачи и общите проблеми, в които участваш.';
       render();
@@ -300,10 +277,10 @@
     editing = item ? {item, recurring} : null; creationKey = null; $('taskForm').reset(); $('editorFeedback').textContent = state.supervisors.length ? '' : 'Няма активни началници смяна с право за преглед. Настрой ги в „Акаунти“ с право за отчитане и избран екип.';
     problemPicker.reset(problemPhotos(item), item, recurring); $('problemPhotoHelp').textContent = item ? 'Добави или премахни снимки на проблема. Предишните остават в историята.' : 'Добави една или повече снимки на проблема. При повторение се използват за всички смени.';
     $('taskRequiresPhotos').checked = requiresPhotos(item);
-    $('editorTitle').textContent = item ? recurring ? 'Промени бъдещите задачи' : 'Промени задача' : 'Възложи задача'; $('saveTask').textContent = item ? 'Запази' : 'Възложи';
+    $('editorTitle').textContent = item ? recurring ? 'Промени бъдещите задачи' : 'Промени задача' : 'Нова задача'; $('saveTask').textContent = item ? 'Запази' : 'Възложи';
     $('taskKind').value = item?.kind || 'shift'; $('taskKind').disabled = !!item; $('taskRepeat').value = recurring ? 'every-shift' : 'once'; $('taskRepeat').disabled = !!item;
     $('taskFrom').disabled = !!item; $('taskUntil').disabled = !!item; $('editReasonLabel').hidden = !item; $('editReason').required = !!item;
-    $('taskTitle').value = item?.title || ''; $('taskDescription').value = item?.description || ''; $('taskPriority').value = item?.priority || 'normal';
+    $('taskMore').open = !!(item?.description || item?.priority === 'high'); $('taskTitle').value = item?.title || ''; $('taskDescription').value = item?.description || ''; $('taskPriority').value = item?.priority || 'normal';
     $('taskOwner').replaceChildren(new Option('Избери началник смяна', '')); $('participantOptions').replaceChildren();
     for (const person of state.supervisors) {
       const option = new Option(person.username + ' · ' + person.team, person.id); option.setAttribute('translate', 'no'); $('taskOwner').append(option);
@@ -316,7 +293,7 @@
     $('taskDueTime').value = item?.due ? new Intl.DateTimeFormat('en-GB', {timeZone: state.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(item.due)) : '17:00';
     $('taskTimezone').textContent = 'Часова зона: ' + state.timezone; editorFields(); editorDraft.accept(); $('taskEditor').showModal(); $('taskTitle').focus();
   }
-  function openAction(item, action, recurring = false) {
+  function openAction(item, action, recurring = false, preset = null) {
     acting = {item, action, recurring}; actionKey = null; $('actionForm').reset(); $('actionFeedback').textContent = ''; solutionPicker.reset([], null, false, action === 'complete' ? 0 : requiredPhotoCount(item)); $('solutionPhotoFields').hidden = action !== 'complete' && (action !== 'report' || !requiresPhotos(item));
     $('solutionPhotoHelp').textContent = action === 'complete' ? 'Снимките са незадължителни при завършване от администратор. Можеш да завършиш със или без снимки.' : 'Всеки отчет изисква толкова нови снимки на решението или текущото състояние, колкото са снимките на проблема, включително при неизпълнена задача.';
     $('transferOwnerLabel').hidden = action !== 'transfer'; $('transferHelp').hidden = action !== 'transfer'; $('transferOwner').required = action === 'transfer';
@@ -325,9 +302,11 @@
       const option = new Option(person.username + ' · ' + person.team, person.id); option.setAttribute('translate', 'no'); $('transferOwner').append(option);
     }
     if (action === 'transfer' && $('transferOwner').options.length === 1) $('actionFeedback').textContent = 'Няма друг активен отговорник с право за отчитане.';
-    $('actionTitle').textContent = action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : action === 'transfer' ? 'Прехвърли задача' : actionLabels[action]; $('actionTaskTitle').textContent = item.title;
-    $('reportStatusLabel').hidden = action !== 'report'; $('reportStatus').replaceChildren();
-    for (const status of item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review']) $('reportStatus').append(new Option(statusLabels[status], status));
+    $('actionTitle').textContent = {completed: '✓ Изпълнена', 'not-done': '× Не е изпълнена', review: '✓ Готово'}[preset] || (action === 'report' ? 'Отчети задача' : action === 'complete' ? 'Завърши задача' : action === 'transfer' ? 'Прехвърли задача' : actionLabels[action]); $('actionTaskTitle').textContent = item.title;
+    // Quick buttons preset the result; a not-done report may still be marked not applicable.
+    const statuses = preset === 'not-done' ? ['not-done', 'not-applicable'] : preset ? [preset] : item.kind === 'shift' ? ['completed', 'not-done', 'not-applicable'] : ['in-progress', 'blocked', 'review'];
+    $('reportStatus').replaceChildren(); for (const status of statuses) $('reportStatus').append(new Option(statusLabels[status], status));
+    $('reportStatusLabel').hidden = action !== 'report' || statuses.length === 1;
     $('actionNote').required = !['approve', 'complete'].includes(action) && (action !== 'report' || $('reportStatus').value !== 'completed'); actionDraft.accept(); $('taskAction').showModal();
   }
   async function mutate(form, feedback, fn) {
@@ -375,7 +354,11 @@
   for (const id of ['taskKind', 'taskRepeat', 'taskOwner', 'taskFrom', 'taskRequiresPhotos']) $(id).addEventListener('change', editorFields);
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
-  for (const id of ['ownerFilter', 'statsFrom', 'statsUntil']) $(id).addEventListener('input', () => { if (id !== 'ownerFilter') periodChosen = true; listPage = 1; render(); });
+  $('ownerFilter').addEventListener('input', () => { listPage = 1; render(); });
+  for (const [id, step] of [['monthPrev', -1], ['monthNext', 1]]) $(id).addEventListener('click', () => { month = TaskViewModel.addMonths(month, step); monthChosen = true; listPage = 1; render(); });
+  $('schedulesTab').hidden = !admin && !assigner; $('taskSearchLabel').hidden = !overseer;
+  // Shift starts and grace periods change the list without any record change.
+  setInterval(() => { if (!document.hidden) refresh(); }, 60000);
   $('taskSearch').addEventListener('input', () => {
     listPage = 1; clearTimeout(searchTimer); $('taskContent').setAttribute('aria-busy', 'true');
     searchTimer = setTimeout(render, 150);
