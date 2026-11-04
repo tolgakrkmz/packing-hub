@@ -72,7 +72,7 @@ async function exerciseTaskRefresh({page, base, expect}) {
   await page.goto(base+'/tasks');
   await page.locator('[data-hub-language=bg]').click();
   await expect(page.locator('#taskSubtitle')).toContainText('Възлагай');
-  await page.locator('#taskTabs [data-view=global]').click();
+  await page.locator('#taskTabs [data-view=open]').click();
   await expect(page.locator('.task-card').first()).toBeVisible();
   await page.evaluate(() => {
     const test = window.__taskRefreshTest = {reads:0, block:true, hidden:false, node:document.getElementById('taskContent').firstElementChild};

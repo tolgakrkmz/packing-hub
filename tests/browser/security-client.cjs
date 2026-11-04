@@ -115,7 +115,7 @@ async function exerciseServerClientSecurity({admin,hub,base,device,expect,setTim
   await admin.goto(base+href('taskChanged',task.id));
   await expect(admin.locator('.task-card h2')).toHaveText(text);
   await expect(admin.locator('.task-card')).toContainText(text);
-  await admin.locator('.task-card').getByRole('button',{name:'История',exact:true}).click();
+  await admin.locator('.task-card .task-more summary').click(); await admin.locator('.task-card .task-menu').getByRole('button',{name:'История',exact:true}).click();
   await expect(admin.locator('#historyContent')).toContainText(text);
   await noMarkup(admin,expect);
   await admin.locator('[data-close=taskHistory]').click();

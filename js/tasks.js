@@ -150,7 +150,7 @@
       }
       if (owner && !final && item.kind === 'global' && item.status !== 'review') { const ready = button('✓ Готово', () => openAction(item, 'report', false, 'review'), 'task-yes'); ready.dataset.quick = 'ready'; quick.append(ready); }
       if (supervisor && item.kind === 'global' && !final && (owner || item.participants.some(person => person.id === HubServer.user.id))) { const note = button('Добави бележка', () => openAction(item, 'progress')); note.dataset.quick = 'note'; quick.append(note); }
-      if (reviewer && item.status === 'review') quick.append(button('✓ Потвърди', () => openAction(item, 'approve'), 'task-yes'), button('Върни', () => openAction(item, 'return')));
+      if (reviewer && item.status === 'review') quick.append(button('✓ Потвърди', () => openAction(item, 'approve'), 'task-yes'), button('Върни за работа', () => openAction(item, 'return')));
       if (owner && !final && started && place.tab !== 'open') items.append(menuItem('Промени отчета', () => openAction(item, 'report')));
       if (admin && !final) {
         if (item.kind === 'global' || state.now < item.due && !item.report) items.append(menuItem('Промени', () => openEditor(item)));
@@ -171,8 +171,10 @@
     try {
       await HubServer.send('/api/tasks/items/' + item.id, 'PATCH', {action: 'report', status: 'completed', note: '', requestId}, {'If-Match': '"' + item.revision + '"'});
       quickKeys.delete(item.id); busy = false; await refresh({fresh: true}); $('taskMessage').textContent = 'Отчетено като изпълнена.';
-    } catch (error) { $('taskMessage').textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.'; }
-    finally { busy = false; if (control.isConnected) control.disabled = false; }
+    } catch (error) {
+      busy = false; if (error.status) await refresh({fresh: true}).catch(() => {});
+      $('taskMessage').textContent = error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.';
+    } finally { busy = false; if (control.isConnected) control.disabled = false; }
   }
   function render() {
     if (!state) return;

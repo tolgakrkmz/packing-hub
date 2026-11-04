@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {randomUUID} = require('node:crypto');
 const {photo} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
+const {menuAction} = require('./task-ui.cjs');
 async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}) {
   setTime('2026-10-12T10:00:00+03:00');
   const now = Date.parse('2026-10-12T10:00:00+03:00'), manager = hub.auth.list()[0];
@@ -32,14 +33,14 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
   try {
     await page.setViewportSize({width: 1440, height: 900});
     await page.goto(base + '/tasks'); await page.locator('[data-hub-language=bg]').click();
-    await page.locator('[data-view=history]').click(); await page.locator('[data-history-view=cancelled]').click();
-    await expect(page.locator('.task-card h2')).toHaveText(['Fictional review date 2026-10-12', 'Fictional review date 2026-10-10']);
-    await page.locator('#statsFrom').fill('2026-10-09'); await expect(page.locator('.task-card')).toHaveCount(3);
-    await page.locator('#refreshTasks').click(); await expect(page.locator('#statsFrom')).toHaveValue('2026-10-09');
-    // Calendar dates still span two days when daylight saving starts.
-    setTime('2026-03-30T00:30:00+03:00'); await page.goto(base + '/tasks');
-    await expect(page.locator('#statsFrom')).toHaveValue('2026-03-28'); await expect(page.locator('#statsUntil')).toHaveValue('2026-03-30');
-    setTime('2026-10-12T10:00:00+03:00'); await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click();
+    await page.locator('[data-view=missed]').click(); await expect(page.locator('#monthLabel')).toHaveText('Октомври 2026');
+    await expect(page.locator('.task-card h2')).toHaveText(['Fictional review date 2026-10-12', 'Fictional review date 2026-10-10', 'Fictional review date 2026-10-09']);
+    await page.locator('#monthPrev').click(); await expect(page.locator('#monthLabel')).toHaveText('Септември 2026'); await expect(page.locator('.task-card')).toHaveCount(0);
+    await page.locator('#refreshTasks').click(); await expect(page.locator('#monthLabel')).toHaveText('Септември 2026');
+    // The local month starts at midnight in Sofia, not in UTC.
+    setTime('2026-11-01T00:30:00+02:00'); await page.goto(base + '/tasks'); await page.locator('[data-view=missed]').click();
+    await expect(page.locator('#monthLabel')).toHaveText('Ноември 2026');
+    setTime('2026-10-12T10:00:00+03:00'); await page.goto(base + '/tasks');
     const cards = page.locator('.task-card'), firstImage = cards.first().locator('img'), lastImage = cards.last().locator('img');
     await expect(cards).toHaveCount(50);
     await expect.poll(() => firstImage.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -58,7 +59,7 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
     // The changed card can reload its photo. Other loaded cards must keep theirs.
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.ok(requests.length <= reads + 1);
-    await cards.last().getByRole('button', {name: 'История', exact: true}).click();
+    await menuAction(cards.last(), 'История');
     await expect(page.locator('#historyContent h3')).toHaveText(raw.title); await page.locator('[data-close=taskHistory]').click();
     await page.locator('#taskPagination [data-page-action=next]').click(); await expect(cards).toHaveCount(10);
     await cards.last().locator('img').scrollIntoViewIfNeeded();
@@ -77,10 +78,11 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
       owner: {id: manager.id, username: manager.username, team: 'А'}, participants: [], status: 'pending', due: now + 60000, createdAt: now,
       shift: {date: '2026-10-12', code: 1, team: 'А', start: now - 3600000, due: now + 60000}, problemPhotos: [], events: []}));
     await page.locator('[data-hub-language=bg]').click(); await page.locator('#taskSearch').fill('Fictional boundary task');
-    await page.locator('[data-view=shift]').click(); await page.locator('#refreshTasks').click();
-    await expect(cards).toHaveCount(1); await expect(cards.getByRole('button', {name: 'Промени', exact: true})).toBeVisible();
+    await page.locator('#refreshTasks').click();
+    const edit = cards.locator('.task-menu-item').filter({hasText: /^Промени$/});
+    await expect(cards).toHaveCount(1); await expect(edit).toHaveCount(1);
     setTime('2026-10-12T10:01:00+03:00'); await page.locator('#refreshTasks').click();
-    await expect(cards.getByRole('button', {name: 'Промени', exact: true})).toHaveCount(0);
+    await expect(edit).toHaveCount(0);
     // A live update must preserve focus on a reused card opened by an exact link.
     await page.goto(base + '/tasks?target=' + ids[0]);
     const target = page.locator('.notification-target');
@@ -93,9 +95,9 @@ async function exerciseTaskPerformance({admin: page, hub, base, expect, setTime}
     await expect.poll(() => target.locator('img').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
     // Browsers without IntersectionObserver retain the native lazy-image fallback.
     await page.context().addInitScript(() => { window.IntersectionObserver = undefined; });
-    await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click(); await expect(cards).toHaveCount(50);
+    await page.goto(base + '/tasks'); await expect(cards).toHaveCount(50);
     await expect(cards.last().locator('img')).toHaveAttribute('src', /\/api\/tasks\//);
-    console.log('PASS two-day review dates, manual history range, DST boundary, viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, linked focus, fallback and BG/EN mobile layout');
+    console.log('PASS month review, chosen month kept on refresh, local month boundary, viewport-only photos, scroll/pages/viewer, retained cards, updated history, time boundaries, linked focus, fallback and BG/EN mobile layout');
   } finally { page.off('request', track); }
 }
 module.exports = {exerciseTaskPerformance};

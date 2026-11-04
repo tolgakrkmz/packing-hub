@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {uploadPhoto} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
+const {menuAction, taskCard} = require('./task-ui.cjs');
 async function exerciseTasks({admin, hub, base, device, expect, setTime, screenshotDir}) {
   setTime('2026-12-01T15:00:00+02:00');
   await admin.goto(base + '/accounts');
@@ -22,7 +23,7 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await expect(chief.locator('.task-count:visible')).toHaveCount(0);
   await admin.goto(base + '/tasks'); await expect(admin.locator('#newTask')).toBeVisible();
   async function assign(title, {global = false, repeat = false} = {}) {
-    await admin.locator('#newTask').click(); await admin.locator('#taskTitle').fill(title); await admin.locator('#taskDescription').fill('Fictional packing task detail');
+    await admin.locator('#newTask').click(); await admin.locator('#taskTitle').fill(title); await admin.locator('#taskMore summary').click(); await admin.locator('#taskDescription').fill('Fictional packing task detail');
     await admin.locator('#taskOwner').selectOption(String(chiefUser.id));
     if (global) {
       await admin.locator('#taskKind').selectOption('global'); await admin.locator('#taskDueDate').fill('2026-12-03'); await admin.locator('#taskDueTime').fill('17:00');
@@ -37,29 +38,29 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await chief.goto(base + '/tasks'); await expect(chief.locator('#taskContent')).toContainText('Fictional <b>shift check</b>');
   await expect(chief.locator('#taskContent b')).toHaveCount(0); await expect(chief.locator('#newTask')).toBeHidden();
   const shiftCard = chief.locator('.task-card').filter({hasText: 'Fictional <b>shift check</b>'});
-  await shiftCard.getByRole('button', {name: 'Отчети', exact: true}).click(); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
+  await shiftCard.locator('[data-quick=done]').click(); await expect(chief.locator('#reportStatusLabel')).toBeHidden(); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#taskAction')).not.toBeVisible();
   await expect(chief.locator('.tasks-heading .task-count')).toBeHidden();
-  await chief.locator('[data-view=history]').click(); await expect(chief.locator('#taskContent')).toContainText('Изпълнена');
+  await chief.locator('[data-view=done]').click(); await expect(chief.locator('#taskContent')).toContainText('Изпълнена');
   // A completed report counts in statistics during its shift, before the grace period ends.
-  await chief.locator('[data-view=stats]').click(); await expect(chief.locator('#taskContent')).toContainText('Отчетени като изпълнени: 1 / 1 (100%).');
+  await expect(chief.locator('.task-summary .task-metric strong')).toHaveText(['100%', '1', '0']); await expect(chief.locator('.task-owner-list')).toHaveCount(0);
   await assign('Fictional recurring check one', {repeat: true}); await assign('Fictional recurring check two', {repeat: true});
   await assign('Fictional global packing problem', {global: true});
   await expect(chief.locator('.tasks-heading .task-count')).toHaveText('3');
   await expect(participant.locator('a[href="/tasks"] .task-count')).toHaveText('1');
   await expect(admin.locator('.tasks-heading .task-count')).toBeHidden();
-  await chief.locator('[data-view=global]').click(); await chief.locator('#refreshTasks').click();
+  await chief.locator('[data-view=open]').click(); await chief.locator('#refreshTasks').click();
   await expect(chief.locator('#taskContent')).toContainText('Fictional global packing problem');
-  await participant.goto(base + '/tasks'); await participant.locator('[data-view=global]').click();
-  await expect(participant.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
-  await participant.getByRole('button', {name: 'Добави напредък', exact: true}).click();
+  await participant.goto(base + '/tasks');
+  await expect(participant.locator('[data-quick=ready]')).toHaveCount(0);
+  await participant.locator('[data-quick=note]').click();
   await participant.locator('#actionNote').fill('Fictional handover note'); await participant.locator('#actionForm button[type=submit]').click();
   await expect(participant.locator('#taskAction')).not.toBeVisible();
   await chief.locator('#refreshTasks').click(); await expect(chief.locator('#taskContent')).toContainText('Fictional handover note');
-  await chief.getByRole('button', {name: 'Отчети', exact: true}).click(); await chief.locator('#reportStatus').selectOption('review');
+  await chief.locator('[data-quick=ready]').click();
   await chief.locator('#actionNote').fill('Fictional solution ready'); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#taskAction')).not.toBeVisible();
-  await admin.locator('[data-view=global]').click(); await admin.locator('#refreshTasks').click(); await expect(admin.locator('#taskContent')).toContainText('Готова за проверка');
+  await admin.locator('[data-view=open]').click(); await admin.locator('#refreshTasks').click(); await expect(admin.locator('[data-task-group=confirm]')).toBeVisible();
   await expect(admin.locator('.tasks-heading .task-count')).toHaveText('1');
   await expect(admin.locator('.tasks-heading .task-count')).toBeVisible();
   await expect(chief.locator('.tasks-heading .task-count')).toHaveText('2');
@@ -67,25 +68,23 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await admin.getByRole('button', {name: 'Върни за работа', exact: true}).click(); await admin.locator('#actionNote').fill('Fictional remaining step'); await admin.locator('#actionForm button[type=submit]').click();
   await expect(admin.locator('#taskAction')).not.toBeVisible();
   await chief.locator('#refreshTasks').click(); await expect(chief.locator('#taskContent')).toContainText('Fictional remaining step');
-  await chief.getByRole('button', {name: 'Отчети', exact: true}).click(); await chief.locator('#reportStatus').selectOption('review'); await chief.locator('#actionNote').fill('Fictional final solution'); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
+  await chief.locator('[data-quick=ready]').click(); await chief.locator('#actionNote').fill('Fictional final solution'); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#taskAction')).not.toBeVisible(); await admin.locator('#refreshTasks').click();
-  await admin.getByRole('button', {name: 'Потвърди приключване', exact: true}).click(); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
+  await admin.getByRole('button', {name: '✓ Потвърди', exact: true}).click(); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
   await expect(admin.locator('.tasks-heading .task-count')).toBeHidden();
-  setTime('2026-12-01T22:31:00+02:00'); await admin.locator('[data-view=stats]').click(); await admin.locator('#refreshTasks').click();
-  await admin.locator('#statsFrom').fill('2026-12-01'); await admin.locator('#statsUntil').fill('2026-12-05');
-  const statsRow = admin.locator('.task-table tbody tr').filter({hasText: chiefUser.username});
-  await expect(statsRow.locator('td')).toHaveText([chiefUser.username, '3', '1', '0', '2', '1', '0']);
-  await chief.locator('[data-view=shift]').click(); await chief.locator('#refreshTasks').click();
+  setTime('2026-12-01T22:31:00+02:00'); await admin.locator('[data-view=done]').click(); await admin.locator('#refreshTasks').click();
+  await expect(admin.locator('.task-owner-row').filter({hasText: chiefUser.username})).toContainText('1 / 3 · 33%');
+  await chief.locator('[data-view=open]').click(); await chief.locator('#refreshTasks').click();
   const recurringCard = chief.locator('.task-card').filter({hasText: 'Fictional recurring check one'}); await expect(recurringCard).toContainText('Неотчетена');
-  await recurringCard.getByRole('button', {name: 'Отчети', exact: true}).click(); await chief.locator('#reportStatus').selectOption('not-done'); await chief.locator('#actionNote').fill('Fictional blocker explanation');
+  await recurringCard.locator('[data-quick=not-done]').click(); await expect(chief.locator('#reportStatus')).toHaveValue('not-done'); await chief.locator('#actionNote').fill('Fictional blocker explanation');
   // A network failure preserves the draft; a retry is recorded once.
   await chief.route('**/api/tasks/items/**', route => route.abort()); await uploadPhoto(chief, 'solution', expect); await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#actionFeedback')).not.toBeEmpty(); await expect(chief.locator('#actionNote')).toHaveValue('Fictional blocker explanation');
   await chief.unroute('**/api/tasks/items/**'); await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
-  await chief.locator('[data-view=history]').click(); await chief.locator('[data-history-view=reported]').click(); await expect(chief.locator('#taskContent')).toContainText('Закъснял отчет');
-  await chief.reload(); await expect(chief.locator('#taskOverview')).toContainText('Неотчетени');
+  await chief.locator('[data-view=missed]').click(); await expect(chief.locator('#taskContent')).toContainText('Закъснял отчет');
+  await chief.reload(); await expect(chief.locator('[data-task-group=unreported]')).toBeVisible();
   await admin.locator('[data-view=schedules]').click(); await expect(admin.locator('#taskContent')).toContainText('Fictional recurring check one');
-  await admin.locator('.task-card').filter({hasText: 'Fictional recurring check one'}).getByRole('button', {name: 'Спри повторението'}).click();
+  await menuAction(taskCard(admin, 'Fictional recurring check one'), 'Спри повторението');
   await admin.locator('#actionNote').fill('Fictional stop reason'); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
   await expect(admin.locator('#taskContent')).toContainText('Повторението е спряно');
   // A separate viewing permission grants an overview, without supervisor powers.
@@ -101,10 +100,9 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   await expect(reader.locator('.task-count:visible')).toHaveCount(0);
   await expect(reader.locator('#taskSubtitle')).toContainText('Преглед на всички задачи');
   await expect(reader.locator('#newTask')).toBeHidden(); await expect(reader.locator('#ownerFilterLabel')).toBeVisible();
-  await expect(reader.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
-  await expect(reader.getByRole('button', {name: 'Добави напредък', exact: true})).toHaveCount(0);
+  await expect(reader.locator('.task-quick button')).toHaveCount(0);
   await expect(reader.locator('#taskContent')).toContainText('Fictional recurring check two');
-  await reader.locator('[data-view=history]').click(); await reader.locator('#statsUntil').fill('2026-12-05');
+  await reader.locator('[data-view=done]').click();
   await expect(reader.locator('#taskContent')).toContainText('Fictional global packing problem');
   const readerForm = admin.locator(`.account-card[data-id="${readerUser.id}"]`);
   await readerForm.locator('..').locator('summary').first().click();
@@ -136,18 +134,18 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
     await admin.setViewportSize({width, height: 900});
     for (const language of ['en', 'bg']) {
       await admin.locator(`[data-hub-language=${language}]`).click();
-      for (const section of ['shift', 'global', 'history', 'stats', 'schedules']) { await admin.locator(`[data-view=${section}]`).click(); await assertResponsive(admin, `Tasks ${section}/${language} at ${width}px`); }
+      for (const section of ['open', 'done', 'missed', 'schedules']) { await admin.locator(`[data-view=${section}]`).click(); await assertResponsive(admin, `Tasks ${section}/${language} at ${width}px`); }
       await admin.locator('#newTask').click(); await assertResponsive(admin, `Task editor ${language} at ${width}px`);
       await admin.locator('[data-close=taskEditor]').first().click();
     }
   }
-  await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('#newTask')).toHaveText('+ Assign task');
-  await admin.locator('[data-view=history]').click(); await expect(admin.locator('#taskContent')).toContainText('Fictional <b>shift check</b>');
+  await admin.locator('[data-hub-language=en]').click(); await expect(admin.locator('#newTask')).toHaveText('+ New task');
+  await admin.locator('[data-view=done]').click(); await expect(admin.locator('#taskContent')).toContainText('Fictional <b>shift check</b>');
   if (screenshotDir) {
     fs.mkdirSync(screenshotDir, {recursive: true}); await admin.setViewportSize({width: 1440, height: 1000});
-    await admin.locator('[data-hub-language=bg]').click(); await admin.locator('[data-view=stats]').click();
+    await admin.locator('[data-hub-language=bg]').click(); await admin.locator('[data-view=done]').click();
     await admin.screenshot({path: path.join(screenshotDir, 'tasks-admin-statistics.png'), fullPage: true});
-    await chief.setViewportSize({width: 390, height: 844}); await chief.locator('[data-view=shift]').click();
+    await chief.setViewportSize({width: 390, height: 844}); await chief.locator('[data-view=open]').click();
     await chief.screenshot({path: path.join(screenshotDir, 'tasks-supervisor-mobile.png'), fullPage: true});
   }
   // Stickers follow weekday 09:00–17:30 hours.
@@ -167,17 +165,17 @@ async function exerciseTasks({admin, hub, base, device, expect, setTime, screens
   const stickersCard = stickers.locator('.task-card').filter({hasText: 'Fictional Stickers shift check'});
   await expect(stickersCard.locator('.task-meta').last()).toContainText('Редовна смяна');
   await expect(stickersCard.locator('.task-meta').last()).toContainText('9:00'); await expect(stickersCard.locator('.task-meta').last()).toContainText('17:30');
-  await expect(stickersCard.getByRole('button', {name: 'Отчети', exact: true})).toHaveCount(0);
+  await expect(stickersCard.locator('[data-quick=done]')).toHaveCount(0);
   await expect(stickers.locator('.tasks-heading .task-count')).toBeHidden();
   setTime('2026-12-01T09:00:00+02:00'); await stickers.reload();
   await expect(stickers.locator('.tasks-heading .task-count')).toHaveText('1');
-  await expect(stickersCard.getByRole('button', {name: 'Отчети', exact: true})).toBeVisible();
+  await expect(stickersCard.locator('[data-quick=done]')).toBeVisible();
   setTime('2026-12-01T15:00:00+02:00'); await stickers.locator('#refreshTasks').click();
   await expect(stickersCard).not.toContainText('Неотчетена');
-  await stickersCard.getByRole('button', {name: 'Отчети', exact: true}).click();
+  await stickersCard.locator('[data-quick=done]').click();
   await uploadPhoto(stickers, 'solution', expect); await stickers.locator('#actionForm button[type=submit]').click(); await expect(stickers.locator('#taskAction')).not.toBeVisible();
   await expect(stickers.locator('.tasks-heading .task-count')).toBeHidden();
-  await stickers.locator('[data-view=history]').click();
+  await stickers.locator('[data-view=done]').click();
   await expect(stickersCard).toContainText('Изпълнена'); await expect(stickersCard).not.toContainText('Закъснял отчет');
   await assertResponsive(stickers, 'Regular Stickers task on mobile');
   assert.equal(hub.tasks.list({role: 'admin'}).items.filter(item => item.report?.note === 'Fictional blocker explanation').length, 1);

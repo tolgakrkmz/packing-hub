@@ -1375,7 +1375,7 @@ Object.assign(HUB_EN_MESSAGES, {
   'Следващ месец': 'Next month',
   'Какво трябва да се направи?': 'What needs to be done?',
   'Кой отговаря?': 'Who is responsible?',
-  'Вид': 'Type',
+  'Вид задача': 'Task type',
   'До дата (обща задача)': 'By date (shared task)',
   'Още: описание и спешност': 'More: description and urgency',
   'Спешност': 'Urgency',

@@ -14,6 +14,7 @@ function profilesFixture() {
     category: i % 2 ? 'special' : 'standard', timestamp: i, images: []
   }]));
 }
+const {menuAction} = require('./task-ui.cjs');
 async function historyChecks({page, expect, replace, read, online = false}) {
   const month = key => page.locator(`.history-month[data-month="2026-${key}"]`);
   await expect(page.locator('.history-month')).toHaveCount(3);
@@ -144,16 +145,16 @@ async function exerciseServerPagedLists({admin, hub, base, expect}) {
       status: 'pending', due: now + i * 60000, createdAt: now, updatedAt: now, events: [], problemPhotos: []};
     insert.run(item.id, JSON.stringify(item));
   }});
-  await admin.goto(base + '/tasks'); await admin.locator('[data-view=global]').click();
+  await admin.goto(base + '/tasks');
   await admin.locator('[data-hub-language=en]').click();
   const cards = admin.locator('.task-card'), pager = admin.locator('#taskPagination');
   const next = () => pager.locator('[data-page-action=next]');
   await expect(cards).toHaveCount(50); await expect(pager).toContainText('1–50 of 105');
-  await expect(admin.locator('.task-metric strong').first()).toHaveText('105');
+  await expect(admin.locator('[data-view=open] .task-badge')).toHaveText('105');
   const found = new Set(await cards.evaluateAll(nodes => nodes.map(node => node.dataset.taskId)));
   await next().click(); await expect(pager).toContainText('Page 2 of 3');
   (await cards.evaluateAll(nodes => nodes.map(node => node.dataset.taskId))).forEach(id => found.add(id));
-  await cards.first().getByRole('button', {name: 'History', exact: true}).click();
+  await menuAction(cards.first(), 'History');
   await expect(admin.locator('#historyContent h3')).toHaveText('Fictional paged task 50');
   await admin.locator('[data-close=taskHistory]').click();
   await admin.locator('#refreshTasks').click(); await expect(pager).toContainText('Page 2 of 3');
@@ -164,14 +165,10 @@ async function exerciseServerPagedLists({admin, hub, base, expect}) {
   await expect(cards).toHaveCount(1); await expect(cards.first()).toHaveAttribute('data-task-id', 'demo-page-task-100');
   await admin.locator('#taskSearch').fill('Fictional paged task');
   await expect(cards).toHaveCount(50); await expect(pager).toContainText('Page 1 of 3');
-  await admin.locator('[data-view=history]').click();
-  await admin.locator('[data-history-view=unreported]').click();
-  await expect(admin.locator('#taskPeriod')).toBeHidden();
-  await expect(admin.locator('[data-history-view=unreported] .task-badge')).toHaveText('105');
-  await expect(cards).toHaveCount(50); await next().click();
+  await next().click();
   await expect(pager).toContainText('Page 2 of 3');
   await admin.locator('#ownerFilter').selectOption(String(manager.id)); await expect(pager).toContainText('Page 1 of 3');
-  await admin.locator('[data-view=global]').click(); await next().click(); await next().click();
+  await next().click();
   hub.store.db.prepare("DELETE FROM task_items WHERE id LIKE 'demo-page-task-%' AND id NOT IN ('demo-page-task-0','demo-page-task-1','demo-page-task-2')").run();
   await admin.locator('#refreshTasks').click(); await expect(cards).toHaveCount(3); await expect(pager).toContainText('Page 1 of 1');
   for (const language of ['bg', 'en']) {

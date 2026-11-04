@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {randomUUID} = require('node:crypto');
 const {photo, uploadPhoto} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
+const {menuAction, taskCard} = require('./task-ui.cjs');
 
 async function exerciseAdminTaskCompletion({admin, hub, base, device, expect, setTime}) {
   setTime('2026-12-01T23:00:00+02:00');
@@ -14,18 +15,17 @@ async function exerciseAdminTaskCompletion({admin, hub, base, device, expect, se
   const shift = make('Fictional admin photo completion', {kind: 'shift', repeat: 'once', from: '2026-12-01'});
   const chief = await device(owner.username, true), delegate = await device(manager.username, false);
   for (const page of [chief, delegate]) {
-    await page.goto(base + '/tasks'); await page.locator('[data-view=global]').click();
-    await expect(page.getByRole('button', {name: 'Завърши задача', exact: true})).toHaveCount(0);
+    await page.goto(base + '/tasks'); await expect(page.locator('.task-card').first()).toBeVisible();
+    await expect(page.locator('.task-menu-item', {hasText: 'Отбележи като изпълнена'})).toHaveCount(0);
   }
-  await chief.locator('.task-card').filter({hasText: 'Fictional admin no-photo completion'}).getByRole('button', {name: 'Отчети', exact: true}).click();
-  await chief.locator('#reportStatus').selectOption('review'); await chief.locator('#actionNote').fill('Fictional owner report');
+  await taskCard(chief, 'Fictional admin no-photo completion').locator('[data-quick=ready]').click();
+  await chief.locator('#actionNote').fill('Fictional owner report');
   await chief.locator('#actionForm button[type=submit]').click();
   await expect(chief.locator('#actionFeedback')).toHaveText('Добави снимка преди запис.');
   await chief.locator('[data-close=taskAction]').first().click();
 
   await admin.goto(base + '/tasks'); await admin.locator('[data-hub-language=bg]').click();
-  await admin.locator('[data-view=global]').click();
-  await admin.locator('.task-card').filter({hasText: 'Fictional admin no-photo completion'}).getByRole('button', {name: 'Завърши задача', exact: true}).click();
+  await menuAction(taskCard(admin, 'Fictional admin no-photo completion'), 'Отбележи като изпълнена');
   await expect(admin.locator('#reportStatusLabel')).toBeHidden(); await expect(admin.locator('#solutionPhotoFields')).toBeVisible();
   await expect(admin.locator('#solutionPhotoFields')).toContainText('Снимките са незадължителни');
   await expect(admin.locator('#solutionPhotoCount')).not.toContainText('задължителни');
@@ -33,17 +33,16 @@ async function exerciseAdminTaskCompletion({admin, hub, base, device, expect, se
   await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
   const item = id => hub.tasks.list(actor).items.find(item => item.id === id);
   assert.equal(item(global).status, 'completed'); assert.equal(item(global).requiresPhotos, true); assert.equal(item(global).report.photos.length, 0);
-  await admin.locator('[data-view=history]').click();
-  await admin.locator('#statsFrom').fill('2026-12-01'); await admin.locator('#statsUntil').fill('2026-12-03');
+  await admin.locator('[data-view=done]').click();
   const history = admin.locator('.task-card').filter({hasText: 'Fictional admin no-photo completion'});
   await expect(history).toContainText('Завършена от администратор без снимки.');
   await expect(history).not.toContainText('Няма снимка от предишната версия.');
-  await history.getByRole('button', {name: 'История', exact: true}).click();
+  await menuAction(history, 'История');
   await expect(admin.locator('#historyContent')).toContainText('Завършена от администратор');
   await admin.locator('[data-close=taskHistory]').click();
 
-  await admin.locator('[data-hub-language=en]').click(); await admin.locator('[data-view=shift]').click();
-  await admin.locator('.task-card').filter({hasText: 'Fictional admin photo completion'}).getByRole('button', {name: 'Complete task', exact: true}).click();
+  await admin.locator('[data-hub-language=en]').click(); await admin.locator('[data-view=open]').click();
+  await menuAction(taskCard(admin, 'Fictional admin photo completion'), 'Mark as completed');
   await expect(admin.locator('#solutionPhotoFields')).toContainText('Photos are optional');
   await admin.locator('#solutionPhoto').setInputFiles({name: 'fictional-invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('Fictional invalid upload')});
   await expect(admin.locator('#solutionPhotoInfo')).toContainText('Choose a photo');
