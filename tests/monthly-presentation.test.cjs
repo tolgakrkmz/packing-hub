@@ -71,16 +71,20 @@ test('problems show the month-end state: counts, impact, the longest open and th
   assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
 });
 
-test('long proposed solutions get a smaller font and stay inside the problems box', async () => {
-  const long = Array.from({length:4}, (_, i) => `${i + 1}. Fictional step: ` + 'the team agrees who acts and by when. '.repeat(5)).join('\n\n');
-  const problemItems = ['high', 'high', 'medium', 'low', 'low'].map((impactLevel, i) => ({title:'Fictional ' + i, impactLevel, createdAt:at('2026-09-02'), resolvedAt:null, proposals:[{at:at('2026-09-03'), text:long}]}));
-  const xml = unzipText(Buffer.from(await deck.build(PptxGenJS, september({problemItems}), {improvements:[]}).write({outputType:'arraybuffer'})))['ppt/slides/slide8.xml'];
+test('the slide shows a short summary of each solution and long ones stay inside the problems box', async () => {
+  const build = async problemItems => unzipText(Buffer.from(await deck.build(PptxGenJS, september({problemItems}), {improvements:[]}).write({outputType:'arraybuffer'})))['ppt/slides/slide8.xml'];
+  const item = text => ({title:'Fictional', impactLevel:'high', createdAt:at('2026-09-02'), resolvedAt:null, proposals:[{at:at('2026-09-03'), text}]});
+  const short = slideText(await build([item('1. Fictional training. Teach the team the steps.\n\n\t2.\tFictional rights: remove deletion from shared accounts.'),
+    item('One fictional sentence about the fix. More detail nobody reads on a slide.')]));
+  assert.ok(short.includes('1. Fictional training   ·   2. Fictional rights'), short.join(' | '));
+  assert.ok(short.includes('One fictional sentence about the fix'), short.join(' | '));
+  const many = Array.from({length:30}, (_, i) => `${i + 1}. Fictional step with a fairly long heading about who acts. Detail.`).join('\n');
+  const xml = await build(['high', 'high', 'medium', 'low', 'low'].map(() => item(many)));
   const boxes = [...xml.matchAll(/<p:sp>.*?<\/p:sp>/gs)].map(([sp]) => sp).filter(sp => sp.includes('Fictional step'));
   assert.equal(boxes.length, 5);
   for (const sp of boxes) {
     const [, y] = sp.match(/<a:off x="\d+" y="(\d+)"/), [, cy] = sp.match(/<a:ext cx="\d+" cy="(\d+)"/);
     assert.ok((+y + +cy) / 914400 <= 6.8, 'solution text runs past the box');
-    assert.match(sp, /sz="800"/);
     assert.match(sp, /…<\/a:t>/);
   }
 });

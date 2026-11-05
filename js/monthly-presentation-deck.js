@@ -242,22 +242,34 @@ const MonthlyPresentationDeck = (() => {
     box(slide, x, 2.95, w, 3.85);
     label(slide, 'Problems by impact and the proposed solution', x + 0.25, 3.1, w - 0.5);
     if (!p.oldest.length) return text(slide, 'No active problems at month end.', x + 0.25, top0, w - 0.5, 0.4, {fontSize:12, color:C.muted});
-    const rows = p.oldest.map(row => ({...row, body:row.solution.replace(/\t/g, ' ').split('\n').map(line => line.trim()).filter(Boolean).join('\n')}));
+    const rows = p.oldest.map(row => ({...row, body:summary(row.solution)}));
     const size = solutionSize(rows.map(row => row.body || 'No solution proposed yet.'), solutionW, room);
     // Even at the smallest size the texts may not fit: each row then keeps an equal share of lines and ends with "…"; the full text stays on the board.
     if (rows.reduce((sum, row) => sum + rowHeight(row.body || '-', size, solutionW) + 0.12, 0) > room) {
       const lines = Math.max(1, Math.floor((room / rows.length - 0.42) / (size * 1.25 / 72)));
       rows.forEach(row => { row.body = clip(row.body, size, solutionW, lines); });
     }
+    const used = rows.reduce((sum, row) => sum + rowHeight(row.body || '-', size, solutionW), 0), gap = Math.min(0.4, Math.max(0.12, (room - used) / rows.length));
     let top = top0;
     rows.forEach((row, i) => {
       const [, color] = LEVELS[row.level] || ['', C.muted], h = rowHeight(row.body || 'No solution proposed yet.', size, solutionW);
-      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.06, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
+      if (i) slide.addShape('line', {x:x + 0.25, y:top - gap / 2, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
       slide.addShape('ellipse', {x:x + 0.25, y:top + 0.08, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
       text(slide, [{text:row.title, options:{bold:true}}, {text:`   ${row.days} ${row.days === 1 ? 'day' : 'days'} open`, options:{fontSize:9, color:C.muted}}], solutionX, top, solutionW, 0.28, {fontSize:11, valign:'middle'});
       text(slide, row.body || 'No solution proposed yet.', solutionX, top + 0.3, solutionW, h - 0.3, {fontSize:size, color:row.body ? C.text : C.muted, italic:!row.body});
-      top += h + 0.12;
+      top += h + gap;
     });
+  }
+
+  // A short summary instead of the full text: the heading of each numbered point ("1. Staff training. Train …" → "1. Staff training"),
+  // otherwise the first sentence; long headings are cut at a word with "…".
+  const cut = (value, max) => value.length <= max ? value : value.slice(0, max).replace(/\s+\S*$/, '') + '…';
+  const heading = value => value.split(/[.:;!?](?:\s|$)/)[0].trim();
+  function summary(value) {
+    const lines = String(value || '').split('\n').map(line => line.replace(/\t/g, ' ').trim()).filter(Boolean);
+    const points = lines.map(line => line.match(/^(\d+)[.)]\s*(.+)$/)).filter(Boolean);
+    if (points.length) return points.map(([, n, rest]) => `${n}. ${cut(heading(rest), 50)}`).join('   ·   ');
+    return lines.length ? cut(heading(lines.join(' ')), 120) : '';
   }
 
   // Estimated wrapped height of a solution: Arial averages about 0.5 em per character.
