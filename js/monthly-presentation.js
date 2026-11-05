@@ -69,7 +69,7 @@
     try {
       const inputs = Object.fromEntries([...MonthlyPresentation.INPUTS, ...MonthlyPresentation.EDITABLE].map(key => [key, form.elements[key].value]));
       // Problems and tasks are optional for the deck: without access or connection their slide parts say they were not available.
-      const [problemItems, taskItems] = await Promise.all(['/api/problems', '/api/tasks'].map(url => HubServer.json(url).then(result => result.items).catch(() => null)));
+      const [problemItems, taskItems] = await Promise.all(['/api/problems', '/api/tasks?month=' + month].map(url => HubServer.json(url).then(result => result.items).catch(() => null)));
       const period = {start:ShiftSchedule.sofiaInstant(`${month}-01`, 0), end:ShiftSchedule.sofiaInstant(`${MonthlyPresentation.addMonths(month, 1)}-01`, 0), now:Date.now()};
       const pairTeams = PairTargetsStatistics.aggregate(pairStatistics.getEntries(), month).teams;
       const values = MonthlyPresentation.values({month, production:loaded.production, downtime:loaded.downtime, inputs, today:statisticsDay(),

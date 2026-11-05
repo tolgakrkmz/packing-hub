@@ -77,10 +77,10 @@ const MonthlyPresentation = (() => {
       staff:num(staff), packedT:num(packed), perPersonT:num(staff ? packed / staff : NaN, 1), teams:[...teams, row('Stickers', stickers, '—', '—', packedBy(STICKERS))]};
   }
 
-  // Shift tasks and global tasks due in the month; cancelled and not applicable ones are left out.
-  function tasks(items, start, end) {
+  // Shift tasks by shift date (as on the tasks page) and global tasks due in the month; cancelled and not applicable ones are left out.
+  function tasks(items, start, end, month) {
     if (!Array.isArray(items)) return null;
-    const due = items.filter(item => item.due >= start && item.due < end && !['cancelled', 'not-applicable'].includes(item.status));
+    const due = items.filter(item => (item.kind === 'shift' ? item.shift.date.slice(0, 7) === month : item.due >= start && item.due < end) && !['cancelled', 'not-applicable'].includes(item.status));
     const completed = due.filter(item => item.status === 'completed'), late = completed.filter(item => item.report?.late).length;
     const notDone = due.filter(item => item.status === 'not-done' || item.displayStatus === 'unreported').length;
     return {total:due.length, completed:completed.length, late, notDone, open:due.length - completed.length - notDone, onTime:pct((completed.length - late) / due.length, 0)};
@@ -149,7 +149,7 @@ const MonthlyPresentation = (() => {
         return {team:label, packedT:num(sum(inMonth(production, month).filter(entry => entry.shift === team), entry => entry.tonnage) / 1000),
           pairs:String(pairs.reported || 0), met:finitePct(pairs.successPct), kg:finitePct(pairs.kgPct)};
       }),
-      tasks:period ? tasks(taskItems, period.start, period.end) : null,
+      tasks:period ? tasks(taskItems, period.start, period.end, month) : null,
       empty:{current:!now.rows, previous:!p1.rows || !p2.rows}
     };
   }
