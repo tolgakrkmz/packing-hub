@@ -1447,7 +1447,9 @@ Package Hub colours: overview, production-to-packing reconciliation,
 three-month packing workload, automatic-line utilization, logistics
 improvements, Global problems as the board stands on the day the deck is made
 with a short summary of the latest proposed solution, up to six board photos
-of those problems as photo evidence (the slide is left out without photos),
+of those problems as photo evidence (the slide is left out without photos; in
+the slide show a click on a photo opens it large on a hidden slide and a click
+there returns),
 and workforce. Tonnage, crates, line split,
 stickers, scrap and downtime come from the selected month's statistics; the
 two earlier months are read only for the packing mix. The 470 KB generator

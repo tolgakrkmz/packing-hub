@@ -301,10 +301,21 @@ const MonthlyPresentationDeck = (() => {
       const col = cols[i % perRow], y = top + Math.floor(i / perRow) * (cellH + GAP), roomW = col.w - 0.3, roomH = cellH - 0.65, ratio = photo.width / photo.height;
       const w = Math.min(roomW, roomH * ratio), h = w / ratio, [, color] = LEVELS[photo.level] || ['', C.muted];
       box(slide, col.x, y, col.w, cellH);
-      slide.addImage({data:photo.data, x:col.x + (col.w - w) / 2, y:y + 0.15 + (roomH - h) / 2, w, h, altText:photo.title});
+      slide.addImage({data:photo.data, x:col.x + (col.w - w) / 2, y:y + 0.15 + (roomH - h) / 2, w, h, altText:photo.title, hyperlink:{slide:ZOOM_FIRST + i, tooltip:'Enlarge'}});
       slide.addShape('ellipse', {x:col.x + 0.2, y:y + cellH - 0.36, w:0.12, h:0.12, fill:{color}, line:{color, width:0}});
       text(slide, cut(photo.title, 90), col.x + 0.42, y + cellH - 0.45, col.w - 0.6, 0.32, {fontSize:10, valign:'middle'});
     });
+  }
+
+  // Hidden slides after the last page, one per photo: a click on a thumbnail opens its large version, a click on that returns to the evidence slide.
+  const ZOOM_FIRST = 11;
+  function zoom(pptx, photo, i, count) {
+    const slide = pptx.addSlide(), ratio = photo.width / photo.height, roomW = W - 2 * M, roomH = 6.3, w = Math.min(roomW, roomH * ratio), h = w / ratio, [, color] = LEVELS[photo.level] || ['', C.muted];
+    slide.background = {color:C.bg};
+    slide.hidden = true;
+    slide.addImage({data:photo.data, x:(W - w) / 2, y:0.35 + (roomH - h) / 2, w, h, altText:photo.title, hyperlink:{slide:9, tooltip:'Back to Photo Evidence'}});
+    slide.addShape('ellipse', {x:M, y:6.97, w:0.12, h:0.12, fill:{color}, line:{color, width:0}});
+    text(slide, [{text:photo.title, options:{bold:true}}, {text:`   Photo ${i + 1} of ${count} · click the photo to return`, options:{color:C.muted}}], M + 0.22, 6.86, RIGHT - M - 0.22, 0.34, {fontSize:11, valign:'middle'});
   }
 
   function people(pptx, v, page) {
@@ -346,6 +357,7 @@ const MonthlyPresentationDeck = (() => {
     workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v);
     if (photos.length) evidence(pptx, v, photos);
     people(pptx, v, pages);
+    photos.forEach((photo, i) => zoom(pptx, photo, i, photos.length));
     return pptx;
   }
   return {build};

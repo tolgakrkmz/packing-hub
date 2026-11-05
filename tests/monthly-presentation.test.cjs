@@ -98,6 +98,13 @@ test('board photos add a Photo Evidence slide before Workforce and the pages cou
   assert.equal((files['ppt/slides/slide9.xml'].match(/<p:pic>/g) || []).length, 2);
   assert.ok(ten.includes('Workforce') && ten.includes('10 / 10'), ten.join(' | '));
   assert.ok(slideText(files['ppt/slides/slide8.xml']).includes('8 / 10'));
+  // Each thumbnail links to its hidden large slide (11, 12) and each large photo links back to slide 9.
+  const target = (n, rid) => files[`ppt/slides/_rels/slide${n}.xml.rels`].match(new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`))[1];
+  const links = n => [...files[`ppt/slides/slide${n}.xml`].matchAll(/<a:hlinkClick r:id="(rId\d+)"[^>]*action="ppaction:\/\/hlinksldjump"/g)].map(([, rid]) => target(n, rid));
+  assert.deepEqual(links(9), ['slide11.xml', 'slide12.xml']);
+  for (const n of [11, 12]) { assert.match(files[`ppt/slides/slide${n}.xml`], /<p:sld [^>]*show="0"/); assert.deepEqual(links(n), ['slide9.xml']); }
+  assert.ok(slideText(files['ppt/slides/slide12.xml']).some(line => line.includes('Photo 2 of 2')));
+  assert.equal(files['ppt/slides/slide13.xml'], undefined);
 });
 
 test('workforce counts stickers in the staff and the packed tonnage, like Statistics', () => {
