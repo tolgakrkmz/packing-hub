@@ -2,7 +2,8 @@
 const MonthlyPresentationDeck = (() => {
   const C = {bg:'15171B', panel:'1D2025', panel2:'22262C', border:'2C3039', text:'EDEBE3', muted:'8A8D93',
     amber:'F5A623', amberDark:'3A2C10', blue:'4F95C9', teal:'3FBFA0', coral:'E0765A', purple:'A083D6', pink:'C26B9E'};
-  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 9, GAP = 0.25, RIGHT = W - M;
+  const FONT = 'Arial', W = 13.333, M = 0.6, GAP = 0.25, RIGHT = W - M;
+  let pages = 9; // 10 when the photo evidence slide is added; set by build.
   const text = (slide, value, x, y, w, h, options = {}) => slide.addText(value, {x, y, w, h, fontFace:FONT, fontSize:12, color:C.text, margin:0, valign:'top', ...options});
   const box = (slide, x, y, w, h, fill = C.panel, line = C.border) => slide.addShape('roundRect', {x, y, w, h, rectRadius:0.08, fill:{color:fill}, line:{color:line, width:0.75}});
   const bar = (slide, x, y, w, h, color) => slide.addShape('rect', {x, y, w:Math.max(w, 0.01), h, fill:{color}, line:{color, width:0}});
@@ -21,7 +22,7 @@ const MonthlyPresentationDeck = (() => {
     text(slide, subtitle, M, 1.3, RIGHT - M, 0.4, {fontSize:13, color:C.muted});
     slide.addShape('line', {x:M, y:7.0, w:RIGHT - M, h:0, line:{color:C.border, width:0.75}});
     text(slide, 'Package Hub · Monthly report', M, 7.1, 6, 0.25, {fontSize:9, color:C.muted});
-    text(slide, `${page} / ${PAGES}`, RIGHT - 2, 7.1, 2, 0.25, {fontSize:9, color:C.muted, align:'right'});
+    text(slide, `${page} / ${pages}`, RIGHT - 2, 7.1, 2, 0.25, {fontSize:9, color:C.muted, align:'right'});
     return slide;
   }
 
@@ -227,12 +228,12 @@ const MonthlyPresentationDeck = (() => {
   const LEVELS = {high:['High', C.coral], medium:['Medium', C.amber], low:['Low', C.teal]};
 
   function globalProblems(pptx, v) {
-    const slide = frame(pptx, v, 8, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
+    const p = v.problems, slide = frame(pptx, v, 8, 'Global Problems', p ? `Status on ${p.asOf} · new and resolved count ${v.monthName} · for information` : 'For information');
     if (!p) return unavailable(slide, 'Global problems were not available when the presentation was created.');
     // Compact figures so the proposed solutions get most of the slide.
     columns(4).forEach((col, i) => {
       const [title, value, color, sub] = [['Active problems', p.active, C.amber, `${p.open} open · ${p.proposed} with a solution`], ['New', p.created, C.blue, 'Recorded during the month'],
-        ['Resolved', p.resolved, C.teal, 'Closed during the month'], ['High impact', p.byImpact[0].count, C.coral, 'Active at month end']][i];
+        ['Resolved', p.resolved, C.teal, 'Closed during the month'], ['High impact', p.byImpact[0].count, C.coral, 'Active now']][i];
       box(slide, col.x, 1.95, col.w, 0.8);
       text(slide, String(value), col.x + 0.2, 1.95, 0.7, 0.8, {fontSize:26, bold:true, color, valign:'middle'});
       label(slide, title, col.x + 0.95, 2.08, col.w - 1.1);
@@ -292,8 +293,22 @@ const MonthlyPresentationDeck = (() => {
     return 8;
   }
 
-  function people(pptx, v) {
-    const slide = frame(pptx, v, 9, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team and the stickers shift · for information`), f = v.workforce;
+  // Board photos of the listed problems as evidence, each kept in proportion inside its cell with the problem title below.
+  function evidence(pptx, v, photos) {
+    const slide = frame(pptx, v, 9, 'Photo Evidence', `Photos from the Global problems board · ${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`);
+    const perRow = Math.min(3, photos.length), rowCount = Math.ceil(photos.length / perRow), cols = columns(perRow), top = 1.95, cellH = (6.8 - top - GAP * (rowCount - 1)) / rowCount;
+    photos.forEach((photo, i) => {
+      const col = cols[i % perRow], y = top + Math.floor(i / perRow) * (cellH + GAP), roomW = col.w - 0.3, roomH = cellH - 0.65, ratio = photo.width / photo.height;
+      const w = Math.min(roomW, roomH * ratio), h = w / ratio, [, color] = LEVELS[photo.level] || ['', C.muted];
+      box(slide, col.x, y, col.w, cellH);
+      slide.addImage({data:photo.data, x:col.x + (col.w - w) / 2, y:y + 0.15 + (roomH - h) / 2, w, h, altText:photo.title});
+      slide.addShape('ellipse', {x:col.x + 0.2, y:y + cellH - 0.36, w:0.12, h:0.12, fill:{color}, line:{color, width:0}});
+      text(slide, cut(photo.title, 90), col.x + 0.42, y + cellH - 0.45, col.w - 0.6, 0.32, {fontSize:10, valign:'middle'});
+    });
+  }
+
+  function people(pptx, v, page) {
+    const slide = frame(pptx, v, page, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team and the stickers shift · for information`), f = v.workforce;
     if (!f) return unavailable(slide, 'The personnel list was not available when the presentation was created.');
     const cols = columns(4);
     [['Active people', f.active, C.amber], ['Automatic line', f.auto, C.teal], ['Manual packing', f.manual, C.blue], ['Stickers', f.stickers, C.pink]]
@@ -317,7 +332,8 @@ const MonthlyPresentationDeck = (() => {
   }
 
   // improvements: lines "Title: description"; specialLabel names the special production row.
-  function build(PptxGenJS, v, {improvements = [], specialLabel = ''} = {}) {
+  function build(PptxGenJS, v, {improvements = [], specialLabel = '', photos = []} = {}) {
+    pages = photos.length ? 10 : 9;
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_WIDE';
     pptx.title = `Packaging & Logistics – ${v.monthName} ${v.year}`;
@@ -327,7 +343,9 @@ const MonthlyPresentationDeck = (() => {
       return at > 0 ? {title:line.slice(0, at).trim(), body:line.slice(at + 1).trim()} : {title:line, body:''};
     });
     cover(pptx, v); overview(pptx, v); performance(pptx, v); reconciliation(pptx, v, String(specialLabel).trim() || 'Special production');
-    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v); people(pptx, v);
+    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v);
+    if (photos.length) evidence(pptx, v, photos);
+    people(pptx, v, pages);
     return pptx;
   }
   return {build};

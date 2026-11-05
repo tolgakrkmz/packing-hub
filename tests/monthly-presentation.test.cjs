@@ -25,7 +25,7 @@ const inputs = {profiles:'450000', dispatchedT:'1800', extrudedT:'2400', realiza
 const at = date => Date.parse(date + 'T12:00:00Z');
 const problemItems = [
   {title:'Fictional old high', titleEn:'', impactLevel:'high', createdAt:at('2026-07-01'), resolvedAt:null, proposals:[{at:at('2026-08-01'), text:'Фиктивно старо', textEn:'Fictional first idea'}, {at:at('2026-09-10'), text:'Fictional fix', textEn:''}]},
-  {title:'Фиктивен проблем', titleEn:'Fictional medium', impactLevel:'medium', createdAt:at('2026-09-05'), resolvedAt:null, proposals:[{at:at('2026-10-05'), text:'Fictional too late'}]},
+  {title:'Фиктивен проблем', titleEn:'Fictional medium', impactLevel:'medium', createdAt:at('2026-09-05'), resolvedAt:null, proposals:[{at:at('2026-10-05'), text:'Fictional later idea'}]},
   {title:'Fictional resolved', impactLevel:'low', createdAt:at('2026-08-01'), resolvedAt:at('2026-09-20'), proposals:[]},
   {title:'Fictional later', impactLevel:'high', createdAt:at('2026-10-03'), resolvedAt:null, proposals:[]},
   {title:'Fictional resolved later', impactLevel:'low', createdAt:at('2026-09-01'), resolvedAt:at('2026-10-02'), proposals:[]}];
@@ -60,14 +60,14 @@ test('performance: goal, change against last month, team pairs and tasks due in 
   assert.equal(september({taskItems:null}).tasks, null);
 });
 
-test('problems show the month-end state: counts, impact, the longest open and their latest solution, without authors', () => {
+test('problems show the board on the day the deck is made, with the month counts and the latest solution, without authors', () => {
   const p = september().problems;
-  assert.deepEqual([p.active, p.open, p.proposed, p.created, p.resolved], [3, 2, 1, 2, 1]);
-  assert.deepEqual(plain(p.byImpact), [{level:'high', count:1}, {level:'medium', count:1}, {level:'low', count:1}]);
+  assert.deepEqual([p.asOf, p.active, p.open, p.proposed, p.created, p.resolved], ['20 October 2026', 3, 1, 2, 2, 1]);
+  assert.deepEqual(plain(p.byImpact), [{level:'high', count:2}, {level:'medium', count:1}, {level:'low', count:0}]);
   assert.deepEqual(plain(p.oldest), [
-    {title:'Fictional old high', level:'high', days:91, stage:'Solution proposed', solution:'Fictional fix'},
-    {title:'Fictional medium', level:'medium', days:25, stage:'Open', solution:''},
-    {title:'Fictional resolved later', level:'low', days:29, stage:'Open', solution:''}]);
+    {title:'Fictional old high', level:'high', days:110, stage:'Solution proposed', solution:'Fictional fix'},
+    {title:'Fictional later', level:'high', days:16, stage:'Open', solution:''},
+    {title:'Fictional medium', level:'medium', days:44, stage:'Solution proposed', solution:'Fictional later idea'}]);
   assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
 });
 
@@ -87,6 +87,17 @@ test('the slide shows a short summary of each solution and long ones stay inside
     assert.ok((+y + +cy) / 914400 <= 6.8, 'solution text runs past the box');
     assert.match(sp, /…<\/a:t>/);
   }
+});
+
+test('board photos add a Photo Evidence slide before Workforce and the pages count to ten', async () => {
+  const dot = 'image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const photos = [{title:'Fictional old high', level:'high', width:1600, height:1200, data:dot}, {title:'Fictional later', level:'high', width:900, height:1600, data:dot}];
+  const files = unzipText(Buffer.from(await deck.build(PptxGenJS, september(), {improvements:[], photos}).write({outputType:'arraybuffer'})));
+  const nine = slideText(files['ppt/slides/slide9.xml']), ten = slideText(files['ppt/slides/slide10.xml']);
+  for (const line of ['Photo Evidence', 'Photos from the Global problems board · 2 photos', 'Fictional old high', 'Fictional later', '9 / 10']) assert.ok(nine.includes(line), nine.join(' | '));
+  assert.equal((files['ppt/slides/slide9.xml'].match(/<p:pic>/g) || []).length, 2);
+  assert.ok(ten.includes('Workforce') && ten.includes('10 / 10'), ten.join(' | '));
+  assert.ok(slideText(files['ppt/slides/slide8.xml']).includes('8 / 10'));
 });
 
 test('workforce counts stickers in the staff and the packed tonnage, like Statistics', () => {
@@ -141,7 +152,7 @@ test('the deck has nine designed slides with the figures, native charts and edit
   has(4, ['800 t', '1,000 t', '100.4 t', 'AL share 42.1%', 'PACKING MIX – JULY TO SEPTEMBER']);
   has(5, ['70.0%', '40.0%', '28.0%', '216 h', 'Fictional material wait', '36 h of downtime in 2 stops.']);
   has(6, ['Fictional count', 'Stock checked twice.', 'Fictional scanners', 'Add an improvement', '6 trucks/day', '+2 trucks/day', '+33.3%']);
-  has(7, ['Global Problems', '3', '2 open · 1 with a solution', 'Fictional old high   91 days open', 'PROBLEMS BY IMPACT AND THE PROPOSED SOLUTION', 'Fictional fix', 'No solution proposed yet.', '8 / 9']);
+  has(7, ['Global Problems', 'Status on 20 October 2026 · new and resolved count September · for information', '3', '1 open · 2 with a solution', 'Fictional old high   110 days open', 'Active now', 'PROBLEMS BY IMPACT AND THE PROPOSED SOLUTION', 'Fictional fix', 'No solution proposed yet.', '8 / 9']);
   has(8, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—', 'Stickers', '33.5', 'Headcount is the current roster. Staff 17 (automatic + manual + stickers) packed 1,900 t: 111.8 t per person.']);
   const charts = Object.keys(files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map(name => files[name]);
   assert.equal(charts.length, 3);
