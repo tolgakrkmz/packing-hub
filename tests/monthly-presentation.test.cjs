@@ -71,6 +71,20 @@ test('problems show the month-end state: counts, impact, the longest open and th
   assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
 });
 
+test('long proposed solutions get a smaller font and stay inside the problems box', async () => {
+  const long = Array.from({length:4}, (_, i) => `${i + 1}. Fictional step: ` + 'the team agrees who acts and by when. '.repeat(5)).join('\n\n');
+  const problemItems = ['high', 'high', 'medium', 'low', 'low'].map((impactLevel, i) => ({title:'Fictional ' + i, impactLevel, createdAt:at('2026-09-02'), resolvedAt:null, proposals:[{at:at('2026-09-03'), text:long}]}));
+  const xml = unzipText(Buffer.from(await deck.build(PptxGenJS, september({problemItems}), {improvements:[]}).write({outputType:'arraybuffer'})))['ppt/slides/slide8.xml'];
+  const boxes = [...xml.matchAll(/<p:sp>.*?<\/p:sp>/gs)].map(([sp]) => sp).filter(sp => sp.includes('Fictional step'));
+  assert.equal(boxes.length, 5);
+  for (const sp of boxes) {
+    const [, y] = sp.match(/<a:off x="\d+" y="(\d+)"/), [, cy] = sp.match(/<a:ext cx="\d+" cy="(\d+)"/);
+    assert.ok((+y + +cy) / 914400 <= 6.8, 'solution text runs past the box');
+    assert.match(sp, /sz="800"/);
+    assert.match(sp, /…<\/a:t>/);
+  }
+});
+
 test('workforce counts stickers in the staff and the packed tonnage, like Statistics', () => {
   const f = september().workforce;
   assert.deepEqual([f.active, f.auto, f.manual, f.stickers, f.staff, f.packedT, f.perPersonT], ['17', '9', '5', '3', '17', '1,900', '111.8']);
@@ -123,7 +137,7 @@ test('the deck has nine designed slides with the figures, native charts and edit
   has(4, ['800 t', '1,000 t', '100.4 t', 'AL share 42.1%', 'PACKING MIX – JULY TO SEPTEMBER']);
   has(5, ['70.0%', '40.0%', '28.0%', '216 h', 'Fictional material wait', '36 h of downtime in 2 stops.']);
   has(6, ['Fictional count', 'Stock checked twice.', 'Fictional scanners', 'Add an improvement', '6 trucks/day', '+2 trucks/day', '+33.3%']);
-  has(7, ['Global Problems', '3', '2 open · 1 with a proposed solution', 'Fictional old high', '91 days open', 'PROPOSED SOLUTION', 'Fictional fix', 'No solution proposed yet.', '8 / 9']);
+  has(7, ['Global Problems', '3', '2 open · 1 with a solution', 'Fictional old high   91 days open', 'PROBLEMS BY IMPACT AND THE PROPOSED SOLUTION', 'Fictional fix', 'No solution proposed yet.', '8 / 9']);
   has(8, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—', 'Stickers', '33.5', 'Headcount is the current roster. Staff 17 (automatic + manual + stickers) packed 1,900 t: 111.8 t per person.']);
   const charts = Object.keys(files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map(name => files[name]);
   assert.equal(charts.length, 3);

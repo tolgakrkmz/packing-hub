@@ -229,25 +229,55 @@ const MonthlyPresentationDeck = (() => {
   function globalProblems(pptx, v) {
     const slide = frame(pptx, v, 8, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
     if (!p) return unavailable(slide, 'Global problems were not available when the presentation was created.');
-    const cols = columns(4);
-    card(slide, {...cols[0], y:1.95, h:1.75, title:'Active problems', value:String(p.active), color:C.amber, sub:`${p.open} open · ${p.proposed} with a proposed solution`});
-    card(slide, {...cols[1], y:1.95, h:1.75, title:'New this month', value:String(p.created), color:C.blue, sub:'Recorded during the month'});
-    card(slide, {...cols[2], y:1.95, h:1.75, title:'Resolved this month', value:String(p.resolved), color:C.teal, sub:'Closed during the month'});
-    card(slide, {...cols[3], y:1.95, h:1.75, title:'High impact', value:String(p.byImpact[0].count), color:C.coral, sub:'Active at month end'});
-    const x = M, w = RIGHT - M, n = Math.max(1, p.oldest.length), rowH = Math.min(0.8, 2.3 / n), problemW = 4.6, solutionX = x + 0.5 + problemW + 0.3;
-    box(slide, x, 3.9, w, 2.9);
-    label(slide, 'Problem, by impact', x + 0.25, 4.07, problemW);
-    label(slide, 'Proposed solution', solutionX, 4.07, RIGHT - 0.25 - solutionX);
-    if (!p.oldest.length) text(slide, 'No active problems at month end.', x + 0.25, 4.5, w - 0.5, 0.4, {fontSize:12, color:C.muted});
-    p.oldest.forEach((row, i) => {
-      const top = 4.45 + i * rowH, [, color] = LEVELS[row.level] || ['', C.muted];
-      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.03, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
-      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.1, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
-      text(slide, [{text:row.title, options:{fontSize:11, breakLine:true}}, {text:`${row.days} ${row.days === 1 ? 'day' : 'days'} open`, options:{fontSize:9, color:C.muted}}],
-        x + 0.5, top, problemW, rowH - 0.06, {valign:'top', fit:'shrink'});
-      text(slide, row.solution || 'No solution proposed yet.', solutionX, top, RIGHT - 0.25 - solutionX, rowH - 0.06,
-        {fontSize:10, color:row.solution ? C.text : C.muted, italic:!row.solution, valign:'top', fit:'shrink'});
+    // Compact figures so the proposed solutions get most of the slide.
+    columns(4).forEach((col, i) => {
+      const [title, value, color, sub] = [['Active problems', p.active, C.amber, `${p.open} open · ${p.proposed} with a solution`], ['New', p.created, C.blue, 'Recorded during the month'],
+        ['Resolved', p.resolved, C.teal, 'Closed during the month'], ['High impact', p.byImpact[0].count, C.coral, 'Active at month end']][i];
+      box(slide, col.x, 1.95, col.w, 0.8);
+      text(slide, String(value), col.x + 0.2, 1.95, 0.7, 0.8, {fontSize:26, bold:true, color, valign:'middle'});
+      label(slide, title, col.x + 0.95, 2.08, col.w - 1.1);
+      text(slide, sub, col.x + 0.95, 2.37, col.w - 1.1, 0.25, {fontSize:10, color:C.muted});
     });
+    const x = M, w = RIGHT - M, solutionX = x + 0.5, solutionW = w - 0.75, top0 = 3.45, room = 6.7 - top0;
+    box(slide, x, 2.95, w, 3.85);
+    label(slide, 'Problems by impact and the proposed solution', x + 0.25, 3.1, w - 0.5);
+    if (!p.oldest.length) return text(slide, 'No active problems at month end.', x + 0.25, top0, w - 0.5, 0.4, {fontSize:12, color:C.muted});
+    const rows = p.oldest.map(row => ({...row, body:row.solution.replace(/\t/g, ' ').split('\n').map(line => line.trim()).filter(Boolean).join('\n')}));
+    const size = solutionSize(rows.map(row => row.body || 'No solution proposed yet.'), solutionW, room);
+    // Even at the smallest size the texts may not fit: each row then keeps an equal share of lines and ends with "…"; the full text stays on the board.
+    if (rows.reduce((sum, row) => sum + rowHeight(row.body || '-', size, solutionW) + 0.12, 0) > room) {
+      const lines = Math.max(1, Math.floor((room / rows.length - 0.42) / (size * 1.25 / 72)));
+      rows.forEach(row => { row.body = clip(row.body, size, solutionW, lines); });
+    }
+    let top = top0;
+    rows.forEach((row, i) => {
+      const [, color] = LEVELS[row.level] || ['', C.muted], h = rowHeight(row.body || 'No solution proposed yet.', size, solutionW);
+      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.06, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
+      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.08, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
+      text(slide, [{text:row.title, options:{bold:true}}, {text:`   ${row.days} ${row.days === 1 ? 'day' : 'days'} open`, options:{fontSize:9, color:C.muted}}], solutionX, top, solutionW, 0.28, {fontSize:11, valign:'middle'});
+      text(slide, row.body || 'No solution proposed yet.', solutionX, top + 0.3, solutionW, h - 0.3, {fontSize:size, color:row.body ? C.text : C.muted, italic:!row.body});
+      top += h + 0.12;
+    });
+  }
+
+  // Estimated wrapped height of a solution: Arial averages about 0.5 em per character.
+  const textLines = (value, size, w) => value.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / Math.floor(w * 72 / (size * 0.5)))), 0);
+  const rowHeight = (value, size, w) => 0.3 + textLines(value, size, w) * size * 1.25 / 72;
+  // The largest size from 11 pt down to 8 pt at which every row fits.
+  function clip(value, size, w, lines) {
+    const per = Math.floor(w * 72 / (size * 0.5)), kept = [];
+    for (const line of value.split('\n')) {
+      const need = Math.max(1, Math.ceil(line.length / per));
+      if (need <= lines) { kept.push(line); lines -= need; continue; }
+      if (lines > 0) kept.push(line.slice(0, lines * per - 1).trimEnd() + '…');
+      else kept[kept.length - 1] = kept[kept.length - 1].slice(0, -1) + '…';
+      break;
+    }
+    return kept.join('\n');
+  }
+  function solutionSize(values, w, room) {
+    for (let size = 11; size > 8; size -= 0.5) if (values.reduce((sum, value) => sum + rowHeight(value, size, w) + 0.12, 0) <= room) return size;
+    return 8;
   }
 
   function people(pptx, v) {
