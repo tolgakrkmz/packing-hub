@@ -51,17 +51,19 @@ const MonthlyPresentation = (() => {
       .map(row => ({reason:row.reason, hours:short(row.minutes / 60), stops:row.stops}));
   }
 
-  // Global problems as they stood at the end of the month: only counts, impact and titles, no authors.
+  // Global problems as they stood at the end of the month: counts, impact, titles and the proposed solutions, no authors.
   function problems(items, start, end, now) {
     if (!Array.isArray(items)) return null;
     const until = Math.min(end, now), known = items.filter(item => item.createdAt < end);
     const active = known.filter(item => !item.resolvedAt || item.resolvedAt >= end);
-    const proposed = item => (item.proposals || []).some(entry => entry.at < end), rank = {high:0, medium:1, low:2};
+    const made = item => (item.proposals || []).filter(entry => entry.at < end), proposed = item => made(item).length > 0, rank = {high:0, medium:1, low:2};
+    // The latest solution proposed by month end, in English when a translation exists.
+    const solution = item => { const last = made(item).sort((a, b) => b.at - a.at)[0]; return last ? String(last.textEn || last.text || '') : ''; };
     return {active:active.length, proposed:active.filter(proposed).length, open:active.filter(item => !proposed(item)).length,
       created:known.filter(item => item.createdAt >= start).length, resolved:items.filter(item => item.resolvedAt >= start && item.resolvedAt < end).length,
       byImpact:['high', 'medium', 'low'].map(level => ({level, count:active.filter(item => item.impactLevel === level).length})),
       oldest:[...active].sort((a, b) => rank[a.impactLevel] - rank[b.impactLevel] || a.createdAt - b.createdAt).slice(0, 5).map(item => ({
-        title:String(item.titleEn || item.title || ''), level:item.impactLevel, days:Math.max(0, Math.floor((until - item.createdAt) / 86400000)), stage:proposed(item) ? 'Solution proposed' : 'Open'}))};
+        title:String(item.titleEn || item.title || ''), level:item.impactLevel, days:Math.max(0, Math.floor((until - item.createdAt) / 86400000)), stage:proposed(item) ? 'Solution proposed' : 'Open', solution:solution(item)}))};
   }
 
   // Team totals only: today's roster headcount (no dated snapshots exist) against the month's packed tonnage per team.

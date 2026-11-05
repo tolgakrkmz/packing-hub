@@ -1445,7 +1445,8 @@ dispatch, trucks per day and target, up to three improvements, profiles and
 stations) and downloads an editable 16:9 PowerPoint with eight slides in the
 Package Hub colours: overview, production-to-packing reconciliation,
 three-month packing workload, automatic-line utilization, logistics
-improvements, Global problems and workforce. Tonnage, crates, line split,
+improvements, Global problems with the latest proposed solution for each, and
+workforce. Tonnage, crates, line split,
 stickers, scrap and downtime come from the selected month's statistics; the
 two earlier months are read only for the packing mix. The 470 KB generator
 (`js/pptxgen-bundle.js`) loads on first use, and the file is built on this

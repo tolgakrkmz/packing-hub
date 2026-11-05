@@ -24,8 +24,8 @@ const inputs = {profiles:'450000', dispatchedT:'1800', extrudedT:'2400', realiza
 // Fictional problems and roster counts; instants are UTC for readability.
 const at = date => Date.parse(date + 'T12:00:00Z');
 const problemItems = [
-  {title:'Fictional old high', titleEn:'', impactLevel:'high', createdAt:at('2026-07-01'), resolvedAt:null, proposals:[{at:at('2026-09-10')}]},
-  {title:'Фиктивен проблем', titleEn:'Fictional medium', impactLevel:'medium', createdAt:at('2026-09-05'), resolvedAt:null, proposals:[{at:at('2026-10-05')}]},
+  {title:'Fictional old high', titleEn:'', impactLevel:'high', createdAt:at('2026-07-01'), resolvedAt:null, proposals:[{at:at('2026-08-01'), text:'Фиктивно старо', textEn:'Fictional first idea'}, {at:at('2026-09-10'), text:'Fictional fix', textEn:''}]},
+  {title:'Фиктивен проблем', titleEn:'Fictional medium', impactLevel:'medium', createdAt:at('2026-09-05'), resolvedAt:null, proposals:[{at:at('2026-10-05'), text:'Fictional too late'}]},
   {title:'Fictional resolved', impactLevel:'low', createdAt:at('2026-08-01'), resolvedAt:at('2026-09-20'), proposals:[]},
   {title:'Fictional later', impactLevel:'high', createdAt:at('2026-10-03'), resolvedAt:null, proposals:[]},
   {title:'Fictional resolved later', impactLevel:'low', createdAt:at('2026-09-01'), resolvedAt:at('2026-10-02'), proposals:[]}];
@@ -60,14 +60,14 @@ test('performance: goal, change against last month, team pairs and tasks due in 
   assert.equal(september({taskItems:null}).tasks, null);
 });
 
-test('problems show the month-end state: counts, impact and the longest open, without authors', () => {
+test('problems show the month-end state: counts, impact, the longest open and their latest solution, without authors', () => {
   const p = september().problems;
   assert.deepEqual([p.active, p.open, p.proposed, p.created, p.resolved], [3, 2, 1, 2, 1]);
   assert.deepEqual(plain(p.byImpact), [{level:'high', count:1}, {level:'medium', count:1}, {level:'low', count:1}]);
   assert.deepEqual(plain(p.oldest), [
-    {title:'Fictional old high', level:'high', days:91, stage:'Solution proposed'},
-    {title:'Fictional medium', level:'medium', days:25, stage:'Open'},
-    {title:'Fictional resolved later', level:'low', days:29, stage:'Open'}]);
+    {title:'Fictional old high', level:'high', days:91, stage:'Solution proposed', solution:'Fictional fix'},
+    {title:'Fictional medium', level:'medium', days:25, stage:'Open', solution:''},
+    {title:'Fictional resolved later', level:'low', days:29, stage:'Open', solution:''}]);
   assert.equal(presentation.values({month:'2026-09', production, downtime, period}).problems, null);
 });
 
@@ -123,7 +123,7 @@ test('the deck has nine designed slides with the figures, native charts and edit
   has(4, ['800 t', '1,000 t', '100.4 t', 'AL share 42.1%', 'PACKING MIX – JULY TO SEPTEMBER']);
   has(5, ['70.0%', '40.0%', '28.0%', '216 h', 'Fictional material wait', '36 h of downtime in 2 stops.']);
   has(6, ['Fictional count', 'Stock checked twice.', 'Fictional scanners', 'Add an improvement', '6 trucks/day', '+2 trucks/day', '+33.3%']);
-  has(7, ['Global Problems', '3', '2 open · 1 with a proposed solution', 'Fictional old high', '91 days · Solution proposed', '8 / 9']);
+  has(7, ['Global Problems', '3', '2 open · 1 with a proposed solution', 'Fictional old high', '91 days open', 'PROPOSED SOLUTION', 'Fictional fix', 'No solution proposed yet.', '8 / 9']);
   has(8, ['Workforce', '17 people', 'Team A', '1,100 t', '183.3', '—', 'Stickers', '33.5', 'Headcount is the current roster. Staff 17 (automatic + manual + stickers) packed 1,900 t: 111.8 t per person.']);
   const charts = Object.keys(files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).map(name => files[name]);
   assert.equal(charts.length, 3);

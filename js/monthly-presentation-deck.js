@@ -234,25 +234,19 @@ const MonthlyPresentationDeck = (() => {
     card(slide, {...cols[1], y:1.95, h:1.75, title:'New this month', value:String(p.created), color:C.blue, sub:'Recorded during the month'});
     card(slide, {...cols[2], y:1.95, h:1.75, title:'Resolved this month', value:String(p.resolved), color:C.teal, sub:'Closed during the month'});
     card(slide, {...cols[3], y:1.95, h:1.75, title:'High impact', value:String(p.byImpact[0].count), color:C.coral, sub:'Active at month end'});
-    const leftW = 4.2, x = M + leftW + GAP, w = RIGHT - x, most = Math.max(1, ...p.byImpact.map(row => row.count));
-    box(slide, M, 3.9, leftW, 2.9);
-    label(slide, 'Active by impact', M + 0.25, 4.07, leftW - 0.5);
-    p.byImpact.forEach((row, i) => {
-      const [name, color] = LEVELS[row.level], top = 4.55 + i * 0.7, track = leftW - 2.0;
-      text(slide, name, M + 0.25, top, 0.95, 0.35, {fontSize:12, color:C.muted, valign:'middle'});
-      bar(slide, M + 1.25, top + 0.08, track, 0.2, C.panel2);
-      bar(slide, M + 1.25, top + 0.08, track * row.count / most, 0.2, color);
-      text(slide, String(row.count), M + leftW - 0.65, top, 0.4, 0.35, {fontSize:14, bold:true, align:'right', valign:'middle'});
-    });
+    const x = M, w = RIGHT - M, n = Math.max(1, p.oldest.length), rowH = Math.min(0.8, 2.3 / n), problemW = 4.6, solutionX = x + 0.5 + problemW + 0.3;
     box(slide, x, 3.9, w, 2.9);
-    label(slide, 'Longest open, by impact', x + 0.25, 4.07, w - 0.5);
+    label(slide, 'Problem, by impact', x + 0.25, 4.07, problemW);
+    label(slide, 'Proposed solution', solutionX, 4.07, RIGHT - 0.25 - solutionX);
     if (!p.oldest.length) text(slide, 'No active problems at month end.', x + 0.25, 4.5, w - 0.5, 0.4, {fontSize:12, color:C.muted});
     p.oldest.forEach((row, i) => {
-      const top = 4.45 + i * 0.45, [, color] = LEVELS[row.level] || ['', C.muted];
-      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.05, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
-      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.12, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
-      text(slide, row.title, x + 0.5, top, w - 3.05, 0.37, {fontSize:11, valign:'middle', fit:'shrink'});
-      text(slide, `${row.days} ${row.days === 1 ? 'day' : 'days'} · ${row.stage}`, x + w - 2.5, top, 2.25, 0.37, {fontSize:10, color:C.muted, align:'right', valign:'middle'});
+      const top = 4.45 + i * rowH, [, color] = LEVELS[row.level] || ['', C.muted];
+      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.03, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
+      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.1, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
+      text(slide, [{text:row.title, options:{fontSize:11, breakLine:true}}, {text:`${row.days} ${row.days === 1 ? 'day' : 'days'} open`, options:{fontSize:9, color:C.muted}}],
+        x + 0.5, top, problemW, rowH - 0.06, {valign:'top', fit:'shrink'});
+      text(slide, row.solution || 'No solution proposed yet.', solutionX, top, RIGHT - 0.25 - solutionX, rowH - 0.06,
+        {fontSize:10, color:row.solution ? C.text : C.muted, italic:!row.solution, valign:'top', fit:'shrink'});
     });
   }
 
