@@ -178,8 +178,7 @@ async function exerciseAccessibility({admin, hub, base, device, expect}) {
   assert.notEqual(await focused(admin), 'BODY', 'focus kept after creating a task');
 
   await operator.goto(base + '/tasks');
-  await operator.locator('[data-view=global]').click();
-  const report = operator.locator('.task-card').filter({hasText: 'Fictional keyboard task'}).getByRole('button', {name: 'Отчети', exact: true});
+  const report = operator.locator('.task-card').filter({hasText: 'Fictional keyboard task'}).locator('[data-quick=ready]');
   await report.focus(); await operator.keyboard.press('Enter');
   await expect(operator.locator('#taskAction')).toBeVisible();
   assert.deepEqual(await unnamedControls(operator), [], 'task action dialog name');

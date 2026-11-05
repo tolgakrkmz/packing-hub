@@ -81,7 +81,7 @@ async function exerciseTaskRefresh({page, base, expect}) {
     test.restore = () => { window.fetch = fetch; };
     window.fetch = async (...args) => {
       const response = await fetch(...args);
-      if (args[0] === '/api/tasks') { test.reads++; if (test.block) await new Promise(resolve => { test.release = resolve; }); }
+      if (String(args[0]).startsWith('/api/tasks?')) { test.reads++; if (test.block) await new Promise(resolve => { test.release = resolve; }); }
       return response;
     };
     document.getElementById('refreshTasks').click(); document.getElementById('refreshTasks').click(); document.getElementById('refreshTasks').click();
