@@ -5,7 +5,9 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname,'..');
 const copy = value => JSON.parse(JSON.stringify(value));
-async function environment(module,{fallback = false} = {}) {
+// Fixes "today" for date-dependent pages; explicit dates still parse normally.
+const fixedDate = at => class extends Date { constructor(...args) { super(...(args.length ? args : [at])); } static now() { return at; } };
+async function environment(module,{fallback = false, now} = {}) {
   class Control {
     constructor(tagName = 'BUTTON',dataset = {}) {
       this.tagName = tagName; this.dataset = dataset; this.value = ''; this.checked = false;
@@ -45,7 +47,7 @@ async function environment(module,{fallback = false} = {}) {
   };
   let sync;
   const sandbox = vm.createContext({
-    Date,URLSearchParams,location:{search:''},confirm:() => true,prompt:() => null,alert() {},
+    Date:now === undefined ? Date : fixedDate(Date.parse(now)),URLSearchParams,location:{search:''},confirm:() => true,prompt:() => null,alert() {},
     document:{
       getElementById(id) { assert.ok(controls[id],'Missing control: '+id); return controls[id]; },
       querySelector:() => new Control(),createElement:() => new Control(),

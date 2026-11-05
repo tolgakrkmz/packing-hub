@@ -10,7 +10,7 @@ async function exerciseTeamRatings({admin, hub, base, device, expect, setTime}) 
   hub.store.put('personnel', {...personnel.data, employees: people}, personnel.revision, actor);
   const ratings = () => hub.store.db.prepare('SELECT employee_id,rating,reason FROM team_ratings ORDER BY employee_id').all().map(row => ({...row}));
   async function pair(page, first, second) {
-    await page.goto(base + '/pair-targets'); await expect(page.locator('#pairAccessMessage')).toContainText('21:30');
+    await page.goto(base + '/pair-targets'); await expect(page.locator('#pairAccessMessage')).toContainText('Въвеждането за Стикери няма срок.');
     await page.locator('#addPairBtn').click();
     await page.locator('#memberOne').selectOption(people[first].id); await page.locator('#memberTwo').selectOption(people[second].id);
     await page.locator('#targetKg').fill('100'); await page.locator('#targetCrates').fill('1'); await page.locator('#areaManual').check();
