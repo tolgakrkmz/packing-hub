@@ -309,7 +309,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         }
         const taskRoute = pathname.match(/^\/api\/tasks(?:\/(items|schedules)\/([0-9a-f:-]+))?$/);
         if (taskRoute) {
-          if (!taskRoute[1] && request.method === 'GET') return json(response, 200, tasks.list(currentUser()));
+          if (!taskRoute[1] && request.method === 'GET') return json(response, 200, tasks.list(currentUser(), {month: url.searchParams.get('month') ?? undefined, target: url.searchParams.get('target') ?? undefined}));
           if (!taskRoute[1] && request.method === 'POST') {
             const input = await jsonBody(request, taskPhotoRequestBytes), result = tasks.create(input, currentUser());
             broadcast('tasks', 0); return json(response, 201, result);

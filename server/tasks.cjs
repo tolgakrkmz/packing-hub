@@ -171,12 +171,36 @@ function createTasks(store, {timezone = 'Europe/Sofia', now = Date.now, photos: 
     if (!visible(item, user)) throw problem(403, 'FORBIDDEN');
     return photos.get(item, photoId);
   }
-  function list(user) {
+  // With a month, closed tasks come only from that month (plus an exact target), so the
+  // list stays small however long the history grows; open tasks are always included.
+  const monthKey = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+  const rows = found => ({...JSON.parse(found.data), id: found.id, revision: found.revision});
+  function monthOf(month) {
+    if (month === 'current') return localDate(now()).slice(0, 7);
+    if (!monthKey(month)) throw problem(400, 'INVALID_TASK_DATE');
+    return month;
+  }
+  // Plans that ended before the month are left out, except an exact target.
+  function schedulesFor(month, target) {
+    if (month === undefined) return all('task_schedules');
+    return db.prepare(`SELECT * FROM task_schedules WHERE json_extract(data,'$.until')>=? OR id=?`).all(monthOf(month) + '-01', target ?? '').map(rows);
+  }
+  function itemsFor(month, target) {
+    if (month === undefined) return all('task_items');
+    month = monthOf(month);
+    const next = month.slice(5) === '12' ? `${Number(month.slice(0, 4)) + 1}-01` : `${month.slice(0, 4)}-${String(Number(month.slice(5)) + 1).padStart(2, '0')}`;
+    return db.prepare(`SELECT * FROM task_items WHERE json_extract(data,'$.status') NOT IN ('completed','cancelled','not-done','not-applicable') OR id=?
+      OR (json_extract(data,'$.kind')='shift' AND json_extract(data,'$.shift.date')>=? AND json_extract(data,'$.shift.date')<?)
+      OR (json_extract(data,'$.kind')='global' AND json_extract(data,'$.due')>=? AND json_extract(data,'$.due')<?)`)
+      .all(target ?? '', month + '-01', next + '-01', instant(month + '-01', '00:00'), instant(next + '-01', '00:00'))
+      .map(rows);
+  }
+  function list(user, {month, target} = {}) {
     access(user); const at = now();
     maintain();
     const available = new Set(db.prepare('SELECT id FROM task_photos').all().map(row => row.id));
     return {now: at, timezone, graceMinutes: GRACE / 60000, currentShift: currentShift(at), photoPolicy: photos.policy(), supervisors: can(user, 'canManageTasks') || can(user, 'canAssignTasks') ? roster() : [],
-      items: all('task_items').filter(item => visible(item, user)).map(item => photos.decorate(derived(item, at), available)), schedules: all('task_schedules').filter(item => visible(item, user)).map(item => photos.decorate({...item, requiresPhotos: requiresPhotos(item)}, available))};
+      items: itemsFor(month, target).filter(item => visible(item, user)).map(item => photos.decorate(derived(item, at), available)), schedules: schedulesFor(month, target).filter(item => visible(item, user)).map(item => photos.decorate({...item, requiresPhotos: requiresPhotos(item)}, available))};
   }
   function summary(user) {
     access(user); const at = now();

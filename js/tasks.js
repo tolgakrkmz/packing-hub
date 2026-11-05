@@ -228,11 +228,12 @@
     if (!fresh && pendingRead) return pendingRead;
     const current = ++sequence;
     const operation = (async () => { try {
-      const result = await HubServer.json('/api/tasks'); if (current !== sequence || draftOpen() || document.hidden) return;
-      state = result; $('taskMessage').textContent = '';
+      const target = new URLSearchParams(location.search).get('target');
+      const result = await HubServer.json('/api/tasks?' + new URLSearchParams({month: monthChosen ? month : 'current', ...(target ? {target} : {})})); if (current !== sequence || draftOpen() || document.hidden) return;
+      state = result; $('taskMessage').textContent = ''; scheduleWake();
       // Clock ticks alone do not change cards, but crossing a start/due/grace
       // boundary changes actions and overdue totals even with the same records.
-      const snapshot = JSON.stringify({...result, now:undefined, month:monthChosen ? null : date(result.now).slice(0, 7), timeBoundaries:result.items.map(item => [
+      const snapshot = JSON.stringify({...result, now:undefined, month:monthChosen ? month : date(result.now).slice(0, 7), timeBoundaries:result.items.map(item => [
         result.now >= item.shift?.start, result.now < item.due, item.due + result.graceMinutes * 60000 < result.now
       ])});
       if (snapshot === displayedSnapshot) return;
@@ -245,7 +246,8 @@
       globalThis.HubNotificationTarget?.select([...state.items, ...state.schedules], item => item.id, item => {
         $('ownerFilter').value = ''; $('taskSearch').value = '';
         view = state.schedules.includes(item) ? 'schedules' : placeOf(item).tab;
-        if (['done', 'missed'].includes(view)) { month = monthOf(item); monthChosen = true; }
+        // Another month needs its own closed tasks; they load right after this render.
+        if (['done', 'missed'].includes(view) && monthOf(item) !== month) { month = monthOf(item); monthChosen = true; queueMicrotask(() => refresh({fresh: true})); }
         const values = listFor(view, view === 'schedules' ? state.schedules : state.items);
         listPage = Math.floor(values.indexOf(item) / pageSize) + 1;
       });
@@ -357,10 +359,16 @@
   $('newTask').hidden = !assigner; $('newTask').addEventListener('click', () => { if (state && assigner) openEditor(); }); $('ownerFilterLabel').hidden = supervisor && !assigner && !admin && !reviewer;
   $('refreshTasks').addEventListener('click', refresh);
   $('ownerFilter').addEventListener('input', () => { listPage = 1; render(); });
-  for (const [id, step] of [['monthPrev', -1], ['monthNext', 1]]) $(id).addEventListener('click', () => { month = TaskViewModel.addMonths(month, step); monthChosen = true; listPage = 1; render(); });
+  for (const [id, step] of [['monthPrev', -1], ['monthNext', 1]]) $(id).addEventListener('click', () => { month = TaskViewModel.addMonths(month, step); monthChosen = true; listPage = 1; render(); refresh({fresh: true}); });
   $('schedulesTab').hidden = !admin && !assigner; $('taskSearchLabel').hidden = !overseer;
-  // Shift starts and grace periods change the list without any record change.
-  setInterval(() => { if (!document.hidden) refresh(); }, 60000);
+  // Shift starts, deadlines and grace periods change the list without a record change, so wake
+  // only at the next such moment (at least hourly, for the month change); other changes are pushed.
+  let wakeTimer;
+  function scheduleWake() {
+    clearTimeout(wakeTimer);
+    const grace = state.graceMinutes * 60000, next = Math.min(state.now + 3600000, ...state.items.flatMap(item => [item.shift?.start, item.due, item.due + grace]).filter(at => at > state.now));
+    wakeTimer = setTimeout(refresh, next - state.now + 1000);
+  }
   $('taskSearch').addEventListener('input', () => {
     listPage = 1; clearTimeout(searchTimer); $('taskContent').setAttribute('aria-busy', 'true');
     searchTimer = setTimeout(render, 150);

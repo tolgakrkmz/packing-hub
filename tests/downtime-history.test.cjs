@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {environment} = require('./report-write-environment.cjs');
 
+// History opens on the current month, so the tests fix the day inside the October fixtures.
+const now = '2026-10-07T12:00:00+03:00';
 const historyIds = env => [...env.controls.historyWrap.innerHTML.matchAll(/data-id="([^"]+)"/g)].map(match => match[1]);
 const ids = [
   'ffffffff-ffff-4fff-8fff-ffffffffffff',
@@ -12,7 +14,7 @@ const ids = [
 
 for(const fallback of [false,true]) {
   test(`downtime history: latest entry is first within its day (${fallback ? 'browser storage' : 'file'})`,async () => {
-    const env = await environment('line-downtime',{fallback});
+    const env = await environment('line-downtime',{fallback,now});
     let nextId = 0;
     env.sandbox.crypto = {randomUUID:() => ids[nextId++]};
     for(const [date,start,end] of [
@@ -32,7 +34,7 @@ for(const fallback of [false,true]) {
     const saved = fallback ? JSON.parse([...env.local.values()][0]) : JSON.parse(env.handle.text);
     assert.deepEqual(saved.entries.map(entry => entry.id),ids);
 
-    const reopened = await environment('line-downtime',{fallback});
+    const reopened = await environment('line-downtime',{fallback,now});
     if(fallback) {
       reopened.controls.importFallback.files = [{text:async () => JSON.stringify(saved)}];
       await reopened.controls.importFallback.dispatch('change');
@@ -52,7 +54,7 @@ for(const fallback of [false,true]) {
 }
 
 test('downtime history keeps the addition order for legacy IDs and refreshed file entries',async () => {
-  const env = await environment('line-downtime');
+  const env = await environment('line-downtime',{now});
   const record = (id,date) => ({id,date,shift:'А',start:'10:00',end:'10:20',durationMin:20,reason:'Механична повреда'});
   const saved = {reasons:['Механична повреда','Друго'],entries:[
     record('legacy-z-last','2026-10-05'),
@@ -73,7 +75,7 @@ test('downtime history keeps the addition order for legacy IDs and refreshed fil
 });
 
 test('downtime history shows a retried save first without duplicates',async () => {
-  const env = await environment('line-downtime');
+  const env = await environment('line-downtime',{now});
   let nextId = 0;
   env.sandbox.crypto = {randomUUID:() => ids[nextId++]};
   await env.draft(); await env.save();

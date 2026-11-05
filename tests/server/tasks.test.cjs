@@ -537,3 +537,22 @@ test('accounts that both report and review receive reminders for their own work 
   assert.deepEqual(await (await s.request('/api/tasks/summary', chief)).json(), {count: 2});
   assert.equal(s.hub.tasks.list(chief.user).items.length, 2);
 });
+test('month lists keep open tasks, that month and an exact target', async t => {
+  const s = await setup(t);
+  const closed = await s.create(s.payload({kind: 'global', dueDate: '2026-12-02', dueTime: '17:00'}));
+  const open = await s.create(s.payload({kind: 'global', dueDate: '2026-12-03', dueTime: '17:00'}));
+  assert.equal((await s.change(closed, s.admin, {action: 'complete', note: ''})).status, 200);
+  const plan = await s.create(s.payload({repeat: 'every-shift', from: '2026-12-01', until: '2026-12-20'}));
+  s.time('2027-01-05T10:00:00+02:00');
+  const ids = async query => (await (await s.request('/api/tasks' + query, s.admin)).json()).items.filter(item => item.kind === 'global').map(item => item.id).sort();
+  assert.deepEqual(await ids('?month=2027-01'), [open]);
+  assert.deepEqual(await ids('?month=current'), [open]);
+  assert.deepEqual(await ids('?month=2026-12'), [closed, open].sort());
+  assert.deepEqual(await ids('?month=2027-01&target=' + closed), [closed, open].sort());
+  assert.deepEqual(await ids(''), [closed, open].sort());
+  assert.equal((await s.request('/api/tasks?month=2027-13', s.admin)).status, 400);
+  const plans = async query => (await (await s.request('/api/tasks' + query, s.admin)).json()).schedules.map(item => item.id);
+  assert.deepEqual(await plans('?month=2026-12'), [plan]);
+  assert.deepEqual(await plans('?month=2027-01'), []);
+  assert.deepEqual(await plans('?month=2027-01&target=' + plan), [plan]);
+});
