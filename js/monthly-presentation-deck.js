@@ -2,7 +2,8 @@
 const MonthlyPresentationDeck = (() => {
   const C = {bg:'15171B', panel:'1D2025', panel2:'22262C', border:'2C3039', text:'EDEBE3', muted:'8A8D93',
     amber:'F5A623', amberDark:'3A2C10', blue:'4F95C9', teal:'3FBFA0', coral:'E0765A', purple:'A083D6', pink:'C26B9E'};
-  const FONT = 'Arial', W = 13.333, M = 0.6, PAGES = 9, GAP = 0.25, RIGHT = W - M;
+  const FONT = 'Arial', W = 13.333, M = 0.6, GAP = 0.25, RIGHT = W - M;
+  let pages = 9; // 10 when the photo evidence slide is added; set by build.
   const text = (slide, value, x, y, w, h, options = {}) => slide.addText(value, {x, y, w, h, fontFace:FONT, fontSize:12, color:C.text, margin:0, valign:'top', ...options});
   const box = (slide, x, y, w, h, fill = C.panel, line = C.border) => slide.addShape('roundRect', {x, y, w, h, rectRadius:0.08, fill:{color:fill}, line:{color:line, width:0.75}});
   const bar = (slide, x, y, w, h, color) => slide.addShape('rect', {x, y, w:Math.max(w, 0.01), h, fill:{color}, line:{color, width:0}});
@@ -21,7 +22,7 @@ const MonthlyPresentationDeck = (() => {
     text(slide, subtitle, M, 1.3, RIGHT - M, 0.4, {fontSize:13, color:C.muted});
     slide.addShape('line', {x:M, y:7.0, w:RIGHT - M, h:0, line:{color:C.border, width:0.75}});
     text(slide, 'Package Hub · Monthly report', M, 7.1, 6, 0.25, {fontSize:9, color:C.muted});
-    text(slide, `${page} / ${PAGES}`, RIGHT - 2, 7.1, 2, 0.25, {fontSize:9, color:C.muted, align:'right'});
+    text(slide, `${page} / ${pages}`, RIGHT - 2, 7.1, 2, 0.25, {fontSize:9, color:C.muted, align:'right'});
     return slide;
   }
 
@@ -227,37 +228,98 @@ const MonthlyPresentationDeck = (() => {
   const LEVELS = {high:['High', C.coral], medium:['Medium', C.amber], low:['Low', C.teal]};
 
   function globalProblems(pptx, v) {
-    const slide = frame(pptx, v, 8, 'Global Problems', `Status at the end of ${v.monthName} ${v.year} · for information`), p = v.problems;
+    const p = v.problems, slide = frame(pptx, v, 8, 'Global Problems', p ? `Status on ${p.asOf} · new and resolved count ${v.monthName} · for information` : 'For information');
     if (!p) return unavailable(slide, 'Global problems were not available when the presentation was created.');
-    const cols = columns(4);
-    card(slide, {...cols[0], y:1.95, h:1.75, title:'Active problems', value:String(p.active), color:C.amber, sub:`${p.open} open · ${p.proposed} with a proposed solution`});
-    card(slide, {...cols[1], y:1.95, h:1.75, title:'New this month', value:String(p.created), color:C.blue, sub:'Recorded during the month'});
-    card(slide, {...cols[2], y:1.95, h:1.75, title:'Resolved this month', value:String(p.resolved), color:C.teal, sub:'Closed during the month'});
-    card(slide, {...cols[3], y:1.95, h:1.75, title:'High impact', value:String(p.byImpact[0].count), color:C.coral, sub:'Active at month end'});
-    const leftW = 4.2, x = M + leftW + GAP, w = RIGHT - x, most = Math.max(1, ...p.byImpact.map(row => row.count));
-    box(slide, M, 3.9, leftW, 2.9);
-    label(slide, 'Active by impact', M + 0.25, 4.07, leftW - 0.5);
-    p.byImpact.forEach((row, i) => {
-      const [name, color] = LEVELS[row.level], top = 4.55 + i * 0.7, track = leftW - 2.0;
-      text(slide, name, M + 0.25, top, 0.95, 0.35, {fontSize:12, color:C.muted, valign:'middle'});
-      bar(slide, M + 1.25, top + 0.08, track, 0.2, C.panel2);
-      bar(slide, M + 1.25, top + 0.08, track * row.count / most, 0.2, color);
-      text(slide, String(row.count), M + leftW - 0.65, top, 0.4, 0.35, {fontSize:14, bold:true, align:'right', valign:'middle'});
+    // Compact figures so the proposed solutions get most of the slide.
+    columns(4).forEach((col, i) => {
+      const [title, value, color, sub] = [['Active problems', p.active, C.amber, `${p.open} open · ${p.proposed} with a solution`], ['New', p.created, C.blue, 'Recorded during the month'],
+        ['Resolved', p.resolved, C.teal, 'Closed during the month'], ['High impact', p.byImpact[0].count, C.coral, 'Active now']][i];
+      box(slide, col.x, 1.95, col.w, 0.8);
+      text(slide, String(value), col.x + 0.2, 1.95, 0.7, 0.8, {fontSize:26, bold:true, color, valign:'middle'});
+      label(slide, title, col.x + 0.95, 2.08, col.w - 1.1);
+      text(slide, sub, col.x + 0.95, 2.37, col.w - 1.1, 0.25, {fontSize:10, color:C.muted});
     });
-    box(slide, x, 3.9, w, 2.9);
-    label(slide, 'Longest open, by impact', x + 0.25, 4.07, w - 0.5);
-    if (!p.oldest.length) text(slide, 'No active problems at month end.', x + 0.25, 4.5, w - 0.5, 0.4, {fontSize:12, color:C.muted});
-    p.oldest.forEach((row, i) => {
-      const top = 4.45 + i * 0.45, [, color] = LEVELS[row.level] || ['', C.muted];
-      if (i) slide.addShape('line', {x:x + 0.25, y:top - 0.05, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
-      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.12, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
-      text(slide, row.title, x + 0.5, top, w - 3.05, 0.37, {fontSize:11, valign:'middle', fit:'shrink'});
-      text(slide, `${row.days} ${row.days === 1 ? 'day' : 'days'} · ${row.stage}`, x + w - 2.5, top, 2.25, 0.37, {fontSize:10, color:C.muted, align:'right', valign:'middle'});
+    const x = M, w = RIGHT - M, solutionX = x + 0.5, solutionW = w - 0.75, top0 = 3.45, room = 6.7 - top0;
+    box(slide, x, 2.95, w, 3.85);
+    label(slide, 'Problems by impact and the proposed solution', x + 0.25, 3.1, w - 0.5);
+    if (!p.oldest.length) return text(slide, 'No active problems at month end.', x + 0.25, top0, w - 0.5, 0.4, {fontSize:12, color:C.muted});
+    const rows = p.oldest.map(row => ({...row, body:summary(row.solution)}));
+    const size = solutionSize(rows.map(row => row.body || 'No solution proposed yet.'), solutionW, room);
+    // Even at the smallest size the texts may not fit: each row then keeps an equal share of lines and ends with "…"; the full text stays on the board.
+    if (rows.reduce((sum, row) => sum + rowHeight(row.body || '-', size, solutionW) + 0.12, 0) > room) {
+      const lines = Math.max(1, Math.floor((room / rows.length - 0.42) / (size * 1.25 / 72)));
+      rows.forEach(row => { row.body = clip(row.body, size, solutionW, lines); });
+    }
+    const used = rows.reduce((sum, row) => sum + rowHeight(row.body || '-', size, solutionW), 0), gap = Math.min(0.4, Math.max(0.12, (room - used) / rows.length));
+    let top = top0;
+    rows.forEach((row, i) => {
+      const [, color] = LEVELS[row.level] || ['', C.muted], h = rowHeight(row.body || 'No solution proposed yet.', size, solutionW);
+      if (i) slide.addShape('line', {x:x + 0.25, y:top - gap / 2, w:w - 0.5, h:0, line:{color:C.border, width:0.5}});
+      slide.addShape('ellipse', {x:x + 0.25, y:top + 0.08, w:0.13, h:0.13, fill:{color}, line:{color, width:0}});
+      text(slide, [{text:row.title, options:{bold:true}}, {text:`   ${row.days} ${row.days === 1 ? 'day' : 'days'} open`, options:{fontSize:9, color:C.muted}}], solutionX, top, solutionW, 0.28, {fontSize:11, valign:'middle'});
+      text(slide, row.body || 'No solution proposed yet.', solutionX, top + 0.3, solutionW, h - 0.3, {fontSize:size, color:row.body ? C.text : C.muted, italic:!row.body});
+      top += h + gap;
     });
   }
 
-  function people(pptx, v) {
-    const slide = frame(pptx, v, 9, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team and the stickers shift · for information`), f = v.workforce;
+  // A short summary instead of the full text: the heading of each numbered point ("1. Staff training. Train …" → "1. Staff training"),
+  // otherwise the first sentence; long headings are cut at a word with "…".
+  const cut = (value, max) => value.length <= max ? value : value.slice(0, max).replace(/\s+\S*$/, '') + '…';
+  const heading = value => value.split(/[.:;!?](?:\s|$)/)[0].trim();
+  function summary(value) {
+    const lines = String(value || '').split('\n').map(line => line.replace(/\t/g, ' ').trim()).filter(Boolean);
+    const points = lines.map(line => line.match(/^(\d+)[.)]\s*(.+)$/)).filter(Boolean);
+    if (points.length) return points.map(([, n, rest]) => `${n}. ${cut(heading(rest), 50)}`).join('   ·   ');
+    return lines.length ? cut(heading(lines.join(' ')), 120) : '';
+  }
+
+  // Estimated wrapped height of a solution: Arial averages about 0.5 em per character.
+  const textLines = (value, size, w) => value.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / Math.floor(w * 72 / (size * 0.5)))), 0);
+  const rowHeight = (value, size, w) => 0.3 + textLines(value, size, w) * size * 1.25 / 72;
+  // The largest size from 11 pt down to 8 pt at which every row fits.
+  function clip(value, size, w, lines) {
+    const per = Math.floor(w * 72 / (size * 0.5)), kept = [];
+    for (const line of value.split('\n')) {
+      const need = Math.max(1, Math.ceil(line.length / per));
+      if (need <= lines) { kept.push(line); lines -= need; continue; }
+      if (lines > 0) kept.push(line.slice(0, lines * per - 1).trimEnd() + '…');
+      else kept[kept.length - 1] = kept[kept.length - 1].slice(0, -1) + '…';
+      break;
+    }
+    return kept.join('\n');
+  }
+  function solutionSize(values, w, room) {
+    for (let size = 11; size > 8; size -= 0.5) if (values.reduce((sum, value) => sum + rowHeight(value, size, w) + 0.12, 0) <= room) return size;
+    return 8;
+  }
+
+  // Board photos of the listed problems as evidence, each kept in proportion inside its cell with the problem title below.
+  function evidence(pptx, v, photos) {
+    const slide = frame(pptx, v, 9, 'Photo Evidence', `Photos from the Global problems board · ${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`);
+    const perRow = Math.min(3, photos.length), rowCount = Math.ceil(photos.length / perRow), cols = columns(perRow), top = 1.95, cellH = (6.8 - top - GAP * (rowCount - 1)) / rowCount;
+    photos.forEach((photo, i) => {
+      const col = cols[i % perRow], y = top + Math.floor(i / perRow) * (cellH + GAP), roomW = col.w - 0.3, roomH = cellH - 0.65, ratio = photo.width / photo.height;
+      const w = Math.min(roomW, roomH * ratio), h = w / ratio, [, color] = LEVELS[photo.level] || ['', C.muted];
+      box(slide, col.x, y, col.w, cellH);
+      slide.addImage({data:photo.data, x:col.x + (col.w - w) / 2, y:y + 0.15 + (roomH - h) / 2, w, h, altText:photo.title, hyperlink:{slide:ZOOM_FIRST + i, tooltip:'Enlarge'}});
+      slide.addShape('ellipse', {x:col.x + 0.2, y:y + cellH - 0.36, w:0.12, h:0.12, fill:{color}, line:{color, width:0}});
+      text(slide, cut(photo.title, 90), col.x + 0.42, y + cellH - 0.45, col.w - 0.6, 0.32, {fontSize:10, valign:'middle'});
+    });
+  }
+
+  // Hidden slides after the last page, one per photo: a click on a thumbnail opens its large version, a click on that returns to the evidence slide.
+  const ZOOM_FIRST = 11;
+  function zoom(pptx, photo, i, count) {
+    const slide = pptx.addSlide(), ratio = photo.width / photo.height, roomW = W - 2 * M, roomH = 6.3, w = Math.min(roomW, roomH * ratio), h = w / ratio, [, color] = LEVELS[photo.level] || ['', C.muted];
+    slide.background = {color:C.bg};
+    slide.hidden = true;
+    slide.addImage({data:photo.data, x:(W - w) / 2, y:0.35 + (roomH - h) / 2, w, h, altText:photo.title, hyperlink:{slide:9, tooltip:'Back to Photo Evidence'}});
+    slide.addShape('ellipse', {x:M, y:6.97, w:0.12, h:0.12, fill:{color}, line:{color, width:0}});
+    text(slide, [{text:photo.title, options:{bold:true}}, {text:`   Photo ${i + 1} of ${count} · click the photo to return`, options:{color:C.muted}}], M + 0.22, 6.86, RIGHT - M - 0.22, 0.34, {fontSize:11, valign:'middle'});
+  }
+
+  function people(pptx, v, page) {
+    const slide = frame(pptx, v, page, 'Workforce', `Current roster and ${v.monthName} packed tonnage per team and the stickers shift · for information`), f = v.workforce;
     if (!f) return unavailable(slide, 'The personnel list was not available when the presentation was created.');
     const cols = columns(4);
     [['Active people', f.active, C.amber], ['Automatic line', f.auto, C.teal], ['Manual packing', f.manual, C.blue], ['Stickers', f.stickers, C.pink]]
@@ -281,7 +343,8 @@ const MonthlyPresentationDeck = (() => {
   }
 
   // improvements: lines "Title: description"; specialLabel names the special production row.
-  function build(PptxGenJS, v, {improvements = [], specialLabel = ''} = {}) {
+  function build(PptxGenJS, v, {improvements = [], specialLabel = '', photos = []} = {}) {
+    pages = photos.length ? 10 : 9;
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_WIDE';
     pptx.title = `Packaging & Logistics – ${v.monthName} ${v.year}`;
@@ -291,7 +354,10 @@ const MonthlyPresentationDeck = (() => {
       return at > 0 ? {title:line.slice(0, at).trim(), body:line.slice(at + 1).trim()} : {title:line, body:''};
     });
     cover(pptx, v); overview(pptx, v); performance(pptx, v); reconciliation(pptx, v, String(specialLabel).trim() || 'Special production');
-    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v); people(pptx, v);
+    workload(pptx, v); automaticLine(pptx, v); logistics(pptx, v, items); globalProblems(pptx, v);
+    if (photos.length) evidence(pptx, v, photos);
+    people(pptx, v, pages);
+    photos.forEach((photo, i) => zoom(pptx, photo, i, photos.length));
     return pptx;
   }
   return {build};

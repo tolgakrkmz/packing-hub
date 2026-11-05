@@ -59,6 +59,23 @@
     input.value = input.dataset.site; markChanged(input); input.focus();
   }));
 
+  // Up to six board photos of the problems on the slide, made smaller on this computer so the deck stays light; a photo that fails is left out.
+  async function evidencePhotos(problems, items) {
+    const wanted = (problems?.oldest || []).flatMap(row => ((items || []).find(item => item.id === row.id)?.photos || []).filter(photo => photo.available !== false)
+      .map(photo => ({row, url:`/api/problems/${encodeURIComponent(row.id)}/photos/${encodeURIComponent(photo.id)}`}))).slice(0, 6);
+    const photos = await Promise.all(wanted.map(async ({row, url}) => {
+      try {
+        const response = await fetch(url, {credentials:'same-origin'});
+        if (!response.ok) return null;
+        const image = await createImageBitmap(await response.blob()), scale = Math.min(1, 1600 / Math.max(image.width, image.height)), canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        return {title:row.title, level:row.level, width:canvas.width, height:canvas.height, data:canvas.toDataURL('image/jpeg', 0.82).replace(/^data:/, '')};
+      } catch { return null; }
+    }));
+    return photos.filter(Boolean);
+  }
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!el.connDot.classList.contains('on') || !el.avConnDot.classList.contains('on')) { feedback.textContent = 'Свържи тонажния дневник и дневника за престои.'; return; }
@@ -75,7 +92,7 @@
       const values = MonthlyPresentation.values({month, production:loaded.production, downtime:loaded.downtime, inputs, today:statisticsDay(),
         problemItems, period, counts:getPersonnelSnapshot(), goalTons, pairTeams, taskItems});
       const deck = MonthlyPresentationDeck.build(await loadLibrary(), values,
-        {improvements:form.elements.improvements.value.split('\n'), specialLabel:form.elements.specialLabel.value});
+        {improvements:form.elements.improvements.value.split('\n'), specialLabel:form.elements.specialLabel.value, photos:await evidencePhotos(values.problems, problemItems)});
       const link = document.createElement('a');
       link.href = URL.createObjectURL(await deck.write({outputType:'blob'}));
       link.download = `packing-presentation-${month}.pptx`;
