@@ -49,17 +49,19 @@ async function exerciseEmptyStates({admin, hub, base, device, expect, createObse
   const chief = await hub.auth.create('demo-empty-chief', 'Fictional-password-123', 'operator', actor, {}, () => {}, {taskSupervisor:true, taskTeam:'В'});
   await admin.goto(base + '/tasks');
   const content = admin.locator('#taskContent');
-  await expect(content.locator('.task-empty')).toContainText('Няма активни сменни задачи.');
-  await expect(content.getByRole('button', {name:'+ Възложи задача'})).toBeVisible();
-  await admin.locator('[data-view=global]').click();
-  await expect(content.locator('.task-empty')).toContainText('Няма активни глобални задачи.');
+  await expect(content.locator('.task-empty')).toContainText('Няма задачи за отчет.');
+  await expect(content.getByRole('button', {name:'+ Нова задача'})).toBeVisible();
+  await admin.locator('[data-view=done]').click();
+  await expect(content.locator('.task-empty')).toContainText('Няма изпълнени задачи през този месец.');
+  await expect(content.getByRole('button', {name:'+ Нова задача'})).toHaveCount(0);
+  await admin.locator('[data-view=open]').click();
   await admin.locator('#taskSearch').fill('fictional-no-match');
-  await expect(content.locator('.task-empty')).toContainText('Няма активни глобални задачи.');
+  await expect(content.locator('.task-empty')).toContainText('Няма задачи за отчет.');
   await expect(content.getByRole('button', {name:'Изчисти филтрите'})).toHaveCount(0);
   await admin.locator('#taskSearch').fill('');
   await admin.locator('#newTask').click();
   await admin.locator('#taskTitle').fill('Fictional empty-state task');
-  await admin.locator('#taskDescription').fill('Fictional detail');
+  await admin.locator('#taskMore summary').click(); await admin.locator('#taskDescription').fill('Fictional detail');
   await admin.locator('#taskOwner').selectOption(String(chief.id));
   await admin.locator('#taskKind').selectOption('global');
   await admin.locator('#taskDueDate').fill('2026-12-03'); await admin.locator('#taskDueTime').fill('17:00');
@@ -84,14 +86,16 @@ async function exerciseEmptyStates({admin, hub, base, device, expect, createObse
   await expect(content.locator('.task-empty')).toContainText('Задачите не могат да се заредят.');
   await admin.unroute('**/api/tasks');
   await content.getByRole('button', {name:'Опитай отново'}).click();
-  await expect(content.locator('.task-card')).toHaveCount(0);
-  await expect(content.locator('.task-empty')).toContainText('Няма активни сменни задачи.');
+  await expect(content).toContainText('Fictional empty-state task');
+  await admin.locator('[data-view=missed]').click();
+  await expect(content.locator('.task-empty')).toContainText('Няма неизпълнени задачи през този месец.');
   await admin.locator('[data-hub-language=en]').click();
-  await expect(content.locator('.task-empty')).toContainText('No active shift tasks.');
+  await expect(content.locator('.task-empty')).toContainText('No missed tasks this month.');
   await admin.locator('[data-hub-language=bg]').click();
   await observer.goto(base + '/tasks');
-  await expect(observer.locator('#taskContent .task-empty')).toContainText('Няма активни сменни задачи.');
-  await expect(observer.getByRole('button', {name:'+ Възложи задача'})).toHaveCount(0);
+  await observer.locator('[data-view=done]').click();
+  await expect(observer.locator('#taskContent .task-empty')).toContainText('Няма изпълнени задачи през този месец.');
+  await expect(observer.getByRole('button', {name:'+ Нова задача'})).toHaveCount(0);
   hub.store.db.exec('DELETE FROM task_items; DELETE FROM task_schedules;');
 
   // Instructions: empty project versus search without matches.

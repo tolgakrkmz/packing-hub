@@ -96,7 +96,8 @@ async function exerciseAccessibility({admin, hub, base, device, expect}) {
         await expect(page.locator('html')).toHaveAttribute('lang', language);
         // The operator's own team В is preselected, so its form opens with the automatic / manual breakdown.
         const fields = role === 'operator' && route === '/production-log' ? expected.map(id => id === 'tonInput' ? 'autoKgInput' : id) : expected;
-        await checkPage(page, `${role} ${language} ${route}`, role === 'admin' && route === '/tasks' ? ['newTask', ...fields] : fields);
+        // Shift supervisors see only their own tasks, without search.
+        await checkPage(page, `${role} ${language} ${route}`, role === 'admin' && route === '/tasks' ? ['newTask', ...fields] : route === '/tasks' && role === 'operator' ? fields.filter(id => id !== 'taskSearch') : fields);
       }
     }
     await page.locator('[data-hub-language=bg]').click();

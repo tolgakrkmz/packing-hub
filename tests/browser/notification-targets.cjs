@@ -48,12 +48,12 @@ async function exerciseNotificationTargets({admin, hub, base, device, expect, se
   const task = hub.tasks.create(payload('Fictional oldest linked task'), actor);
   for (let i = 0; i < 52; i++) { setTime(new Date(Date.parse('2026-10-05T08:31:00+03:00')+i*1000).toISOString()); hub.tasks.create({...payload('Fictional later task ' + i), dueDate: '2026-10-06'}, actor); }
   await opened(admin, 'taskDue', task.id);
-  await expect(admin.locator('[data-view=history]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(admin.locator('[data-view=open]')).toHaveAttribute('aria-pressed', 'true');
   await expect(admin.locator('#taskPagination')).toContainText('2');
   hub.tasks.change(task.id, {action: 'report', status: 'review', note: 'Fictional linked result'}, 1, chief);
   hub.tasks.change(task.id, {action: 'approve'}, 2, actor);
   await opened(admin, 'taskOutcome', task.id);
-  await expect(admin.locator('[data-history-view=reported]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(admin.locator('[data-view=done]')).toHaveAttribute('aria-pressed', 'true'); await expect(admin.locator('#monthLabel')).toHaveText('Октомври 2026');
   const schedule = hub.tasks.create({...payload('Fictional linked recurring plan'), kind: 'shift', repeat: 'every-shift', from: '2026-10-05', until: '2026-10-10'}, actor);
   await opened(admin, 'taskChanged', schedule.id);
   await expect(admin.locator('[data-view=schedules]')).toHaveAttribute('aria-pressed', 'true');

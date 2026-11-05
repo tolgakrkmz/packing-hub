@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="css/theme.css"><link rel="stylesheet" href="css/layout.css"><link rel="stylesheet" href="css/tasks.css"><link rel="stylesheet" href="css/i18n.css">
 <script src="js/i18n-en.js"></script><script src="js/i18n.js" data-storage-key="portfolio-hub-language"></script>
 <link rel="stylesheet" href="css/list-pagination.css">
-<script src="js/list-pagination.js" defer></script><script src="js/task-photos.js" defer></script><script src="js/tasks.js" defer></script>
+<script src="js/list-pagination.js" defer></script><script src="js/task-photos.js" defer></script><script src="js/task-view-model.js" defer></script><script src="js/tasks.js" defer></script>
 <link rel="icon" type="image/svg+xml" href="assets/package-hub-mark.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/package-hub-icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -15,27 +15,25 @@
 </head>
 <body>
 <main class="wrap tasks-wrap">
-<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Задачи</h1><p id="taskSubtitle">Сменни ангажименти и общи проблеми за решаване.</p></div><button id="newTask" type="button" hidden>+ Възложи задача</button></header>
+<header class="tasks-heading"><div><a class="hub-brand module-brand" href="index.html" translate="no"><img src="assets/package-hub-mark.svg" width="44" height="44" alt=""><span>Package <span class="brand-hub">Hub</span></span></a><p class="tasks-eyebrow">Организация на опаковката</p><h1>Задачи</h1><p id="taskSubtitle">Сменни ангажименти и общи проблеми за решаване.</p></div><button id="newTask" type="button" hidden>+ Нова задача</button></header>
 <p id="taskMessage" role="status" aria-live="polite" tabindex="-1"></p>
-<section id="taskOverview" class="task-overview" aria-label="Обобщение"></section>
 <nav id="taskTabs" class="task-tabs" aria-label="Раздели на задачите">
-<button type="button" data-view="shift" aria-pressed="true">Сменни задачи</button><button type="button" data-view="global" aria-pressed="false">Глобални задачи</button><button type="button" data-view="history" aria-pressed="false">История</button><button type="button" data-view="stats" aria-pressed="false">Статистика</button><button type="button" data-view="schedules" aria-pressed="false">Повтарящи се</button>
+<button type="button" data-view="open" aria-pressed="true"><span>За отчет</span><span class="task-badge" hidden></span></button><button type="button" data-view="done" aria-pressed="false"><span>Изпълнени</span><span class="task-badge" hidden></span></button><button type="button" data-view="missed" aria-pressed="false"><span>Неизпълнени</span><span class="task-badge" hidden></span></button><button id="schedulesTab" type="button" data-view="schedules" aria-pressed="false" hidden><span>Повтарящи се</span><span class="task-badge" hidden></span></button>
 </nav>
-<div class="task-toolbar"><label id="ownerFilterLabel" hidden>Отговорник<select id="ownerFilter"><option value="">Всички отговорници</option></select></label><label>Търсене<input id="taskSearch" type="search" placeholder="Търси задача…"></label><button id="refreshTasks" type="button" class="secondary">Опресни</button></div>
-<div id="taskPeriod" class="task-toolbar" hidden><label>От дата<input id="statsFrom" type="date" required></label><label>До дата<input id="statsUntil" type="date" required></label><p>Сменните отчети са по датата на започване на смяната. Глобалните задачи са по срока.</p></div>
+<div class="task-toolbar"><label id="ownerFilterLabel" hidden>Отговорник<select id="ownerFilter"><option value="">Всички отговорници</option></select></label><label id="taskSearchLabel">Търсене<input id="taskSearch" type="search" placeholder="Търси задача…"></label><button id="refreshTasks" type="button" class="secondary">Опресни</button></div>
+<div id="taskMonth" class="task-month" hidden><button id="monthPrev" type="button" class="secondary" aria-label="Предишен месец">‹</button><strong id="monthLabel"></strong><button id="monthNext" type="button" class="secondary" aria-label="Следващ месец">›</button></div>
 <section id="taskContent" aria-live="polite"></section>
-<p class="task-help" id="taskHelp">Неизпълнена и неотчетена са различни състояния. Липсващ отчет се отбелязва 30 минути след края на смяната. Закъснелите отчети остават видими в историята.</p>
 <p class="task-help" id="photoPolicy"></p>
 <dialog id="taskEditor" class="task-dialog" aria-labelledby="editorTitle">
-<form id="taskForm"><div class="dialog-heading"><h2 id="editorTitle">Възложи задача</h2><button type="button" data-close="taskEditor" class="secondary" aria-label="Затвори">×</button></div>
-<label>Заглавие<input id="taskTitle" required maxlength="180"></label><label>Описание<textarea id="taskDescription" maxlength="4000" rows="3"></textarea></label>
+<form id="taskForm"><div class="dialog-heading"><h2 id="editorTitle">Нова задача</h2><button type="button" data-close="taskEditor" class="secondary" aria-label="Затвори">×</button></div>
+<label>Какво трябва да се направи?<input id="taskTitle" required maxlength="180"></label>
+<label>Кой отговаря?<select id="taskOwner" required></select></label><p id="ownerTeam" class="task-muted"></p>
+<label>Вид задача<select id="taskKind"><option value="shift">По смени</option><option value="global">До дата (обща задача)</option></select></label>
+<section id="shiftFields"><label>Повторение<select id="taskRepeat"><option value="once">Само конкретната смяна</option><option value="every-shift">Всяка работна смяна по графика на А–Г</option></select></label><div class="task-fields"><label>Дата на смяната / начало<input id="taskFrom" type="date"></label><label id="taskUntilLabel" hidden>Последна дата<input id="taskUntil" type="date"></label></div><p id="shiftPreview" class="task-muted"></p><p>За Стикери се възлага конкретна 1-ва смяна. Повтарянето е за период до 366 дни.</p></section>
+<section id="globalFields" hidden><fieldset id="taskParticipants"><legend>Други участници</legend><div id="participantOptions"></div></fieldset><div class="task-fields"><label>Краен срок — дата<input id="taskDueDate" type="date"></label><label>Час<input id="taskDueTime" type="time" value="17:00"></label></div><p id="taskTimezone"></p></section>
 <label class="task-photo-option"><input id="taskRequiresPhotos" type="checkbox" checked aria-describedby="taskRequiresPhotosHelp"><span>Изисква снимки</span></label><p id="taskRequiresPhotosHelp" class="task-muted">При включена отметка снимките „Проблем“ и „Решение“ са задължителни.</p>
 <fieldset id="problemPhotoFields" class="task-photo-picker"><legend>Проблем — снимка</legend><p id="problemPhotoHelp">Добави една или повече снимки на проблема. При повторение се използват за всички смени.</p><div class="task-fields"><label>Избери снимка<input id="problemPhoto" type="file" accept="image/*" multiple></label><label>Снимай<input id="problemCamera" type="file" accept="image/*" capture="environment"></label></div><p id="problemPhotoCount" class="task-muted" role="status" translate="no"></p><div id="problemPhotoPreview" class="task-photo-choices"></div><p id="problemPhotoInfo" class="task-muted" role="status"></p><button id="problemPhotoClear" type="button" class="secondary" hidden>Премахни избора</button></fieldset>
-<div class="task-fields"><label>Тип<select id="taskKind"><option value="shift">Сменна задача</option><option value="global">Глобална задача</option></select></label><label>Приоритет<select id="taskPriority"><option value="normal">Нормален</option><option value="high">Висок</option></select></label></div>
-<label>Основен отговорник<select id="taskOwner" required></select></label><p id="ownerTeam" class="task-muted"></p>
-<fieldset id="taskParticipants"><legend>Други участници</legend><div id="participantOptions"></div></fieldset>
-<section id="shiftFields"><label>Повторение<select id="taskRepeat"><option value="once">Само конкретната смяна</option><option value="every-shift">Всяка работна смяна по графика на А–Г</option></select></label><div class="task-fields"><label>Дата на смяната / начало<input id="taskFrom" type="date"></label><label id="taskUntilLabel" hidden>Последна дата<input id="taskUntil" type="date"></label></div><p id="shiftPreview" class="task-muted"></p><p>За Стикери се възлага конкретна 1-ва смяна. Повтарянето е за период до 366 дни.</p></section>
-<section id="globalFields" hidden><div class="task-fields"><label>Краен срок — дата<input id="taskDueDate" type="date"></label><label>Час<input id="taskDueTime" type="time" value="17:00"></label></div><p id="taskTimezone"></p></section>
+<details id="taskMore" class="task-more-fields"><summary>Още: описание и спешност</summary><label>Описание<textarea id="taskDescription" maxlength="4000" rows="3"></textarea></label><label>Спешност<select id="taskPriority"><option value="normal">Нормална</option><option value="high">Спешно</option></select></label></details>
 <label id="editReasonLabel" hidden>Причина за промяната<textarea id="editReason" maxlength="4000" rows="2"></textarea></label>
 <p id="editorFeedback" class="task-error" role="status"></p><div class="task-actions"><button id="saveTask" type="submit">Възложи</button><button type="button" data-close="taskEditor" class="secondary">Отказ</button></div>
 </form></dialog>

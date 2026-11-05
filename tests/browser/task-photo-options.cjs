@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {uploadPhoto} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
+const {menuAction} = require('./task-ui.cjs');
 
 async function exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTime, screenshotDir}) {
   setTime('2026-12-01T15:00:00+02:00');
@@ -38,41 +39,42 @@ async function exerciseTaskPhotoOptions({admin, hub, base, device, expect, setTi
   await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   const task = () => hub.tasks.list(owner).items.find(item => item.title === 'Fictional optional-photo global');
   assert.equal(task().requiresPhotos, false); assert.equal(task().problemPhoto, null);
-  await admin.locator('[data-view=global]').click();
   const adminCard = admin.locator('.task-card').filter({hasText: 'Fictional optional-photo global'});
-  await adminCard.getByRole('button', {name: 'Промени', exact: true}).click();
+  await menuAction(adminCard, 'Промени');
   await expect(check).not.toBeChecked(); await check.check();
   await admin.locator('#editReason').fill('Fictional enable photographic evidence');
   await admin.locator('#saveTask').click(); await expect(admin.locator('#editorFeedback')).toHaveText('Добави снимка преди запис.');
   await uploadPhoto(admin, 'problem', expect);
   await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   assert.equal(task().requiresPhotos, true);
-  await chief.goto(base + '/tasks'); await chief.locator('[data-view=global]').click();
+  await chief.goto(base + '/tasks');
   const card = chief.locator('.task-card').filter({hasText: 'Fictional optional-photo global'});
   await expect(card).toContainText('Изисква снимки');
-  await card.getByRole('button', {name: 'Отчети', exact: true}).click();
-  await expect(chief.locator('#solutionPhotoFields')).toBeVisible(); await chief.locator('#reportStatus').selectOption('review');
+  await card.locator('[data-quick=ready]').click();
+  await expect(chief.locator('#solutionPhotoFields')).toBeVisible();
   await chief.locator('#actionNote').fill('Fictional result requiring evidence');
   await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#actionFeedback')).toHaveText('Добави снимка преди запис.');
   assert.equal(task().status, 'pending'); await chief.locator('[data-close=taskAction]').first().click();
-  await adminCard.getByRole('button', {name: 'Промени', exact: true}).click(); await check.uncheck();
+  await menuAction(adminCard, 'Промени'); await check.uncheck();
   await admin.locator('#editReason').fill('Fictional no-photo assignment'); await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
-  await chief.locator('#refreshTasks').click(); await expect(card).toContainText('Снимки не се изискват');
-  await card.getByRole('button', {name: 'Отчети', exact: true}).click(); await expect(chief.locator('#solutionPhotoFields')).toBeHidden();
-  await chief.locator('#reportStatus').selectOption('review'); await chief.locator('#actionNote').fill('Fictional text-only result');
+  await chief.locator('#refreshTasks').click(); await expect(card).not.toContainText('Изисква снимки');
+  await card.locator('[data-quick=ready]').click(); await expect(chief.locator('#solutionPhotoFields')).toBeHidden();
+  await chief.locator('#actionNote').fill('Fictional text-only result');
   await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
   assert.equal(task().report.photo, null);
-  await admin.locator('#refreshTasks').click(); await adminCard.getByRole('button', {name: 'Потвърди приключване', exact: true}).click();
+  await admin.locator('#refreshTasks').click(); await adminCard.getByRole('button', {name: '✓ Потвърди', exact: true}).click();
   await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible(); assert.equal(task().status, 'completed');
   await admin.locator('#newTask').click(); await expect(check).toBeChecked();
   await admin.locator('#taskTitle').fill('Fictional optional-photo shift'); await admin.locator('#taskOwner').selectOption(String(owner.id));
   await admin.locator('#taskFrom').fill('2026-12-01'); await check.uncheck(); await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
-  await chief.locator('#refreshTasks').click(); await chief.locator('[data-view=shift]').click();
+  await chief.locator('#refreshTasks').click();
   const shiftCard = chief.locator('.task-card').filter({hasText: 'Fictional optional-photo shift'});
   await expect(shiftCard.locator('.task-photos')).toHaveCount(0);
-  await shiftCard.getByRole('button', {name: 'Отчети', exact: true}).click(); await expect(chief.locator('#solutionPhotoFields')).toBeHidden();
-  await chief.locator('#reportStatus').selectOption('completed'); await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
+  // Without required photos one tap records the report, without a dialog.
+  await shiftCard.locator('[data-quick=done]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
+  await expect(chief.locator('#taskMessage')).toHaveText('Отчетено като изпълнена.');
   assert.equal(hub.tasks.list(owner).items.find(item => item.title === 'Fictional optional-photo shift').status, 'completed');
+  await expect(shiftCard).toHaveCount(0); await chief.locator('[data-view=done]').click(); await expect(shiftCard).toBeVisible();
   console.log('PASS default photo checkbox, opt-out, enabling evidence, required report, text-only completion, reviewed completion and mobile BG/EN');
 }
 

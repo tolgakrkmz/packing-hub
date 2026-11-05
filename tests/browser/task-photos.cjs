@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {uploadPhoto} = require('../server/task-photo-fixture.cjs');
 const {assertResponsive} = require('./responsive.cjs');
+const {menuAction, showMonth} = require('./task-ui.cjs');
 async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, screenshotDir}) {
   setTime('2026-12-01T15:00:00+02:00');
   const owner = await hub.auth.create('demo-photo-browser-chief', 'Fictional-password-123', 'operator', null, {}, () => {}, {taskSupervisor: true, taskTeam: 'В'});
@@ -28,14 +29,14 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
   await admin.unroute('**/api/tasks'); await admin.locator('#saveTask').click(); await expect(admin.locator('#taskEditor')).not.toBeVisible();
   const items = hub.tasks.list(owner).items; assert.equal(items.length, 1);
   const item = items[0]; assert.equal(item.problemPhoto.width, 1280); assert.ok(item.problemPhoto.bytes <= 300 * 1024);
-  await chief.goto(base + '/tasks'); await chief.locator('[data-view=global]').click();
+  await chief.goto(base + '/tasks');
   const card = chief.locator('.task-card').filter({hasText: 'Fictional photo browser problem'});
   await card.getByRole('button', {name: 'Отвори снимката'}).click();
   await expect(chief.locator('#taskPhotoViewer')).toBeVisible();
   await expect(chief.locator('#photoViewerImage')).toBeVisible();
   assert.equal(await chief.locator('#photoViewerImage').evaluate(img => img.naturalWidth), 1280);
   await chief.locator('[data-close=taskPhotoViewer]').click();
-  await card.getByRole('button', {name: 'Отчети', exact: true}).click(); await chief.locator('#reportStatus').selectOption('review'); await chief.locator('#actionNote').fill('Fictional photographed resolution');
+  await card.locator('[data-quick=ready]').click(); await expect(chief.locator('#reportStatusLabel')).toBeHidden(); await chief.locator('#actionNote').fill('Fictional photographed resolution');
   await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#actionFeedback')).toHaveText('Добави снимка преди запис.');
   await uploadPhoto(chief, 'solution', expect);
   await chief.route('**/api/tasks/items/**', async route => route.fulfill({status: 507, contentType: 'application/json', body: JSON.stringify({error: 'TASK_PHOTO_STORAGE'})}));
@@ -47,13 +48,12 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
   await chief.unroute('**/api/tasks/items/**'); await chief.locator('#actionForm button[type=submit]').click(); await expect(chief.locator('#taskAction')).not.toBeVisible();
   const reported = hub.tasks.list(owner).items[0]; assert.equal(reported.events.filter(event => event.action === 'report').length, 1);
   await expect(card.locator('.task-photos figure')).toHaveCount(2);
-  await card.getByRole('button', {name: 'История', exact: true}).click(); await expect(chief.locator('#historyContent .task-photo')).toHaveCount(2);
+  await menuAction(card, 'История'); await expect(chief.locator('#historyContent .task-photo')).toHaveCount(2);
   await chief.locator('[data-close=taskHistory]').click();
-  await admin.locator('#refreshTasks').click(); await admin.locator('[data-view=global]').click();
+  await admin.locator('#refreshTasks').click();
   const adminCard = admin.locator('.task-card').filter({hasText: 'Fictional photo browser problem'});
-  await adminCard.getByRole('button', {name: 'Потвърди приключване', exact: true}).click(); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
-  await chief.locator('[data-view=history]').click();
-  await chief.locator('#statsFrom').fill('2026-12-01'); await chief.locator('#statsUntil').fill('2026-12-03');
+  await adminCard.getByRole('button', {name: '✓ Потвърди', exact: true}).click(); await admin.locator('#actionForm button[type=submit]').click(); await expect(admin.locator('#taskAction')).not.toBeVisible();
+  await chief.locator('#refreshTasks').click(); await chief.locator('[data-view=done]').click();
   await expect(card).toBeVisible();
   for (const width of [320, 390, 768, 1440]) {
     await chief.setViewportSize({width, height: 900});
@@ -65,7 +65,7 @@ async function exerciseTaskPhotos({admin, hub, base, device, expect, setTime, sc
   }
   await chief.locator('[data-hub-language=bg]').click();
   setTime('2027-06-02T15:00:00+02:00'); hub.tasks.maintain();
-  await chief.locator('#refreshTasks').click(); await chief.locator('#statsFrom').fill('2026-12-01'); await chief.locator('#statsUntil').fill('2026-12-03');
+  await chief.locator('#refreshTasks').click(); await expect(chief.locator('#monthLabel')).toHaveText('Юни 2027'); await showMonth(chief, 'Декември 2026');
   await expect(card).toContainText('Снимката е изтрита след срока за съхранение.'); await expect(card).toContainText('Изпълнена');
   assert.equal((await chief.request.get(base + '/api/tasks/items/' + item.id + '/photos/' + item.problemPhoto.id)).status(), 410);
   console.log('PASS required problem/solution photos, camera selection, compression, viewer, quota errors, lost-response retries, history, retention and mobile BG/EN');

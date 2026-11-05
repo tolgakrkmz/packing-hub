@@ -52,22 +52,23 @@ async function exerciseTaskAssignment({admin, hub, base, device, expect, setTime
     await assertResponsive(page, 'Delegated task editor ' + kind + '/' + language);
     await uploadPhoto(page, 'problem', expect); await page.locator('#saveTask').click(); await expect(page.locator('#taskEditor')).not.toBeVisible();
     await page.locator('[data-hub-language=bg]').click();
-    await page.locator('[data-view=' + (kind === 'recurring' ? 'schedules' : kind) + ']').click();
+    await page.locator('[data-view=' + (kind === 'recurring' ? 'schedules' : 'open') + ']').click();
     await expect(page.locator('#taskContent')).toContainText(title);
   }
   for (const kind of ['shift', 'global', 'recurring']) await assign(assigner, kind, 'Fictional delegated ' + kind + ' task');
-  await expect(assigner.getByRole('button', {name: 'Спри повторението', exact: true})).toHaveCount(0);
-  await assigner.locator('[data-view=global]').click();
+  await expect(assigner.locator('.task-menu-item', {hasText: 'Спри повторението'})).toHaveCount(0);
+  await assigner.locator('[data-view=open]').click();
   const global = hub.tasks.list(user).items.find(item => item.title === 'Fictional delegated global task');
   assert.equal(global.events[0].actor.id, user.id);
   hub.tasks.change(global.id, {solutionPhoto: photo, action: 'report', status: 'review', note: 'Fictional solution for review'}, 1, owner);
-  await assigner.locator('#refreshTasks').click(); await expect(assigner.locator('#taskContent')).toContainText('Готова за проверка');
-  for (const name of ['Промени', 'Отмени', 'Отчети', 'Добави напредък', 'Потвърди приключване', 'Върни за работа']) await expect(assigner.getByRole('button', {name, exact: true})).toHaveCount(0);
+  await assigner.locator('#refreshTasks').click(); await expect(assigner.locator('#taskContent')).toContainText('Готово — чака потвърждение');
+  for (const name of ['Промени', 'Отмени задачата', 'Прехвърли на друг']) await expect(assigner.locator('.task-menu-item', {hasText: name})).toHaveCount(0);
+  await expect(assigner.locator('.task-quick button')).toHaveCount(0);
   const chief = await hub.auth.create('demo-assignment-chief', password, 'operator', null, {canAssignTasks: true}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   const chiefPage = await device(chief.username, true); await chiefPage.goto(base + '/tasks');
   await assign(chiefPage, 'global', 'Fictional supervisor delegated task');
   await expect(chiefPage.locator('#ownerFilterLabel')).toBeVisible();
-  await expect(chiefPage.getByRole('button', {name: 'Добави напредък', exact: true})).toHaveCount(0);
+  await expect(chiefPage.locator('[data-quick=note]')).toHaveCount(0);
   await expect(chiefPage.locator('.task-count:visible')).toHaveCount(0);
   if (screenshotDir) {
     const fs = require('node:fs'), path = require('node:path'); fs.mkdirSync(screenshotDir, {recursive: true});
