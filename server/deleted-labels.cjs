@@ -5,6 +5,8 @@ const {can} = require('./permissions.cjs');
 const {createTaskPhotos, jpeg} = require('./task-photos.cjs');
 const labelReader = require('./label-reader.cjs');
 const DAY = 86400000, LIMIT_BYTES = 200 * 1024 * 1024;
+// The reading copy is sharper than the stored photo and is never saved.
+const READ_EDGE = 2400, READ_BYTES = 1536 * 1024;
 function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reader = labelReader.read} = {}) {
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS deleted_labels(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);`);
@@ -19,7 +21,7 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
   async function read(input, user) {
     access(user);
     if (!input || typeof input !== 'object' || Object.keys(input).some(key => key !== 'photo')) throw problem(400, 'INVALID_LABEL');
-    return {fields: await reader(jpeg(input.photo).content)};
+    return {fields: await reader(jpeg(input.photo, {maxBytes: READ_BYTES, maxEdge: READ_EDGE}).content)};
   }
   function fields(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !labelReader.FIELDS.includes(key))) throw problem(400, 'INVALID_LABEL');

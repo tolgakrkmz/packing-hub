@@ -88,5 +88,5 @@ function photoPicker(prefix) {
   input.addEventListener('change', choose); camera.addEventListener('change', choose); clear.addEventListener('click', () => { if (!isBusy()) { clearFeedback(); reset([], original?.item, original?.recurring, expected); } });
   return {reset, render, get values() { return entries.map(entry => entry.photo ? {id: entry.photo.id} : entry.data); }, get count() { return entries.length; }, get valid() { return entries.every(entry => !entry.photo || entry.photo.available); }, get pending() { return pending; }, get failed() { return failed; }};
 }
-  return {photoViews, photoPicker};
+  return {photoViews, photoPicker, withoutMetadata};
 }

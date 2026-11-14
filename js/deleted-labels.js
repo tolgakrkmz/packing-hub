@@ -3,10 +3,11 @@
   const $ = id => document.getElementById(id);
   if (typeof HubServer === 'undefined') { $('labelMessage').textContent = 'Грешни етикети са достъпни в сървърната версия след вход с личен акаунт.'; return; }
   const manager = HubServer.can('canManageDeletedLabels');
+  const READ_EDGE = 2400, READ_BYTES = 1536 * 1024; // matches the server's reading limits
   let state = null, busy = false, requestKey = null, sequence = 0, reading = null, readFields = null;
   function el(tag, text = '', cls = '', custom = false) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; if (custom) node.setAttribute('translate', 'no'); return node; }
   function button(label, fn, cls = 'secondary') { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', fn); return node; }
-  const {photoPicker} = createTaskPhotos({$, el, button, photoObserver: null, observePhotos() {}, forgetPhotos() {}, getState: () => state, isBusy: () => busy});
+  const {photoPicker, withoutMetadata} = createTaskPhotos({$, el, button, photoObserver: null, observePhotos() {}, forgetPhotos() {}, getState: () => state, isBusy: () => busy});
   const picker = photoPicker('label');
   const english = () => typeof HubI18n !== 'undefined' && HubI18n.language === 'en';
   const time = at => new Date(at).toLocaleString(english() ? 'en-GB' : 'bg-BG', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
@@ -93,6 +94,23 @@
     catch (error) { $('labelMessage').textContent = failure(error); }
     finally { busy = false; await refresh(); }
   }
+  // The server reads a sharper copy than the one stored, so small label text survives a photo taken from further away.
+  let chosenFile = null;
+  for (const id of ['labelPhoto', 'labelCamera']) $(id).addEventListener('change', event => { chosenFile = event.target.files[0] || null; });
+  async function readingCopy(file, fallback) {
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, READ_EDGE / Math.max(bitmap.width, bitmap.height)), canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [.85, .75, .65]) {
+        const data = withoutMetadata(canvas.toDataURL('image/jpeg', quality)).split(',')[1];
+        if (data.length * 3 / 4 <= READ_BYTES) return data;
+      }
+    } catch {} finally { bitmap?.close(); }
+    return fallback;
+  }
   // When the photo is ready the server reads it; the lead then checks only the Pallet No.
   async function readPhoto() {
     const [photo] = picker.values;
@@ -101,7 +119,7 @@
     if (reading === photo || readFields?.photo === photo) return;
     reading = photo; $('labelRead').hidden = false; $('labelPallet').value = ''; $('labelPallet').disabled = true; $('labelReadInfo').textContent = 'Четене на етикета…';
     let fields = {}, problem = '';
-    try { fields = (await HubServer.send('/api/deleted-labels/read', 'POST', {photo})).fields; } catch (error) { problem = failure(error); }
+    try { const copy = chosenFile ? await readingCopy(chosenFile, photo) : photo; fields = (await HubServer.send('/api/deleted-labels/read', 'POST', {photo: copy})).fields; } catch (error) { problem = failure(error); }
     if (reading !== photo) return;
     reading = null; readFields = {photo, fields}; $('labelPallet').disabled = false; $('labelPallet').value = fields.palletNo || '';
     const others = [fields.productionOrder, fields.customer].filter(Boolean).join(' · ');

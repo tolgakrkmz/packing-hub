@@ -1910,6 +1910,7 @@ Object.assign(HUB_EN_MESSAGES, {
   "Pallet No не се прочете. Въведи го от етикета.": "The Pallet No could not be read. Type it from the label.",
   "Изчакай етикетът да се прочете.": "Wait until the label is read.",
   "Въведи Pallet No от етикета.": "Type the Pallet No from the label.",
+  "📷 Снимай отблизо — етикетът да запълва кадъра.": "📷 Take it close up — let the label fill the frame.",
   "Сървърът чете други етикети. Въведи Pallet No ръчно.": "The server is reading other labels. Type the Pallet No by hand.",
   "Списък на етикетите": "Label list",
   "Търси по Pallet No, поръчка, клиент…": "Search by Pallet No, order, customer…",
