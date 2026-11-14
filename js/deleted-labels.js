@@ -10,6 +10,13 @@
   const picker = photoPicker('label');
   const english = () => typeof HubI18n !== 'undefined' && HubI18n.language === 'en';
   const time = at => new Date(at).toLocaleString(english() ? 'en-GB' : 'bg-BG', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  const stamp = at => new Date(at).toLocaleString(english() ? 'en-GB' : 'bg-BG', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+  // How long a label has waited; the list refreshes every minute, so this stays current.
+  function age(at) {
+    const minutes = Math.max(0, Math.floor((Date.now() - at) / 60000)), days = Math.floor(minutes / 1440), hours = Math.floor(minutes % 1440 / 60);
+    const parts = english() ? [days && days + ' d', (days || hours) && hours + ' h', !days && minutes % 60 + ' min'] : [days && days + ' д', (days || hours) && hours + ' ч', !days && minutes % 60 + ' мин'];
+    return (english() ? 'waiting ' : 'чака ') + parts.filter(Boolean).join(' ');
+  }
   const failure = error => error.status ? error.message : 'Връзката със сървъра е прекъсната. Опитай отново.';
   // A retried save reuses its request id, so a lost response never adds the same label twice.
   function keyed(payload) {
@@ -24,8 +31,12 @@
       img.alt = 'Снимка на етикет'; img.loading = 'lazy'; img.width = item.photo.width; img.height = item.photo.height; img.src = url;
       open.setAttribute('aria-label', 'Отвори снимката'); open.append(img); node.append(open);
     }
+    // Date and waiting time first: the oldest label should be deleted first.
+    const when = el('p', '', 'label-age' + (pending && Date.now() - item.createdAt > 86400000 ? ' is-old' : ''), true);
+    when.append(el('strong', '📅 ' + stamp(item.createdAt)), ...(pending ? [el('span', age(item.createdAt))] : []));
+    node.append(when);
     if (item.text) node.append(el('p', item.text, 'label-text', true));
-    node.append(el('p', item.createdBy.username + ' · ' + time(item.createdAt) + (pending ? '' : ' · ✓ ' + item.deletedBy.username + ' · ' + time(item.deletedAt)), 'task-meta', true));
+    node.append(el('p', item.createdBy.username + (pending ? '' : ' · ✓ ' + item.deletedBy.username + ' · ' + time(item.deletedAt)), 'task-meta', true));
     if (manager) {
       const actions = el('div', '', 'label-actions');
       actions.append(pending ? button('✓ Изтрит', () => act(item, 'delete'), '') : button('Върни', () => act(item, 'reopen')),
@@ -37,7 +48,7 @@
   function render() {
     if (!state) return;
     const by = status => state.items.filter(item => item.status === status);
-    const pending = by('pending').sort((a, b) => b.createdAt - a.createdAt), deleted = by('deleted').sort((a, b) => b.deletedAt - a.deletedAt);
+    const pending = by('pending').sort((a, b) => a.createdAt - b.createdAt), deleted = by('deleted').sort((a, b) => b.deletedAt - a.deletedAt);
     const heading = el('h2'); heading.append(el('span', 'За изтриване'), el('span', String(pending.length), 'task-badge'));
     $('labelList').replaceChildren(heading, ...(pending.length ? pending.map(card) : [el('div', 'Няма етикети за изтриване.', 'task-empty')]));
     $('deletedSection').hidden = !deleted.length; $('deletedCount').textContent = String(deleted.length);

@@ -14,3 +14,6 @@
 .label-deleted summary{cursor:pointer;font-weight:600;padding:8px 4px}
 .label-deleted .label-card{opacity:.75;border-left-color:var(--teal)}
 @media(max-width:650px){.label-group{grid-template-columns:1fr}}
+.label-age{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;margin:10px 0 0;font-size:15px}
+.label-age span{padding:2px 10px;border-radius:999px;background:var(--panel-2);font-weight:700}
+.label-age.is-old span{background:var(--coral);color:#1a0d0a}
