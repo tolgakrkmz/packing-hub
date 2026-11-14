@@ -1,7 +1,7 @@
 /* Labels to be deleted: the photo is read on the server, the lead checks only the Pallet No. Nothing is stored in the browser. */
 (() => {
   const $ = id => document.getElementById(id);
-  if (typeof HubServer === 'undefined') { $('labelMessage').textContent = 'Изтрити етикети са достъпни в сървърната версия след вход с личен акаунт.'; return; }
+  if (typeof HubServer === 'undefined') { $('labelMessage').textContent = 'Грешни етикети са достъпни в сървърната версия след вход с личен акаунт.'; return; }
   const manager = HubServer.can('canManageDeletedLabels');
   let state = null, busy = false, requestKey = null, sequence = 0, reading = null, readFields = null;
   function el(tag, text = '', cls = '', custom = false) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; if (custom) node.setAttribute('translate', 'no'); return node; }
