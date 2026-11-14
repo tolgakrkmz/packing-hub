@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {parse} = require('../server/label-reader.cjs');
+const {parse, oneAtATime} = require('../server/label-reader.cjs');
 // Fictional label text; the layout is an assumption until it is checked against Tesseract output of a real label.
 const text = `Customer: Delivery Address
 Fictional Customer Ltd
@@ -25,4 +25,13 @@ test('the QR code wins for the pallet; OCR letter-for-digit slips in numbers are
 });
 test('an unreadable photo gives empty fields, never an error', () => {
   assert.deepEqual(Object.values(parse('')), ['', '', '', '', '', '', '']);
+});
+test('photos are read one at a time and a long queue is refused', async () => {
+  let running = 0, most = 0;
+  const read = oneAtATime(async n => { running++; most = Math.max(most, running); await new Promise(r => setTimeout(r, 5)); running--; return n; }, 3);
+  const results = await Promise.allSettled([1, 2, 3, 4].map(read));
+  assert.equal(most, 1);
+  assert.deepEqual(results.map(r => r.status), ['fulfilled', 'fulfilled', 'fulfilled', 'rejected']);
+  assert.equal(results[3].reason.code, 'LABEL_READ_BUSY');
+  assert.equal(await read(5), 5, 'the queue frees up after the work is done');
 });

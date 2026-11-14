@@ -100,12 +100,12 @@
     if (typeof photo !== 'string') { reading = null; readFields = null; $('labelRead').hidden = true; $('labelReadInfo').textContent = ''; return; }
     if (reading === photo || readFields?.photo === photo) return;
     reading = photo; $('labelRead').hidden = false; $('labelPallet').value = ''; $('labelPallet').disabled = true; $('labelReadInfo').textContent = 'Четене на етикета…';
-    let fields = {};
-    try { fields = (await HubServer.send('/api/deleted-labels/read', 'POST', {photo})).fields; } catch (error) { $('labelReadInfo').textContent = failure(error); }
+    let fields = {}, problem = '';
+    try { fields = (await HubServer.send('/api/deleted-labels/read', 'POST', {photo})).fields; } catch (error) { problem = failure(error); }
     if (reading !== photo) return;
     reading = null; readFields = {photo, fields}; $('labelPallet').disabled = false; $('labelPallet').value = fields.palletNo || '';
     const others = [fields.productionOrder, fields.customer].filter(Boolean).join(' · ');
-    $('labelReadInfo').textContent = fields.palletNo ? 'Прочетено от снимката' + (others ? ': ' + others : '.') : 'Pallet No не се прочете. Въведи го от етикета.';
+    $('labelReadInfo').textContent = fields.palletNo ? 'Прочетено от снимката' + (others ? ': ' + others : '.') : problem || 'Pallet No не се прочете. Въведи го от етикета.';
     if (!fields.palletNo) $('labelPallet').focus();
   }
   new MutationObserver(readPhoto).observe($('labelPhotoInfo'), {childList: true, characterData: true, subtree: true});

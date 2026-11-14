@@ -1,6 +1,7 @@
 /* Reads the fields of a packing label photo on the server: zbar for the QR code, Tesseract for the printed text. */
 const {execFile} = require('node:child_process');
 const fs = require('node:fs/promises'), os = require('node:os'), path = require('node:path');
+const {problem} = require('./store.cjs');
 const FIELDS = ['palletNo', 'productionOrder', 'customer', 'grossWt', 'netWt', 'length', 'pieces'];
 // A missing program or a failed read leaves the fields empty; the lead then types the pallet.
 const run = (command, args) => new Promise(resolve => execFile(command, args, {timeout: 20000, maxBuffer: 1024 * 1024, encoding: 'utf8'}, (error, stdout) => resolve(error ? '' : stdout)));
@@ -27,7 +28,7 @@ function parse(text, qr = '') {
   return result;
 }
 // The photo goes to a private temporary file (the container's /tmp is in memory) and is removed right after reading.
-async function read(jpeg) {
+async function readNow(jpeg) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'label-')), file = path.join(dir, 'label.jpg');
   try {
     await fs.writeFile(file, jpeg, {mode: 0o600});
@@ -35,4 +36,16 @@ async function read(jpeg) {
     return parse(text, qr);
   } finally { await fs.rm(dir, {recursive: true, force: true}); }
 }
-module.exports = {read, parse, FIELDS};
+// OCR is CPU-heavy: photos are read one at a time and a long queue is refused instead of overloading the server.
+function oneAtATime(work, max = 4) {
+  let queue = Promise.resolve(), waiting = 0;
+  return async input => {
+    if (waiting >= max) throw problem(503, 'LABEL_READ_BUSY');
+    waiting++;
+    const turn = queue.then(() => work(input));
+    queue = turn.catch(() => {});
+    try { return await turn; } finally { waiting--; }
+  };
+}
+const read = oneAtATime(readNow);
+module.exports = {read, parse, oneAtATime, FIELDS};
