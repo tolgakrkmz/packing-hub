@@ -62,7 +62,8 @@ function verifyDatabase(filename) {
     if (tables.has('team_ratings')) db.prepare('SELECT count(*) FROM team_ratings').get();
     // The wall is additive as well; reading the BLOBs proves the photos are intact.
     if (tables.has('wall_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM wall_photos').get();
-    for (const table of ['wall_posts', 'wall_comments', 'wall_reactions']) if (tables.has(table)) db.prepare(`SELECT count(*) FROM ${table}`).get();
+    if (tables.has('label_photos')) db.prepare('SELECT count(*),sum(length(content)) FROM label_photos').get();
+    for (const table of ['deleted_labels', 'wall_posts', 'wall_comments', 'wall_reactions']) if (tables.has(table)) db.prepare(`SELECT count(*) FROM ${table}`).get();
     for (const table of ['task_items', 'task_schedules']) {
       for (const row of db.prepare(`SELECT data FROM ${table}`).iterate()) JSON.parse(row.data);
     }
