@@ -18,13 +18,14 @@ function parse(text, qr = '') {
   const at = lines.findIndex(line => /customer\s*:/i.test(line));
   if (at >= 0) {
     const same = lines[at].replace(/.*customer\s*:/i, '').replace(/delivery.*$/i, '').trim();
-    result.customer = clean(same || (lines[at + 1] || '').split(/\s{2,}|\s(?=Aleja|ul\.|Str|Delivery)/i)[0]);
+    result.customer = clean(/\p{L}{2}/u.test(same) ? same : (lines[at + 1] || '').split(/\s{2,}|\s(?=Aleja|ul\.|Str|Delivery)/i)[0]);
   }
   // Weights follow the packing date; length and pieces follow the 8-digit cast number.
-  const weights = all.match(/\d{4}-\d{2}-\d{2}\s+([0-9.,]+)\s+([0-9.,]+)/);
-  if (weights) [result.grossWt, result.netWt] = [weights[1], weights[2]];
-  const cast = all.match(/\b\d{8}\s+([0-9.,]+)\s+([0-9.,]+)/);
-  if (cast) [result.length, result.pieces] = [cast[1], cast[2]];
+  // The small right-hand column often reads only in part, so each number is taken on its own and a missing one stays empty.
+  const weights = all.match(/\d{4}[-.]\d{2}[-.]\d{2}[ \t]+(\d{1,5})(?:[ \t]+(\d{1,5})\b)?/);
+  if (weights) [result.grossWt, result.netWt] = [weights[1], weights[2] || ''];
+  const cast = all.match(/\b\d{8}[ \t]+(\d{3,5})(?:[ \t]+(\d{1,5})\b)?/);
+  if (cast) [result.length, result.pieces] = [cast[1], cast[2] || ''];
   return result;
 }
 // The photo goes to a private temporary file (the container's /tmp is in memory) and is removed right after reading.

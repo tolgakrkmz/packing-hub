@@ -18,10 +18,37 @@ PA00000001`;
 test('label fields are read from the printed text', () => {
   assert.deepEqual(parse(text), {palletNo: 'PA00000001', productionOrder: 'DP0000001_00001', customer: 'Fictional Customer Ltd', grossWt: '120', netWt: '110', length: '3000', pieces: '50'});
 });
+// Same layout as Tesseract's default output for a real angled phone photo: the right column is partly lost.
+const angled = `Customer:
+Fictional Customer Ltd Delivery Address
+
+Example Street 1
+Purchase Order No. Sampletown
+
+4500000001 3
+
+Type of Production
+: Packi
+Drawing profile 1 AE i
+500-0000/6063/T6 Cast No. Length ie
+/C1 SB 40000001 3000 om
+
+Production Order/Contract Ref.Customer No
+DP0000001_00001 XX1 - 0001
+
+Pallet No
+
+PA00000001`;
+test('an angled photo still gives pallet, order, customer and length; unread numbers stay empty', () => {
+  assert.deepEqual(parse(angled, 'PA00000001'), {palletNo: 'PA00000001', productionOrder: 'DP0000001_00001', customer: 'Fictional Customer Ltd', grossWt: '', netWt: '', length: '3000', pieces: ''});
+});
 test('the QR code wins for the pallet; OCR letter-for-digit slips in numbers are repaired', () => {
   assert.equal(parse('Pallet No\nPA0000O00l', 'PA00000009').palletNo, 'PA00000009');
   assert.equal(parse('Pallet No\nPA0000O00l').palletNo, 'PA00000001');
   assert.equal(parse('DPOOO0001_0000l').productionOrder, 'DP0000001_00001');
+});
+test('noise after the Customer heading is skipped', () => {
+  assert.equal(parse('Customer: -\nFictional Customer Ltd Delivery Address').customer, 'Fictional Customer Ltd');
 });
 test('an unreadable photo gives empty fields, never an error', () => {
   assert.deepEqual(Object.values(parse('')), ['', '', '', '', '', '', '']);
