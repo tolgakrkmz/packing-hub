@@ -19,10 +19,13 @@
 <form id="labelForm" class="label-composer" hidden>
 <h2>Нов етикет за изтриване</h2>
 <fieldset class="task-photo-picker"><legend>Снимка на етикета (задължителна)</legend><div class="task-fields"><label>Снимай<input id="labelCamera" type="file" accept="image/*" capture="environment"></label><label>Избери снимка<input id="labelPhoto" type="file" accept="image/*"></label></div><p id="labelPhotoCount" class="task-muted" role="status" translate="no" hidden></p><div id="labelPhotoPreview" class="task-photo-choices"></div><p id="labelPhotoInfo" class="task-muted" role="status"></p><button id="labelPhotoClear" type="button" class="secondary" hidden>Премахни избора</button></fieldset>
-<label>Бележка (по желание)<input id="labelText" maxlength="300" placeholder="напр. номер на етикета или причина"></label>
+<div id="labelRead" class="label-read" hidden><label>Pallet No — провери дали е като на етикета<input id="labelPallet" maxlength="120" autocomplete="off" translate="no"></label><p id="labelReadInfo" class="task-muted" role="status"></p></div>
 <p id="actionFeedback" class="task-error" role="status"></p><div class="task-actions"><button type="submit">Добави етикета</button></div>
 </form>
 <section id="labelList" class="label-group" aria-live="polite"></section>
-<details id="deletedSection" class="label-deleted" hidden><summary>Изтрити <span id="deletedCount" class="task-badge"></span></summary><div id="deletedList" class="label-group"></div></details>
+<details id="recordSection" class="label-records"><summary>Списък на етикетите <span id="recordCount" class="task-badge"></span></summary>
+<label class="label-search">Търси по Pallet No, поръчка, клиент…<input id="recordSearch" type="search" autocomplete="off"></label>
+<div class="label-table-scroll"><table class="label-table"><thead><tr><th>Pallet No</th><th>Production Order</th><th>Customer</th><th>Gross Wt.</th><th>Net Wt.</th><th>Length</th><th>Pieces</th><th>Добавен</th><th>Състояние</th></tr></thead><tbody id="recordList"></tbody></table></div>
+<p id="recordEmpty" class="task-muted" hidden>Няма намерени етикети.</p></details>
 <dialog id="taskPhotoViewer" class="task-dialog task-photo-viewer"><div class="dialog-heading"><h2 id="photoViewerTitle">Снимка на етикет</h2><button type="button" data-close="taskPhotoViewer" class="secondary" aria-label="Затвори">×</button></div><img id="photoViewerImage" alt=""><p id="photoViewerFeedback" role="status"></p></dialog>
 </main></body></html>

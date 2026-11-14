@@ -1,6 +1,8 @@
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production HUB_DATABASE=/var/lib/package-hub/hub.sqlite
 WORKDIR /app
+# Label photos are read on the server: Tesseract for the printed text, zbar for the QR code.
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng zbar-tools && rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node *.html manifest.webmanifest ./
 COPY --chown=node:node css ./css
 COPY --chown=node:node js ./js
