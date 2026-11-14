@@ -53,6 +53,7 @@ test('other accounts cannot open the module; bad input is rejected', async t => 
   assert.equal((await s.request('/api/deleted-labels', s.operator)).status, 403);
   assert.equal((await s.request('/api/deleted-labels/read', s.operator, 'POST', {photo})).status, 403);
   assert.equal((await s.request('/api/deleted-labels/read', s.lead, 'POST', {photo: 'not-a-photo'})).status, 400);
+  assert.equal((await s.request('/api/deleted-labels/read', s.lead, 'POST', {photo: 'A'.repeat(2100000)})).status, 413, 'reading copy is bounded');
   assert.equal((await s.request('/deleted-labels', s.operator)).status, 403);
   for (const extra of [{photo: 'not-a-photo', fields}, {photo, fields, text: 'x'.repeat(301)}, {photo, fields, text: 5}, {photo, fields, other: 1}, {photos: [photo], fields}, {photo, fields: {...fields, extra: '1'}}, {photo, fields: {...fields, customer: 'x'.repeat(121)}}, {photo, fields: {...fields, pieces: 5}}]) {
     assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {requestId: randomUUID(), ...extra})).status >= 400, true, JSON.stringify(extra).slice(0, 40));
