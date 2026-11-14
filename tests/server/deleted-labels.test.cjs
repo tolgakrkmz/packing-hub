@@ -4,8 +4,10 @@ const {randomUUID} = require('node:crypto');
 const {createHubServer} = require('../../server/server.cjs');
 const {photo} = require('./task-photo-fixture.cjs');
 const password = 'Fictional-labels-password-123';
+const fields = {palletNo: 'PA00000001', productionOrder: 'DP0000001_00001', customer: 'Fictional Customer Ltd', grossWt: '120', netWt: '110', length: '3000', pieces: '50'};
 async function setup(t, clock = {at: Date.parse('2026-10-26T08:00:00Z')}) {
-  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => clock.at});
+  const reads = [];
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, taskNow: () => clock.at, labelReader: async jpeg => { reads.push(jpeg.length); return {...fields, palletNo: 'PA00000001'}; }});
   await hub.auth.create('demo-admin', password, 'admin');
   await hub.auth.create('demo-lead', password, 'operator', undefined, {}, () => {}, {taskSupervisor: true, taskTeam: 'А'});
   await hub.auth.create('demo-operator', password, 'operator');
@@ -16,17 +18,22 @@ async function setup(t, clock = {at: Date.parse('2026-10-26T08:00:00Z')}) {
   const [admin, lead, operator] = await Promise.all(['demo-admin', 'demo-lead', 'demo-operator'].map(login));
   const list = async (user = lead) => (await (await request('/api/deleted-labels', user)).json()).items;
   const change = (item, user, action) => request('/api/deleted-labels/' + item.id, user, 'PATCH', {action, requestId: randomUUID()}, {'If-Match': '"' + item.revision + '"'});
-  return {hub, clock, admin, lead, operator, request, list, change};
+  return {hub, clock, admin, lead, operator, request, list, change, reads};
 }
 test('a shift lead adds a label only with a photo; a manager marks it deleted, undoes and removes it', async t => {
   const s = await setup(t);
-  assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {text: 'Fictional label', requestId: randomUUID()})).status, 400, 'photo is required');
-  const input = {text: 'Fictional label 4521', photo, requestId: randomUUID()};
+  const read = await s.request('/api/deleted-labels/read', s.lead, 'POST', {photo});
+  assert.equal(read.status, 200); assert.deepEqual((await read.json()).fields, fields);
+  assert.equal(s.reads.length, 1); assert.deepEqual(await s.list(), [], 'reading saves nothing');
+  assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {fields, requestId: randomUUID()})).status, 400, 'photo is required');
+  assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo: ' '}, requestId: randomUUID()})).status, 400, 'pallet is required');
+  const input = {text: 'Fictional label 4521', photo, fields: {...fields, palletNo: 'PA00000002'}, requestId: randomUUID()};
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', input)).status, 201);
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', input)).status, 201); // retry with the same id adds nothing
   let [item] = await s.list();
   assert.equal((await s.list()).length, 1);
   assert.deepEqual([item.text, item.status, item.createdBy.username, item.photo.available], ['Fictional label 4521', 'pending', 'demo-lead', true]);
+  assert.deepEqual(item.fields, {...fields, palletNo: 'PA00000002'}, 'the checked pallet replaces the read one');
   const image = await s.request('/api/deleted-labels/' + item.id + '/photos/' + item.photo.id, s.lead);
   assert.equal(image.status, 200); assert.equal(image.headers.get('content-type'), 'image/jpeg');
   assert.equal((await s.change(item, s.lead, 'delete')).status, 403, 'only a manager marks labels');
@@ -44,18 +51,23 @@ test('a shift lead adds a label only with a photo; a manager marks it deleted, u
 test('other accounts cannot open the module; bad input is rejected', async t => {
   const s = await setup(t);
   assert.equal((await s.request('/api/deleted-labels', s.operator)).status, 403);
+  assert.equal((await s.request('/api/deleted-labels/read', s.operator, 'POST', {photo})).status, 403);
+  assert.equal((await s.request('/api/deleted-labels/read', s.lead, 'POST', {photo: 'not-a-photo'})).status, 400);
   assert.equal((await s.request('/deleted-labels', s.operator)).status, 403);
-  for (const extra of [{photo: 'not-a-photo'}, {photo, text: 'x'.repeat(301)}, {photo, text: 5}, {photo, other: 1}, {photos: [photo]}]) {
+  for (const extra of [{photo: 'not-a-photo', fields}, {photo, fields, text: 'x'.repeat(301)}, {photo, fields, text: 5}, {photo, fields, other: 1}, {photos: [photo], fields}, {photo, fields: {...fields, extra: '1'}}, {photo, fields: {...fields, customer: 'x'.repeat(121)}}, {photo, fields: {...fields, pieces: 5}}]) {
     assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {requestId: randomUUID(), ...extra})).status >= 400, true, JSON.stringify(extra).slice(0, 40));
   }
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'PUT', {})).status, 405);
 });
-test('labels marked deleted are pruned with their photo after 30 days; pending ones stay', async t => {
+test('a deleted label loses its photo after 7 days and its record after a year; pending ones stay', async t => {
   const s = await setup(t);
-  for (const text of ['Fictional A', 'Fictional B']) await s.request('/api/deleted-labels', s.lead, 'POST', {text, photo, requestId: randomUUID()});
-  const done = (await s.list()).find(item => item.text === 'Fictional A');
+  for (const palletNo of ['PA00000011', 'PA00000012']) await s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo}, requestId: randomUUID()});
+  const done = (await s.list()).find(item => item.fields.palletNo === 'PA00000011');
   await s.change(done, s.admin, 'delete');
-  s.clock.at += 31 * 86400000; s.hub.deletedLabels.prune();
-  assert.deepEqual((await s.list()).map(item => item.text), ['Fictional B']);
+  s.clock.at += 8 * 86400000; s.hub.deletedLabels.prune();
+  const kept = (await s.list()).find(item => item.fields.palletNo === 'PA00000011');
+  assert.deepEqual([kept.status, kept.photo.available], ['deleted', false], 'record stays searchable without the photo');
   assert.equal(s.hub.store.db.prepare('SELECT count(*) AS n FROM label_photos').get().n, 1);
+  s.clock.at += 360 * 86400000; s.hub.deletedLabels.prune();
+  assert.deepEqual((await s.list()).map(item => item.fields.palletNo), ['PA00000012']);
 });

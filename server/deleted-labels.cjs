@@ -1,10 +1,11 @@
-/* Labels to be deleted: anyone with access adds one with a required photo; a manager marks it deleted or removes it. */
+/* Labels to be deleted: a shift lead adds a label photo, the server reads its fields, a manager marks it deleted or removes it. */
 const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
-const {createTaskPhotos} = require('./task-photos.cjs');
+const {createTaskPhotos, jpeg} = require('./task-photos.cjs');
+const labelReader = require('./label-reader.cjs');
 const DAY = 86400000, LIMIT_BYTES = 200 * 1024 * 1024;
-function createDeletedLabels(store, {now = Date.now, photos: photoOptions} = {}) {
+function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reader = labelReader.read} = {}) {
   const {db} = store;
   db.exec(`CREATE TABLE IF NOT EXISTS deleted_labels(id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 1, data TEXT NOT NULL);`);
   const requests = store.requestLog('deleted_label_requests', 'INVALID_LABEL', now), idempotent = requests.run;
@@ -14,6 +15,22 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions} = {})
   const manager = user => { access(user); if (!can(user, 'canManageDeletedLabels')) throw problem(403, 'FORBIDDEN'); };
   const actor = user => ({id: user.id, username: user.username});
   const shape = found => { const item = JSON.parse(found.data); return {...item, id: found.id, revision: found.revision, photo: {...item.photo, available: photos.exists(item.photo.id)}}; };
+  // Reading saves nothing: the lead checks the pallet number before the label is added.
+  async function read(input, user) {
+    access(user);
+    if (!input || typeof input !== 'object' || Object.keys(input).some(key => key !== 'photo')) throw problem(400, 'INVALID_LABEL');
+    return {fields: await reader(jpeg(input.photo).content)};
+  }
+  function fields(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !labelReader.FIELDS.includes(key))) throw problem(400, 'INVALID_LABEL');
+    const result = Object.fromEntries(labelReader.FIELDS.map(key => {
+      const value = input[key] ?? '';
+      if (typeof value !== 'string' || value.length > 120) throw problem(400, 'INVALID_LABEL');
+      return [key, value.trim()];
+    }));
+    if (!result.palletNo) throw problem(400, 'LABEL_PALLET_REQUIRED');
+    return result;
+  }
   function row(id) {
     const found = db.prepare('SELECT * FROM deleted_labels WHERE id=?').get(id);
     if (!found) throw problem(404, 'NOT_FOUND');
@@ -25,12 +42,13 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions} = {})
   }
   function create(input, user) {
     access(user);
-    if (!input || typeof input !== 'object' || Object.keys(input).some(key => !['requestId', 'text', 'photo'].includes(key))) throw problem(400, 'INVALID_LABEL');
+    if (!input || typeof input !== 'object' || Object.keys(input).some(key => !['requestId', 'text', 'photo', 'fields'].includes(key))) throw problem(400, 'INVALID_LABEL');
     if (typeof (input.text ?? '') !== 'string' || (input.text ?? '').length > 300) throw problem(400, 'INVALID_LABEL');
     if (typeof input.photo !== 'string') throw problem(400, 'TASK_PHOTO_REQUIRED');
+    const values = fields(input.fields);
     return idempotent(input, user, () => {
       const id = randomUUID(), at = now();
-      db.prepare('INSERT INTO deleted_labels(id,data) VALUES(?,?)').run(id, JSON.stringify({text: (input.text ?? '').trim(), photo: photos.add(input.photo, at), createdAt: at, createdBy: actor(user), status: 'pending', deletedAt: null, deletedBy: null}));
+      db.prepare('INSERT INTO deleted_labels(id,data) VALUES(?,?)').run(id, JSON.stringify({text: (input.text ?? '').trim(), fields: values, photo: photos.add(input.photo, at), createdAt: at, createdBy: actor(user), status: 'pending', deletedAt: null, deletedBy: null}));
       store.audit(user, 'deleted-label-create', 'deleted-labels');
       return {id};
     });
@@ -61,17 +79,20 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions} = {})
     if (!found) throw problem(404, 'NOT_FOUND');
     return Buffer.from(found.content);
   }
-  // Labels marked deleted are kept 30 days so the mark can still be checked or undone; request ids follow the 90-day window.
+  // After a label is marked deleted its photo is kept 7 days and its record a year, so it can still be searched.
+  // shortcut: the whole list is sent to the page and searched there, fine for a few thousand records a year; move search to the server when it grows.
   function prune() {
     store.transaction(() => {
-      const cutoff = now() - 30 * DAY;
+      const at = now();
       for (const found of db.prepare('SELECT id,data FROM deleted_labels').all()) {
         const item = JSON.parse(found.data);
-        if (item.deletedAt && item.deletedAt < cutoff) { db.prepare('DELETE FROM deleted_labels WHERE id=?').run(found.id); db.prepare('DELETE FROM label_photos WHERE id=?').run(item.photo.id); }
+        if (!item.deletedAt) continue;
+        if (item.deletedAt < at - 7 * DAY) db.prepare('DELETE FROM label_photos WHERE id=?').run(item.photo.id);
+        if (item.deletedAt < at - 365 * DAY) db.prepare('DELETE FROM deleted_labels WHERE id=?').run(found.id);
       }
-      requests.prune(now() - 90 * DAY);
+      requests.prune(at - 90 * DAY);
     });
   }
-  return {list, create, change, photo, prune};
+  return {list, read, create, change, photo, prune};
 }
 module.exports = {createDeletedLabels};

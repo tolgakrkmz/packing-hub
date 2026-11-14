@@ -23,7 +23,7 @@ const {createActivity} = require('./activity.cjs');
 const {createShiftCloseout} = require('./shift-closeout.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, productionNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, productionNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions, labelReader}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename,{personnelNow,productionNow});
@@ -33,7 +33,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const activity = createActivity(store);
   const tasks = createTasks(store, {timezone: taskTimezone, ...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const problems = createProblems(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
-  const deletedLabels = createDeletedLabels(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
+  const deletedLabels = createDeletedLabels(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos, ...(labelReader ? {reader: labelReader} : {})});
   const wall = createWall(store, {...(taskNow ? {now: taskNow} : {}), photos: taskPhotos});
   const teamRatings = createTeamRatings(store, productionNow ? {now: productionNow} : {});
   const statistics = createStatisticsReads(store);
@@ -374,6 +374,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
           const content = deletedLabels.photo(labelPhoto[1], labelPhoto[2], currentUser());
           response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length});
           return response.end(request.method === 'HEAD' ? undefined : content);
+        }
+        if (pathname === '/api/deleted-labels/read') {
+          if (request.method !== 'POST') throw problem(405, 'METHOD_REJECTED');
+          return json(response, 200, await deletedLabels.read(await jsonBody(request, taskPhotoRequestBytes), currentUser()));
         }
         const labelRoute = pathname.match(/^\/api\/deleted-labels(?:\/([0-9a-f-]{36}))?$/);
         if (labelRoute) {
