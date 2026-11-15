@@ -393,6 +393,7 @@ function renderAll() {
     document.getElementById('downtimeScopeTitle').textContent = `Престой на автоматична линия — ${scopeLabel}`;
     const rows = annual ? aggregateAvByMonth(selectedYear) : aggregateAvByYear();
     renderAvKpis(rows, annual ? 'месец' : 'година');
+    renderAvPareto(annual ? selectedYear + '-' : '', scopeLabel);
     renderAvTable(rows, annual ? `месец (${selectedYear})` : 'година');
   });
   renderOverview();

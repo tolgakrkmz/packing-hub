@@ -123,6 +123,10 @@
 .av-reason-records{list-style:none;padding:0 10px 8px 26px;margin:0;}
 .av-reason-records li{padding:7px 0;border-top:1px solid var(--border);}
 .av-record-meta{font-size:10px;color:var(--text-muted);line-height:1.5;}
+.av-pareto{margin-bottom:18px;}
+.av-pareto-bar{display:block;height:6px;margin-top:5px;border-radius:3px;background:var(--text-muted);opacity:.45;}
+.av-pareto-table tr.leading .av-pareto-bar{background:var(--amber);opacity:1;}
+.av-pareto-table tr.leading td:first-child{font-weight:650;}
 .av-record-note{font-size:12px;line-height:1.5;margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere;}
 @media(max-width:520px){
   .av-reasons summary,.av-reason-group summary{flex-wrap:wrap;}
@@ -628,6 +632,11 @@
       <h2 id="downtimeScopeTitle">Престой на автоматична линия</h2>
       <div class="kpi-row" id="avKpiRow"></div>
       <div class="conn-note" id="avHint" style="margin-bottom:14px;"></div>
+      <section class="av-pareto" id="avPareto" aria-labelledby="avParetoTitle" hidden>
+        <h2 id="avParetoTitle">Водещи причини</h2>
+        <p class="conn-note">Причините са подредени по минути престой. Оранжевите заедно дават около 80% от престоя — с тях започни.</p>
+        <div id="avParetoContainer" style="overflow-x:auto;"></div>
+      </section>
       <details class="stats-details">
         <summary>Покажи периодите и причините</summary>
       <h2 id="avTableTitle">Разбивка</h2>
