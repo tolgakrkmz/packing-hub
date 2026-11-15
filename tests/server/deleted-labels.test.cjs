@@ -72,7 +72,7 @@ test('a deleted label loses its photo after 7 days and its record after a year; 
   s.clock.at += 360 * 86400000; s.hub.deletedLabels.prune();
   assert.deepEqual((await s.list()).map(item => item.fields.palletNo), ['PA00000012']);
 });
-test('a pallet waits only once, typed spacing and case do not matter, and photos are cacheable', async t => {
+test('a pallet waits only once, typed spacing and case do not matter, and photos are revalidated', async t => {
   const s = await setup(t);
   const add = palletNo => s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo}, requestId: randomUUID()});
   assert.equal((await add(' pa 00000021 ')).status, 201);
@@ -82,6 +82,9 @@ test('a pallet waits only once, typed spacing and case do not matter, and photos
   assert.equal(duplicate.status, 409); assert.equal((await duplicate.json()).error, 'LABEL_DUPLICATE');
   await s.change(item, s.admin, 'delete');
   assert.equal((await add('PA00000021')).status, 201, 'a new wrong label is allowed once the old one is deleted');
-  const image = await s.request('/api/deleted-labels/' + item.id + '/photos/' + item.photo.id, s.lead);
-  assert.match(image.headers.get('cache-control'), /private.*immutable/);
+  const url = '/api/deleted-labels/' + item.id + '/photos/' + item.photo.id, image = await s.request(url, s.lead);
+  assert.equal(image.headers.get('cache-control'), 'private, no-cache', 'access is checked on every view');
+  const tag = image.headers.get('etag');
+  assert.equal((await s.request(url, s.lead, 'GET', undefined, {'If-None-Match': tag})).status, 304, 'an unchanged photo is not sent again');
+  assert.equal((await s.request(url, s.operator, 'GET', undefined, {'If-None-Match': tag})).status, 403, 'a cached copy never skips the permission check');
 });

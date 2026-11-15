@@ -372,8 +372,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (labelPhoto) {
           if (!['GET', 'HEAD'].includes(request.method)) throw problem(405, 'METHOD_REJECTED');
           const content = deletedLabels.photo(labelPhoto[1], labelPhoto[2], currentUser());
-          // A photo id never changes content, so the page can redraw cards without downloading photos again.
-          response.writeHead(200, {'Content-Type': 'image/jpeg', 'Content-Length': content.length, 'Cache-Control': 'private, max-age=604800, immutable'});
+          // The browser asks every time, so access is checked again, but an unchanged photo is answered without its bytes.
+          const tag = '"' + labelPhoto[2] + '"', headers = {'Cache-Control': 'private, no-cache', ETag: tag};
+          if (request.headers['if-none-match'] === tag) { response.writeHead(304, headers); return response.end(); }
+          response.writeHead(200, {...headers, 'Content-Type': 'image/jpeg', 'Content-Length': content.length});
           return response.end(request.method === 'HEAD' ? undefined : content);
         }
         if (pathname === '/api/deleted-labels/read') {
