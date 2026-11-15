@@ -73,8 +73,16 @@ async function exerciseStatisticsPeriod({page, expect, replaceSources, screensho
   await page.locator('[data-stats-tab=downtime]').click();
   await expect(page.locator('#avKpiRow')).toContainText('0,5 ч');
   await expect(page.locator('#downtimeScopeTitle')).toContainText('Годишен преглед 2024');
+  await expect(page.locator('#avParetoTitle')).toHaveText('Водещи причини — Годишен преглед 2024');
+  await expect(page.locator('#avParetoContainer tbody tr.leading')).toHaveText(/Fictional period downtime\s*30\s*100%\s*100%/);
   await page.locator('[data-view=year]').click();
   await expect(page.locator('#downtimeScopeTitle')).toContainText('Всички години');
+  await expect(page.locator('#avParetoTitle')).toHaveText('Водещи причини — Всички години');
+  await year.selectOption('2026');
+  await page.locator('[data-view=month]').click();
+  await expect(page.locator('#avPareto')).toBeHidden();
+  await year.selectOption('2024');
+  await page.locator('[data-view=year]').click();
   await expect(month).toHaveValue('02');
   await expect(year).toHaveValue('2024');
   await page.locator('[data-stats-tab=production]').click();

@@ -267,6 +267,50 @@ function renderAvReasons(periodKey, openStates) {
   </td></tr>`;
 }
 
+/* Pareto: reasons by minutes; "leading" rows together reach 80% of the downtime. */
+function calculateDowntimePareto(downtimeEntries, datePrefix) {
+  const groups = new Map();
+  let totalMin = 0;
+  downtimeEntries.forEach(entry => {
+    const minutes = Number(entry.durationMin) || 0;
+    if (!entry.date || !entry.date.startsWith(datePrefix) || minutes <= 0) return;
+    const reason = String(entry.reason || '').trim() || 'Без посочена причина';
+    const group = groups.get(reason) || {reason, durationMin: 0, count: 0};
+    group.durationMin += minutes;
+    group.count += 1;
+    groups.set(reason, group);
+    totalMin += minutes;
+  });
+  let cumulativeMin = 0;
+  const rows = Array.from(groups.values())
+    .sort((a, b) => b.durationMin - a.durationMin || b.count - a.count || a.reason.localeCompare(b.reason, 'bg'))
+    .map(row => {
+      const leading = cumulativeMin * 5 < totalMin * 4; // integer form of "before this row < 80%"
+      cumulativeMin += row.durationMin;
+      return {...row, share: row.durationMin / totalMin * 100, cumulative: cumulativeMin / totalMin * 100, leading};
+    });
+  return {totalMin, rows};
+}
+
+function renderAvPareto(datePrefix, scopeLabel) {
+  const section = document.getElementById('avPareto');
+  const {rows} = statisticsCache.get('downtime-pareto', [avEntries], datePrefix, () => calculateDowntimePareto(avEntries, datePrefix));
+  section.hidden = !rows.length;
+  if (!rows.length) return;
+  document.getElementById('avParetoTitle').textContent = `Водещи причини — ${scopeLabel}`;
+  const widest = rows[0].durationMin;
+  document.getElementById('avParetoContainer').innerHTML =
+    '<table class="stats-table av-pareto-table"><thead><tr><th>Причина</th>' +
+    '<th style="text-align:right">Минути</th><th style="text-align:right">Дял</th><th style="text-align:right">Натрупано</th></tr></thead><tbody>' +
+    rows.map(row => `<tr${row.leading ? ' class="leading"' : ''}>
+      <td><span data-i18n-exact>${escapeHtml(row.reason)}</span><span class="av-pareto-bar" style="width:${(row.durationMin / widest * 100).toFixed(1)}%" aria-hidden="true"></span></td>
+      <td class="num">${fmt(row.durationMin)}</td>
+      <td class="num">${fmt(row.share)}%</td>
+      <td class="num">${fmt(row.cumulative)}%</td>
+    </tr>`).join('') +
+    '</tbody></table>';
+}
+
 function renderAvTable(
   rows,
   periodLabel
