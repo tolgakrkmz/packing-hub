@@ -16,7 +16,7 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
   const access = user => { if (!can(user, 'canViewDeletedLabels')) throw problem(403, 'FORBIDDEN'); };
   const manager = user => { access(user); if (!can(user, 'canManageDeletedLabels')) throw problem(403, 'FORBIDDEN'); };
   const actor = user => ({id: user.id, username: user.username});
-  const shape = found => { const item = JSON.parse(found.data); return {...item, id: found.id, revision: found.revision, photo: {...item.photo, available: photos.exists(item.photo.id)}}; };
+  const shape = (found, has = photos.exists) => { const item = JSON.parse(found.data); return {...item, id: found.id, revision: found.revision, photo: {...item.photo, available: has(item.photo.id)}}; };
   // Reading saves nothing: the lead checks the pallet number before the label is added.
   async function read(input, user) {
     access(user);
@@ -28,7 +28,7 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
     const result = Object.fromEntries(labelReader.FIELDS.map(key => {
       const value = input[key] ?? '';
       if (typeof value !== 'string' || value.length > 120) throw problem(400, 'INVALID_LABEL');
-      return [key, value.trim()];
+      return [key, key === 'palletNo' ? value.replace(/\s+/g, '').toUpperCase() : value.trim()];
     }));
     if (!result.palletNo) throw problem(400, 'LABEL_PALLET_REQUIRED');
     return result;
@@ -40,7 +40,9 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
   }
   function list(user) {
     access(user);
-    return {items: db.prepare('SELECT * FROM deleted_labels').all().map(shape), photoPolicy: {...photos.policy(), maxPhotos: 1}};
+    // One query for which photos still exist, instead of one per label.
+    const available = new Set(db.prepare('SELECT id FROM label_photos').all().map(found => found.id));
+    return {items: db.prepare('SELECT * FROM deleted_labels').all().map(found => shape(found, id => available.has(id))), photoPolicy: {...photos.policy(), maxPhotos: 1}};
   }
   function create(input, user) {
     access(user);
@@ -49,6 +51,8 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
     if (typeof input.photo !== 'string') throw problem(400, 'TASK_PHOTO_REQUIRED');
     const values = fields(input.fields);
     return idempotent(input, user, () => {
+      // Two leads may photograph the same label; only one pending entry per pallet.
+      if (db.prepare("SELECT 1 FROM deleted_labels WHERE json_extract(data,'$.status')='pending' AND json_extract(data,'$.fields.palletNo')=?").get(values.palletNo)) throw problem(409, 'LABEL_DUPLICATE');
       const id = randomUUID(), at = now();
       db.prepare('INSERT INTO deleted_labels(id,data) VALUES(?,?)').run(id, JSON.stringify({text: (input.text ?? '').trim(), fields: values, photo: photos.add(input.photo, at), createdAt: at, createdBy: actor(user), status: 'pending', deletedAt: null, deletedBy: null}));
       store.audit(user, 'deleted-label-create', 'deleted-labels');

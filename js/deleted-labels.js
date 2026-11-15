@@ -12,7 +12,7 @@
   const english = () => typeof HubI18n !== 'undefined' && HubI18n.language === 'en';
   const time = at => new Date(at).toLocaleString(english() ? 'en-GB' : 'bg-BG', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
   const stamp = at => new Date(at).toLocaleString(english() ? 'en-GB' : 'bg-BG', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
-  // How long a label has waited; the list refreshes every minute, so this stays current.
+  // How long a label has waited; the list is redrawn every minute, so this stays current.
   function age(at) {
     const minutes = Math.max(0, Math.floor((Date.now() - at) / 60000)), days = Math.floor(minutes / 1440), hours = Math.floor(minutes % 1440 / 60);
     const parts = english() ? [days && days + ' d', (days || hours) && hours + ' h', !days && minutes % 60 + ' min'] : [days && days + ' д', (days || hours) && hours + ' ч', !days && minutes % 60 + ' мин'];
@@ -55,8 +55,9 @@
     const query = $('recordSearch').value.trim().toLocaleLowerCase('bg');
     const all = [...state.items].sort((a, b) => b.createdAt - a.createdAt);
     const found = query ? all.filter(item => [...COLUMNS.map(key => item.fields?.[key]), item.text, item.createdBy.username].some(value => String(value || '').toLocaleLowerCase('bg').includes(query))) : all;
-    $('recordCount').textContent = String(all.length);
+    $('recordCount').textContent = query ? found.length + ' / ' + all.length : String(all.length);
     $('recordEmpty').hidden = !!found.length;
+    $('recordMore').hidden = found.length <= 300;
     // shortcut: at most 300 rows are drawn; a search narrows the rest.
     $('recordList').replaceChildren(...found.slice(0, 300).map(item => {
       const row = el('tr');
@@ -150,6 +151,7 @@
   $('recordSearch').addEventListener('input', () => { if (state) records(); });
   $('labelForm').hidden = false;
   HubServer.watch('deleted-labels', refresh, draftOpen);
-  setInterval(() => { if (!draftOpen()) refresh(); }, 60000);
+  // Changes arrive through the live connection (and a reconnect reloads); the minute tick only redraws the waiting times.
+  setInterval(render, 60000);
   picker.reset(); refresh();
 })();
