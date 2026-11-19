@@ -26,7 +26,11 @@ test('a shift lead adds a label only with a photo; a manager marks it deleted, u
   assert.equal(read.status, 200); assert.deepEqual((await read.json()).fields, fields);
   assert.equal(s.reads.length, 1); assert.deepEqual(await s.list(), [], 'reading saves nothing');
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {fields, requestId: randomUUID()})).status, 400, 'photo is required');
-  assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo: ' '}, requestId: randomUUID()})).status, 400, 'pallet is required');
+  assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {photo, text: 'Wrong weight', fields: {...fields, palletNo: ' '}, requestId: randomUUID()})).status, 400, 'pallet is required');
+  for (const text of [undefined, '', '   ']) {
+    const missing = await s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields, ...(text === undefined ? {} : {text}), requestId: randomUUID()});
+    assert.equal(missing.status, 400, 'reason is required'); assert.equal((await missing.json()).error, 'LABEL_REASON_REQUIRED');
+  }
   const input = {text: 'Fictional label 4521', photo, fields: {...fields, palletNo: 'PA00000002'}, requestId: randomUUID()};
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', input)).status, 201);
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', input)).status, 201); // retry with the same id adds nothing
@@ -56,13 +60,13 @@ test('other accounts cannot open the module; bad input is rejected', async t => 
   assert.equal((await s.request('/api/deleted-labels/read', s.lead, 'POST', {photo: 'A'.repeat(2100000)})).status, 413, 'reading copy is bounded');
   assert.equal((await s.request('/deleted-labels', s.operator)).status, 403);
   for (const extra of [{photo: 'not-a-photo', fields}, {photo, fields, text: 'x'.repeat(301)}, {photo, fields, text: 5}, {photo, fields, other: 1}, {photos: [photo], fields}, {photo, fields: {...fields, extra: '1'}}, {photo, fields: {...fields, customer: 'x'.repeat(121)}}, {photo, fields: {...fields, pieces: 5}}]) {
-    assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {requestId: randomUUID(), ...extra})).status >= 400, true, JSON.stringify(extra).slice(0, 40));
+    assert.equal((await s.request('/api/deleted-labels', s.lead, 'POST', {requestId: randomUUID(), text: 'Wrong weight', ...extra})).status >= 400, true, JSON.stringify(extra).slice(0, 40));
   }
   assert.equal((await s.request('/api/deleted-labels', s.lead, 'PUT', {})).status, 405);
 });
 test('a deleted label loses its photo after 7 days and its record after a year; pending ones stay', async t => {
   const s = await setup(t);
-  for (const palletNo of ['PA00000011', 'PA00000012']) await s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo}, requestId: randomUUID()});
+  for (const palletNo of ['PA00000011', 'PA00000012']) await s.request('/api/deleted-labels', s.lead, 'POST', {photo, text: 'Wrong weight', fields: {...fields, palletNo}, requestId: randomUUID()});
   const done = (await s.list()).find(item => item.fields.palletNo === 'PA00000011');
   await s.change(done, s.admin, 'delete');
   s.clock.at += 8 * 86400000; s.hub.deletedLabels.prune();
@@ -74,7 +78,7 @@ test('a deleted label loses its photo after 7 days and its record after a year; 
 });
 test('a pallet waits only once, typed spacing and case do not matter, and photos are revalidated', async t => {
   const s = await setup(t);
-  const add = palletNo => s.request('/api/deleted-labels', s.lead, 'POST', {photo, fields: {...fields, palletNo}, requestId: randomUUID()});
+  const add = palletNo => s.request('/api/deleted-labels', s.lead, 'POST', {photo, text: 'Wrong weight', fields: {...fields, palletNo}, requestId: randomUUID()});
   assert.equal((await add(' pa 00000021 ')).status, 201);
   const [item] = await s.list();
   assert.equal(item.fields.palletNo, 'PA00000021', 'pallet is stored without spaces in capitals');

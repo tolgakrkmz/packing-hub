@@ -1,4 +1,4 @@
-/* Labels to be deleted: a shift lead adds a label photo, the server reads its fields, a manager marks it deleted or removes it. */
+/* Labels to be deleted: a shift lead adds a label photo and the reason, the server reads its fields, a manager marks it deleted or removes it. */
 const {randomUUID} = require('node:crypto');
 const {problem} = require('./store.cjs');
 const {can} = require('./permissions.cjs');
@@ -49,12 +49,13 @@ function createDeletedLabels(store, {now = Date.now, photos: photoOptions, reade
     if (!input || typeof input !== 'object' || Object.keys(input).some(key => !['requestId', 'text', 'photo', 'fields'].includes(key))) throw problem(400, 'INVALID_LABEL');
     if (typeof (input.text ?? '') !== 'string' || (input.text ?? '').length > 300) throw problem(400, 'INVALID_LABEL');
     if (typeof input.photo !== 'string') throw problem(400, 'TASK_PHOTO_REQUIRED');
-    const values = fields(input.fields);
+    const values = fields(input.fields), text = (input.text ?? '').trim();
+    if (!text) throw problem(400, 'LABEL_REASON_REQUIRED');
     return idempotent(input, user, () => {
       // Two leads may photograph the same label; only one pending entry per pallet.
       if (db.prepare("SELECT 1 FROM deleted_labels WHERE json_extract(data,'$.status')='pending' AND json_extract(data,'$.fields.palletNo')=?").get(values.palletNo)) throw problem(409, 'LABEL_DUPLICATE');
       const id = randomUUID(), at = now();
-      db.prepare('INSERT INTO deleted_labels(id,data) VALUES(?,?)').run(id, JSON.stringify({text: (input.text ?? '').trim(), fields: values, photo: photos.add(input.photo, at), createdAt: at, createdBy: actor(user), status: 'pending', deletedAt: null, deletedBy: null}));
+      db.prepare('INSERT INTO deleted_labels(id,data) VALUES(?,?)').run(id, JSON.stringify({text, fields: values, photo: photos.add(input.photo, at), createdAt: at, createdBy: actor(user), status: 'pending', deletedAt: null, deletedBy: null}));
       store.audit(user, 'deleted-label-create', 'deleted-labels');
       return {id};
     });

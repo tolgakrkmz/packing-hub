@@ -40,7 +40,7 @@
     if (f.palletNo) node.append(el('p', f.palletNo, 'label-pallet', true));
     const info = [f.productionOrder, f.customer].filter(Boolean).join(' · ');
     if (info) node.append(el('p', info, 'label-text', true));
-    if (item.text) node.append(el('p', item.text, 'label-text', true));
+    if (item.text) { const reason = el('p', '', 'label-text'); reason.append(el('strong', 'Причина:'), ' ', el('span', item.text, '', true)); node.append(reason); }
     node.append(el('p', item.createdBy.username + (pending ? '' : ' · ✓ ' + item.deletedBy.username + ' · ' + time(item.deletedAt)), 'task-meta', true));
     if (manager) {
       const actions = el('div', '', 'label-actions');
@@ -62,6 +62,7 @@
     $('recordList').replaceChildren(...found.slice(0, 300).map(item => {
       const row = el('tr');
       for (const key of COLUMNS) row.append(el('td', item.fields?.[key] || '—', '', true));
+      row.append(el('td', item.text || '—', 'label-reason-cell', true));
       row.append(el('td', stamp(item.createdAt), '', true));
       const status = el('td');
       status.append(el('span', item.status === 'pending' ? 'За изтриване' : '✓ ' + stamp(item.deletedAt), item.status === 'pending' ? 'label-status is-pending' : 'label-status', item.status !== 'pending'));
@@ -137,11 +138,13 @@
     if (!photo) { $('actionFeedback').textContent = 'Добави снимка на етикета.'; return; }
     if (reading || readFields?.photo !== photo) { $('actionFeedback').textContent = 'Изчакай етикетът да се прочете.'; return; }
     if (!$('labelPallet').value.trim()) { $('actionFeedback').textContent = 'Въведи Pallet No от етикета.'; $('labelPallet').focus(); return; }
+    const text = $('labelReason').value.trim();
+    if (!text) { $('actionFeedback').textContent = 'Въведи причината за изтриване.'; $('labelReason').focus(); return; }
     busy = true; $('actionFeedback').textContent = '';
-    const controls = [...$('labelForm').querySelectorAll('input,button')]; for (const control of controls) control.disabled = true;
+    const controls = [...$('labelForm').querySelectorAll('input,textarea,button')]; for (const control of controls) control.disabled = true;
     try {
-      await HubServer.send('/api/deleted-labels', 'POST', keyed({photo, fields: {...readFields.fields, palletNo: $('labelPallet').value.trim()}}));
-      requestKey = null; picker.reset(); $('labelMessage').textContent = 'Етикетът е добавен.';
+      await HubServer.send('/api/deleted-labels', 'POST', keyed({photo, text, fields: {...readFields.fields, palletNo: $('labelPallet').value.trim()}}));
+      requestKey = null; picker.reset(); $('labelReason').value = ''; $('labelMessage').textContent = 'Етикетът е добавен.';
     } catch (error) { $('actionFeedback').textContent = failure(error); }
     finally { busy = false; for (const control of controls) control.disabled = false; await refresh(); }
   });
