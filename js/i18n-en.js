@@ -1922,6 +1922,8 @@ Object.assign(HUB_EN_MESSAGES, {
   "Няма намерени етикети.": "No labels found.",
   "Показани са първите 300. Търси, за да стесниш списъка.": "Showing the first 300. Search to narrow the list.",
   "Добавен": "Added",
+  "Причина за изтриване (задължителна)": "Reason for deleting (required)",
+  "Въведи причината за изтриване.": "Enter the reason for deleting.",
   "Глобални проблеми · Package Hub": "Global problems · Package Hub",
   "Глобални проблеми": "Global problems",
   "Проблеми извън нашия контрол и решенията, които предлагаме.": "Problems outside our control and the solutions we propose.",

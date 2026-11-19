@@ -16,6 +16,9 @@
 .label-age.is-old span{background:var(--coral);color:#1a0d0a}
 .label-hint{margin:0 0 10px;font-weight:600;color:var(--amber)}
 .label-read{display:flex;flex-direction:column;gap:6px}
+.label-reason{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.label-reason textarea{font:inherit;font-weight:400;resize:vertical}
+.label-table td.label-reason-cell{white-space:normal;min-width:160px;max-width:320px;overflow-wrap:anywhere}
 .label-read input{font-size:18px;font-weight:700;letter-spacing:.5px}
 .label-pallet{margin:8px 0 0;font-size:20px;font-weight:800;letter-spacing:.5px;overflow-wrap:anywhere}
 .label-records{margin-top:28px}
