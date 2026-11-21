@@ -64,6 +64,7 @@ function createStaticAssets(sources,{transformHTML = (name,html) => html} = {}) 
     const body = asset.variants.get(encoding); headers['Content-Length'] = body.length;
     response.writeHead(status,headers); response.end(request.method === 'HEAD' ? undefined : body); return status;
   }
-  return {version,assetURL,send};
+  const html = name => prepared.get(name)?.variants.get('identity').toString('utf8');
+  return {version,assetURL,send,html};
 }
 module.exports = {createStaticAssets,selectEncoding};

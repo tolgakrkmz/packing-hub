@@ -118,8 +118,14 @@ test('farewell flag file sends open screens and every page to the farewell scree
   }
   const farewellPage = await fetch(base + '/farewell', {redirect: 'manual'});
   assert.equal(farewellPage.status, 200);
+  const farewellHTML = await farewellPage.text();
   // The shell would receive the farewell event again and reload the page forever.
-  assert.doesNotMatch(await farewellPage.text(), /server-shell\.js/);
+  assert.doesNotMatch(farewellHTML, /server-shell\.js/);
+  assert.match(farewellHTML, /farewell-signer">създателят на Package Hub</);
+  fs.writeFileSync(farewellFile, 'Демо <Подпис> & Ко\nвтори ред\n');
+  const signed = await (await fetch(base + '/farewell')).text();
+  assert.match(signed, /translate="no">Демо &#60;Подпис&#62; &#38; Ко<\/span>/);
+  assert.doesNotMatch(signed, /втори ред|създателят на Package Hub/);
   fs.rmSync(farewellFile);
   await new Promise(resolve => setTimeout(resolve, 3500));
   assert.equal((await fetch(base + '/', {redirect: 'manual', headers})).status, 200);
