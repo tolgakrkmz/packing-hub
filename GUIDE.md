@@ -1197,6 +1197,12 @@ Use only fictional development records. HTTP mode refuses non-localhost origins.
 docker compose exec package-hub touch /var/lib/package-hub/farewell.on
 ```
 
+To sign the screen with a name, write it as the first line of the same file instead (the name stays on the server and never enters Git):
+
+```bash
+docker compose exec package-hub sh -c 'echo "First Last" > /var/lib/package-hub/farewell.on'
+```
+
 Within about three seconds every open page switches to the farewell screen and every page request redirects there. Data and the API stay untouched. Remove the file to bring the app back:
 
 ```bash

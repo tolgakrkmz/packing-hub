@@ -75,6 +75,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   const clients = new Set(), attempts = new Map();
   const farewellOn = () => Boolean(farewellFile && fs.existsSync(farewellFile));
   let farewell = farewellOn();
+  // The first line of the flag file, if any, signs the farewell screen; the name stays on the server, out of Git.
+  const farewellSigner = () => { try { return fs.readFileSync(farewellFile, 'utf8').split('\n')[0].trim().slice(0, 80); } catch { return ''; } };
+  const escapeHTML = text => text.replace(/[&<>"']/g, character => '&#' + character.charCodeAt(0) + ';');
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${origin.protocol === 'https:' ? '; Secure' : ''}`;
   const tokenFor = request => (request.headers.cookie || '').split(';').map(item => item.trim()).find(item => item.startsWith(cookieName + '='))?.slice(cookieName.length + 1) || '';
   const json = (response, status, data, extra = {}) => { response.writeHead(status, {'Content-Type': 'application/json; charset=utf-8', ...extra}); response.end(JSON.stringify(data)); };
@@ -521,6 +524,12 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       if (assetName.endsWith('.html')) {
         const canonical = assetName === '/index.html' ? '/' : assetName.slice(0, -5);
         if (pathname !== canonical) { response.writeHead(308, {Location: canonical + url.search}); return response.end(); }
+      }
+      const signer = assetName === '/farewell.html' && farewellFile && farewellSigner();
+      if (signer) {
+        const page = Buffer.from(staticAssets.html(assetName).replace(/<span class="farewell-signer">[^<]*<\/span>/, '<span class="farewell-signer" translate="no">' + escapeHTML(signer) + '</span>'));
+        response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8', 'Content-Length': page.length});
+        return response.end(request.method === 'HEAD' ? undefined : page);
       }
       staticAssets.send(assetName,request,response);
       if (request.method === 'GET' && session && assetName.endsWith('.html') && assetName !== '/login.html') store.audit(session.user, 'visit', assetName.slice(1, -5));
