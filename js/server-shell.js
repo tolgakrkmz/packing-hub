@@ -164,6 +164,7 @@ function renderHubServerShell({boot, currentModule, can, canViewModule, applySer
       versionLive = false; transportLost = true; showVersion();
       state.setAttribute('data-connection', 'pending'); state.textContent = 'Възстановяване на връзката…';
     };
+    eventSource.addEventListener('farewell', () => { eventSource.close(); location.assign('/farewell'); });
     eventSource.addEventListener('change', event => { const data = JSON.parse(event.data); for (const refresh of listeners.get(data.module) || []) refresh(); });
     // The server emits this for normal session expiry too. Keep the phone's
     // opt-in; account revocation already removes its subscriptions server-side.

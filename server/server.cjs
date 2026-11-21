@@ -23,7 +23,7 @@ const {createActivity} = require('./activity.cjs');
 const {createShiftCloseout} = require('./shift-closeout.cjs');
 const {inspect} = require('../scripts/check-publication.cjs');
 const root = path.resolve(__dirname, '..');
-function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, productionNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions, labelReader}) {
+function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezone = 'Europe/Sofia', taskNow, personnelNow=taskNow, productionNow=taskNow, taskPhotos, maintenanceSocket, notifications: notificationOptions, labelReader, farewellFile = filename === ':memory:' ? null : path.join(path.dirname(filename), 'farewell.on')}) {
   const origin = new URL(publicOrigin);
   if (origin.origin !== publicOrigin || origin.protocol !== 'https:' && !(allowHttp && origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname))) throw new Error('Configure an HTTPS HUB_PUBLIC_ORIGIN; HTTP is restricted to explicit localhost development.');
   const store = openStore(filename,{personnelNow,productionNow});
@@ -68,11 +68,13 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   });
   const staticAssets = createStaticAssets(assets,{transformHTML:(name,html) => {
     const content = pageLinks(html);
-    return ['/login.html', '/account-password.html'].includes(name) ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/server-shell.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
+    return ['/login.html', '/account-password.html', '/farewell.html'].includes(name) ? content : content.replace('<head>', '<head>\n<script src="/server-session.js"></script>\n<script src="/js/notification-model.js"></script>\n<script src="/js/permission-model.js"></script>\n<script src="/js/server-connection.js"></script>\n<script src="/js/server-shell.js"></script>\n<script src="/js/shift-closeout-indicator.js"></script>\n<script src="/js/notification-target.js"></script>\n<script src="/js/notification-prompt.js"></script>\n<script src="/js/notifications.js"></script>\n<link rel="stylesheet" href="/css/notifications.css">\n<link rel="stylesheet" href="/css/server.css">');
   }});
   const {version} = staticAssets;
   const cookieName = origin.protocol === 'https:' ? '__Host-hub-session' : 'hub-local-session';
   const clients = new Set(), attempts = new Map();
+  const farewellOn = () => Boolean(farewellFile && fs.existsSync(farewellFile));
+  let farewell = farewellOn();
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${origin.protocol === 'https:' ? '; Secure' : ''}`;
   const tokenFor = request => (request.headers.cookie || '').split(';').map(item => item.trim()).find(item => item.startsWith(cookieName + '='))?.slice(cookieName.length + 1) || '';
   const json = (response, status, data, extra = {}) => { response.writeHead(status, {'Content-Type': 'application/json; charset=utf-8', ...extra}); response.end(JSON.stringify(data)); };
@@ -238,6 +240,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
         if (pathname === '/api/events' && request.method === 'GET') {
           response.writeHead(200, {'Content-Type': 'text/event-stream', Connection: 'keep-alive', 'X-Accel-Buffering': 'no'});
           response.write(`event: version\ndata: ${JSON.stringify({version})}\n\n`);
+          if (farewell) response.write('event: farewell\ndata: {}\n\n');
           const client = {response, token}; clients.add(client);
           request.on('close', () => clients.delete(client));
           return;
@@ -503,6 +506,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const assetName = pages.get(route) || (route === '/index' ? '/index.html' : pathname);
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
+      if (farewell && assetName.endsWith('.html') && assetName !== '/farewell.html') { response.writeHead(302, {Location: '/farewell'}); return response.end(); }
       if (assetName.endsWith('.html') && !['/login.html', '/farewell.html'].includes(assetName) && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
       if (assetName.endsWith('.html') && session?.user.mustChangePassword && !['/login.html', '/account-password.html'].includes(assetName)) { response.writeHead(302, {Location: '/account-password'}); return response.end(); }
       const moduleName = assetName.slice(1, -5);
@@ -537,6 +541,9 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
     for (const client of clients) if (auth.session(client.token)) client.response.write(': heartbeat\n\n'); else { client.response.end('event: logout\ndata: {}\n\n'); clients.delete(client); }
   }, 20000);
   heartbeat.unref();
+  // Polls the flag file so creating or removing it in the data volume switches every open screen within seconds.
+  const farewellTick = setInterval(() => { const next = farewellOn(); if (next && !farewell) for (const client of clients) client.response.write('event: farewell\ndata: {}\n\n'); farewell = next; }, 3000);
+  farewellTick.unref();
   const photoCleanup = setInterval(() => { try { wall.cleanup(); } catch (error) { logFailure('job wall-cleanup', error); } try { tasks.maintain(); } catch (error) { logFailure('job task-maintenance', error); } try { tasks.pruneRequests(); problems.pruneRequests(); deletedLabels.prune(); notifications.prune(); } catch (error) { logFailure('job retention', error); } }, 3600000);
   photoCleanup.unref();
   let statusRunning = false, notificationStopped = false, statusWork;
@@ -547,7 +554,7 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
   }
   const notificationTick = setInterval(() => { syncNotifications(); notifications.flush().catch(error => logFailure('job push-delivery', error)); }, 30000); notificationTick.unref();
   const notificationStatusTick = setInterval(checkNotificationStatus, 5 * 60000); notificationStatusTick.unref();
-  const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
+  const close = async () => { notificationStopped = true; clearInterval(notificationTick); clearInterval(notificationStatusTick); await statusWork; await notifications.close(); clearInterval(photoCleanup); clearInterval(heartbeat); clearInterval(farewellTick); for (const client of clients) client.response.end(); server.closeIdleConnections(); await new Promise(resolve => server.close(resolve)); imports.close(); store.close(); };
   return {server, store, auth, imports, tasks, problems, deletedLabels, wall, maintenance, notifications, close};
 }
 if (require.main === module) {
