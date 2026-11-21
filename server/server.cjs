@@ -503,10 +503,10 @@ function createHubServer({filename, publicOrigin, allowHttp = false, taskTimezon
       const assetName = pages.get(route) || (route === '/index' ? '/index.html' : pathname);
       const asset = assets.get(assetName);
       if (!asset) throw problem(404, 'NOT_FOUND');
-      if (assetName.endsWith('.html') && assetName !== '/login.html' && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
+      if (assetName.endsWith('.html') && !['/login.html', '/farewell.html'].includes(assetName) && !session) { response.writeHead(302, {Location: '/login'}); return response.end(); }
       if (assetName.endsWith('.html') && session?.user.mustChangePassword && !['/login.html', '/account-password.html'].includes(assetName)) { response.writeHead(302, {Location: '/account-password'}); return response.end(); }
       const moduleName = assetName.slice(1, -5);
-      if (assetName.endsWith('.html') && !['index', 'login', 'account', 'account-password', 'production-import', 'admin-denied'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
+      if (assetName.endsWith('.html') && !['index', 'login', 'account', 'account-password', 'production-import', 'admin-denied', 'farewell'].includes(moduleName) && !canViewModule(session?.user, moduleName)) {
         if (moduleName === 'admin-panel') { staticAssets.send('/admin-denied.html',request,response,403); return; }
         throw problem(403,'FORBIDDEN');
       }

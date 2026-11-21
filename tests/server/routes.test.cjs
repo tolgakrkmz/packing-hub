@@ -84,3 +84,10 @@ test('redirects do not duplicate page visits; unknown and private paths never be
   assert.equal((await request('/api/session')).status, 200);
   assert.deepEqual(visits(), ['production-log']);
 });
+test('farewell screen opens without a session while other screens still require login', async t => {
+  const {request} = await setup(t);
+  const farewell = await request('/farewell', null);
+  assert.equal(farewell.status, 200);
+  assert.match(await farewell.text(), /Благодарим ви за всяка смяна/);
+  assert.equal((await request('/', null)).status, 302);
+});
