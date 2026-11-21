@@ -1,5 +1,15 @@
 /* English UI messages; stored records and identifiers remain in their original form. */
 const HUB_EN_MESSAGES = {
+  "Довиждане · Package Hub": "Goodbye · Package Hub",
+  "Последна смяна": "Final shift",
+  "Благодарим ви за всяка смяна.": "Thank you for every shift.",
+  "Package Hub спира работа. Но това, което изградихме заедно, не се изключва с един бутон.": "Package Hub is shutting down. But what we built together cannot be switched off with a button.",
+  "Всеки отчет, всеки престой, записан в три през нощта, всяка двойка, която стигна таргета си — зад всичко това стояхте вие. Приложението само броеше. Работата я вършехте вие.": "Every report, every downtime logged at three in the morning, every pair that hit its target — behind all of it stood you. The app only counted. You did the work.",
+  "Благодаря на всеки, който влезе уморен в нощната смяна и пак попълни отчета. На всеки, който сподели проблем, вместо да го премълчи. На всеки, който повярва, че може да бъде по-добре — и го направи по-добре.": "Thank you to everyone who came in tired for the night shift and still filled in the report. To everyone who spoke up about a problem instead of staying silent. To everyone who believed things could be better — and made them better.",
+  "Линията продължава. Пазете се един друг.": "The line goes on. Look after each other.",
+  "С благодарност,": "With gratitude,",
+  "създателят на Package Hub": "the creator of Package Hub",
+  "Смяната е приключена": "The shift is closed",
   "Повиши таргетите": "Raise targets",
   "Повишение към 30 т": "Raise towards 30 t",
   "След повишението сборът е": "After the raise the total is",

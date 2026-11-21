@@ -1189,6 +1189,20 @@ HUB_DATABASE=/tmp/hub-demo.sqlite HUB_ALLOW_HTTP=true HUB_PUBLIC_ORIGIN=http://1
 
 Use only fictional development records. HTTP mode refuses non-localhost origins.
 
+## Farewell screen
+
+`/farewell` is a public goodbye page. To show it on every screen at once, run in the server's compose folder:
+
+```bash
+docker compose exec package-hub touch /var/lib/package-hub/farewell.on
+```
+
+Within about three seconds every open page switches to the farewell screen and every page request redirects there. Data and the API stay untouched. Remove the file to bring the app back:
+
+```bash
+docker compose exec package-hub rm /var/lib/package-hub/farewell.on
+```
+
 ## Run locally in offline mode
 
 1. Download or clone the repository into a separate demo folder.

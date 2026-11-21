@@ -29,7 +29,7 @@ test('all approved screens serve clean GET/HEAD routes and redirect legacy bookm
       if (method === 'HEAD') assert.equal(html, '');
       else {
         assert.doesNotMatch(html, /href="\/?[a-z-]+\.html(?:[?#"][^"]*)?/);
-        assert.equal(html.includes('/server-session.js'), !['login.html', 'account-password.html'].includes(file));
+        assert.equal(html.includes('/server-session.js'), !['login.html', 'account-password.html', 'farewell.html'].includes(file));
       }
       const legacy = await request('/' + file + '?module=pair-targets&lang=en', undefined, method);
       assert.equal(legacy.status, 308, file);
@@ -83,4 +83,44 @@ test('redirects do not duplicate page visits; unknown and private paths never be
   assert.equal((await request('/js/login.js')).status, 200);
   assert.equal((await request('/api/session')).status, 200);
   assert.deepEqual(visits(), ['production-log']);
+});
+test('farewell screen opens without a session while other screens still require login', async t => {
+  const {request} = await setup(t);
+  const farewell = await request('/farewell', null);
+  assert.equal(farewell.status, 200);
+  assert.match(await farewell.text(), /Благодарим ви за всяка смяна/);
+  assert.equal((await request('/', null)).status, 302);
+});
+test('farewell flag file sends open screens and every page to the farewell screen', async t => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'hub-farewell-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const farewellFile = path.join(dir, 'farewell.on');
+  const hub = createHubServer({filename: ':memory:', publicOrigin: 'http://127.0.0.1:0', allowHttp: true, farewellFile});
+  await hub.auth.create('demo-farewell-admin', password, 'admin');
+  await new Promise(resolve => hub.server.listen(0, '127.0.0.1', resolve));
+  t.after(() => hub.close());
+  const base = 'http://127.0.0.1:' + hub.server.address().port;
+  const admin = await hub.auth.login('demo-farewell-admin', password);
+  const headers = {Origin: base, Cookie: 'hub-local-session=' + admin.token};
+  assert.equal((await fetch(base + '/', {redirect: 'manual', headers})).status, 200);
+  const events = await fetch(base + '/api/events', {headers});
+  const reader = events.body.getReader();
+  fs.writeFileSync(farewellFile, '');
+  let received = '';
+  const deadline = Date.now() + 8000;
+  while (!received.includes('event: farewell') && Date.now() < deadline) received += new TextDecoder().decode((await reader.read()).value);
+  await reader.cancel();
+  assert.match(received, /event: farewell/);
+  for (const route of ['/', '/login', '/statistics']) {
+    const page = await fetch(base + route, {redirect: 'manual', headers});
+    assert.equal(page.status, 302, route);
+    assert.equal(page.headers.get('location'), '/farewell');
+  }
+  const farewellPage = await fetch(base + '/farewell', {redirect: 'manual'});
+  assert.equal(farewellPage.status, 200);
+  // The shell would receive the farewell event again and reload the page forever.
+  assert.doesNotMatch(await farewellPage.text(), /server-shell\.js/);
+  fs.rmSync(farewellFile);
+  await new Promise(resolve => setTimeout(resolve, 3500));
+  assert.equal((await fetch(base + '/', {redirect: 'manual', headers})).status, 200);
 });

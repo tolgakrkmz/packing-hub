@@ -1,0 +1,12 @@
+body{min-height:100vh;background:radial-gradient(circle at 50% 0,var(--amber-dark),var(--bg) 60%);}
+.farewell{max-width:640px;margin:0 auto;padding:10vh 16px 48px;line-height:1.7;font-size:17px;color:var(--text-muted);animation:farewell-in 1.6s ease-out both;}
+.farewell-brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--text);margin:0 0 40px;}
+.farewell-eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:700;color:var(--amber);margin:0 0 8px;}
+.farewell h1{font-size:clamp(30px,6vw,44px);line-height:1.15;color:var(--text);margin:0 0 24px;}
+.farewell-lead{font-size:20px;color:var(--text);}
+.farewell-quote{margin:36px 0;padding-left:18px;border-left:3px solid var(--amber);font-size:22px;font-style:italic;color:var(--text);}
+.farewell-sign{color:var(--text);}
+.farewell-closed{margin-top:40px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;}
+.farewell-closed span{color:var(--red);}
+@keyframes farewell-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.farewell{animation:none}}
